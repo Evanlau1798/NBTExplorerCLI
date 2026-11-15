@@ -30,9 +30,7 @@ public static class BoundedJson
             {
                 strings = checked(strings + reader.ValueSpan.Length);
                 Check(strings, limits.MaxStringBytes, offset);
-                string value;
-                try { value = reader.GetString()!; }
-                catch (InvalidOperationException error) { throw new JsonException("Unpaired JSON Unicode escape is unsupported", error); }
+                var value = NativeJsonStrings.ReadToken(ref reader);
                 if (type == JsonTokenType.PropertyName)
                 {
                     Check(++entries, limits.MaxContainerEntries, offset);

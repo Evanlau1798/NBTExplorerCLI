@@ -64,7 +64,7 @@ public sealed record SyntaxLocator
             throw new ArgumentOutOfRangeException(nameof(startByte));
         if (preimageHash is null || preimageHash.Length != 64 || !preimageHash.All(Uri.IsHexDigit))
             throw new ArgumentException("SHA-256 preimage is required", nameof(preimageHash));
-        if (newline is not ("lf" or "crlf" or "mixed" or "none")) throw new ArgumentException("Invalid newline", nameof(newline));
+        if (newline is not ("lf" or "crlf" or "cr" or "mixed" or "none")) throw new ArgumentException("Invalid newline", nameof(newline));
         (GrammarProfile, GrammarVersion, StartByte, LengthBytes, PreimageHash, Encoding, Newline)
             = (grammarProfile, grammarVersion, startByte, lengthBytes, preimageHash.ToLowerInvariant(), encoding, newline);
     }

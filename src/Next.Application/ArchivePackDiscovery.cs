@@ -30,6 +30,7 @@ internal static class ArchivePackDiscovery
             var role = entry.FullName == "pack.mcmeta" ? WorldSourceRole.PackMetadata
                 : parts.Length == 4 && parts[0] == "assets" && parts[2] == "lang" && parts[3].EndsWith(".json", StringComparison.Ordinal) ? WorldSourceRole.Language
                 : parts.Length >= 4 && parts[0] == "data" && parts[2] is "function" or "functions" && entry.FullName.EndsWith(".mcfunction", StringComparison.Ordinal) ? WorldSourceRole.Function
+                : parts.Length >= 4 && parts[0] == "data" && parts[2] is "structure" or "structures" && entry.FullName.EndsWith(".nbt", StringComparison.Ordinal) ? WorldSourceRole.Structure
                 : parts.Length >= 4 && parts[0] is "data" or "assets" && entry.FullName.EndsWith(".json", StringComparison.Ordinal) ? WorldSourceRole.PackJson
                 : WorldSourceRole.Irrelevant;
             var state = role == WorldSourceRole.Irrelevant ? SourceOutcome.Irrelevant : outcome;

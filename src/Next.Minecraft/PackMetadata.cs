@@ -12,14 +12,14 @@ public sealed record PackMetadata(PackSourceKind Kind, int? LegacyFormat, PackFo
         if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kind));
         using var document = BoundedJson.ReadDecoded(source, limits);
         var root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("pack", out var pack) || pack.ValueKind != JsonValueKind.Object
-            || !pack.TryGetProperty("description", out var description)
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetNativeProperty("pack", out var pack) || pack.ValueKind != JsonValueKind.Object
+            || !pack.TryGetNativeProperty("description", out var description)
             || description.ValueKind is not (JsonValueKind.String or JsonValueKind.Object or JsonValueKind.Array))
             throw new JsonException("Missing pack section or description");
-        int? legacy = pack.TryGetProperty("pack_format", out var format) ? Integer(format) : null;
-        var hasMinimum = pack.TryGetProperty("min_format", out var min);
-        var hasMaximum = pack.TryGetProperty("max_format", out var max);
-        var hasSupported = pack.TryGetProperty("supported_formats", out var supported);
+        int? legacy = pack.TryGetNativeProperty("pack_format", out var format) ? Integer(format) : null;
+        var hasMinimum = pack.TryGetNativeProperty("min_format", out var min);
+        var hasMaximum = pack.TryGetNativeProperty("max_format", out var max);
+        var hasSupported = pack.TryGetNativeProperty("supported_formats", out var supported);
         var threshold = kind == PackSourceKind.Datapack ? 82 : 65;
         PackFormatVersion minimum, maximum;
         if (hasMinimum || hasMaximum)
@@ -56,7 +56,7 @@ public sealed record PackMetadata(PackSourceKind Kind, int? LegacyFormat, PackFo
         int min, max;
         if (value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 2)
         { min = Integer(value[0]); max = Integer(value[1]); }
-        else if (value.ValueKind == JsonValueKind.Object && value.TryGetProperty("min_inclusive", out var lower) && value.TryGetProperty("max_inclusive", out var upper))
+        else if (value.ValueKind == JsonValueKind.Object && value.TryGetNativeProperty("min_inclusive", out var lower) && value.TryGetNativeProperty("max_inclusive", out var upper))
         { min = Integer(lower); max = Integer(upper); }
         else { min = max = Integer(value); }
         if (min > max) throw new JsonException("Reversed legacy pack range");

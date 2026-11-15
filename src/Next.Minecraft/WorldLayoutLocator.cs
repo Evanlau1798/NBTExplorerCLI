@@ -13,7 +13,7 @@ public static class WorldLayoutLocator
         var extension = name.Contains('.') ? name[(name.LastIndexOf('.') + 1)..] : "";
         var kind = extension switch
         {
-            "dat" => ArtifactKind.Nbt, "mca" or "mcr" => parts.Length >= 2 && parts[^2] == "entities" ? ArtifactKind.Entities : ArtifactKind.Region,
+            "dat" or "nbt" => ArtifactKind.Nbt, "mca" or "mcr" => parts.Length >= 2 && parts[^2] == "entities" ? ArtifactKind.Entities : ArtifactKind.Region,
             "json" or "mcmeta" => ArtifactKind.Json, "mcfunction" => ArtifactKind.McFunction, "zip" => ArtifactKind.Archive, _ => ArtifactKind.Text
         };
         var artifact = new ArtifactAddress(worldId, relativePath, kind);
@@ -58,6 +58,7 @@ public static class WorldLayoutLocator
             var role = entry == "pack.mcmeta" ? WorldSourceRole.PackMetadata
                 : segments.Length >= 4 && segments[0] == "assets" && segments[2] == "lang" && kind == ArtifactKind.Json ? WorldSourceRole.Language
                 : segments.Length >= 4 && segments[0] == "data" && kind == ArtifactKind.McFunction ? WorldSourceRole.Function
+                : segments.Length >= 4 && segments[0] == "data" && segments[2] is "structure" or "structures" && kind == ArtifactKind.Nbt ? WorldSourceRole.Structure
                 : segments.Length >= 3 && segments[0] is "data" or "assets" && kind == ArtifactKind.Json ? WorldSourceRole.PackJson
                 : WorldSourceRole.Unknown;
             return new(artifact, role, PackRoot: pack.Root, PackKind: pack.Kind);

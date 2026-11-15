@@ -7,7 +7,7 @@ namespace Next.Application;
 
 public sealed record ScanRequest(SnapshotScope Scope, DecodeLimits? Limits = null, int MaximumSources = 100_000);
 public sealed record DiscoveredSource(WorldSourceLocation Location, ChunkPosition? Chunk, SourceOutcome Outcome,
-    string? DiagnosticCode, Hash256? ContentHash, OperationSupport Capability, PackMetadata? Pack = null);
+    string? DiagnosticCode, Hash256? ContentHash, OperationSupport Capability, PackMetadata? Pack = null, Hash256? PackMetadataHash = null);
 public sealed record WorldDiscoveryResult(WorldMetadata? Metadata, SnapshotScope Scope, WorldInventorySnapshot Inventory, ImmutableArray<DiscoveredSource> Sources, string? DiagnosticCode)
 {
     // Catalog completeness covers enumeration and container headers; payload extraction is a separate stage.
@@ -23,8 +23,10 @@ public static class WorldDiscovery
         if (request.MaximumSources is < 1 or > 100_000) throw new ArgumentOutOfRangeException(nameof(request));
         var physical = inventory.Enumerate(); var sources = new List<DiscoveredSource>();
         var metadataHashes = new Dictionary<string, Hash256>(StringComparer.Ordinal);
+        var changedPacks = new HashSet<string>(StringComparer.Ordinal);
         WorldMetadata? metadata = null; string? diagnostic = physical.DiagnosticCode;
-        WorldDiscoveryResult Finish() => new(metadata, request.Scope, physical, sources.ToImmutableArray(), diagnostic);
+        WorldDiscoveryResult Finish() => new(metadata, request.Scope, physical, sources.Select(source => source.Location.PackRoot is { } root && changedPacks.Contains(root) && source.Outcome == SourceOutcome.Success
+            ? source with { Outcome = SourceOutcome.Failed, DiagnosticCode = "PackMetadataChanged", Capability = new() } : source).ToImmutableArray(), diagnostic);
         bool Add(DiscoveredSource source)
         {
             if (sources.Count == request.MaximumSources) { diagnostic = "SourceLimitExceeded"; return false; }
@@ -129,7 +131,9 @@ public static class WorldDiscovery
                 {
                     if (!packStates.TryGetValue(location.PackRoot, out var state))
                         packStates.Add(location.PackRoot, state = DirectoryPackDiscovery.Read(inventory, location.PackRoot, location.PackKind!.Value, limits));
-                    if (!Add(new(location, null, state.Outcome, state.Code, hash, new(Read: state.Outcome == SourceOutcome.Success ? SupportLevel.Supported : SupportLevel.Unknown), state.Metadata))) break;
+                    if (entry.RelativePath == location.PackRoot + "/pack.mcmeta" && state.Outcome == SourceOutcome.Success && state.ContentHash != hash)
+                        changedPacks.Add(location.PackRoot);
+                    if (!Add(new(location, null, state.Outcome, state.Code, hash, new(Read: state.Outcome == SourceOutcome.Success ? SupportLevel.Supported : SupportLevel.Unknown), state.Metadata, state.ContentHash))) break;
                     continue;
                 }
                 if (location.Role is WorldSourceRole.Terrain or WorldSourceRole.Entities or WorldSourceRole.PointOfInterest)

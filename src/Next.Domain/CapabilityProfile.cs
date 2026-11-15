@@ -4,7 +4,7 @@ namespace Next.Domain;
 
 public enum SupportLevel { Unknown, Supported, Unsupported }
 public enum ProfileOperation { Read, Extract, Plan, Write, Recover }
-public enum ProfileFacet { Layout, ItemSchema, TextSchema, CommandGrammar, Compression }
+public enum ProfileFacet { Layout, ItemSchema, TextSchema, CommandGrammar, Compression, PackLayout }
 public enum LogicalListEncoding { Unknown, Homogeneous, CompoundWrapper }
 
 public sealed record OperationSupport(SupportLevel Read = SupportLevel.Unknown, SupportLevel Extract = SupportLevel.Unknown,

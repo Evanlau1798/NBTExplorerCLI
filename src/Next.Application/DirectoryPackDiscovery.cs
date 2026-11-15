@@ -5,7 +5,7 @@ namespace Next.Application;
 
 internal static class DirectoryPackDiscovery
 {
-    internal sealed record State(PackMetadata? Metadata, SourceOutcome Outcome, string? Code);
+    internal sealed record State(PackMetadata? Metadata, SourceOutcome Outcome, string? Code, Hash256? ContentHash);
     internal static Dictionary<string, PackSourceKind> FindRoots(WorldInventorySnapshot inventory)
     {
         var roots = new Dictionary<string, PackSourceKind>(StringComparer.Ordinal);
@@ -40,11 +40,11 @@ internal static class DirectoryPackDiscovery
         try
         {
             var bytes = inventory.Read(new(inventory.WorldId, root + "/pack.mcmeta", ArtifactKind.Json));
-            return new(PackMetadata.Read(bytes, kind, limits), SourceOutcome.Success, null);
+            return new(PackMetadata.Read(bytes, kind, limits), SourceOutcome.Success, null, Hash256.Compute(bytes));
         }
         catch (Exception error) when (DiscoveryFailure.IsExpected(error))
         {
-            var failure = DiscoveryFailure.Describe(error); return new(null, failure.Outcome, "PackMetadata:" + failure.Code);
+            var failure = DiscoveryFailure.Describe(error); return new(null, failure.Outcome, "PackMetadata:" + failure.Code, null);
         }
     }
 }

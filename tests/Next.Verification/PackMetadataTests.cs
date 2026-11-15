@@ -39,7 +39,8 @@ internal static class PackMetadataTests
         BinaryNbtTests.RejectCodec(CodecError.LimitExceeded, () => BoundedJson.ReadDecoded(Bytes("\"abc\""), new(MaxStringBytes: 2)));
         Reject<JsonException>(() => BoundedJson.ReadDecoded([0x22, 0xff, 0x22]));
         Reject<JsonException>(() => BoundedJson.ReadDecoded(Bytes("{\"a\":1,\"\\u0061\":2}")));
-        Reject<JsonException>(() => BoundedJson.ReadDecoded(Bytes("\"\\ud800\"")));
+        using var unicode = BoundedJson.ReadDecoded(Bytes("\"\\ud800\""));
+        Require(NativeJsonStrings.Read(unicode.RootElement) == "\ud800", "native JSON preserves Java code units");
         BinaryNbtTests.RejectCodec(CodecError.LimitExceeded, () => BoundedJson.ReadDecoded(Bytes("{}"), new(MaxDecodedBytes: 1)));
         BinaryNbtTests.RejectCodec(CodecError.LimitExceeded, () => BoundedJson.ReadDecoded(Bytes("[1]"), new(MaxNodes: 1)));
         BinaryNbtTests.RejectCodec(CodecError.LimitExceeded, () => BoundedJson.ReadDecoded(Bytes(new string('[', 258) + new string(']', 258))));
