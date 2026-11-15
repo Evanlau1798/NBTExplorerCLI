@@ -10,6 +10,7 @@ internal sealed class AtomicStateRepository
     private readonly string root;
     private readonly string family;
     private readonly ArtifactStorage storage;
+    private readonly object writeGate = new();
     internal AtomicStateRepository(string root, string family, ArtifactFileIo io)
     {
         this.root = SafeStateDirectory.Ensure(root); this.family = family;
@@ -41,8 +42,12 @@ internal sealed class AtomicStateRepository
     }
     private void WriteCore(string key, ReadOnlyMemory<byte> bytes, Hash256? expected)
     {
-        using var candidate = storage.Stage(Address(key), expected is null ? ArtifactImage.Absent : ArtifactImage.Present(expected), bytes);
-        candidate.Flush(); candidate.Verify(_ => { }); candidate.Commit();
+        // A shared repository must keep the preimage check and replacement in one critical section.
+        lock (writeGate)
+        {
+            using var candidate = storage.Stage(Address(key), expected is null ? ArtifactImage.Absent : ArtifactImage.Present(expected), bytes);
+            candidate.Flush(); candidate.Verify(_ => { }); candidate.Commit();
+        }
     }
     private byte[]? Owner()
     {

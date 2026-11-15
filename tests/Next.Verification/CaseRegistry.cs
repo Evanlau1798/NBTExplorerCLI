@@ -7,6 +7,7 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("cache-shared-store-concurrent-cas", "scan", _ => StateRepositoryConcurrencyTests.SharedCacheStoreCasIsAtomic()),
         new("cache-freshness-bad-pack-metadata-hash", "scan", _ => CacheFreshnessReviewTests.BadPackMetadataStillBindsRawBytes()),
         new("cache-freshness-world-metadata-fallback-hash", "scan", _ => CacheFreshnessReviewTests.UnknownWorldMetadataHashesFallbackSources()),
         new("cache-freshness-unverified-sources", "scan", _ => CacheFreshnessReviewTests.UnverifiedSourcesCannotBeFresh()),
