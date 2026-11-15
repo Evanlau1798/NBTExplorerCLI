@@ -2,6 +2,10 @@
 
 壓縮／Region 的獨立依據使用 CPython 3.13.14（zlib 版本保存在 fixture）：`python tests/oracles/compression_oracle.py` 與 `python tests/oracles/region_oracle.py` 分別輸出 `compression-oracle.json`／`region-oracle.json`；UTF-8 無 BOM、LF 保存並更新 manifest。它們只使用 Python gzip/zlib/struct 及固定 Java NBT bytes，不引用產品 assemblies。前者驗 framing／checksum／完整 EOF／多 member／非法 Huffman 與 window；後者獨立建立 index 與已知／opaque payload。`python tests/oracles/region_oracle.py <candidate-path>` 可獨立檢視合成候選的 descriptor／payload hashes，不能取代 NBT typed 驗證。一般 Verification 不需要 Python。
 
+`python -B tests/oracles/dat_slice_oracle.py` 產生固定 `codec/dat-slice-oracle.json`：獨立 struct/gzip 建立的 DAT 原件，以及 LiteralTranslation／Int→Long TypedEdit 兩份明確 raw postimages。只含專案合成資料，MUTF-8 字串刻意限定無 NUL 的 BMP literals，其他 code units 由既有 Java oracle 負責。storage suite 比較持久化候選解壓後的完整 bytes，而不只由新 reader 自讀 writer。
+
+`python -B tests/oracles/zip_boundary_oracle.py` 產生 `codec/zip-boundary-oracle.json`，涵蓋正常stored/Deflate、已解出完整abc但未達Deflate EOF、trailing bytes與小型entry/local/extra ZIP64。Python zipfile皆能取abc，另以raw zlib的eof/unused_data確認完整framing差異；本profile刻意不支援ZIP64，因此明確Unsupported，並非宣稱合法ZIP64損壞。
+
 這些是 fixture 生成器，並非產品依賴。一般 `codec` suite 只讀固定 JSON；無須 Java、網路或遊戲。已驗證的產生環境為 JDK 25.0.2，runtime `25.0.2+10-LTS-69`。所有輸入是本專案合成資料；不啟動 Minecraft/server、不讀世界。生成後須核對 manifest；不能藉再生接受未調查的差異。
 
 從 repo 根執行：

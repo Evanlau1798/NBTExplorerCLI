@@ -1,0 +1,51 @@
+using Next.Application;
+using Next.Domain;
+
+namespace Next.Infrastructure;
+
+public sealed class ArtifactStorage : IArtifactStorage
+{
+    internal const int MaximumBytes = 67_108_864;
+    private readonly string root;
+    private readonly Guid world;
+    private readonly ArtifactFileIo io;
+    private readonly ArtifactWriterLock writer;
+    public ArtifactStorage(string root, Guid worldId) : this(root, worldId, new ArtifactFileIo()) { }
+    internal ArtifactStorage(string root, Guid worldId, ArtifactFileIo io)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(root);
+        if (worldId == Guid.Empty) throw new ArgumentException("World identity is required", nameof(worldId));
+        (this.root, world, this.io) = (Path.GetFullPath(root), worldId, io);
+        writer = new(this.root);
+    }
+    public byte[] Read(ArtifactAddress artifact)
+    {
+        using var path = GuardedArtifactPath.Acquire(root, world, artifact);
+        return ReadFile(path.Target);
+    }
+    public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)
+    {
+        ArgumentNullException.ThrowIfNull(preimage);
+        if (bytes.Length > MaximumBytes) throw new IOException("Artifact exceeds 64 MiB limit");
+        var path = GuardedArtifactPath.Acquire(root, world, artifact);
+        try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io); }
+        catch { path.Dispose(); throw; }
+    }
+    internal static byte[] ReadFile(string path)
+    {
+        using var stream = GuardedArtifactPath.OpenFile(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        if (stream.Length > MaximumBytes) throw new IOException("Artifact exceeds 64 MiB limit");
+        var bytes = new byte[checked((int)stream.Length)]; stream.ReadExactly(bytes);
+        return bytes;
+    }
+    internal static ArtifactImage Image(string path)
+    {
+        try { return ArtifactImage.Present(Hash256.Compute(ReadFile(path))); }
+        catch (FileNotFoundException) { return ArtifactImage.Absent; }
+    }
+    internal static ArtifactImage Image(Stream stream)
+    {
+        if (stream.Length > MaximumBytes) throw new IOException("Artifact exceeds 64 MiB limit");
+        return ArtifactImage.Present(new Hash256(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))));
+    }
+}

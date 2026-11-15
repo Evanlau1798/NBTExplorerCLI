@@ -7,6 +7,21 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("zip-independent-entry-zip64", "storage", context => ZipBoundaryTests.IndependentDeflateAndZip64(context.FixtureRoot, zip64: true)),
+        new("zip-independent-completion-and-zip64", "storage", context => ZipBoundaryTests.IndependentDeflateAndZip64(context.FixtureRoot)),
+        new("candidate-remote-volume-policy", "storage", _ => CandidatePathTests.RejectsRemoteVolumePolicy()),
+        new("candidate-fresh-process-readback", "storage", _ => CandidateProcessTests.ReopenInFreshProcess()),
+        new("candidate-readback-child", "calibration", _ => CandidateProcessTests.ReadbackChild()),
+        new("binary-codec-seeded-trees-and-malformed", "storage", _ => BinaryCodecSeedTests.TreesAndMalformed()),
+        new("zip-real-entry-path-and-byte-boundaries", "storage", _ => ZipBoundaryTests.RealEntryBoundaries()),
+        new("dat-noop-retains-timestamp", "storage", _ => DatSliceTests.NoOpPreservesTimestamp()),
+        new("dat-two-authorized-disk-slices", "storage", context => DatSliceTests.TwoAuthorizedEdits(context.FixtureRoot)),
+        new("dat-rejects-stale-scope-and-corrupt", "storage", _ => DatSliceTests.RejectsStaleScopeAndCorrupt()),
+        new("candidate-real-junction-and-path-boundaries", "storage", _ => CandidatePathTests.ActualJunctionAndPathBoundaries()),
+        new("candidate-staging-faults-preserve-source", "storage", _ => CandidateFaultTests.StagingFailuresPreserveSource()),
+        new("candidate-single-writer-and-read-only", "storage", _ => CandidateIoTests.SingleWriterAndReadOnly()),
+        new("candidate-explicit-lifecycle", "storage", _ => CandidateIoTests.ExplicitLifecycle()),
+        new("candidate-stale-corrupt-and-locked", "storage", _ => CandidateIoTests.StaleCorruptAndLocked()),
         new("compression-empty-writer-frames", "compression", context => CompressionTests.EmptyWriterFrames(context.FixtureRoot)),
         new("compression-empty-member-resource-bound", "compression", context => CompressionTests.EmptyMemberResourceBound(context.FixtureRoot)),
         new("region-corrupt-selected-and-capacity", "region", context => RegionTests.CorruptSelectedAndCapacity(context.FixtureRoot)),

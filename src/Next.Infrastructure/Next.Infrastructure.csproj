@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <InternalsVisibleTo Include="Next.Verification" />
     <ProjectReference Include="../Next.Application/Next.Application.csproj" />
   </ItemGroup>
 </Project>
