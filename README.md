@@ -20,7 +20,7 @@ dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --help
 dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --version
 ```
 
-建置與測試分開執行。驗證工程為無外部測試套件的 assertion harness，suite 為 contracts、domain、foundation、architecture、corpus；預設執行全部一般案例。使用 `--fixture-root <absolute-path>` 可覆寫預設輸出資源根，結果不依 shell cwd。每個案例在獨立 worker 執行；`--timeout-ms` 預設 30000，接受 100–120000。Stdout 為單一 JSON，stderr 為診斷；失敗、unsupported、timeout、未知／空選擇皆非零。
+建置與測試分開執行。驗證工程為無外部測試套件的 assertion harness，suite 為 codec、contracts、domain、foundation、architecture、corpus；預設執行全部一般案例。使用 `--fixture-root <absolute-path>` 可覆寫預設輸出資源根，結果不依 shell cwd。每個案例在獨立 worker 執行；`--timeout-ms` 預設 30000，接受 100–120000。Stdout 為單一 JSON，stderr 為診斷；失敗、unsupported、timeout、未知／空選擇皆非零。
 
 校準案例不包含於預設 suite：顯式選擇 `runner-calibration-failure`、`runner-calibration-unsupported` 應 exit 1；`--case runner-calibration-timeout --timeout-ms 1000` 應終止 worker 並 exit 1。校準失敗不能計為通過。
 
