@@ -14,7 +14,9 @@ public sealed partial class WorldTextExtraction
     private readonly ScanRequest request;
     public ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> StorageRules { get; }
     public WorldDiscoveryResult Discovery { get; }
-    public WorldTextExtraction(IWorldInventory inventory, ScanRequest request, IReadOnlyDictionary<ArtifactAddress, IReadOnlyList<StorageTextRule>>? storageRules = null)
+    internal DecodeLimits Limits => request.Limits ?? DecodeLimits.Default;
+    internal IEnumerable<DiscoveredSource> ScanSources => Discovery.Sources.Where(source => source.DiagnosticCode != "InternalWriterLease");
+    public WorldTextExtraction(IWorldInventory inventory, ScanRequest request, IReadOnlyDictionary<ArtifactAddress, IReadOnlyList<StorageTextRule>>? storageRules = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inventory); ArgumentNullException.ThrowIfNull(request);
         this.inventory = inventory; this.request = request;
@@ -31,11 +33,13 @@ public sealed partial class WorldTextExtraction
                 rules.Add(pair.Key, pair.Value.ToImmutableArray());
             }
         }
-        StorageRules = rules.ToImmutable(); Discovery = WorldDiscovery.Discover(inventory, request);
+        StorageRules = rules.ToImmutable(); Discovery = WorldDiscovery.Discover(inventory, request, cancellationToken);
     }
-    public IEnumerable<TextSourceExtraction> ReadSources()
+    public IEnumerable<TextSourceExtraction> ReadSources() => ReadSourcesCore(Discovery.Sources);
+    internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
+    private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected)
     {
-        foreach (var group in Discovery.Sources.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
+        foreach (var group in selected.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
         {
             var sources = group.ToArray();
             if (sources.All(source => source.Outcome != SourceOutcome.Success))

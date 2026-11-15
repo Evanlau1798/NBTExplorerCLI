@@ -16,12 +16,14 @@ public sealed record WorldDiscoveryResult(WorldMetadata? Metadata, SnapshotScope
 
 public static class WorldDiscovery
 {
-    public static WorldDiscoveryResult Discover(IWorldInventory inventory, ScanRequest request)
+    public static WorldDiscoveryResult Discover(IWorldInventory inventory, ScanRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inventory); ArgumentNullException.ThrowIfNull(request); ArgumentNullException.ThrowIfNull(request.Scope);
         var limits = request.Limits ?? DecodeLimits.Default; limits.Validate();
         if (request.MaximumSources is < 1 or > 100_000) throw new ArgumentOutOfRangeException(nameof(request));
+        cancellationToken.ThrowIfCancellationRequested();
         var physical = inventory.Enumerate(); var sources = new List<DiscoveredSource>();
+        cancellationToken.ThrowIfCancellationRequested();
         var metadataHashes = new Dictionary<string, Hash256>(StringComparer.Ordinal);
         var changedPacks = new HashSet<string>(StringComparer.Ordinal);
         WorldMetadata? metadata = null; string? diagnostic = physical.DiagnosticCode;
@@ -29,12 +31,14 @@ public static class WorldDiscovery
             ? source with { Outcome = SourceOutcome.Failed, DiagnosticCode = "PackMetadataChanged", Capability = new() } : source).ToImmutableArray(), diagnostic);
         bool Add(DiscoveredSource source)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (sources.Count == request.MaximumSources) { diagnostic = "SourceLimitExceeded"; return false; }
             sources.Add(source); return true;
         }
         var activeMetadata = "level.dat"; var validatingMetadata = false;
         NbtDocument ReadMetadata(string path)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             activeMetadata = path;
             var bytes = inventory.Read(new(inventory.WorldId, path, ArtifactKind.Nbt)); metadataHashes[path] = Hash256.Compute(bytes);
             return CompressedNbt.ReadDocument(bytes, NbtCompression.GZip, limits).Document;
@@ -42,6 +46,7 @@ public static class WorldDiscovery
         try
         {
             var level = ReadMetadata("level.dat");
+            cancellationToken.ThrowIfCancellationRequested();
             // The registry's own version is checked separately; directory names never select a profile.
             var worldGen = physical.Entries.Any(entry => entry.RelativePath == "data/minecraft/world_gen_settings.dat" && entry.Outcome == SourceOutcome.Success)
                 ? ReadMetadata("data/minecraft/world_gen_settings.dat") : null;
@@ -52,11 +57,26 @@ public static class WorldDiscovery
             var failure = DiscoveryFailure.Describe(error); diagnostic ??= failure.Code;
             foreach (var entry in physical.Entries)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
+                    var artifact = new ArtifactAddress(inventory.WorldId, entry.RelativePath, ArtifactKind.Text);
+                    if (entry.RelativePath == ".nbtcli-writer.lock" && entry.Outcome == SourceOutcome.Success && !entry.IsDirectory)
+                    {
+                        if (!Add(new(new(artifact, WorldSourceRole.Irrelevant), null, SourceOutcome.Irrelevant, "InternalWriterLease", null, new()))) break;
+                        continue;
+                    }
                     var target = entry.RelativePath == activeMetadata && !validatingMetadata;
-                    if (!Add(new(new(new(inventory.WorldId, entry.RelativePath, ArtifactKind.Text), WorldSourceRole.Unknown), null,
-                        target ? failure.Outcome : SourceOutcome.Unsupported, target ? failure.Code : "MetadataUnavailable", metadataHashes.GetValueOrDefault(entry.RelativePath), new()))) break;
+                    var outcome = target ? failure.Outcome : SourceOutcome.Unsupported;
+                    var code = target ? failure.Code : "MetadataUnavailable";
+                    var hash = metadataHashes.GetValueOrDefault(entry.RelativePath);
+                    if (entry.Outcome != SourceOutcome.Success) { outcome = entry.Outcome; code = entry.DiagnosticCode; }
+                    else if (hash is null)
+                    {
+                        try { hash = Hash256.Compute(inventory.Read(artifact)); }
+                        catch (Exception readError) when (DiscoveryFailure.IsExpected(readError)) { (outcome, code) = DiscoveryFailure.Describe(readError); }
+                    }
+                    if (!Add(new(new(artifact, WorldSourceRole.Unknown), null, outcome, code, hash, new()))) break;
                 }
                 catch (ArgumentException) { diagnostic = "InvalidArtifactPath"; }
             }
@@ -66,6 +86,7 @@ public static class WorldDiscovery
         var packStates = new Dictionary<string, DirectoryPackDiscovery.State>(StringComparer.Ordinal);
         foreach (var (root, kind) in packs.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!request.Scope.ArtifactPaths.IsEmpty && !request.Scope.ArtifactPaths.Any(path => path == root || path.StartsWith(root + "/", StringComparison.Ordinal))) continue;
             var state = DirectoryPackDiscovery.Read(inventory, root, kind, limits); packStates.Add(root, state);
             if (state.Outcome != SourceOutcome.Success && (request.Scope.ArtifactPaths.IsEmpty || request.Scope.ArtifactPaths.Contains(root, StringComparer.Ordinal)))
@@ -80,6 +101,7 @@ public static class WorldDiscovery
         }
         foreach (var entry in physical.Entries)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!request.Scope.ArtifactPaths.IsEmpty && !request.Scope.ArtifactPaths.Contains(entry.RelativePath, StringComparer.Ordinal)) continue;
             WorldSourceLocation location;
             try { location = WorldLayoutLocator.Locate(inventory.WorldId, entry.RelativePath, metadata.Profile, metadata.DimensionDirectories, packs); }
@@ -99,11 +121,13 @@ public static class WorldDiscovery
                 if (!Add(new(location, null, entry.Outcome, entry.DiagnosticCode, null, new()))) break;
                 continue;
             }
+            Hash256? rawHash = null;
             try
             {
                 if (DirectoryPackDiscovery.Owner(entry.RelativePath, packs) is { } packRoot && packStates.TryGetValue(packRoot, out var packState) && packState.Outcome != SourceOutcome.Success)
                 {
-                    if (!Add(new(location with { PackRoot = packRoot, PackKind = packs[packRoot] }, null, packState.Outcome, packState.Code, null, new()))) break;
+                    rawHash = Hash256.Compute(inventory.Read(location.Artifact));
+                    if (!Add(new(location with { PackRoot = packRoot, PackKind = packs[packRoot] }, null, packState.Outcome, packState.Code, rawHash, new(), PackMetadataHash: packState.ContentHash))) break;
                     continue;
                 }
                 if (entry.RelativePath == ".nbtcli-writer.lock")
@@ -118,10 +142,11 @@ public static class WorldDiscovery
                 }
                 if (location.Role == WorldSourceRole.Irrelevant)
                 {
-                    if (!Add(new(location, null, SourceOutcome.Irrelevant, null, Hash256.Compute(inventory.Read(location.Artifact)), new()))) break;
+                    rawHash = Hash256.Compute(inventory.Read(location.Artifact));
+                    if (!Add(new(location, null, SourceOutcome.Irrelevant, null, rawHash, new()))) break;
                     continue;
                 }
-                var bytes = inventory.Read(location.Artifact); var hash = Hash256.Compute(bytes);
+                var bytes = inventory.Read(location.Artifact); var hash = Hash256.Compute(bytes); rawHash = hash;
                 if (location.Role == WorldSourceRole.Archive)
                 {
                     if (!ArchivePackDiscovery.Discover(location, bytes, limits, Add)) break;
@@ -157,7 +182,7 @@ public static class WorldDiscovery
             catch (Exception error) when (DiscoveryFailure.IsExpected(error))
             {
                 var failure = DiscoveryFailure.Describe(error);
-                if (!Add(new(location, null, failure.Outcome, failure.Code, null, new()))) break;
+                if (!Add(new(location, null, failure.Outcome, failure.Code, rawHash, new()))) break;
             }
         }
         return Finish();

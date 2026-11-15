@@ -16,6 +16,18 @@ public static class TextExtractionBudget
 {
     public static long RecordBytes(SourceAddress address, long codeUnits)
         => checked(codeUnits * 2 + (address.NodePath.Segments.Length + (address.ComponentPath?.Segments.Length ?? 0) + (address.Syntax?.NodePath?.Segments.Length ?? 0)) * 16L + 256);
+    public static long ResultBytes(TextExtractionResult result, IEnumerable<NameReferenceCandidate>? references = null)
+    {
+        long bytes = 0;
+        void Charge(SourceAddress address, string value) => bytes = checked(bytes + RecordBytes(address, value.Length));
+        foreach (var text in result.Occurrences) Charge(text.Address, text.Text);
+        foreach (var key in result.TranslationKeys) Charge(key.Address, key.Key);
+        foreach (var diagnostic in result.Diagnostics) Charge(diagnostic.Address, diagnostic.Code);
+        foreach (var command in result.PendingCommands) Charge(command.Address, command.Command);
+        foreach (var unknown in result.Unclassified) Charge(unknown.Address, unknown.Text);
+        foreach (var reference in references ?? []) Charge(reference.Address, reference.Name);
+        return bytes;
+    }
 }
 public enum StorageTextKind { Literal, TextComponent }
 public sealed record StorageTextRule(TypedPath Path, StorageTextKind Kind);

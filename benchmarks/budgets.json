@@ -1,11 +1,12 @@
 {
-  "policyVersion": 1,
+  "policyVersion": 2,
   "planVersion": "0.3",
   "gateRevision": 2,
   "workers": {"default": 2, "maximum": 8},
   "hardLimits": {
     "inFlightBufferBytes": 268435456,
     "queuedSources": 16,
+    "artifactRetainedTextBytes": 134217728,
     "artifactBytes": 67108864,
     "decodedBytes": 134217728,
     "depth": 256,
@@ -31,6 +32,7 @@
     "samples": {"S": 5, "M": 5, "L": 3},
     "sustainedRunMinutes": 15
   },
+  "queueUnit": "Physical artifact work group; expanded ZIP/chunk semantic sources retain their separate catalog and result counts. Completed groups retain their buffer reservation until the single store callback finishes.",
   "control": "G06 accepted correct serial implementation; absent until G06, no speedup claim",
   "measurementRule": "Compare identical source/corpus/configuration, semantic output, diagnostics, coverage and completeness before timing. Retain every sample; report median and observed maximum, not p95 from these sample counts.",
   "scope": "Initial capacities, to be implemented and tested by owning gates. Buffer is a global lease budget, not RSS; sessions/plans have separate bounds. L scan capacity does not promise one full-L JSON session.",

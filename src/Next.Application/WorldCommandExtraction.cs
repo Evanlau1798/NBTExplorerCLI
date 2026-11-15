@@ -23,17 +23,8 @@ public sealed partial class WorldTextExtraction
     }
     private long CheckRetention(TextExtractionResult text, ImmutableArray<NameReferenceCandidate> references)
     {
-        long retained = 0;
-        void Charge(SourceAddress address, string value)
-        {
-            retained = checked(retained + TextExtractionBudget.RecordBytes(address, value.Length));
-            if (retained > (request.Limits ?? DecodeLimits.Default).MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Combined source extraction exceeds retention budget");
-        }
-        foreach (var item in text.Occurrences) Charge(item.Address, item.Text);
-        foreach (var key in text.TranslationKeys) Charge(key.Address, key.Key);
-        foreach (var diagnostic in text.Diagnostics) Charge(diagnostic.Address, diagnostic.Code);
-        foreach (var candidate in text.Unclassified) Charge(candidate.Address, candidate.Text);
-        foreach (var reference in references) Charge(reference.Address, reference.Name);
+        var retained = TextExtractionBudget.ResultBytes(text, references);
+        if (retained > (request.Limits ?? DecodeLimits.Default).MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Combined source extraction exceeds retention budget");
         return retained;
     }
 }

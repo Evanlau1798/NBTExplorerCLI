@@ -37,14 +37,16 @@ internal static class DirectoryPackDiscovery
     }
     internal static State Read(IWorldInventory inventory, string root, PackSourceKind kind, DecodeLimits limits)
     {
+        Hash256? hash = null;
         try
         {
             var bytes = inventory.Read(new(inventory.WorldId, root + "/pack.mcmeta", ArtifactKind.Json));
-            return new(PackMetadata.Read(bytes, kind, limits), SourceOutcome.Success, null, Hash256.Compute(bytes));
+            hash = Hash256.Compute(bytes);
+            return new(PackMetadata.Read(bytes, kind, limits), SourceOutcome.Success, null, hash);
         }
         catch (Exception error) when (DiscoveryFailure.IsExpected(error))
         {
-            var failure = DiscoveryFailure.Describe(error); return new(null, failure.Outcome, "PackMetadata:" + failure.Code, null);
+            var failure = DiscoveryFailure.Describe(error); return new(null, failure.Outcome, "PackMetadata:" + failure.Code, hash);
         }
     }
 }
