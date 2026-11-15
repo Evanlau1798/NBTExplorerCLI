@@ -1,0 +1,9 @@
+.old/
+plan/
+tmp/
+.tools/
+**/bin/
+**/obj/
+artifacts/
+.vs/
+*.user
