@@ -61,7 +61,7 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
         if (value is null || !output.CouldInclude(role)) return;
         var source = new SourceAddress(binding.Artifact, path, role, binding.Dimension, binding.Chunk);
         if (modern) output.Merge(TextComponentExtractor.Nbt(source, value, profile, limits, output.Scope));
-        else if (value is NbtString json) output.Merge(TextComponentExtractor.Json(source, NativeJsonStrings.EncodeJavaDocument(json.Value, limits), profile, limits, output.Scope));
+        else if (value is NbtString json) output.Merge(TextComponentExtractor.EmbeddedJsonString(source, json.Value, profile, limits, output.Scope));
         else output.Diagnostic(path, "InvalidJsonComponentString");
     }
     private void Literal(NbtValue? value, TypedPath path, string role)

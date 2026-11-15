@@ -15,7 +15,7 @@ public sealed record UnclassifiedTextCandidate(SourceAddress Address, string Tex
 public static class TextExtractionBudget
 {
     public static long RecordBytes(SourceAddress address, long codeUnits)
-        => checked(codeUnits * 2 + (address.NodePath.Segments.Length + (address.ComponentPath?.Segments.Length ?? 0)) * 16L + 256);
+        => checked(codeUnits * 2 + (address.NodePath.Segments.Length + (address.ComponentPath?.Segments.Length ?? 0) + (address.Syntax?.NodePath?.Segments.Length ?? 0)) * 16L + 256);
 }
 public enum StorageTextKind { Literal, TextComponent }
 public sealed record StorageTextRule(TypedPath Path, StorageTextKind Kind);

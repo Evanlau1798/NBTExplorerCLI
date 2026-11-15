@@ -100,7 +100,7 @@ public sealed class WorldTextExtraction
                 var profile = MinecraftProfiles.ForPackMetadata(source.Pack ?? throw new InvalidDataException("Missing function pack metadata"));
                 if (profile is null) return new(source, SourceOutcome.Unsupported, null, "UnsupportedPackProfile");
                 var grammar = profile.Features[ProfileFacet.CommandGrammar];
-                var syntax = new SyntaxLocator(grammar.Schema, grammar.Version, start, bytes.Length - start, Hash256.Compute(bytes).Hex, start == 0 ? "utf8" : "utf8-bom", Newline(script));
+                var syntax = new SyntaxLocator(grammar.Schema, grammar.Version, start, bytes.Length - start, Hash256.Compute(bytes).Hex, start == 0 ? "utf8" : "utf8-bom", SyntaxLocator.DetectNewline(script));
                 var address = new SourceAddress(source.Location.Artifact, TypedPath.Root, "command.function", syntax: syntax);
                 text = new([], [], [], [new(address, script)], []);
             }
@@ -129,15 +129,4 @@ public sealed class WorldTextExtraction
         => source.Location.PackRoot is not { } root || source.Location.Artifact.Kind == ArtifactKind.Archive
             || source.PackMetadataHash is { } expected && Hash256.Compute(inventory.Read(new(inventory.WorldId, root + "/pack.mcmeta", ArtifactKind.Json))) == expected;
     private static TextSourceExtraction Forward(DiscoveredSource source) => new(source, source.Outcome, null, source.DiagnosticCode);
-    private static string Newline(string source)
-    {
-        var crlf = false; var cr = false; var lf = false;
-        for (var index = 0; index < source.Length; index++)
-            if (source[index] == '\r')
-            {
-                if (index + 1 < source.Length && source[index + 1] == '\n') { crlf = true; index++; } else cr = true;
-            }
-            else if (source[index] == '\n') lf = true;
-        return (crlf ? 1 : 0) + (cr ? 1 : 0) + (lf ? 1 : 0) > 1 ? "mixed" : crlf ? "crlf" : cr ? "cr" : lf ? "lf" : "none";
-    }
 }

@@ -14,6 +14,15 @@ public static class TextComponentExtractor
         var embedded = source.Artifact.Kind is ArtifactKind.Nbt or ArtifactKind.Region or ArtifactKind.Entities
             || source.Artifact.Kind == ArtifactKind.Archive && source.Artifact.ContainerEntry?.EndsWith(".nbt", StringComparison.Ordinal) == true;
         if (embedded && modern) throw Unsupported();
+        return ReadJson(source, component, profile, limits, scope, embedded);
+    }
+    public static TextExtractionResult EmbeddedJsonString(SourceAddress source, string component, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null)
+    {
+        if (Check(source, profile)) throw Unsupported();
+        return ReadJson(source, NativeJsonStrings.EncodeJavaDocument(component, limits), profile, limits, scope, true);
+    }
+    private static TextExtractionResult ReadJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits? limits, SnapshotScope? scope, bool embedded)
+    {
         limits ??= DecodeLimits.Default;
         using var json = BoundedJson.ReadDecoded(component, limits);
         var collector = new TextExtractionCollector(source, embedded, limits, scope);

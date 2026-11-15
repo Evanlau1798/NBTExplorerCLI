@@ -21,8 +21,8 @@ internal static class TextExtractionReviewTests
             var pack = new PackMetadata(PackSourceKind.Datapack, format, new(format, 0), new(format, int.MaxValue));
             var result = PackTextExtractor.Extract(Modifier, Encoding.UTF8.GetBytes("{\"function\":\"set_components\",\"components\":{\":custom_name\":{\"text\":\"Name\"}}}"), pack);
             Require(result.Complete && result.Occurrences.Length == 1 && Row(result.Occurrences.Single()) == "/components/:custom_name/text|<physical>|item.name|Name", "empty default namespace retains the exact JSON key");
-            var nestedBytes = Encoding.UTF8.GetBytes("{\"function\":\"set_components\",\"components\":{\":bundle_contents\":[]}}");
-            Require(PackTextExtractor.Extract(Modifier, nestedBytes, pack).Diagnostics.Single().Code == "UnsupportedNestedItemData", "empty namespace nested data remains incomplete");
+            var nestedBytes = Encoding.UTF8.GetBytes("{\"function\":\"set_components\",\"components\":{\":bundle_contents\":{}}}");
+            Require(PackTextExtractor.Extract(Modifier, nestedBytes, pack).Diagnostics.Single().Code == "InvalidLootList", "empty namespace malformed nested data remains incomplete");
             Require(PackTextExtractor.Extract(Modifier, nestedBytes, pack, scope: new([], [], ["language.value"], [])).Complete, "empty namespace follows the same type scope");
             var player = new WorldSourceLocation(new(World, "playerdata/test.dat", ArtifactKind.Nbt), WorldSourceRole.Player);
             var named = C(E("id", S("minecraft:paper")), E("components", C(E(":custom_name", Text("Name", modern)))));
@@ -48,8 +48,8 @@ internal static class TextExtractionReviewTests
             """), Pack);
         Require(result.Complete && result.Occurrences.Select(Row).SequenceEqual(new[] {
             "/components/custom_name/text|<physical>|item.name|Short", "/components/lore/0|<physical>|item.lore|Lore" }), "short default namespace keys retain literal JSON addresses");
-        var nested = PackTextExtractor.Extract(Modifier, Encoding.UTF8.GetBytes("{\"function\":\"set_components\",\"components\":{\"bundle_contents\":[]}}"), Pack);
-        Require(!nested.Complete && nested.Diagnostics.Single().Code == "UnsupportedNestedItemData", "short nested component key cannot bypass incomplete outcome");
+        var nested = PackTextExtractor.Extract(Modifier, Encoding.UTF8.GetBytes("{\"function\":\"set_components\",\"components\":{\"bundle_contents\":{}}}"), Pack);
+        Require(!nested.Complete && nested.Diagnostics.Single().Code == "InvalidLootList", "short malformed nested component key cannot bypass incomplete outcome");
         var duplicate = PackTextExtractor.Extract(Modifier, Encoding.UTF8.GetBytes("""
             {"function":"set_components","components":{"custom_name":"A","minecraft:custom_name":"B"}}
             """), Pack);
@@ -129,10 +129,10 @@ internal static class TextExtractionReviewTests
     }
     public static void NestedUnsupportedHonorsTypeScope()
     {
-        var bytes = Encoding.UTF8.GetBytes("{\"function\":\"set_components\",\"components\":{\"minecraft:bundle_contents\":[]}}");
+        var bytes = Encoding.UTF8.GetBytes("{\"function\":\"set_components\",\"components\":{\"minecraft:bundle_contents\":{}}}");
         var excluded = PackTextExtractor.Extract(Modifier, bytes, Pack, scope: new([], [], ["language.value"], []));
         Require(excluded.Complete && excluded.Occurrences.IsEmpty, "unrelated language type excludes nested-item parsing");
         var selected = PackTextExtractor.Extract(Modifier, bytes, Pack, scope: new([], [], ["item.name"], []));
-        Require(!selected.Complete && selected.Diagnostics.Single().Code == "UnsupportedNestedItemData", "possibly matching nested item remains incomplete");
+        Require(!selected.Complete && selected.Diagnostics.Single().Code == "InvalidLootList", "possibly matching malformed nested item remains incomplete");
     }
 }

@@ -6,6 +6,7 @@ namespace Next.Minecraft;
 internal sealed class TextExtractionCollector(SourceAddress source, bool embeddedJson, DecodeLimits limits, SnapshotScope? scope = null)
 {
     internal SnapshotScope Scope { get; } = scope ?? SnapshotScope.All;
+    internal DecodeLimits Limits { get; } = limits;
     internal bool Includes(string role) => WorldSourceScope.IncludesRole(role, Scope);
     internal bool CouldInclude(string role) => WorldSourceScope.CouldIncludeRole(role, Scope);
     private readonly List<TextOccurrence> occurrences = [];
@@ -54,7 +55,7 @@ internal sealed class TextExtractionCollector(SourceAddress source, bool embedde
     private void Charge(SourceAddress address, string text)
     {
         retainedBytes = checked(retainedBytes + TextExtractionBudget.RecordBytes(address, text.Length));
-        if (retainedBytes > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Extracted text/address retention budget exceeded");
+        if (retainedBytes > Limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Extracted text/address retention budget exceeded");
     }
     internal TextExtractionResult Finish() => new(occurrences.ToImmutableArray(), keys.ToImmutableArray(), diagnostics.ToImmutableArray(), commands.ToImmutableArray(), unclassified.ToImmutableArray());
     internal static TypedPath At(TypedPath path, string key) => new(path.Segments.Add(PathSegment.ForKey(key)));

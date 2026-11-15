@@ -47,6 +47,18 @@ public sealed record ChunkPosition(int X, int Z)
 
 public sealed record SyntaxLocator
 {
+    public static string DetectNewline(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var crlf = false; var cr = false; var lf = false;
+        for (var index = 0; index < source.Length; index++)
+            if (source[index] == '\r')
+            {
+                if (index + 1 < source.Length && source[index + 1] == '\n') { crlf = true; index++; } else cr = true;
+            }
+            else if (source[index] == '\n') lf = true;
+        return (crlf ? 1 : 0) + (cr ? 1 : 0) + (lf ? 1 : 0) > 1 ? "mixed" : crlf ? "crlf" : cr ? "cr" : lf ? "lf" : "none";
+    }
     public string GrammarProfile { get; }
     public int GrammarVersion { get; }
     public long StartByte { get; }
@@ -54,8 +66,9 @@ public sealed record SyntaxLocator
     public string PreimageHash { get; }
     public string Encoding { get; }
     public string Newline { get; }
+    public TypedPath? NodePath { get; }
     public SyntaxLocator(string grammarProfile, int grammarVersion, long startByte, long lengthBytes,
-        string preimageHash, string encoding, string newline)
+        string preimageHash, string encoding, string newline, TypedPath? nodePath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(grammarProfile);
         ArgumentException.ThrowIfNullOrWhiteSpace(encoding);
@@ -67,6 +80,7 @@ public sealed record SyntaxLocator
         if (newline is not ("lf" or "crlf" or "cr" or "mixed" or "none")) throw new ArgumentException("Invalid newline", nameof(newline));
         (GrammarProfile, GrammarVersion, StartByte, LengthBytes, PreimageHash, Encoding, Newline)
             = (grammarProfile, grammarVersion, startByte, lengthBytes, preimageHash.ToLowerInvariant(), encoding, newline);
+        NodePath = nodePath;
     }
 }
 

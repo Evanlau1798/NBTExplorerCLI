@@ -59,11 +59,17 @@ routes retain complete nested paths. Loot pools, entries, children, modifier seq
 filtered modifiers use explicit function schemas. Their known IDs are checked against pinned
 official registry identifiers; an unknown function does not become empty successful text.
 
-Legacy loot `set_nbt` currently produces `UnsupportedLegacyTagSyntax`. Native JSON
-`set_components` container, bundle, projectile, block-entity and entity payloads produce
-`UnsupportedNestedItemData` at the exact component path. Commands produce
-pending grammar candidates. These are incomplete sources, not writable text. Syntax parsing
-is a separate consumer boundary. Other unimplemented JSON/source schemas remain explicit
+Native JSON `set_components` recurses through container, bundle, projectile, block-entity and
+entity payloads. Raw NBT fields in JSON use their own profile's embedded JSON String or native
+component representation. Block/entity data also accepts the official SNBT String alternative.
+Legacy loot `set_nbt` uses the known loot item type for book/bundle/crossbow fields; without a
+known item identity, ambiguous item-specific fields produce `UnknownLegacyItemType`.
+SNBT extraction reuses the bounded format parser and logical list adapter. Addresses retain
+the real outer String path, the syntax leaf's byte span/hash and stable logical `syntax.nodePath`,
+plus a separate `componentPath` for JSON inside an SNBT String. `utf8-java-string` means spans
+are relative to strict UTF8 encoding of that decoded outer Java String, not raw JSON-file bytes.
+Commands remain pending grammar candidates. These are incomplete sources, not writable text.
+Other unimplemented JSON/source schemas remain explicit
 unsupported results. This extraction layer is not a complete Minecraft gameplay validator.
 
 ## Rules and completeness

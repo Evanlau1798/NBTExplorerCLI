@@ -7,6 +7,13 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("pack-snbt-default-namespace-ids", "discovery", _ => SnbtTextExtractionTests.SnbtDefaultNamespaceIdentities()),
+        new("pack-legacy-unknown-identity-scope", "discovery", _ => SnbtTextExtractionTests.UnknownLegacyIdentityRespectsScope()),
+        new("pack-snbt-wrapper-spans-and-limits", "discovery", _ => SnbtTextExtractionTests.ModernWrapperSpansAndUnknownItemType()),
+        new("world-text-invalid-snbt-source-failure", "discovery", _ => SnbtTextExtractionTests.InvalidSyntaxBecomesSourceFailure()),
+        new("pack-legacy-loot-snbt-locations", "discovery", _ => SnbtTextExtractionTests.LegacyLootTagLocations()),
+        new("pack-custom-data-snbt-string", "discovery", _ => SnbtTextExtractionTests.CustomDataSnbtStringAlternative()),
+        new("pack-native-nested-items-and-raw-nbt", "discovery", _ => NativeItemJsonTests.NestedItemsAndRawNbtFields()),
         new("text-review-empty-namespace-aliases", "discovery", _ => TextExtractionReviewTests.EmptyNamespaceAliases()),
         new("text-review-component-aliases", "discovery", _ => TextExtractionReviewTests.ComponentAliasesKeepLiteralKeys()),
         new("text-review-legacy-nested-items", "discovery", _ => TextExtractionReviewTests.LegacyNestedItemsHavePhysicalPaths()),

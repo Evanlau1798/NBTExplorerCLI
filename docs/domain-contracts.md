@@ -74,13 +74,19 @@ The following field lists are exact and ordered:
 
 Location is artifact parent, optional dimension, chunk-present byte (then int32 X/Z
 when present), node path, component path, JSON target byte (value=0/propertyName=1),
-syntax-present byte (then grammar-profile text and int32 grammar version). Syntax
+syntax variant byte (0=absent; 1=grammar-profile text and int32 grammar version;
+2=the same grammar fields followed by a required typed syntax node path). Variant 1
+retains its original canonical bytes; variant 2 distinguishes syntax leaves nested in
+one physical String without using mutable byte offsets. Syntax
 preimage hash, spans, encoding/newline and current text are excluded from location IDs.
 They belong to source revision/preconditions, so text changes cannot silently retarget
 an occurrence. Group kind distinguishes structural and inferred algorithms; rule version
 is required and current members are excluded. A location shift still needs explicit
 rebase/conflict handling; stable IDs do not authorize automatic relocation.
-For syntax addresses the typed node/component path identifies the actual grammar node;
+For syntax addresses the typed syntax node path, when present, identifies the grammar
+node inside the physical String at `nodePath`; `componentPath` may identify a JSON leaf
+inside that syntax String. The optional `syntax.nodePath` roundtrips in address schema 1.
+For older addresses without that field, the typed node/component path identifies the grammar node;
 Root denotes the grammar root. A byte span cannot turn Root into an arbitrary child.
 G02/G03 resolvers must verify that the preimage-bound span matches that exact typed node,
 reject inconsistencies, and never use an occurrence digest to skip those checks.

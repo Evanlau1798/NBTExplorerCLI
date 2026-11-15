@@ -71,9 +71,10 @@ internal static class LootTextExtractionTests
         {
             var json = JsonSerializer.Serialize(new { function = "minecraft:set_components", components = new Dictionary<string, object> { [field] = new { text = "Nested" } } });
             var result = PackTextExtractor.Extract(Location("item_modifier/nested.json"), Encoding.UTF8.GetBytes(json), Metadata);
-            Require(!result.Complete && result.Occurrences.IsEmpty && result.Diagnostics.Single().Code == "UnsupportedNestedItemData"
+            var code = field is "minecraft:block_entity_data" ? "MissingBlockEntityIdentity" : field is "minecraft:entity_data" ? "MissingEntityIdentity" : "InvalidLootList";
+            Require(!result.Complete && result.Occurrences.IsEmpty && result.Diagnostics.Single().Code == code
                 && result.Diagnostics.Single().Address.NodePath.ToJsonPointer() == "/components/" + field,
-                "unimplemented nested item schemas remain exact incomplete sources, not empty successful extraction");
+                "malformed nested item schemas remain exact incomplete sources, not empty successful extraction");
         }
     }
 }

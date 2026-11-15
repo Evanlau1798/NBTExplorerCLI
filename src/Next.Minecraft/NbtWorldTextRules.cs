@@ -20,15 +20,16 @@ internal sealed partial class NbtTextReader
     {
         foreach (var (entity, path) in Sequence(Field(root, "Entities", TypedPath.Root), At(TypedPath.Root, "Entities"))) Entity(entity, path);
     }
-    private void BlockEntity(NbtValue value, TypedPath path)
+    internal void BlockEntity(NbtValue value, TypedPath path)
     {
         if (Field(value, "id", path) is not NbtString id) { output.Diagnostic(path, "MissingBlockEntityIdentity"); return; }
-        var role = id.Value == "minecraft:command_block" ? "command_block.name" : "container.name";
+        var identity = MinecraftIdentifier.DefaultNamespace(id.Value);
+        var role = identity == "minecraft:command_block" ? "command_block.name" : "container.name";
         Component(Field(value, "CustomName", path), At(path, "CustomName"), role);
         foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
-        if (id.Value is "minecraft:sign" or "minecraft:hanging_sign")
+        if (identity is "minecraft:sign" or "minecraft:hanging_sign")
         {
-            var signRole = id.Value == "minecraft:sign" ? "sign" : "hanging_sign";
+            var signRole = identity == "minecraft:sign" ? "sign" : "hanging_sign";
             foreach (var side in new[] { "front", "back" })
             {
                 var sideField = side + "_text";
@@ -38,22 +39,23 @@ internal sealed partial class NbtTextReader
                     foreach (var (line, linePath) in Sequence(Field(text, field, sidePath), At(sidePath, field))) Component(line, linePath, signRole + "." + side + ".line");
             }
         }
-        if (id.Value == "minecraft:lectern" && Field(value, "Book", path) is { } book) Item(book, At(path, "Book"), "lectern.book");
-        if (id.Value == "minecraft:command_block" && Field(value, "Command", path) is { } command)
+        if (identity == "minecraft:lectern" && Field(value, "Book", path) is { } book) Item(book, At(path, "Book"), "lectern.book");
+        if (identity == "minecraft:command_block" && Field(value, "Command", path) is { } command)
         {
             if (command is NbtString text) output.Command(At(path, "Command"), text.Value);
             else output.Diagnostic(At(path, "Command"), "InvalidCommand");
         }
     }
-    private void Entity(NbtValue value, TypedPath path)
+    internal void Entity(NbtValue value, TypedPath path)
     {
         if (Field(value, "id", path) is not NbtString id) { output.Diagnostic(path, "MissingEntityIdentity"); return; }
-        Component(Field(value, "CustomName", path), At(path, "CustomName"), id.Value == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name");
-        if (id.Value == "minecraft:text_display") Component(Field(value, "text", path), At(path, "text"), "text_display.text");
+        var identity = MinecraftIdentifier.DefaultNamespace(id.Value);
+        Component(Field(value, "CustomName", path), At(path, "CustomName"), identity == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name");
+        if (identity == "minecraft:text_display") Component(Field(value, "text", path), At(path, "text"), "text_display.text");
         Player(value, path);
         foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
         if (Field(value, "Item", path) is { } carried) Item(carried, At(path, "Item"));
-        if (id.Value == "minecraft:item_display" && Field(value, "item", path) is { } displayed) Item(displayed, At(path, "item"));
+        if (identity == "minecraft:item_display" && Field(value, "item", path) is { } displayed) Item(displayed, At(path, "item"));
         foreach (var (passenger, passengerPath) in Sequence(Field(value, "Passengers", path), At(path, "Passengers"))) Entity(passenger, passengerPath);
     }
     private void Equipment(NbtValue value, TypedPath path)

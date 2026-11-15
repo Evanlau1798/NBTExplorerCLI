@@ -126,7 +126,11 @@ public static class SourceIdentity
         writer.Path(address.NodePath);
         writer.Path(address.ComponentPath);
         writer.Byte((byte)address.JsonTarget);
-        writer.Byte(address.Syntax is null ? (byte)0 : (byte)1);
-        if (address.Syntax is not null) { writer.Text(address.Syntax.GrammarProfile); writer.Int(address.Syntax.GrammarVersion); }
+        writer.Byte(address.Syntax is null ? (byte)0 : address.Syntax.NodePath is null ? (byte)1 : (byte)2);
+        if (address.Syntax is not null)
+        {
+            writer.Text(address.Syntax.GrammarProfile); writer.Int(address.Syntax.GrammarVersion);
+            if (address.Syntax.NodePath is not null) writer.Path(address.Syntax.NodePath);
+        }
     }
 }

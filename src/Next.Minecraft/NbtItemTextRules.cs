@@ -14,7 +14,7 @@ internal sealed partial class NbtTextReader
         if (Field(value, field, path) is not { } data) return;
         var dataPath = At(path, field);
         if (data is not NbtCompound) { output.Diagnostic(dataPath, "InvalidItemData"); return; }
-        if (oldTags) { LegacyItem(data, dataPath, id.Value, bookRole); return; }
+        if (oldTags) { LegacyItem(data, dataPath, MinecraftIdentifier.DefaultNamespace(id.Value), bookRole); return; }
         foreach (var group in ((NbtCompound)data).Entries.GroupBy(entry => MinecraftIdentifier.DefaultNamespace(entry.Name), StringComparer.Ordinal))
         {
             if (group.Count() != 1) { output.Diagnostic(dataPath, "AmbiguousItemComponent"); continue; }
@@ -36,7 +36,8 @@ internal sealed partial class NbtTextReader
             }
         }
     }
-    private void LegacyItem(NbtValue tag, TypedPath path, string id, string bookRole)
+    internal void LegacyTag(NbtValue tag, string? itemId) => LegacyItem(tag, TypedPath.Root, itemId, "book");
+    private void LegacyItem(NbtValue tag, TypedPath path, string? id, string bookRole)
     {
         var items = id == "minecraft:bundle" ? "Items" : id == "minecraft:crossbow" ? "ChargedProjectiles" : null;
         if (items is not null)
@@ -49,6 +50,15 @@ internal sealed partial class NbtTextReader
         }
         if (Field(tag, "BlockEntityTag", path) is { } block) BlockEntity(block, At(path, "BlockEntityTag"));
         if (Field(tag, "EntityTag", path) is { } entity) Entity(entity, At(path, "EntityTag"));
+        if (id is null && tag is NbtCompound compound && compound.Entries.Any(entry => entry.Name switch
+        {
+            "pages" or "filtered_pages" => output.CouldInclude(bookRole + ".page"),
+            "title" or "filtered_title" => output.CouldInclude(bookRole + ".title"),
+            "author" => output.CouldInclude(bookRole + ".author"),
+            "Items" or "ChargedProjectiles" => new[] { "item", "book", "container.name", "sign", "hanging_sign", "lectern.book", "command_block.name", "command.block", "entity.name", "armor_stand.name", "text_display.text" }.Any(output.CouldInclude),
+            _ => false
+        }))
+            output.Diagnostic(path, "UnknownLegacyItemType");
         if (id is not ("minecraft:written_book" or "minecraft:writable_book")) return;
         var written = id == "minecraft:written_book";
         Literal(Field(tag, "title", path), At(path, "title"), bookRole + ".title");

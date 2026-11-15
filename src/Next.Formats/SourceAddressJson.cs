@@ -20,7 +20,8 @@ public static class SourceAddressJson
     private sealed record SegmentDto(string? Kind, string? Key, int? Index);
     private sealed record ChunkDto(int? X, int? Z);
     private sealed record SyntaxDto(string? GrammarProfile, int? GrammarVersion, long? StartByte, long? LengthBytes,
-        string? PreimageHash, string? Encoding, string? Newline);
+        string? PreimageHash, string? Encoding, string? Newline,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SegmentDto?[]? NodePath = null);
     private sealed record AddressDto(string? SchemaFamily, int SchemaVersion, ArtifactDto? Artifact,
         SegmentDto?[]? NodePath, string? SemanticRole, string? Dimension, ChunkDto? Chunk,
         SegmentDto?[]? ComponentPath, SyntaxDto? Syntax, string? JsonTarget);
@@ -34,7 +35,8 @@ public static class SourceAddressJson
             address.Chunk is null ? null : new(address.Chunk.X, address.Chunk.Z),
             address.ComponentPath is null ? null : EncodePath(address.ComponentPath), address.Syntax is null ? null
                 : new(address.Syntax.GrammarProfile, address.Syntax.GrammarVersion, address.Syntax.StartByte,
-                    address.Syntax.LengthBytes, address.Syntax.PreimageHash, address.Syntax.Encoding, address.Syntax.Newline),
+                    address.Syntax.LengthBytes, address.Syntax.PreimageHash, address.Syntax.Encoding, address.Syntax.Newline,
+                    address.Syntax.NodePath is null ? null : EncodePath(address.Syntax.NodePath)),
             address.JsonTarget == JsonTargetKind.Value ? "value" : "propertyName"), Options);
     }
 
@@ -101,5 +103,5 @@ public static class SourceAddressJson
         syntax.LengthBytes ?? throw new JsonException("Missing syntax length"),
         syntax.PreimageHash ?? throw new JsonException("Missing syntax preimage"),
         syntax.Encoding ?? throw new JsonException("Missing syntax encoding"),
-        syntax.Newline ?? throw new JsonException("Missing syntax newline"));
+        syntax.Newline ?? throw new JsonException("Missing syntax newline"), syntax.NodePath is null ? null : DecodePath(syntax.NodePath));
 }

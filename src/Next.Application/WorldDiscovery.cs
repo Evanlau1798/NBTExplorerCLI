@@ -166,9 +166,12 @@ public static class WorldDiscovery
 
 internal static class DiscoveryFailure
 {
-    internal static bool IsExpected(Exception error) => error is CodecException or InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Text.Json.JsonException;
+    internal static bool IsExpected(Exception error) => error is CodecException or SnbtException or InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Text.Json.JsonException;
     internal static (SourceOutcome Outcome, string Code) Describe(Exception error) => error switch
     {
+        SnbtException { Code: SnbtError.UnsupportedGrammar or SnbtError.UnsupportedValue } => (SourceOutcome.Unsupported, "UnsupportedSyntax"),
+        SnbtException { Code: SnbtError.LimitExceeded } => (SourceOutcome.Failed, "LimitExceeded"),
+        SnbtException => (SourceOutcome.Failed, "InvalidSnbt"),
         CodecException { Code: CodecError.UnsupportedProfile } => (SourceOutcome.Unsupported, "UnsupportedProfile"),
         CodecException codec => (SourceOutcome.Failed, codec.Code.ToString()),
         NotSupportedException => (SourceOutcome.Unsupported, "UnsupportedSource"),

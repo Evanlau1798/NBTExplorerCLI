@@ -51,8 +51,8 @@ public static partial class PackTextExtractor
                         if (display.TryGetNativeProperty(field, out var component)) Component(component, new([PathSegment.ForKey("display"), PathSegment.ForKey(field)]), "advancement." + field);
                 }
             }
-            else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "loot_tables" : "loot_table")) Loot(root, TypedPath.Root, output, Component, profile);
-            else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "item_modifiers" : "item_modifier")) Modifier(root, TypedPath.Root, output, Component, profile);
+            else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "loot_tables" : "loot_table")) Loot(root, TypedPath.Root, output, Component, profile, RawComponent);
+            else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "item_modifiers" : "item_modifier")) Modifier(root, TypedPath.Root, output, Component, profile, RawComponent);
             else if (parts.Length < 4 || parts[0] != "data" || parts[2] != "tags") output.Diagnostic(TypedPath.Root, "UnsupportedPackJson");
         }
         else output.Diagnostic(TypedPath.Root, "UnsupportedPackSource");
@@ -63,6 +63,14 @@ public static partial class PackTextExtractor
             if (!output.CouldInclude(role)) return;
             var address = new SourceAddress(source.Artifact, path, role, source.Dimension);
             output.Merge(TextComponentExtractor.Json(address, Encoding.UTF8.GetBytes(value.GetRawText()), profile, limits, output.Scope));
+        }
+        void RawComponent(JsonElement value, TypedPath path, string role)
+        {
+            if (!output.CouldInclude(role)) return;
+            if (profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt") { Component(value, path, role); return; }
+            if (value.ValueKind != JsonValueKind.String) { output.Diagnostic(path, "InvalidJsonComponentString"); return; }
+            var address = new SourceAddress(source.Artifact, path, role, source.Dimension);
+            output.Merge(TextComponentExtractor.EmbeddedJsonString(address, NativeJsonStrings.Read(value), profile, limits, output.Scope));
         }
     }
     private static string Entry(WorldSourceLocation source)

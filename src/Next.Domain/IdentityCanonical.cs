@@ -96,7 +96,9 @@ internal static class IdentityCanonical
             var node = RequiredPath();
             var component = Path();
             var target = (JsonTargetKind)Byte();
-            var syntax = Present() ? new SyntaxLocator(Text(), Int(), 0, 0, new string('0', 64), "utf-8", "none") : null;
+            var syntaxKind = Byte();
+            if (syntaxKind > 2) throw new FormatException("Invalid syntax identity variant");
+            var syntax = syntaxKind == 0 ? null : new SyntaxLocator(Text(), Int(), 0, 0, new string('0', 64), "utf-8", "none", syntaxKind == 2 ? RequiredPath() : null);
             return new(artifact, node, "canonical.location", dimension, chunk, component, syntax, target);
         }
 
