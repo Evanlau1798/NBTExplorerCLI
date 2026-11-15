@@ -2,7 +2,7 @@
 
 Windows x64 / .NET 10 的獨立新核心，直接開發於本目錄。舊版位於 `.old/`，不參與新版 build 或 runtime。
 
-目前僅有工程基礎、help/version 與最小驗證。尚未提供世界讀寫、掃描或翻譯能力，不能作正式版本使用。完整交付範圍見 [能力帳本](docs/capabilities.md) 及 [章程](docs/rewrite-charter.md)。
+目前提供工程基礎、help/version，以及來源地址、穩定身分、保型樹與能力 profile 的領域模型。尚未提供世界讀寫、掃描或翻譯能力，不能作正式版本使用。完整交付範圍見 [能力帳本](docs/capabilities.md) 及 [章程](docs/rewrite-charter.md)；模型規格見 [Domain 契約](docs/domain-contracts.md)。
 
 ## 建置與驗證
 
@@ -18,7 +18,7 @@ dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --help
 dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --version
 ```
 
-建置與測試分開執行。驗證工程為無外部測試套件的 assertion harness，suite 為 foundation、architecture、corpus；預設執行全部一般案例。使用 `--fixture-root <absolute-path>` 可覆寫預設輸出資源根，結果不依 shell cwd。每個案例在獨立 worker 執行；`--timeout-ms` 預設 30000，接受 100–120000。Stdout 為單一 JSON，stderr 為診斷；失敗、unsupported、timeout、未知／空選擇皆非零。
+建置與測試分開執行。驗證工程為無外部測試套件的 assertion harness，suite 為 domain、foundation、architecture、corpus；預設執行全部一般案例。使用 `--fixture-root <absolute-path>` 可覆寫預設輸出資源根，結果不依 shell cwd。每個案例在獨立 worker 執行；`--timeout-ms` 預設 30000，接受 100–120000。Stdout 為單一 JSON，stderr 為診斷；失敗、unsupported、timeout、未知／空選擇皆非零。
 
 校準案例不包含於預設 suite：顯式選擇 `runner-calibration-failure`、`runner-calibration-unsupported` 應 exit 1；`--case runner-calibration-timeout --timeout-ms 1000` 應終止 worker 並 exit 1。校準失敗不能計為通過。
 
