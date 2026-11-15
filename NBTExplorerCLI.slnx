@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Next.Benchmarks/Next.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Next.Application/Next.Application.csproj" />
+    <Project Path="src/Next.Cli/Next.Cli.csproj" />
+    <Project Path="src/Next.Domain/Next.Domain.csproj" />
+    <Project Path="src/Next.Formats/Next.Formats.csproj" />
+    <Project Path="src/Next.Infrastructure/Next.Infrastructure.csproj" />
+    <Project Path="src/Next.Minecraft/Next.Minecraft.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Next.Verification/Next.Verification.csproj" />
+  </Folder>
+</Solution>

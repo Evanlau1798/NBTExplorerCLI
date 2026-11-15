@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "next.domain": {
+        "type": "Project"
+      },
+      "next.formats": {
+        "type": "Project",
+        "dependencies": {
+          "Next.Domain": "[2.0.0-alpha.1, )"
+        }
+      }
+    }
+  }
+}
