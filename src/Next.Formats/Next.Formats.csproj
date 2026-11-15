@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../Next.Domain/Next.Domain.csproj" />
+    <EmbeddedResource Include="Unicode/java21-names.json" />
+    <None Include="../../docs/licenses/Unicode.md" Link="licenses/Unicode.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -64,12 +64,16 @@ internal static class AssemblyPolicyTests
                 .Concat(["nbtcli-next.exe", "nbtcli-next.deps.json", "nbtcli-next.runtimeconfig.json"])
                 .ToHashSet(StringComparer.Ordinal);
             foreach (var path in Directory.EnumerateFileSystemEntries(root))
+            {
+                if (Path.GetFileName(path) == "licenses" && Directory.Exists(path)) continue;
                 Require(File.Exists(path) && allowed.Contains(Path.GetFileName(path)), $"UnexpectedArtifact: {Path.GetFileName(path)}");
+            }
             using var deps = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, "nbtcli-next.deps.json")));
             foreach (var library in deps.RootElement.GetProperty("libraries").EnumerateObject())
                 Require(names.Contains(library.Name.Split('/')[0], StringComparer.Ordinal)
                     && library.Value.GetProperty("type").GetString() == "project", $"UnexpectedDependency: {library.Name}");
         }
+        VerifyLicenses(Path.Combine(root, "licenses"));
         var sourceManifest = Path.Combine(AppContext.BaseDirectory, "ArchitectureFixture", "legacy-source.json");
         using var json = JsonDocument.Parse(File.ReadAllBytes(sourceManifest));
         var forbidden = json.RootElement.EnumerateArray().Select(item => item.GetProperty("sha256").GetString()!)
@@ -80,6 +84,19 @@ internal static class AssemblyPolicyTests
                 name == "Next.Domain", forbidden);
             Require(errors.Count == 0, string.Join(Environment.NewLine, errors));
         }
+    }
+
+    private static void VerifyLicenses(string directory)
+    {
+        Require(Directory.Exists(directory) && (File.GetAttributes(directory) & FileAttributes.ReparsePoint) == 0, "Missing or linked license directory");
+        foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+            Require(File.Exists(entry) && Path.GetFileName(entry) == "Unicode.md"
+                && (File.GetAttributes(entry) & FileAttributes.ReparsePoint) == 0, $"UnexpectedLicenseArtifact: {Path.GetFileName(entry)}");
+        var path = Path.Combine(directory, "Unicode.md");
+        Require(File.Exists(path), "Missing Unicode license");
+        using var stream = File.OpenRead(path);
+        Require(stream.Length <= 65_536 && Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))
+            == "6F72F10D166B2C2E8A395E03E734C5AFC852B59AECA73CED124F6B9C96268D53", "Unicode license differs from the preserved notice");
     }
 
     private static void Require(bool condition, string message)
