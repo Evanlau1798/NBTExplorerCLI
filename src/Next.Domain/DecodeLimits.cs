@@ -14,7 +14,7 @@ public sealed record DecodeLimits(long MaxDecodedBytes = 134_217_728, int MaxDep
     }
 }
 
-public enum CodecError { Truncated, InvalidTag, InvalidLength, InvalidList, MalformedString, LimitExceeded, TrailingData, UnsupportedProfile }
+public enum CodecError { Truncated, InvalidTag, InvalidLength, InvalidList, MalformedString, LimitExceeded, TrailingData, UnsupportedProfile, CorruptCompression, InvalidRegion }
 public sealed class CodecException(CodecError code, long offset, string message) : Exception(message)
 {
     public CodecError Code { get; } = code;

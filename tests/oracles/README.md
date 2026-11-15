@@ -1,5 +1,7 @@
 # 獨立 codec fixtures
 
+壓縮／Region 的獨立依據使用 CPython 3.13.14（zlib 版本保存在 fixture）：`python tests/oracles/compression_oracle.py` 與 `python tests/oracles/region_oracle.py` 分別輸出 `compression-oracle.json`／`region-oracle.json`；UTF-8 無 BOM、LF 保存並更新 manifest。它們只使用 Python gzip/zlib/struct 及固定 Java NBT bytes，不引用產品 assemblies。前者驗 framing／checksum／完整 EOF／多 member／非法 Huffman 與 window；後者獨立建立 index 與已知／opaque payload。`python tests/oracles/region_oracle.py <candidate-path>` 可獨立檢視合成候選的 descriptor／payload hashes，不能取代 NBT typed 驗證。一般 Verification 不需要 Python。
+
 這些是 fixture 生成器，並非產品依賴。一般 `codec` suite 只讀固定 JSON；無須 Java、網路或遊戲。已驗證的產生環境為 JDK 25.0.2，runtime `25.0.2+10-LTS-69`。所有輸入是本專案合成資料；不啟動 Minecraft/server、不讀世界。生成後須核對 manifest；不能藉再生接受未調查的差異。
 
 從 repo 根執行：

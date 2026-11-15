@@ -7,6 +7,17 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("compression-empty-writer-frames", "compression", context => CompressionTests.EmptyWriterFrames(context.FixtureRoot)),
+        new("compression-empty-member-resource-bound", "compression", context => CompressionTests.EmptyMemberResourceBound(context.FixtureRoot)),
+        new("region-corrupt-selected-and-capacity", "region", context => RegionTests.CorruptSelectedAndCapacity(context.FixtureRoot)),
+        new("region-independent-python-oracle", "region", context => RegionTests.IndependentOracle(context.FixtureRoot)),
+        new("compression-composition-and-adversarial", "compression", context => CompressionTests.CompositionAndAdversarial(context.FixtureRoot)),
+        new("region-validated-index-boundaries", "region", context => RegionTests.Boundaries(context.FixtureRoot)),
+        new("region-candidate-preserves-others", "region", context => RegionTests.CandidatePreservesOthers(context.FixtureRoot)),
+        new("region-sector-widths-and-unsupported", "region", context => RegionTests.SectorWidthsAndUnsupported(context.FixtureRoot)),
+        new("compression-independent-python-oracle", "compression", context => CompressionTests.IndependentOracle(context.FixtureRoot)),
+        new("compression-writer-and-limits", "compression", context => CompressionTests.WriterAndLimits(context.FixtureRoot)),
+        new("compression-prefixes-and-short-streams", "compression", context => CompressionTests.PrefixesAndShortStreams(context.FixtureRoot)),
         new("architecture-artifact-license-exact", "architecture", _ => ArtifactLicenseTests.ExactLicenseAndArtifactSet()),
         new("snbt-negative-zero-unsupported", "snbt", _ => SnbtBoundaryTests.NegativeZeroIsNotRepresentable()),
         new("snbt-official-modern-review-regressions", "snbt", context => SnbtOracleTests.OfficialGrammar(context.FixtureRoot, true, variant: "findings")),

@@ -61,7 +61,7 @@ internal static class AssemblyPolicyTests
         if (artifactRoot is not null)
         {
             var allowed = names.SelectMany(name => new[] { name + ".dll", name + ".pdb" })
-                .Concat(["nbtcli-next.exe", "nbtcli-next.deps.json", "nbtcli-next.runtimeconfig.json"])
+                .Concat(["nbtcli-next.exe", "nbtcli-next.deps.json", "nbtcli-next.runtimeconfig.json", "ICSharpCode.SharpZipLib.dll"])
                 .ToHashSet(StringComparer.Ordinal);
             foreach (var path in Directory.EnumerateFileSystemEntries(root))
             {
@@ -69,10 +69,13 @@ internal static class AssemblyPolicyTests
                 Require(File.Exists(path) && allowed.Contains(Path.GetFileName(path)), $"UnexpectedArtifact: {Path.GetFileName(path)}");
             }
             using var deps = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, "nbtcli-next.deps.json")));
+            Require(deps.RootElement.GetProperty("libraries").TryGetProperty("SharpZipLib/1.4.2", out _), "Missing adopted compression dependency");
             foreach (var library in deps.RootElement.GetProperty("libraries").EnumerateObject())
-                Require(names.Contains(library.Name.Split('/')[0], StringComparer.Ordinal)
-                    && library.Value.GetProperty("type").GetString() == "project", $"UnexpectedDependency: {library.Name}");
+                Require((names.Contains(library.Name.Split('/')[0], StringComparer.Ordinal)
+                    && library.Value.GetProperty("type").GetString() == "project")
+                    || (library.Name == "SharpZipLib/1.4.2" && library.Value.GetProperty("type").GetString() == "package"), $"UnexpectedDependency: {library.Name}");
         }
+        VerifyDigest(Path.Combine(root, "ICSharpCode.SharpZipLib.dll"), "32EA2D0CE3512E74F1C7AD82591FE67E6B8939D76A8A4FF9C93EAD030131E71C", 2_097_152);
         VerifyLicenses(Path.Combine(root, "licenses"));
         var sourceManifest = Path.Combine(AppContext.BaseDirectory, "ArchitectureFixture", "legacy-source.json");
         using var json = JsonDocument.Parse(File.ReadAllBytes(sourceManifest));
@@ -90,13 +93,17 @@ internal static class AssemblyPolicyTests
     {
         Require(Directory.Exists(directory) && (File.GetAttributes(directory) & FileAttributes.ReparsePoint) == 0, "Missing or linked license directory");
         foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
-            Require(File.Exists(entry) && Path.GetFileName(entry) == "Unicode.md"
+            Require(File.Exists(entry) && Path.GetFileName(entry) is "Unicode.md" or "SharpZipLib.md"
                 && (File.GetAttributes(entry) & FileAttributes.ReparsePoint) == 0, $"UnexpectedLicenseArtifact: {Path.GetFileName(entry)}");
-        var path = Path.Combine(directory, "Unicode.md");
-        Require(File.Exists(path), "Missing Unicode license");
+        VerifyDigest(Path.Combine(directory, "Unicode.md"), "6F72F10D166B2C2E8A395E03E734C5AFC852B59AECA73CED124F6B9C96268D53", 65_536);
+        VerifyDigest(Path.Combine(directory, "SharpZipLib.md"), "D7FBBC16F871BF24FA5624C7EAF945054B778985F32676DCACBA41FDDCA61133", 65_536);
+    }
+
+    private static void VerifyDigest(string path, string expected, long maximum)
+    {
+        Require(File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0, $"Missing or linked artifact: {path}");
         using var stream = File.OpenRead(path);
-        Require(stream.Length <= 65_536 && Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))
-            == "6F72F10D166B2C2E8A395E03E734C5AFC852B59AECA73CED124F6B9C96268D53", "Unicode license differs from the preserved notice");
+        Require(stream.Length <= maximum && Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)) == expected, $"Artifact digest differs: {path}");
     }
 
     private static void Require(bool condition, string message)

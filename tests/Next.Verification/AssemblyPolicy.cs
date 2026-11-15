@@ -34,9 +34,10 @@ internal static class AssemblyPolicy
         {
             var name = metadata.GetString(metadata.GetAssemblyReference(handle).Name);
             var product = ProductNames.Contains(name) && allowed.Contains(name, StringComparer.Ordinal);
+            var adopted = !domain && owner == "Next.Formats" && name == "ICSharpCode.SharpZipLib";
             var framework = name is "System" or "netstandard" || name.StartsWith("System.", StringComparison.Ordinal)
                 || name.StartsWith("Microsoft.Win32.", StringComparison.Ordinal);
-            if (!product && !framework)
+            if (!product && !framework && !adopted)
                 errors.Add($"AssemblyReference: {name}");
         }
         foreach (var handle in metadata.TypeDefinitions)
