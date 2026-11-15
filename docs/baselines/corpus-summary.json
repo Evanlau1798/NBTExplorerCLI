@@ -1,0 +1,13 @@
+{
+  "gateRevision": 2,
+  "corpusVersion": 1,
+  "id": "C-G",
+  "fileCount": 139,
+  "bytes": 31078949.0,
+  "manifestSha256": "58f44a43e566e8cae4cded365e0fa39c449589389ad9f75ddb8d12c67760406e",
+  "pristineCopy": "tmp/corpus/C-G",
+  "writeTests": "Create a fresh disposable copy for every write test; never modify pristine corpus or legacy world",
+  "expectedSlots": "Not independently established; must enumerate exact addresses in G03 before acceptance",
+  "chunks": "Not independently established; must enumerate validated region indices in G02/G03",
+  "acceptance": "Raw byte baseline only, not proof of format or Minecraft compatibility"
+}

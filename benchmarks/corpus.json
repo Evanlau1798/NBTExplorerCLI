@@ -1,0 +1,82 @@
+{
+  "policyVersion": 1,
+  "planVersion": "0.3",
+  "gateRevision": 2,
+  "command": "dotnet benchmarks/Next.Benchmarks/bin/Release/net10.0/Next.Benchmarks.dll generate-corpus S|M|L <new-output-root>",
+  "expectedSlotRule": "For every pack index, selected locale and key fixture.line.{entry:D6}, the value is Fixture {pack:D3}/{locale}/{entry:D6} ‖§‖; addresses preserve source pack and exact key",
+  "localeOrder": [
+    "en_us",
+    "zh_tw",
+    "de_de",
+    "fr_fr",
+    "es_es",
+    "ja_jp",
+    "ko_kr",
+    "ru_ru"
+  ],
+  "recipe": {
+    "S": {
+      "entriesPerFile": 128,
+      "locales": 1,
+      "packs": 2
+    },
+    "M": {
+      "entriesPerFile": 128,
+      "locales": 8,
+      "packs": 32
+    },
+    "L": {
+      "entriesPerFile": 1024,
+      "locales": 8,
+      "packs": 64
+    }
+  },
+  "corpora": [
+    {
+      "id": "S",
+      "files": 6,
+      "bytes": 33914,
+      "slots": 256,
+      "chunks": 0,
+      "manifestSha256": "33277bc56c3504cc181df5b24132eb207e5f4f06d65a8efdc8c684a73bad3019",
+      "recipeVersion": 1,
+      "profile": "java-1.21 resource pack 34 / LangKey scope / two empty region headers",
+      "source": "Project-authored deterministic literals",
+      "license": "Project-authored fixture data",
+      "materializedRoot": "tmp/corpus/performance-v1/S"
+    },
+    {
+      "id": "M",
+      "files": 290,
+      "bytes": 2246784,
+      "slots": 32768,
+      "chunks": 0,
+      "manifestSha256": "01b91ce89175dd6da7fece5bb5cd904c85f22a36e159cc872d13af885bf4c25f",
+      "recipeVersion": 1,
+      "profile": "java-1.21 resource pack 34 / LangKey scope / two empty region headers",
+      "source": "Project-authored deterministic literals",
+      "license": "Project-authored fixture data",
+      "materializedRoot": "tmp/corpus/performance-v1/M"
+    },
+    {
+      "id": "L",
+      "files": 578,
+      "bytes": 35672320,
+      "slots": 524288,
+      "chunks": 0,
+      "manifestSha256": "f5f595c70de3774881a165dca4f8139750eb41005e206148fb019e0bd311c020",
+      "recipeVersion": 1,
+      "profile": "java-1.21 resource pack 34 / LangKey scope / two empty region headers",
+      "source": "Project-authored deterministic literals",
+      "license": "Project-authored fixture data",
+      "materializedRoot": "tmp/corpus/performance-v1/L"
+    }
+  ],
+  "otherCorpora": {
+    "legacyWorlds": "docs/baselines/corpus-summary.json",
+    "legacyWorldScope": "Raw byte preservation only; semantic oracle adoption in G02/G03, not yet accepted game compatibility",
+    "minimalCases": "fixtures/manifest.json"
+  },
+  "oracle": "Literal recipe, independent JSON property census and per-file SHA-256; metadata pack_format 34 confirmed from official Minecraft 1.21 technical changes",
+  "measurement": "No scan timing or speedup collected; G06 serial control required"
+}

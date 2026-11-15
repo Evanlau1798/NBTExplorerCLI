@@ -16,6 +16,13 @@
           "Next.Minecraft": "[2.0.0-alpha.1, )"
         }
       },
+      "next.benchmarks": {
+        "type": "Project",
+        "dependencies": {
+          "Next.Application": "[2.0.0-alpha.1, )",
+          "Next.Infrastructure": "[2.0.0-alpha.1, )"
+        }
+      },
       "next.domain": {
         "type": "Project"
       },

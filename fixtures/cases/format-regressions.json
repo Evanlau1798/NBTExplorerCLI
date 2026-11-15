@@ -1,0 +1,20 @@
+{
+  "corpusVersion": 1,
+  "source": "Specification-derived literals; historical probes identify triggers, not expected values",
+  "license": "Project-authored fixture data",
+  "cases": [
+    {"id":"NBT-ZLIB-01","findings":["F01"],"gate":"G02","profile":"zlib","inputBase64":"eJziYmBNLE3JLOFgYClJrShhEPNIzcnJVzjQoPBk74KnS/cqvF2w9+2OBgYAAAAA//8DAA==","expected":"CorruptCompression","oracle":"RFC 1950 requires complete trailer; historical Python zlib reported eof=false","invariants":["Do not accept merely because decoded NBT is available"]},
+    {"id":"NBT-MUTF8-TRUNCATED","findings":["F02"],"gate":"G02","profile":"java-mutf8","inputBase64":"CgAACAABcwABwgA=","expected":"MalformedString","oracle":"Java DataInput modified UTF-8: two-byte sequence requires continuation"},
+    {"id":"NBT-MUTF8-CONTINUATION","findings":["F02"],"gate":"G02","profile":"java-mutf8","inputBase64":"CgAACAABcwACwkEA","expected":"MalformedString","oracle":"0x41 is not a continuation byte"},
+    {"id":"NBT-MUTF8-FOUR-BYTE","findings":["F02"],"gate":"G02","profile":"java-mutf8","inputBase64":"CgAACAABcwAE8J+YgAA=","expected":"MalformedString","oracle":"Java modified UTF-8 encodes UTF-16 surrogate code units, not four-byte UTF-8"},
+    {"id":"NBT-MUTF8-PAIR","findings":["F02"],"gate":"G02","profile":"java-mutf8","inputBase64":"CgAACAABcwAG7aC97biAAA==","expected":{"sUtf16":[55357,56832]},"oracle":"Java DataInput/DataOutput; verify independently in G02"},
+    {"id":"SNBT-TYPES-01","findings":["F03"],"gate":"G02","profile":"snbt-legacy","input":"{UUID:[I;1,2,3,4],bytes:[B;-1b],longs:[L;1L],text:'Hello'}","operation":{"path":["text"],"text":"Bonjour"},"expected":{"UUIDType":"IntArray","bytesType":"ByteArray","bytes":[-1],"longsType":"LongArray","text":"Bonjour"},"invariants":["UUID values and types unchanged"]},
+    {"id":"SNBT-EMPTY-ARRAYS","findings":["F03"],"gate":"G02","profile":"snbt-legacy","input":"{b:[B;],i:[I;],l:[L;]}","expected":{"b":"ByteArray","i":"IntArray","l":"LongArray"}},
+    {"id":"SNBT-UNTERMINATED","findings":["F03"],"gate":"G02","profile":"snbt-legacy","input":"{text:'Hello'","expected":"UnexpectedEnd"},
+    {"id":"SNBT-TRAILING","findings":["F03"],"gate":"G02","profile":"snbt-legacy","input":"{text:'Hello'}TRAILING","expected":"TrailingInput"},
+    {"id":"NBT-JSON-01","findings":["F18"],"gate":"G01/G02","profile":"typed-nbt","input":{"type":"custom","value":"payload","keep":42},"expected":{"type":"Compound","keys":["type","value","keep"]},"invariants":["Ordinary field names never imply a typed wrapper"]},
+    {"id":"NBT-LOGICAL-LIST","findings":["F18"],"gate":"G01/G02","profile":"java-1.21.5-logical-wrapper","input":[1,"x",{"":"literal","keep":42}],"expected":"LosslessLogicalRoundtripWithHomogeneousPhysicalList","oracle":"Minecraft 1.21.5 NBT changes; wrapper fixture verification required G02","invariants":["Preserve legitimate empty keys","Reject direct mixed payload under one physical list type"]},
+    {"id":"REGION-BOUNDS-01","findings":["F19"],"gate":"G02/G05","profile":"anvil","input":{"headerBytes":8191},"expected":"TruncatedHeader","invariants":["No giant allocation","Source unchanged","Dispose does not save"]},
+    {"id":"REGION-LENGTH-01","findings":["F19"],"gate":"G02/G05","profile":"anvil","input":{"allocatedSectors":1,"declaredChunkLength":2147483647},"expected":"InvalidChunkLength","invariants":["Reject before allocation"]}
+  ]
+}

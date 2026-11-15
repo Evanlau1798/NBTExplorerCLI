@@ -1,0 +1,38 @@
+{
+  "policyVersion": 1,
+  "planVersion": "0.3",
+  "gateRevision": 2,
+  "workers": {"default": 2, "maximum": 8},
+  "hardLimits": {
+    "inFlightBufferBytes": 268435456,
+    "queuedSources": 16,
+    "artifactBytes": 67108864,
+    "decodedBytes": 134217728,
+    "depth": 256,
+    "nodes": 2000000,
+    "containerEntries": 1000000,
+    "collectionElements": 1000000,
+    "cumulativeStringBytes": 8388608,
+    "mutf8StringBytes": 65535,
+    "sourceCatalogEntries": 100000,
+    "sessionSlots": 100000,
+    "sessionJsonBytes": 67108864,
+    "planOperations": 100000,
+    "planJsonBytes": 67108864,
+    "receiptJsonBytes": 134217728
+  },
+  "acceptance": {
+    "peakRssBytes": {"S": 268435456, "M": 536870912, "L": 1073741824},
+    "cancellationConvergenceMs": 5000,
+    "medianTimeRegressionRatio": 1.10,
+    "allocationPerProcessedByteRegressionRatio": 1.10,
+    "allocationPerSlotRegressionRatio": 1.10,
+    "warmups": {"S": 2, "M": 2, "L": 1},
+    "samples": {"S": 5, "M": 5, "L": 3},
+    "sustainedRunMinutes": 15
+  },
+  "control": "G06 accepted correct serial implementation; absent until G06, no speedup claim",
+  "measurementRule": "Compare identical source/corpus/configuration, semantic output, diagnostics, coverage and completeness before timing. Retain every sample; report median and observed maximum, not p95 from these sample counts.",
+  "scope": "Initial capacities, to be implemented and tested by owning gates. Buffer is a global lease budget, not RSS; sessions/plans have separate bounds. L scan capacity does not promise one full-L JSON session.",
+  "changeRule": "Any revised capacity or corpus-specific threshold is versioned and frozen before the affected measurement/optimization; do not relax after seeing a failed result. G07 must include full G06 workflow scenarios as well as synthetic capacity corpora."
+}
