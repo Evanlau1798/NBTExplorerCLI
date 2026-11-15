@@ -24,7 +24,7 @@ public sealed record ArtifactAddress
         (WorldId, RelativePath, Kind, ContainerEntry) = (worldId, relativePath, kind, containerEntry);
     }
 
-    private static void ValidatePath(string path, bool entry)
+    public static void ValidatePath(string path, bool entry)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         var parts = path.Split('/');

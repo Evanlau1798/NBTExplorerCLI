@@ -1,0 +1,41 @@
+{
+  "legacy": [
+    "level.dat|||Level|",
+    "region/r.-1.0.mca|||Terrain|minecraft:overworld",
+    "region/r.-1.0.mca||-32,0|Terrain|minecraft:overworld",
+    "DIM-1/entities/r.-1.0.mca|||Entities|minecraft:the_nether",
+    "DIM-1/entities/r.-1.0.mca||-32,0|Entities|minecraft:the_nether",
+    "dimensions/models/tags/worldgen/region/r.2.3.mca|||Terrain|models:tags/worldgen",
+    "dimensions/models/tags/worldgen/region/r.2.3.mca||64,96|Terrain|models:tags/worldgen",
+    "datapacks/folder/pack.mcmeta|||PackMetadata|",
+    "datapacks/folder/data/models/function/start.mcfunction|||Function|",
+    "packs/custom-name/pack.mcmeta|||PackMetadata|",
+    "packs/custom-name/assets/models/lang/en_us.json|||Language|",
+    "not-resources.zip|||Archive|",
+    "not-resources.zip|pack.mcmeta||PackMetadata|",
+    "not-resources.zip|assets/models/lang/en_us.json||Language|",
+    "datapacks/another-name.zip|||Archive|",
+    "datapacks/another-name.zip|pack.mcmeta||PackMetadata|",
+    "datapacks/another-name.zip|data/models/function/start.mcfunction||Function|"
+  ],
+  "modern": [
+    "level.dat|||Level|",
+    "data/minecraft/world_gen_settings.dat|||SavedData|",
+    "dimensions/minecraft/overworld/region/r.-1.0.mca|||Terrain|minecraft:overworld",
+    "dimensions/minecraft/overworld/region/r.-1.0.mca||-32,0|Terrain|minecraft:overworld",
+    "dimensions/minecraft/the_nether/entities/r.-1.0.mca|||Entities|minecraft:the_nether",
+    "dimensions/minecraft/the_nether/entities/r.-1.0.mca||-32,0|Entities|minecraft:the_nether",
+    "dimensions/models/tags/worldgen/region/r.2.3.mca|||Terrain|models:tags/worldgen",
+    "dimensions/models/tags/worldgen/region/r.2.3.mca||64,96|Terrain|models:tags/worldgen",
+    "datapacks/folder/pack.mcmeta|||PackMetadata|",
+    "datapacks/folder/data/models/function/start.mcfunction|||Function|",
+    "packs/custom-name/pack.mcmeta|||PackMetadata|",
+    "packs/custom-name/assets/models/lang/en_us.json|||Language|",
+    "not-resources.zip|||Archive|",
+    "not-resources.zip|pack.mcmeta||PackMetadata|",
+    "not-resources.zip|assets/models/lang/en_us.json||Language|",
+    "datapacks/another-name.zip|||Archive|",
+    "datapacks/another-name.zip|pack.mcmeta||PackMetadata|",
+    "datapacks/another-name.zip|data/models/function/start.mcfunction||Function|"
+  ]
+}

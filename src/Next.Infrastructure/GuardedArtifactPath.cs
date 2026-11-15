@@ -14,10 +14,19 @@ internal sealed class GuardedArtifactPath : IDisposable
 
     public static GuardedArtifactPath Acquire(string root, Guid world, ArtifactAddress artifact)
     {
-        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Artifact writes require validated Windows NTFS");
         ArgumentNullException.ThrowIfNull(artifact);
         if (artifact.WorldId != world || artifact.ContainerEntry is not null || artifact.RelativePath.Split('/').Any(part => part.StartsWith(".nbtcli-", StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("Requires a nonreserved physical artifact for the bound world", nameof(artifact));
+        return AcquireCore(root, artifact.RelativePath, directory: false);
+    }
+    internal static GuardedArtifactPath AcquireDirectory(string root, string relativeDirectory)
+    {
+        if (relativeDirectory.Length != 0) ArtifactAddress.ValidatePath(relativeDirectory, entry: false);
+        return AcquireCore(root, relativeDirectory, directory: true);
+    }
+    private static GuardedArtifactPath AcquireCore(string root, string relativePath, bool directory)
+    {
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Artifact access requires validated Windows NTFS");
         var full = Path.GetFullPath(root); var drive = Path.GetPathRoot(full)!;
         if (drive.Length != 3 || !char.IsAsciiLetter(drive[0]) || drive[1] != ':')
             throw new PlatformNotSupportedException("Only local NTFS roots are validated");
@@ -25,19 +34,19 @@ internal sealed class GuardedArtifactPath : IDisposable
         var type = volume.DriveType;
         var format = type is DriveType.Fixed or DriveType.Removable ? volume.DriveFormat : "";
         if (!SupportsVolume(type, format)) throw new PlatformNotSupportedException("Only local NTFS roots are validated");
-        foreach (var part in artifact.RelativePath.Split('/'))
+        foreach (var part in relativePath.Split('/'))
         {
             var name = part.Split('.')[0].ToUpperInvariant();
             if (name is "CON" or "PRN" or "AUX" or "NUL" || name.Length == 4 && (name.StartsWith("COM", StringComparison.Ordinal) || name.StartsWith("LPT", StringComparison.Ordinal)) && "123456789¹²³".Contains(name[3]))
-                throw new ArgumentException("Reserved Windows artifact name", nameof(artifact));
+                throw new ArgumentException("Reserved Windows artifact name", nameof(relativePath));
         }
-        var target = Path.GetFullPath(Path.Combine(full, artifact.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
-        if (!target.StartsWith(Path.TrimEndingDirectorySeparator(full) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Artifact escapes the bound root", nameof(artifact));
+        var target = Path.GetFullPath(Path.Combine(full, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        if (!(directory && target == full) && !target.StartsWith(Path.TrimEndingDirectorySeparator(full) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Artifact escapes the bound root", nameof(relativePath));
         var lease = new GuardedArtifactPath(target);
         try
         {
-            var parent = Path.GetDirectoryName(target)!;
+            var parent = directory ? target : Path.GetDirectoryName(target)!;
             var current = drive;
             lease.HoldDirectory(current);
             foreach (var segment in parent[drive.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))

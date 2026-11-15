@@ -10,6 +10,15 @@ namespace Next.Formats;
 
 public static class ZipArchiveValidation
 {
+    public static ZipArchive OpenRead(byte[] source, DecodeLimits? limits = null)
+    {
+        Validate(source, limits);
+        var legacy = CodePagesEncodingProvider.Instance.GetEncoding(437, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)!;
+        var stream = new MemoryStream(source, writable: false);
+        try { return new(stream, ZipArchiveMode.Read, leaveOpen: false, entryNameEncoding: legacy); }
+        catch { stream.Dispose(); throw; }
+    }
+
     public static void Validate(byte[] source, DecodeLimits? limits = null)
     {
         ArgumentNullException.ThrowIfNull(source); limits ??= DecodeLimits.Default; limits.Validate();

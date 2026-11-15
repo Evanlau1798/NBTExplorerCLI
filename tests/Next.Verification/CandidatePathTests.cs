@@ -24,16 +24,7 @@ internal static class CandidatePathTests
         try
         {
             File.WriteAllBytes(Path.Combine(outside, "level.dat"), [1, 2, 3]);
-            var script = "$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path '" + link.Replace("'", "''", StringComparison.Ordinal)
-                + "' -Target '" + outside.Replace("'", "''", StringComparison.Ordinal) + "' | Out-Null";
-            var powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
-            var start = new ProcessStartInfo(powershell) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
-            foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-EncodedCommand", Convert.ToBase64String(Encoding.Unicode.GetBytes(script)) }) start.ArgumentList.Add(argument);
-            using (var process = Process.Start(start)!)
-            {
-                var output = process.StandardOutput.ReadToEnd(); var error = process.StandardError.ReadToEnd();
-                if (!process.WaitForExit(10_000) || process.ExitCode != 0) throw new InvalidOperationException($"Junction fixture unavailable: {output} {error}");
-            }
+            CreateJunction(link, outside);
             Require((File.GetAttributes(link) & FileAttributes.ReparsePoint) != 0, "fixture is a real junction");
             var store = new ArtifactStorage(root, World);
             var artifact = new ArtifactAddress(World, "link/level.dat", ArtifactKind.Nbt);
@@ -51,6 +42,19 @@ internal static class CandidatePathTests
         {
             if (Directory.Exists(link)) Directory.Delete(link); // Delete the junction itself, never traverse it.
             Directory.Delete(root, recursive: true); Directory.Delete(outside, recursive: true);
+        }
+    }
+    internal static void CreateJunction(string link, string outside)
+    {
+        var script = "$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path '" + link.Replace("'", "''", StringComparison.Ordinal)
+            + "' -Target '" + outside.Replace("'", "''", StringComparison.Ordinal) + "' | Out-Null";
+        var powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+        var start = new ProcessStartInfo(powershell) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+        foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-EncodedCommand", Convert.ToBase64String(Encoding.Unicode.GetBytes(script)) }) start.ArgumentList.Add(argument);
+        using (var process = Process.Start(start)!)
+        {
+            var output = process.StandardOutput.ReadToEnd(); var error = process.StandardError.ReadToEnd();
+            if (!process.WaitForExit(10_000) || process.ExitCode != 0) throw new InvalidOperationException($"Junction fixture unavailable: {output} {error}");
         }
     }
 }
