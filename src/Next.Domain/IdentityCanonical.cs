@@ -6,6 +6,12 @@ internal static class IdentityCanonical
 {
     internal const int MaximumBytes = 67_108_864;
 
+    internal static Guid ReadWorld(StableIdentity identity)
+    {
+        if (!identity.IsValid) throw new ArgumentException("Expected a valid world-bound identity", nameof(identity));
+        return new Reader(identity.Canonical.AsSpan()).WorldReference(identity.Kind);
+    }
+
     public static bool Validate(IdentityKind kind, ReadOnlySpan<byte> bytes)
     {
         if (bytes.Length > MaximumBytes) return false;
@@ -25,6 +31,15 @@ internal static class IdentityCanonical
     private ref struct Reader(ReadOnlySpan<byte> bytes)
     {
         private ReadOnlySpan<byte> _remaining = bytes;
+
+        public Guid WorldReference(IdentityKind kind)
+        {
+            Header(kind);
+            if (kind is IdentityKind.Artifact or IdentityKind.Snapshot) return World();
+            if (kind == IdentityKind.Group) _ = Text();
+            if (kind is IdentityKind.Group or IdentityKind.Occurrence) return ArtifactParent().WorldId;
+            throw new ArgumentException("Identity kind does not directly bind a world", nameof(kind));
+        }
 
         public StableIdentity Identity(IdentityKind expected)
         {
