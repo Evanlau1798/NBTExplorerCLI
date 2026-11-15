@@ -20,10 +20,12 @@ internal sealed partial class NbtTextReader
     {
         foreach (var (entity, path) in Sequence(Field(root, "Entities", TypedPath.Root), At(TypedPath.Root, "Entities"))) Entity(entity, path);
     }
-    internal void BlockEntity(NbtValue value, TypedPath path)
+    internal void BlockEntity(NbtValue value, TypedPath path, string? knownIdentity = null)
     {
-        if (Field(value, "id", path) is not NbtString id) { output.Diagnostic(path, "MissingBlockEntityIdentity"); return; }
-        var identity = MinecraftIdentifier.DefaultNamespace(id.Value);
+        var rawIdentity = Field(value, "id", path);
+        if (rawIdentity is not NbtString && (rawIdentity is not null || knownIdentity is null)) { output.Diagnostic(path, "MissingBlockEntityIdentity"); return; }
+        var identity = rawIdentity is NbtString id ? MinecraftIdentifier.DefaultNamespace(id.Value) : knownIdentity!;
+        if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingBlockEntityIdentity"); return; }
         var role = identity == "minecraft:command_block" ? "command_block.name" : "container.name";
         Component(Field(value, "CustomName", path), At(path, "CustomName"), role);
         foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
@@ -46,10 +48,12 @@ internal sealed partial class NbtTextReader
             else output.Diagnostic(At(path, "Command"), "InvalidCommand");
         }
     }
-    internal void Entity(NbtValue value, TypedPath path)
+    internal void Entity(NbtValue value, TypedPath path, string? knownIdentity = null)
     {
-        if (Field(value, "id", path) is not NbtString id) { output.Diagnostic(path, "MissingEntityIdentity"); return; }
-        var identity = MinecraftIdentifier.DefaultNamespace(id.Value);
+        var rawIdentity = Field(value, "id", path);
+        if (rawIdentity is not NbtString && (rawIdentity is not null || knownIdentity is null)) { output.Diagnostic(path, "MissingEntityIdentity"); return; }
+        var identity = rawIdentity is NbtString id ? MinecraftIdentifier.DefaultNamespace(id.Value) : knownIdentity!;
+        if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingEntityIdentity"); return; }
         Component(Field(value, "CustomName", path), At(path, "CustomName"), identity == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name");
         if (identity == "minecraft:text_display") Component(Field(value, "text", path), At(path, "text"), "text_display.text");
         Player(value, path);

@@ -66,7 +66,7 @@ public static class NativeJsonStrings
         if (!reader.Read()) throw new JsonException("Missing JSON string");
         return ReadToken(ref reader);
     }
-    internal static string ReadToken(ref Utf8JsonReader reader)
+    public static string ReadToken(ref Utf8JsonReader reader)
     {
         if (reader.TokenType is not (JsonTokenType.String or JsonTokenType.PropertyName)) throw new JsonException("Expected a JSON string token");
         try { return reader.GetString()!; }

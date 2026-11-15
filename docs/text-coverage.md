@@ -68,7 +68,9 @@ SNBT extraction reuses the bounded format parser and logical list adapter. Addre
 the real outer String path, the syntax leaf's byte span/hash and stable logical `syntax.nodePath`,
 plus a separate `componentPath` for JSON inside an SNBT String. `utf8-java-string` means spans
 are relative to strict UTF8 encoding of that decoded outer Java String, not raw JSON-file bytes.
-Commands remain pending grammar candidates. These are incomplete sources, not writable text.
+Raw component readers retain commands as grammar candidates. The world adapter passes
+them to the shared [command reader](command-extraction.md), preserving separate name
+references and unresolved coverage. Unsupported grammar remains incomplete, not writable text.
 Other unimplemented JSON/source schemas remain explicit
 unsupported results. This extraction layer is not a complete Minecraft gameplay validator.
 

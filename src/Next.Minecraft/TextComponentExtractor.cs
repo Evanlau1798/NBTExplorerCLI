@@ -21,6 +21,10 @@ public static class TextComponentExtractor
         if (Check(source, profile)) throw Unsupported();
         return ReadJson(source, NativeJsonStrings.EncodeJavaDocument(component, limits), profile, limits, scope, true);
     }
+    internal static TextExtractionResult NativeJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
+    {
+        _ = Check(source, profile); return ReadJson(source, component, profile, limits, scope, false);
+    }
     private static TextExtractionResult ReadJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits? limits, SnapshotScope? scope, bool embedded)
     {
         limits ??= DecodeLimits.Default;
@@ -61,6 +65,7 @@ public static class TextComponentExtractor
         var objectContent = modern && schema.Version == 2 && (fields.ContainsKey("object") || fields.ContainsKey("atlas") || fields.ContainsKey("player"));
         var contents = ContentKeys.Count(fields.ContainsKey) + (objectContent ? 1 : 0);
         if (contents != 1) { output.Diagnostic(path, contents > 1 ? "AmbiguousComponent" : "UnknownComponent"); return; }
+        if (fields.TryGetValue("selector", out var selector) && selector.ValueKind != JsonValueKind.String) { output.Diagnostic(At(path, "selector"), "InvalidComponent"); return; }
         if (objectContent && fields.TryGetValue("object", out var objectKind) && (objectKind.ValueKind != JsonValueKind.String || NativeJsonStrings.Read(objectKind) is not ("atlas" or "player")))
         { output.Diagnostic(path, "UnknownComponent"); return; }
         if (fields.TryGetValue("text", out var text))
@@ -121,6 +126,7 @@ public static class TextComponentExtractor
         var objectContent = profile.Features[ProfileFacet.TextSchema].Version == 2 && (fields.ContainsKey("object") || fields.ContainsKey("atlas") || fields.ContainsKey("player"));
         var contents = ContentKeys.Count(fields.ContainsKey) + (objectContent ? 1 : 0);
         if (contents != 1) { output.Diagnostic(path, contents > 1 ? "AmbiguousComponent" : "UnknownComponent"); return; }
+        if (fields.TryGetValue("selector", out var selector) && selector is not NbtString) { output.Diagnostic(At(path, "selector"), "InvalidComponent"); return; }
         if (objectContent && fields.TryGetValue("object", out var objectKind) && objectKind is not NbtString { Value: "atlas" or "player" })
         { output.Diagnostic(path, "UnknownComponent"); return; }
         if (fields.TryGetValue("text", out var text))

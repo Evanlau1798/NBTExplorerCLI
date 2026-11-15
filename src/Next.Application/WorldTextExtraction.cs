@@ -7,8 +7,8 @@ using System.Text;
 
 namespace Next.Application;
 
-public sealed record TextSourceExtraction(DiscoveredSource Source, SourceOutcome Outcome, TextExtractionResult? Text, string? DiagnosticCode = null);
-public sealed class WorldTextExtraction
+public sealed record TextSourceExtraction(DiscoveredSource Source, SourceOutcome Outcome, TextExtractionResult? Text, string? DiagnosticCode = null, CommandExtractionResult? Commands = null);
+public sealed partial class WorldTextExtraction
 {
     private readonly IWorldInventory inventory;
     private readonly ScanRequest request;
@@ -80,13 +80,24 @@ public sealed class WorldTextExtraction
                 bytes = new byte[checked((int)entry.Length)]; using var content = entry.Open(); content.ReadExactly(bytes);
                 if (Hash256.Compute(bytes) != source.ContentHash) return new(source, SourceOutcome.Failed, null, "SourceChangedDuringExtraction");
             }
-            TextExtractionResult text;
+            TextExtractionResult text; CapabilityProfile? commandProfile = null;
             if (region is not null && source.Chunk is { } chunk)
-                text = NbtTextExtractor.Extract(source.Location, region.ReadChunk(chunk.LocalZ * 32 + chunk.LocalX, request.Limits).Document, chunk, request.Limits, scope: request.Scope, layoutProfile: Discovery.Metadata?.Profile);
+            {
+                var document = region.ReadChunk(chunk.LocalZ * 32 + chunk.LocalX, request.Limits).Document;
+                text = NbtTextExtractor.Extract(source.Location, document, chunk, request.Limits, scope: request.Scope, layoutProfile: Discovery.Metadata?.Profile);
+                commandProfile = NbtTextExtractor.Profile(source.Location, document);
+            }
             else if (source.Location.Artifact.Kind == ArtifactKind.Nbt || source.Location.Role == WorldSourceRole.Structure)
-                text = NbtTextExtractor.Extract(source.Location, ReadDat(bytes), limits: request.Limits, storageRules: StorageRules.GetValueOrDefault(source.Location.Artifact, ImmutableArray<StorageTextRule>.Empty), scope: request.Scope, layoutProfile: Discovery.Metadata?.Profile);
+            {
+                var document = ReadDat(bytes);
+                text = NbtTextExtractor.Extract(source.Location, document, limits: request.Limits, storageRules: StorageRules.GetValueOrDefault(source.Location.Artifact, ImmutableArray<StorageTextRule>.Empty), scope: request.Scope, layoutProfile: Discovery.Metadata?.Profile);
+                commandProfile = NbtTextExtractor.Profile(source.Location, document);
+            }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
+            {
                 text = PackTextExtractor.Extract(source.Location, bytes, source.Pack ?? throw new InvalidDataException("Missing pack metadata snapshot"), request.Limits, request.Scope);
+                commandProfile = MinecraftProfiles.ForPackMetadata(source.Pack!);
+            }
             else if (source.Location.Role == WorldSourceRole.Function)
             {
                 var start = bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }) ? 3 : 0;
@@ -103,18 +114,28 @@ public sealed class WorldTextExtraction
                 var syntax = new SyntaxLocator(grammar.Schema, grammar.Version, start, bytes.Length - start, Hash256.Compute(bytes).Hex, start == 0 ? "utf8" : "utf8-bom", SyntaxLocator.DetectNewline(script));
                 var address = new SourceAddress(source.Location.Artifact, TypedPath.Root, "command.function", syntax: syntax);
                 text = new([], [], [], [new(address, script)], []);
+                commandProfile = profile;
             }
             else if (source.Location.Role == WorldSourceRole.SavedData && Discovery.Metadata is { } metadata)
                 text = DataTextExtractor.Json(source.Location, bytes, metadata, request.Limits, request.Scope);
             else return new(source, SourceOutcome.Unsupported, null, "UnsupportedTextSource");
-            if (!text.PendingCommands.IsEmpty) return new(source, SourceOutcome.Unsupported, text, "CommandGrammarPending");
+            CommandExtractionResult? commands = null;
+            if (!text.PendingCommands.IsEmpty)
+            {
+                if (commandProfile is null) return new(source, SourceOutcome.Unsupported, text, "CommandGrammarPending");
+                commands = ExtractCommands(text.PendingCommands, commandProfile);
+                text = text with { Occurrences = text.Occurrences.AddRange(commands.Text.Occurrences), TranslationKeys = text.TranslationKeys.AddRange(commands.Text.TranslationKeys),
+                    Diagnostics = text.Diagnostics.AddRange(commands.Text.Diagnostics), PendingCommands = commands.Text.PendingCommands };
+                CheckRetention(text, commands.References);
+            }
             if (!text.Unclassified.IsEmpty) return new(source, SourceOutcome.Unsupported, text, "UnclassifiedStorageText");
             if (!text.Diagnostics.IsEmpty)
             {
-                var unsupported = text.Diagnostics.All(diagnostic => diagnostic.Code.StartsWith("Unsupported", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Unknown", StringComparison.Ordinal));
-                return new(source, unsupported ? SourceOutcome.Unsupported : SourceOutcome.Failed, text, text.Diagnostics[0].Code);
+                var unsupported = text.Diagnostics.All(diagnostic => diagnostic.Code.StartsWith("Unsupported", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Unknown", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Dynamic", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Unresolved", StringComparison.Ordinal));
+                return new(source, unsupported ? SourceOutcome.Unsupported : SourceOutcome.Failed, text, text.Diagnostics[0].Code, commands);
             }
-            return new(source, text.Occurrences.IsEmpty && text.TranslationKeys.IsEmpty ? SourceOutcome.Irrelevant : SourceOutcome.Success, text);
+            if (commands is { ReferenceCompleteness: not ReferenceCompleteness.Complete }) return new(source, SourceOutcome.Unsupported, text, "IncompleteCommandReferences", commands);
+            return new(source, text.Occurrences.IsEmpty && text.TranslationKeys.IsEmpty && (commands?.References.IsEmpty ?? true) ? SourceOutcome.Irrelevant : SourceOutcome.Success, text, Commands: commands);
         }
         catch (Exception error) when (DiscoveryFailure.IsExpected(error))
         { var failure = DiscoveryFailure.Describe(error); return new(source, failure.Outcome, null, failure.Code); }

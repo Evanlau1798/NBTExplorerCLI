@@ -21,11 +21,11 @@ internal static class WorldTextBoundaryTests
             {
                 var path = "datapacks/p/data/models/function/" + name + ".mcfunction"; var bytes = Encoding.UTF8.GetBytes(body); Put(root, path, bytes);
                 var scan = new WorldTextExtraction(new WorldInventory(root, World), new(new([], [], ["command.function"], [path])));
-                var result = scan.ReadSources().Single(); var pending = result.Text?.PendingCommands;
-                Require(result.Outcome == SourceOutcome.Unsupported && result.DiagnosticCode == "CommandGrammarPending" && pending is { Length: 1 }, "function must retain a grammar handoff instead of a false complete result");
-                var command = pending!.Value.Single(); var syntax = command.Address.Syntax!;
-                Require(command.Command == body && syntax.StartByte == 0 && syntax.LengthBytes == bytes.Length && syntax.PreimageHash == Hash256.Compute(bytes).Hex && syntax.Newline == name
-                    && SourceAddressJson.Read(SourceAddressJson.Write(command.Address)) == command.Address, "exact source bytes/newline and serialized syntax locator survive function handoff");
+                var result = scan.ReadSources().Single();
+                Require(result.Outcome == SourceOutcome.Unsupported && result.DiagnosticCode == "UnknownCommandGrammar" && result.Commands!.ReferenceCompleteness == ReferenceCompleteness.Unresolved, "unknown function grammar remains explicitly incomplete");
+                var address = result.Text!.Diagnostics.First().Address; var syntax = address.Syntax!;
+                Require(syntax.StartByte == 0 && syntax.LengthBytes == Encoding.UTF8.GetByteCount("say First") && syntax.PreimageHash == Hash256.Compute(bytes).Hex && syntax.Newline == name
+                    && SourceAddressJson.Read(SourceAddressJson.Write(address)) == address, "exact source bytes/newline and serialized syntax locator survive per-line grammar diagnostics");
             }
         }
         finally { Directory.Delete(root, true); }
@@ -39,8 +39,8 @@ internal static class WorldTextBoundaryTests
             const string path = "datapacks/p/data/models/function/bom.mcfunction";
             const string body = "say 雪\r\n"; var encoded = Encoding.UTF8.GetBytes(body); byte[] bytes = [0xef, 0xbb, 0xbf, .. encoded]; Put(root, path, bytes);
             var scan = new WorldTextExtraction(new WorldInventory(root, World), new(new([], [], ["command.function"], [path])));
-            var pending = scan.ReadSources().Single().Text!.PendingCommands.Single(); var syntax = pending.Address.Syntax!;
-            Require(pending.Command == body && syntax.Encoding == "utf8-bom" && syntax.StartByte == 3 && syntax.LengthBytes == encoded.Length && syntax.PreimageHash == Hash256.Compute(bytes).Hex,
+            var diagnostic = scan.ReadSources().Single().Text!.Diagnostics.Single(); var syntax = diagnostic.Address.Syntax!;
+            Require(syntax.Encoding == "utf8-bom" && syntax.StartByte == 3 && syntax.LengthBytes == Encoding.UTF8.GetByteCount("say 雪") && syntax.PreimageHash == Hash256.Compute(bytes).Hex,
                 "BOM remains in raw preimage and outside command body span; it is not command text");
         }
         finally { Directory.Delete(root, true); }

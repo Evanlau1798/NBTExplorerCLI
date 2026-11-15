@@ -19,22 +19,26 @@ internal sealed partial class NbtTextReader
         {
             if (group.Count() != 1) { output.Diagnostic(dataPath, "AmbiguousItemComponent"); continue; }
             var entry = group.Single(); var componentPath = At(dataPath, entry.Name);
-            switch (group.Key)
+            ItemComponent(group.Key, entry.Value, componentPath, bookRole);
+        }
+    }
+    internal void ItemComponent(string name, NbtValue value, TypedPath path, string bookRole = "book")
+    {
+            switch (name)
             {
-                case "minecraft:custom_name": case "minecraft:item_name": Component(entry.Value, componentPath, "item.name"); break;
+                case "minecraft:custom_name": case "minecraft:item_name": Component(value, path, "item.name"); break;
                 case "minecraft:lore":
-                    foreach (var (lore, lorePath) in Sequence(entry.Value, componentPath)) Component(lore, lorePath, "item.lore"); break;
+                    foreach (var (lore, lorePath) in Sequence(value, path)) Component(lore, lorePath, "item.lore"); break;
                 case "minecraft:container":
-                    foreach (var (slot, slotPath) in Sequence(entry.Value, componentPath))
+                    foreach (var (slot, slotPath) in Sequence(value, path))
                         if (Field(slot, "item", slotPath) is { } nested) Item(nested, At(slotPath, "item")); break;
                 case "minecraft:bundle_contents": case "minecraft:charged_projectiles":
-                    foreach (var (nested, nestedPath) in Sequence(entry.Value, componentPath)) Item(nested, nestedPath); break;
-                case "minecraft:block_entity_data": BlockEntity(entry.Value, componentPath); break;
-                case "minecraft:entity_data": Entity(entry.Value, componentPath); break;
-                case "minecraft:written_book_content": Book(entry.Value, componentPath, bookRole, written: true); break;
-                case "minecraft:writable_book_content": Book(entry.Value, componentPath, bookRole, written: false); break;
+                    foreach (var (nested, nestedPath) in Sequence(value, path)) Item(nested, nestedPath); break;
+                case "minecraft:block_entity_data": BlockEntity(value, path); break;
+                case "minecraft:entity_data": Entity(value, path); break;
+                case "minecraft:written_book_content": Book(value, path, bookRole, written: true); break;
+                case "minecraft:writable_book_content": Book(value, path, bookRole, written: false); break;
             }
-        }
     }
     internal void LegacyTag(NbtValue tag, string? itemId) => LegacyItem(tag, TypedPath.Root, itemId, "book");
     private void LegacyItem(NbtValue tag, TypedPath path, string? id, string bookRole)

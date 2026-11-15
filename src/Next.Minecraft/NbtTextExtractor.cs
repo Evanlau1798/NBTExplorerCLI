@@ -11,12 +11,7 @@ public static class NbtTextExtractor
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(document);
         limits ??= DecodeLimits.Default; _ = BinaryNbt.MeasureDocument(document, limits);
-        var versionPath = source.Role == WorldSourceRole.Level ? new TypedPath([PathSegment.ForKey("Data"), PathSegment.ForKey("DataVersion")]) : new([PathSegment.ForKey("DataVersion")]);
-        var version = NbtLocator.Resolve(document.Root, versionPath);
-        if (version.Status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid || version.Status == ResolutionStatus.Found && version.Value is not NbtInt)
-            throw new CodecException(CodecError.InvalidTag, 0, "Invalid artifact DataVersion");
-        var profile = version.Value is NbtInt number ? MinecraftProfiles.ForDataVersion(number.Value) : null;
-        if (profile is null) throw new CodecException(CodecError.UnsupportedProfile, 0, "Missing or unknown artifact DataVersion");
+        var profile = Profile(source, document);
         var binding = new SourceAddress(source.Artifact, TypedPath.Root, "source.document", source.Dimension, chunk);
         var output = new TextExtractionCollector(binding, false, limits, scope);
         var reader = new NbtTextReader(binding, profile, layoutProfile ?? profile, output, limits);
@@ -32,6 +27,16 @@ public static class NbtTextExtractor
             default: output.Diagnostic(TypedPath.Root, "UnsupportedNbtTextSource"); break;
         }
         return output.Finish();
+    }
+    public static CapabilityProfile Profile(WorldSourceLocation source, NbtDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(document);
+        var versionPath = source.Role == WorldSourceRole.Level ? new TypedPath([PathSegment.ForKey("Data"), PathSegment.ForKey("DataVersion")]) : new([PathSegment.ForKey("DataVersion")]);
+        var version = NbtLocator.Resolve(document.Root, versionPath);
+        if (version.Status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid || version.Status == ResolutionStatus.Found && version.Value is not NbtInt)
+            throw new CodecException(CodecError.InvalidTag, 0, "Invalid artifact DataVersion");
+        return version.Value is NbtInt number && MinecraftProfiles.ForDataVersion(number.Value) is { } profile ? profile
+            : throw new CodecException(CodecError.UnsupportedProfile, 0, "Missing or unknown artifact DataVersion");
     }
 }
 
@@ -56,7 +61,7 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
             yield return (child, childPath);
         }
     }
-    private void Component(NbtValue? value, TypedPath path, string role)
+    internal void Component(NbtValue? value, TypedPath path, string role)
     {
         if (value is null || !output.CouldInclude(role)) return;
         var source = new SourceAddress(binding.Artifact, path, role, binding.Dimension, binding.Chunk);

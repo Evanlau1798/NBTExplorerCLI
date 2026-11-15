@@ -7,13 +7,17 @@ namespace Next.Minecraft;
 
 internal static class SnbtTextExtractor
 {
+    internal static TextExtractionResult ItemComponent(SourceAddress source, string syntax, CapabilityProfile profile, string name, DecodeLimits limits, SnapshotScope scope)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemComponent(name, root, TypedPath.Root), false);
+    internal static TextExtractionResult Component(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Component(root, TypedPath.Root, source.SemanticRole), false);
     internal static TextExtractionResult LegacyItemTag(SourceAddress source, string syntax, CapabilityProfile profile, string? itemId, DecodeLimits limits, SnapshotScope scope)
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.LegacyTag(root, itemId));
-    internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.BlockEntity(root, TypedPath.Root));
-    internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Entity(root, TypedPath.Root));
-    private static TextExtractionResult Read(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<NbtTextReader, NbtValue> extract)
+    internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.BlockEntity(root, TypedPath.Root, knownIdentity));
+    internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Entity(root, TypedPath.Root, knownIdentity));
+    private static TextExtractionResult Read(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<NbtTextReader, NbtValue> extract, bool compound = true)
     {
         if (source.Syntax is not null || source.ComponentPath is not null) throw new CodecException(CodecError.UnsupportedProfile, 0, "Nested syntax binding is unsupported");
         var encoding = new UTF8Encoding(false, true);
@@ -21,7 +25,7 @@ internal static class SnbtTextExtractor
         var grammar = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt" ? SnbtProfile.Java1215 : SnbtProfile.JavaLegacy;
         var parsed = Snbt.ParseDocument(encoding.GetBytes(syntax), grammar, limits);
         var document = MinecraftNbtAdapter.Encode(new("", parsed.Root.Value), profile, limits);
-        if (document.Root is not NbtCompound) throw new SnbtException(SnbtError.InvalidToken, 0, "Item tag requires an SNBT compound");
+        if (compound && document.Root is not NbtCompound) throw new SnbtException(SnbtError.InvalidToken, 0, "Item tag requires an SNBT compound");
         var binding = new SourceAddress(source.Artifact, TypedPath.Root, source.SemanticRole, source.Dimension, source.Chunk);
         var output = new TextExtractionCollector(binding, false, limits, scope);
         extract(new(binding, profile, profile, output, limits), document.Root);

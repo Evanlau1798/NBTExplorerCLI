@@ -120,7 +120,7 @@ internal static class TextExtractionReviewTests
                 Put(root, path, Encoding.UTF8.GetBytes("say " + new string('x', length)));
                 var scan = new WorldTextExtraction(new WorldInventory(root, World), new(new([], [], [], [path]), new(MaxDecodedBytes: 512)));
                 var row = scan.ReadSources().Single();
-                Require(length == 2 ? row.DiagnosticCode == "CommandGrammarPending" && row.Text!.PendingCommands.Length == 1
+                Require(length == 2 ? row.DiagnosticCode == "UnknownCommandGrammar" && row.Commands!.ReferenceCompleteness == ReferenceCompleteness.Unresolved
                     : row.Outcome == SourceOutcome.Failed && row.DiagnosticCode == "LimitExceeded" && row.Text is null,
                     "byte and UTF16/address retention limits reject before decoded allocation; small command remains a pending candidate");
             }

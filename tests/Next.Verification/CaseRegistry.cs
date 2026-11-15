@@ -7,6 +7,22 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("command-review-inert-reference-fields", "discovery", _ => CommandReviewTests.InertFieldsCannotBecomeReferences()),
+        new("command-review-invalid-selector-type", "discovery", _ => CommandReviewTests.SelectorTypesAreValidated()),
+        new("command-review-selector-quote-kinds", "discovery", _ => CommandReviewTests.BothSelectorQuotesAndEscapes()),
+        new("command-review-cumulative-token-budget", "discovery", _ => CommandReviewTests.SourceTokenBudgetIsCumulative()),
+        new("command-review-unresolved-source-outcome", "discovery", _ => CommandReviewTests.UnresolvedReferencesStayUnsupported()),
+        new("command-item-component-reference-coverage", "discovery", _ => CommandTextExtractionTests.ItemComponentReferenceCoverage()),
+        new("command-complete-argument-boundaries", "discovery", _ => CommandTextExtractionTests.CompleteArgumentBoundaries()),
+        new("command-grammar-binding-encoded-reference", "discovery", _ => CommandTextExtractionTests.GrammarBindingsAndEncodedReferences()),
+        new("command-conditional-data-item-grammar", "discovery", _ => CommandTextExtractionTests.ConditionalDataAndItemCommands()),
+        new("command-component-selector-references", "discovery", _ => CommandTextExtractionTests.ComponentSelectorReferences()),
+        new("world-command-functions-and-dat", "discovery", _ => WorldCommandExtractionTests.FunctionsAndPhysicalNbtCommands()),
+        new("command-summon-setblock-legacy-give", "discovery", _ => CommandTextExtractionTests.SummonSetblockAndLegacyGive()),
+        new("command-item-component-snbt-fragments", "discovery", _ => CommandTextExtractionTests.ItemComponentFragments()),
+        new("command-comments-preimages-budgets", "discovery", _ => CommandTextExtractionTests.CommentsPreimagesAndBudgets()),
+        new("command-modern-snbt-and-unknown-grammar", "discovery", _ => CommandTextExtractionTests.ModernSnbtAndUnknownGrammar()),
+        new("command-execute-json-components-references", "discovery", _ => CommandTextExtractionTests.ExecuteJsonComponentsAndReferences()),
         new("pack-snbt-default-namespace-ids", "discovery", _ => SnbtTextExtractionTests.SnbtDefaultNamespaceIdentities()),
         new("pack-legacy-unknown-identity-scope", "discovery", _ => SnbtTextExtractionTests.UnknownLegacyIdentityRespectsScope()),
         new("pack-snbt-wrapper-spans-and-limits", "discovery", _ => SnbtTextExtractionTests.ModernWrapperSpansAndUnknownItemType()),
