@@ -401,3 +401,23 @@ and preserve raw bytes outside the selected component.
 Creating missing directories, reference synchronization, restore and
 commit/recovery remain unsupported until their service paths are implemented and verified.
 Preparation does not change the original world.
+
+## Verified raw backups
+
+`WorldBackupService.Create` takes explicit physical artifact preconditions for one world.
+It copies exact raw bytes without parsing Minecraft data, distinguishes empty files from
+expectedAbsent images, verifies stored blobs and rereads sources before publishing the
+canonical version 1 backup manifest. Content hashes identify immutable blobs and the
+completion manifest; reordered replay produces the same backup identity.
+
+`FileSystemWorldBackupStore` uses a separate owned atomic repository. Each object and
+manifest is limited to 64 MiB, artifact declarations are bounded, and physical paths have
+a 32767 UTF-16 unit limit. Manifest encoding stops at its output budget. A conflicting or
+corrupt stored object is preserved and rejected. Failed capture may leave reusable blobs;
+the service exposes a complete backup only after its manifest and all referenced images
+read back successfully.
+
+`Load` verifies world binding and all distinct stored images. `VerifiedBackup.ReadArtifact`
+rechecks the requested blob before returning bytes; an unlisted artifact is rejected.
+Backup validation covers byte integrity and manifest membership. Restore plans must bind
+the current world's raw images separately, then use the same staging and commit engine.

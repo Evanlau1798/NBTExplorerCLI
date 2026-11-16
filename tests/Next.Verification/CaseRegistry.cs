@@ -7,6 +7,12 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("backup-raw-images-complete-restart", "recovery", _ => WorldBackupTests.RawImagesAreCompleteDurableAndIndependentOfParsing()),
+        new("backup-failure-no-completion", "recovery", _ => WorldBackupTests.FailedOrStaleCaptureDoesNotPublishCompletion()),
+        new("backup-manifest-store-trust", "recovery", _ => WorldBackupTests.ManifestAndStoreRejectAmbiguousOrForeignClaims()),
+        new("backup-manifest-output-budget", "recovery", _ => WorldBackupTests.MetadataEncodingStopsAtItsOutputBudget()),
+        new("backup-real-process-completion-windows", "recovery", _ => WorldBackupProcessTests.CompletionSurvivesRealProcessInterruptions()),
+        new("backup-capture-child", "calibration", _ => WorldBackupProcessTests.CaptureChild()),
         new("prepare-world-command-key-components", "preparation", _ => CommandKeyPreparationTests.CommandComponentsKeepFramingAndReferences()),
         new("prepare-world-command-key-encoded-batch", "preparation", _ => CommandKeyPreparationTests.EncodedCommandKeysAndLiteralsShareOneLeaf()),
         new("prepare-world-key-native-snbt-component", "preparation", _ => EncodedKeyPreparationTests.NativeSnbtComponentPreservesItsOuterLayers()),

@@ -34,6 +34,19 @@ internal static class ContractJson
     }
     private sealed record Envelope<T>(string SchemaFamily, int SchemaVersion, T Data);
     public static string Write<T>(string family, T data) => JsonSerializer.Serialize(new Envelope<T>(family, 1, data), Options);
+    internal static string WriteBounded<T>(string family, T data)
+    {
+        using var output = new LimitedJsonOutput();
+        JsonSerializer.Serialize(output, new Envelope<T>(family, 1, data), Options);
+        return Encoding.UTF8.GetString(output.GetBuffer().AsSpan(0, checked((int)output.Length)));
+    }
+    private sealed class LimitedJsonOutput : MemoryStream
+    {
+        private void Check(int count) { if (count > 67_108_864 - Position) throw new JsonException("Contract output exceeds byte budget"); }
+        public override void Write(byte[] buffer, int offset, int count) { Check(count); base.Write(buffer, offset, count); }
+        public override void Write(ReadOnlySpan<byte> buffer) { Check(buffer.Length); base.Write(buffer); }
+        public override void WriteByte(byte value) { Check(1); base.WriteByte(value); }
+    }
     public static T Read<T>(string json, string family, Func<JsonElement, T> decode)
     {
         ArgumentNullException.ThrowIfNull(json);
