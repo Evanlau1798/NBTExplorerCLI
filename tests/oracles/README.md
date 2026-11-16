@@ -79,3 +79,13 @@ Legacy oracle 接受 24／拒絕 20，modern 接受 29／拒絕 15。fixtures �
 輸出存至 `src/Next.Formats/Unicode/java21-names.json`，UTF-8／LF。使用 Java 21.0.8 runtime `21.0.8+12-LTS-250`、Unicode15.0，共 288,767 個 getName／codePointOf 可逆的 entries。gzip 內文為 `hex-codepoint<TAB>name<LF>`；SHA256 `7820d9a7ab31fa78e4241d89d48e1a41df8fa906456062b250cef6d82466822d`。整份 JSON 2,143,040 bytes，SHA256 `660194030d42081ab3b1e22468630d8b848c59c160494f7da9f4585b6bc3f173`。不要把大型 Base64 印入診斷或 review；只核對 metadata、digest 與再生結果。
 
 產品內嵌資料、按需載入，不呼叫 JDK。Unicode 授權完整保留在 `docs/licenses/Unicode.md`（原 JDK21 legal/java.base/unicode.md，僅統一 LF），並複製到產品輸出。JDK／Mojang 程式及 jars 均未納入 source 或產品依賴；只有本專案生成器與合成 oracle 資料。
+
+## Session percent formatter reference
+
+`PercentPlaceholderOracle.java` 只用 JDK `Pattern`／`Integer`，獨立於產品 C# scanner 產生 2,312 組 argument-contract 比較。兩個 regex 常數與 literal fallback／索引語義由官方 `Language`／`TranslatableContents` bytecode 唯讀核對；沒有啟動遊戲。固定 client SHA1：1.20.4 `fd19469fed4a4b4c15b2d5133985f0e3e7816a8a`、1.21 `0e9a07b9bb3390602f977073aa12884a4ce12431`、1.21.5 `b88808bbb3da8d9f453694b5d8f74a3396f1a533`、26.1-snapshot-6 `c9028621e9dccd9b162d33b5188db8518299b792`；均與官方 version metadata 的 client SHA1 相符。
+
+```powershell
+& 'C:/Program Files/Java/jdk-25.0.2/bin/java.exe' --source 25 tests/oracles/PercentPlaceholderOracle.java fixtures/codec/percent-placeholders.reference.json
+```
+
+輸出 UTF-8/LF compact JSON，187,311 bytes，SHA256 `f01596f0e49fe67f5e406753b46ee68d9cbda7c589fb82fcb892492a1fa9d2bd`。Java 25 reference 涵蓋 numeric normalization、implicit/indexed arguments、literal percent、未知／溢位／Unicode index、控制字元與 unpaired UTF16。產品測試讀固定結果，不在 runtime 呼叫 JDK，也不隨產品輸出 JDK／Mojang jars。

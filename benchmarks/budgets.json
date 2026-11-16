@@ -1,5 +1,5 @@
 {
-  "policyVersion": 2,
+  "policyVersion": 3,
   "planVersion": "0.3",
   "gateRevision": 2,
   "workers": {"default": 2, "maximum": 8},
@@ -18,6 +18,9 @@
     "sourceCatalogEntries": 100000,
     "sessionSlots": 100000,
     "sessionJsonBytes": 67108864,
+    "replyDecodedTextBytes": 67108864,
+    "declaredPlaceholderTokens": 256,
+    "placeholderOccurrences": 100000,
     "planOperations": 100000,
     "planJsonBytes": 67108864,
     "receiptJsonBytes": 134217728
