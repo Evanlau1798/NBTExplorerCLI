@@ -328,8 +328,8 @@ same-file pre/postimage contradiction remains as a rejected `conflicting-images`
 
 ## World candidate preparation
 
-`WorldPlanBuilder` binds explicit literal slots and typed edits to live standalone NBT,
-JSON or mcfunction sources from a `WorldQuerySnapshot`. It re-extracts literal scope,
+`WorldPlanBuilder` binds explicit literal slots and typed NBT edits to live standalone,
+Region/chunk or ZIP/entry sources from a `WorldQuerySnapshot`. It re-extracts literal scope,
 uses the shared reply validator, and records raw output, world metadata and directory
 pack metadata preimages even when the query excludes metadata payloads. Preview only
 reads sources; it checks preimages again after binding instead of rebasing changed input.
@@ -343,6 +343,20 @@ NBT readback checks the exact authorized typed tree; JSON and command edits spli
 selected string tokens. Commands also re-extract slot values, keys, references and
 diagnostics. Legacy SNBT values that require physical command line breaks are rejected.
 
-This preparation subset does not yet implement Region/ZIP, nested JSON syntax, NBT
-commands, key/reference conversion, restore or commit/recovery. Those remain explicit
-unsupported boundaries until their service paths are implemented and verified.
+Region preparation preserves unselected chunk descriptors, compressed payloads and
+old sectors, and groups all selected edits into one physical region candidate. ZIP
+replacement retains original local records, appends changed entry records and updates
+only their central directory bindings; unselected compressed streams and metadata remain
+byte-identical. No-op edits retain the complete original container. Nested JSON strings,
+SNBT inside JSON and NBT command fields use their own decoded paths and preimage hashes;
+their physical artifact preimage remains a separate plan condition.
+
+Literal changes to entity/armor stand identifying name text or fallback require the
+explicit complete reference synchronization path; ordinary literal plans reject them.
+No-op names and distinct show_text hover/hover fallback slots remain valid. Region
+preparation verifies one chunk tree at a time and retains
+only its descriptor and payload hash for persisted verification. Entry output buffers and
+nested replacement strings have aggregate retention bounds as well as per-transform limits.
+
+Key/reference conversion, restore and commit/recovery remain explicit unsupported
+boundaries until their service paths are implemented and verified.

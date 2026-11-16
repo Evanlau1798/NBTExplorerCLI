@@ -7,6 +7,14 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("prepare-world-name-hover-permitted", "preparation", _ => NameProtectionTests.NameHoverTextDoesNotChangeIdentifier()),
+        new("prepare-world-identifying-name-protection", "preparation", _ => NameProtectionTests.LiteralNamesCannotBypassReferenceSynchronization()),
+        new("prepare-world-native-json-archive-nbt-language", "preparation", _ => ContainerPreparationTests.NativeEncodedJsonArchiveNbtAndLanguageProfiles()),
+        new("prepare-zip-exact-records-oracle", "preparation", context => ZipEditsTests.ExactEntryRecordsAndIndependentInputs(context.FixtureRoot)),
+        new("prepare-zip-unbound-bounded", "preparation", _ => ZipEditsTests.RejectsUnboundOrOversizedChanges()),
+        new("prepare-world-nbt-command-nested-json", "preparation", _ => ContainerPreparationTests.NbtCommandsAndNestedJsonUseExactLayers()),
+        new("prepare-world-region-dimensions-opaque", "preparation", _ => ContainerPreparationTests.RegionGroupsRetainDimensionAndOpaqueChunks()),
+        new("prepare-world-archive-entry-grouping", "preparation", _ => ContainerPreparationTests.ArchiveEntriesShareOneCandidateAndPreserveOpaqueRecords()),
         new("prepare-world-mixed-complete-no-commit", "preparation", _ => WorldPreparationTests.MixedCandidatesAreCompleteAndNeverCommit()),
         new("prepare-world-scoped-metadata-binding", "preparation", _ => WorldPreparationTests.ScopedPlansRetainInterpretationPreimages()),
         new("prepare-world-command-layers", "preparation", _ => CommandPreparationTests.ExactCommandLayersPreserveFramingAndReferences()),

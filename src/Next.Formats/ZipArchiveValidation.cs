@@ -8,7 +8,7 @@ using ICSharpCode.SharpZipLib.Zip.Compression;
 
 namespace Next.Formats;
 
-public static class ZipArchiveValidation
+public static partial class ZipArchiveValidation
 {
     public static ZipArchive OpenRead(byte[] source, DecodeLimits? limits = null)
     {

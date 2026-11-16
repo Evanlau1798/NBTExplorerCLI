@@ -21,7 +21,7 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
                 var input = plan.Preconditions.Single(item => item.Artifact == output.Artifact);
                 var bytes = inventory.Read(output.Artifact);
                 if (ArtifactImage.Present(Hash256.Compute(bytes)) != input.Image) throw new ArtifactConflictException("Source changed before preparation");
-                var transformed = WorldArtifactEdits.Create(output.Artifact, bytes, operations, bound.Sources[output.Artifact], snapshot.Limits);
+                var transformed = WorldArtifactEdits.Create(output.Artifact, bytes, operations, bound.Sources.Values.Where(source => source.Location.Artifact.RelativePath == output.Artifact.RelativePath).ToArray(), snapshot.Limits);
                 var candidate = storage.Stage(output.Artifact, input.Image, transformed.Bytes); candidates.Add(candidate); candidate.Flush(); candidate.Verify(transformed.Verify);
                 artifacts.Add(new(output.Artifact, candidate.CandidatePath, candidate.Postimage, output.RequiredChecks.Select(name => new ValidationCheck(name, true, name == "preimage" ? input.Image.Hash! : candidate.Postimage.Hash!))));
             }
