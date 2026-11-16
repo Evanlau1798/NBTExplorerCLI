@@ -14,6 +14,7 @@ internal sealed partial class CommandTextReader
     private readonly CapabilityProfile profile;
     private readonly DecodeLimits limits;
     private readonly SnapshotScope scope;
+    private readonly Action<SourceAddress>? componentRoot;
     private readonly Hash256 hash;
     private readonly int byteBase;
     private readonly string newline;
@@ -26,9 +27,10 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
+        this.componentRoot = componentRoot;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
         byteBase = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 } ? 3 : 0;
@@ -122,27 +124,31 @@ internal sealed partial class CommandTextReader
         var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, source.Address.SemanticRole + ".text", source.Address.Dimension, source.Address.Chunk);
         var modern = itemComponent is not null || profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
         var bytes = Utf8.GetBytes(source.Command[start..end]);
-        var result = itemComponent is not null ? SnbtTextExtractor.ItemComponent(binding, source.Command[start..end], profile, itemComponent, limits, scope)
-            : modern ? SnbtTextExtractor.Component(binding, source.Command[start..end], profile, limits, scope)
-            : TextComponentExtractor.NativeJson(binding, bytes, profile, limits, scope);
-        var spans = modern ? null : NativeJsonStringSpans.Read(bytes, limits);
+        var spans = modern ? null : componentRoot is null ? NativeJsonStringSpans.Read(bytes, limits) : NativeJsonValueSpans.Read(bytes, limits);
+        var callback = ComponentCallback(grammarPath, start, modern, spans);
+        var result = itemComponent is not null ? SnbtTextExtractor.ItemComponent(binding, source.Command[start..end], profile, itemComponent, limits, scope, callback)
+            : modern ? SnbtTextExtractor.Component(binding, source.Command[start..end], profile, limits, scope, callback)
+            : TextComponentExtractor.NativeJson(binding, bytes, profile, limits, scope, callback);
         MergeComponent(result, grammarPath, start, end, modern, spans);
         if (result.Diagnostics.IsEmpty) ComponentReferences(bytes, start, end, grammarPath, modern,
             itemTree: itemComponent is not null && itemComponent is not ("minecraft:custom_name" or "minecraft:item_name" or "minecraft:lore"));
     }
     private void MergeComponent(TextExtractionResult result, TypedPath grammarPath, int start, int end, bool syntaxResult, Dictionary<TypedPath, SnbtSpan>? spans = null)
     {
-        SourceAddress Bind(SourceAddress address)
-        {
-            var path = syntaxResult ? address.Syntax!.NodePath! : address.NodePath;
-            var span = syntaxResult ? new SnbtSpan(checked((int)address.Syntax!.StartByte), checked((int)address.Syntax.LengthBytes)) : spans![path];
-            return Address(new(grammarPath.Segments.Concat(path.Segments)), start, 0, address.SemanticRole, span.StartByte, span.LengthBytes, address.ComponentPath);
-        }
+        SourceAddress Bind(SourceAddress address) => BindComponent(address, grammarPath, start, syntaxResult, spans);
         foreach (var text in result.Occurrences) { var address = Bind(text.Address); Charge(address, text.Text); texts.Add(text with { Address = address }); }
         foreach (var key in result.TranslationKeys) { var address = Bind(key.Address); Charge(address, key.Key); keys.Add(key with { Address = address }); }
         foreach (var diagnostic in result.Diagnostics) Unknown(grammarPath, start, end - start, diagnostic.Code);
         foreach (var pending in result.PendingCommands) Unknown(grammarPath, start, end - start, "NestedCommandGrammarPending");
     }
+    private SourceAddress BindComponent(SourceAddress address, TypedPath grammarPath, int start, bool syntaxResult, Dictionary<TypedPath, SnbtSpan>? spans)
+    {
+        var path = syntaxResult ? address.Syntax!.NodePath! : address.NodePath;
+        var span = syntaxResult ? new SnbtSpan(checked((int)address.Syntax!.StartByte), checked((int)address.Syntax.LengthBytes)) : spans![path];
+        return Address(new(grammarPath.Segments.Concat(path.Segments)), start, 0, address.SemanticRole, span.StartByte, span.LengthBytes, address.ComponentPath);
+    }
+    private Action<SourceAddress>? ComponentCallback(TypedPath path, int start, bool syntaxResult, Dictionary<TypedPath, SnbtSpan>? spans = null)
+        => componentRoot is null ? null : address => { var root = BindComponent(address, path, start, syntaxResult, spans); Charge(root, ""); componentRoot(root); };
     private SourceAddress Address(TypedPath path, int start, int length, string role, int? localByte = null, int? localLength = null, TypedPath? componentPath = null)
     {
         var grammar = profile.Features[ProfileFacet.CommandGrammar];

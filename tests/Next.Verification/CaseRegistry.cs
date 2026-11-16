@@ -7,6 +7,12 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("prepare-world-command-key-components", "preparation", _ => CommandKeyPreparationTests.CommandComponentsKeepFramingAndReferences()),
+        new("prepare-world-command-key-encoded-batch", "preparation", _ => CommandKeyPreparationTests.EncodedCommandKeysAndLiteralsShareOneLeaf()),
+        new("prepare-world-key-native-snbt-component", "preparation", _ => EncodedKeyPreparationTests.NativeSnbtComponentPreservesItsOuterLayers()),
+        new("prepare-world-key-literal-encoded-batch", "preparation", _ => EncodedKeyPreparationTests.EncodedKeysAndLiteralSiblingsUseOnePhysicalRewrite()),
+        new("prepare-world-nbt-command-key-mixed", "preparation", _ => CommandKeyPreparationTests.NbtCommandKeysAndLiteralSiblingsShareOneSnapshot()),
+        new("prepare-world-command-key-authority", "preparation", _ => CommandKeyPreparationTests.PlainFieldsAndStaleRawComponentsCannotGrantAuthority()),
         new("prepare-world-key-existing-pack-new-language", "preparation", _ => ArchiveLanguageCreationTests.MissingEntryUsesTheExistingOuterPreimage()),
         new("prepare-world-key-same-pack-source-language", "preparation", _ => ArchiveLanguageCreationTests.PackDescriptionAndLanguageShareOneOutput()),
         new("prepare-zip-added-entries-exact-absence", "preparation", _ => ZipEditsTests.AdditionsPreserveRecordsAndEnforceAbsence()),

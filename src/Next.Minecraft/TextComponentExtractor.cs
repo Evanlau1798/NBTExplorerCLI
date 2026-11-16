@@ -21,9 +21,9 @@ public static class TextComponentExtractor
         if (Check(source, profile)) throw Unsupported();
         return ReadJson(source, NativeJsonStrings.EncodeJavaDocument(component, limits), profile, limits, scope, true, componentRoot);
     }
-    internal static TextExtractionResult NativeJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
+    internal static TextExtractionResult NativeJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
     {
-        _ = Check(source, profile); return ReadJson(source, component, profile, limits, scope, false, null);
+        _ = Check(source, profile); return ReadJson(source, component, profile, limits, scope, false, componentRoot);
     }
     private static TextExtractionResult ReadJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits? limits, SnapshotScope? scope, bool embedded, Action<SourceAddress>? componentRoot)
     {

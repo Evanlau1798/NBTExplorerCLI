@@ -9,29 +9,37 @@ internal static class WorldCommandEdits
 {
     internal static PreparedArtifactBytes Create(ArtifactAddress artifact, byte[] bytes, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits)
     {
-        if (operations.Any(operation => operation is not LiteralPatch)) throw new NotSupportedException("Command preparation requires exact literal slots");
+        if (operations.Any(operation => operation is not (LiteralPatch or KeyConversionPatch))) throw new NotSupportedException("Command preparation requires exact literal or component key operations");
         var profile = MinecraftProfiles.ForPackMetadata(source.Pack ?? throw new NotSupportedException("Command pack profile is missing")) ?? throw new NotSupportedException("Command pack profile is unknown");
-        CommandCandidate Bind(byte[] value)
-        {
-            var start = value.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }) ? 3 : 0; var text = new UTF8Encoding(false, true).GetString(value.AsSpan(start));
-            var grammar = profile.Features[ProfileFacet.CommandGrammar];
-            return new(new(artifact, TypedPath.Root, "command.function", source.Location.Dimension,
-                syntax: new(grammar.Schema, grammar.Version, start, value.Length - start, Hash256.Compute(value).Hex, start == 0 ? "utf8" : "utf8-bom", SyntaxLocator.DetectNewline(text))), text);
-        }
-        var before = Bind(bytes); var literal = operations.Cast<LiteralPatch>().Select(operation => operation.Translation).ToArray();
-        var output = Rewrite(before, literal, profile, limits);
-        return new(output, stream => Verify(before, Bind(WorldArtifactEdits.Read(stream)), literal, profile, limits));
+        var before = BindFunction(artifact, bytes, profile, source.Location.Dimension); var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation).ToArray();
+        var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
+        var output = Rewrite(before, literal, profile, limits, conversions);
+        return new(output, stream => Verify(before, BindFunction(artifact, WorldArtifactEdits.Read(stream), profile, source.Location.Dimension), literal, profile, limits, conversions));
     }
-    internal static byte[] Rewrite(CommandCandidate source, IReadOnlyList<LiteralTranslation> translations, CapabilityProfile profile, DecodeLimits limits)
+    internal static CommandCandidate BindFunction(ArtifactAddress artifact, byte[] value, CapabilityProfile profile, string? dimension)
     {
+        var start = value.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }) ? 3 : 0; var text = new UTF8Encoding(false, true).GetString(value.AsSpan(start));
+        var grammar = profile.Features[ProfileFacet.CommandGrammar];
+        return new(new(artifact, TypedPath.Root, "command.function", dimension,
+            syntax: new(grammar.Schema, grammar.Version, start, value.Length - start, Hash256.Compute(value).Hex, start == 0 ? "utf8" : "utf8-bom", SyntaxLocator.DetectNewline(text))), text);
+    }
+    internal static byte[] Rewrite(CommandCandidate source, IReadOnlyList<LiteralTranslation> translations, CapabilityProfile profile, DecodeLimits limits, IReadOnlyList<TranslationKeyConversion>? conversions = null)
+    {
+        conversions ??= [];
         var encoding = new UTF8Encoding(false, true); var raw = encoding.GetBytes(source.Command);
         var bom = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 }; byte[] bytes = bom ? [0xef, 0xbb, 0xbf, .. raw] : raw;
-        var original = CommandTextExtractor.Extract(source, profile, limits); var slots = original.Text.Occurrences.ToDictionary(item => item.Address);
+        var roots = new HashSet<SourceAddress>();
+        var original = CommandTextExtractor.Extract(source, profile, limits, componentRoot: conversions.Count == 0 ? null : root => roots.Add(root)); var slots = original.Text.Occurrences.ToDictionary(item => item.Address);
         foreach (var item in translations)
             if (!slots.TryGetValue(item.Slot.Address, out var actual) || actual.Text != item.Slot.SourceText || item.Slot.Address.Syntax is null) throw new EditRejectedException(EditFailure.Precondition, "Command slot differs from its decoded source");
+        foreach (var conversion in conversions)
+            if (!roots.Contains(conversion.Address) || !slots.TryGetValue(conversion.Slot.Address, out var actual) || actual.Text != conversion.Slot.SourceText
+                || conversion.Profile != profile.Id || conversion.ProfileVersion != profile.Version) throw new EditRejectedException(EditFailure.Precondition, "Command key target differs from its exact component and slot profile");
+        var keyedEncoded = conversions.Where(item => item.Address.ComponentPath is not null).Select(item => SpanKey(item.Address)).ToHashSet();
         var edits = new List<(SyntaxLocator Span, byte[] Bytes)>(); long replacementBytes = 0; var modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
-        foreach (var group in translations.GroupBy(item => (item.Slot.Address.Syntax!.StartByte, item.Slot.Address.Syntax.LengthBytes, item.Slot.Address.Syntax.NodePath)))
+        foreach (var group in translations.GroupBy(item => SpanKey(item.Slot.Address)))
         {
+            if (keyedEncoded.Contains(group.Key)) continue;
             var first = group.First(); var span = first.Slot.Address.Syntax!;
             if (group.All(item => item.Slot.SourceText == item.Reply.Text)) continue;
             byte[] replacement;
@@ -55,6 +63,14 @@ internal static class WorldCommandEdits
             if (replacementBytes > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Command replacements exceed decode budget");
             edits.Add((span, replacement));
         }
+        foreach (var group in conversions.GroupBy(item => SpanKey(item.Address)))
+        {
+            var replacement = WorldCommandKeyEdits.ComponentBytes(bytes, group.ToArray(), translations.Where(item => SpanKey(item.Slot.Address).Equals(group.Key)).ToArray(), profile, limits);
+            if (replacement.Contains((byte)'\r') || replacement.Contains((byte)'\n')) throw new NotSupportedException("Command component cannot contain physical line breaks");
+            replacementBytes = checked(replacementBytes + replacement.Length);
+            if (replacementBytes > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Command replacements exceed decode budget");
+            edits.Add((group.First().Address.Syntax!, replacement));
+        }
         long length = bytes.Length;
         foreach (var edit in edits) length = checked(length - edit.Span.LengthBytes + edit.Bytes.Length);
         if (length > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Command candidate exceeds decode budget");
@@ -69,18 +85,27 @@ internal static class WorldCommandEdits
         var script = encoding.GetString(output.AsSpan(bom ? 3 : 0)); var root = source.Address; var syntax = root.Syntax;
         var address = new SourceAddress(root.Artifact, root.NodePath, root.SemanticRole, root.Dimension, root.Chunk,
             syntax: syntax is null ? null : new(syntax.GrammarProfile, syntax.GrammarVersion, bom ? 3 : 0, output.Length - (bom ? 3 : 0), Hash256.Compute(output).Hex, syntax.Encoding, SyntaxLocator.DetectNewline(script), syntax.NodePath));
-        Verify(source, new(address, script), translations, profile, limits); return output;
+        Verify(source, new(address, script), translations, profile, limits, conversions); return output;
     }
-    private static void Verify(CommandCandidate before, CommandCandidate after, IReadOnlyList<LiteralTranslation> translations, CapabilityProfile profile, DecodeLimits limits)
+    private static (long Start, long Length, TypedPath? Path) SpanKey(SourceAddress address)
+        => (address.Syntax!.StartByte, address.Syntax.LengthBytes, address.Syntax.NodePath);
+    private static void Verify(CommandCandidate before, CommandCandidate after, IReadOnlyList<LiteralTranslation> translations, CapabilityProfile profile, DecodeLimits limits, IReadOnlyList<TranslationKeyConversion> conversions)
     {
         var original = CommandTextExtractor.Extract(before, profile, limits); var actual = CommandTextExtractor.Extract(after, profile, limits);
         var expected = original.Text.Occurrences.ToDictionary(item => SourceIdentity.Occurrence(item.Address).Digest, item => item.Text);
         foreach (var item in translations) expected[SourceIdentity.Occurrence(item.Slot.Address).Digest] = item.Reply.Text;
         static string Id(SourceAddress address) => SourceIdentity.Occurrence(address).Digest.Hex;
+        var keys = original.Text.TranslationKeys.ToDictionary(item => Id(item.Address), item => item.Key, StringComparer.Ordinal);
+        foreach (var conversion in conversions)
+        {
+            if (!expected.Remove(SourceIdentity.Occurrence(conversion.Slot.Address).Digest)) throw new EditRejectedException(EditFailure.Precondition, "Converted command slot is missing");
+            keys.Add(Id(WorldCommandKeyEdits.Child(conversion, "translation.key", PathSegment.ForKey("translate"))), conversion.Dependency.Key);
+            if (conversion.Reply.Text.Contains('%')) expected.Add(SourceIdentity.Occurrence(WorldCommandKeyEdits.Child(conversion, conversion.Slot.Role, PathSegment.ForKey("with"), PathSegment.ForIndex(0))).Digest, "%");
+        }
         var result = actual.Text.Occurrences.ToDictionary(item => SourceIdentity.Occurrence(item.Address).Digest, item => item.Text);
         if (result.Count != expected.Count || expected.Any(item => !result.TryGetValue(item.Key, out var value) || value != item.Value))
             throw new EditRejectedException(EditFailure.Precondition, "Command candidate text projection differs");
-        if (!original.Text.TranslationKeys.Select(item => (Id(item.Address), item.Key)).OrderBy(item => item.Item1, StringComparer.Ordinal).SequenceEqual(actual.Text.TranslationKeys.Select(item => (Id(item.Address), item.Key)).OrderBy(item => item.Item1, StringComparer.Ordinal))
+        if (!keys.Select(item => (item.Key, item.Value)).OrderBy(item => item.Item1, StringComparer.Ordinal).SequenceEqual(actual.Text.TranslationKeys.Select(item => (Id(item.Address), item.Key)).OrderBy(item => item.Item1, StringComparer.Ordinal))
             || !original.References.Select(item => (Id(item.Address), item.Name, item.Negated)).OrderBy(item => item.Item1, StringComparer.Ordinal).SequenceEqual(actual.References.Select(item => (Id(item.Address), item.Name, item.Negated)).OrderBy(item => item.Item1, StringComparer.Ordinal))
             || !original.Text.Diagnostics.Select(item => (Id(item.Address), item.Code)).OrderBy(item => item.Item1, StringComparer.Ordinal).SequenceEqual(actual.Text.Diagnostics.Select(item => (Id(item.Address), item.Code)).OrderBy(item => item.Item1, StringComparer.Ordinal)))
             throw new EditRejectedException(EditFailure.Precondition, "Command candidate protected references or diagnostics differ");

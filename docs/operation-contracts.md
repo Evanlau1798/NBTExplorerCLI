@@ -389,7 +389,15 @@ raw preimage. Additions preserve old local records and central metadata, require
 unique entry names, and check final entry count, decoded bytes and ZIP size. Component
 and language targets inside one ZIP are prepared together as a single physical output.
 
-Creating missing directories, command key conversion, native SNBT key components,
-reference synchronization, restore and
+Known command profiles support key conversion in standalone/archived functions and real
+NBT command fields. Component roots come from the command grammar and text profile;
+ordinary `text` or `fallback` leaf fields do not grant component authority. Exact raw
+root preconditions precede JSON/SNBT conversion. Command readback checks the complete
+literal/key projection, including fixed percent arguments, references and diagnostics.
+Literal and key edits sharing one encoded leaf are composed from the original snapshot
+before a single physical splice. Native SNBT components inside JSON follow the same rule
+and preserve raw bytes outside the selected component.
+
+Creating missing directories, reference synchronization, restore and
 commit/recovery remain unsupported until their service paths are implemented and verified.
 Preparation does not change the original world.

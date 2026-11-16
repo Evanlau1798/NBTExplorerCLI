@@ -7,10 +7,10 @@ namespace Next.Minecraft;
 
 internal static class SnbtTextExtractor
 {
-    internal static TextExtractionResult ItemComponent(SourceAddress source, string syntax, CapabilityProfile profile, string name, DecodeLimits limits, SnapshotScope scope)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemComponent(name, root, TypedPath.Root), false);
-    internal static TextExtractionResult Component(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Component(root, TypedPath.Root, source.SemanticRole), false);
+    internal static TextExtractionResult ItemComponent(SourceAddress source, string syntax, CapabilityProfile profile, string name, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemComponent(name, root, TypedPath.Root), false, componentRoot);
+    internal static TextExtractionResult Component(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Component(root, TypedPath.Root, source.SemanticRole), false, componentRoot);
     internal static TextExtractionResult LegacyItemTag(SourceAddress source, string syntax, CapabilityProfile profile, string? itemId, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.LegacyTag(root, itemId), componentRoot: componentRoot);
     internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null)

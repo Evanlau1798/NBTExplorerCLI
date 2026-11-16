@@ -59,22 +59,9 @@ public sealed record TranslationKeyConversion
             || Dependency.LanguageArtifact.WorldId != Address.Artifact.WorldId || Dependency.Locale != Slot.TargetLocale
             || Dependency.Text != Reply.Text)
             throw new ArgumentException("Conversion requires the exact slot, validated text and language dependency");
-        if (Rule == KeyConversionRule.LiteralToTranslateComponent)
-        {
-            if (Expected is not NbtString literal || literal.Value != Slot.SourceText)
-                throw new ArgumentException("Expected a matching literal string");
-            return new NbtCompound([new("translate", new NbtString(Dependency.Key))]);
-        }
-        if (Expected is not NbtCompound component || component.Entries.Select(entry => entry.Name).Distinct(StringComparer.Ordinal).Count() != component.Entries.Length
-            || component.Entries.Any(entry => entry.Name is "translate" or "with" or "fallback"))
-            throw new ArgumentException("Expected an unambiguous literal component without active translation fields");
-        var entries = component.Entries;
-        var index = -1;
-        for (var position = 0; position < entries.Length; position++)
-            if (entries[position].Name == "text") index = position;
-        if (index < 0 || entries[index].Value is not NbtString text || text.Value != Slot.SourceText)
-            throw new ArgumentException("Component literal differs from the declared slot");
-        return new NbtCompound(entries.SetItem(index, new("translate", new NbtString(Dependency.Key))));
+        if (Rule == KeyConversionRule.LiteralToTranslateComponent && Expected is not NbtString
+            || Rule == KeyConversionRule.StructuredTextToTranslate && Expected is not NbtCompound) throw new ArgumentException("Component type differs from its conversion rule");
+        return TranslationKeyConversions.ToTranslate(Expected, Slot.SourceText, Dependency.Key);
     }
     public void Validate()
     {
@@ -106,6 +93,22 @@ public sealed record TranslationKeyConversion
 
 public static class TranslationKeyConversions
 {
+    public static NbtCompound ToTranslate(NbtValue original, string expectedText, string key)
+    {
+        ArgumentNullException.ThrowIfNull(original); ArgumentNullException.ThrowIfNull(expectedText); ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (original is NbtString literal)
+        {
+            if (literal.Value != expectedText) throw new ArgumentException("Expected a matching literal string");
+            return new([new("translate", new NbtString(key))]);
+        }
+        if (original is not NbtCompound component || component.Entries.Select(entry => entry.Name).Distinct(StringComparer.Ordinal).Count() != component.Entries.Length
+            || component.Entries.Any(entry => entry.Name is "translate" or "with" or "fallback"))
+            throw new ArgumentException("Expected an unambiguous literal component without active translation fields");
+        var entries = component.Entries; var index = -1;
+        for (var position = 0; position < entries.Length; position++) if (entries[position].Name == "text") index = position;
+        if (index < 0 || entries[index].Value is not NbtString text || text.Value != expectedText) throw new ArgumentException("Component literal differs from the declared slot");
+        return new(entries.SetItem(index, new("translate", new NbtString(key))));
+    }
     public static NbtDocument Apply(SourceAddress document, NbtDocument source, IEnumerable<TranslationKeyConversion> conversions)
     {
         ArgumentNullException.ThrowIfNull(conversions);

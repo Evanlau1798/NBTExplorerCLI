@@ -37,25 +37,28 @@ internal static class WorldArtifactEdits
         var edits = operations.OfType<TypedPatch>().Select(operation => operation.Edit).ToList();
         edits.AddRange(operations.OfType<KeyConversionPatch>().Where(operation => operation.Conversion.Address.Artifact == source.Location.Artifact && operation.Conversion.Rule != KeyConversionRule.EncodedTextToTranslate).Select(operation =>
             TypedEdit.Replace(operation.Conversion.Address.NodePath, operation.Conversion.Expected, WorldKeyEdits.Replacement(operation.Conversion))));
-        foreach (var group in operations.OfType<KeyConversionPatch>().Where(operation => operation.Conversion.Rule == KeyConversionRule.EncodedTextToTranslate).GroupBy(operation => operation.Conversion.Address.NodePath))
-        {
-            if (NbtLocator.Resolve(document.Root, group.Key).Value is not NbtString text) throw new EditRejectedException(EditFailure.Precondition, "Encoded component source is not a string");
-            edits.Add(TypedEdit.Replace(group.Key, text, new NbtString(WorldKeyEdits.RewriteJson(text.Value, group.Select(operation => operation.Conversion).ToArray(), limits))));
-        }
+        var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
         var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation).ToArray();
-        foreach (var group in literal.Where(item => item.Slot.Address.Syntax is not null).GroupBy(item => item.Slot.Address.NodePath))
+        var encodedPaths = conversions.Where(conversion => conversion.Rule == KeyConversionRule.EncodedTextToTranslate && conversion.Address.Syntax is null).Select(conversion => conversion.Address.NodePath)
+            .Concat(literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is not null).Select(item => item.Slot.Address.NodePath)).Distinct();
+        foreach (var path in encodedPaths)
         {
-            var pending = NbtTextExtractor.Extract(source.Location, document, source.Chunk, limits).PendingCommands.SingleOrDefault(item => item.Address.NodePath.Equals(group.Key))
+            if (NbtLocator.Resolve(document.Root, path).Value is not NbtString text) throw new EditRejectedException(EditFailure.Precondition, "Encoded component source is not a string");
+            var changed = WorldKeyEdits.RewriteJson(text.Value, conversions.Where(conversion => conversion.Rule == KeyConversionRule.EncodedTextToTranslate && conversion.Address.Syntax is null && conversion.Address.NodePath.Equals(path)).ToArray(), limits,
+                literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is not null && item.Slot.Address.NodePath.Equals(path)).ToArray());
+            edits.Add(TypedEdit.Replace(path, text, new NbtString(changed)));
+        }
+        var commandPaths = literal.Where(item => item.Slot.Address.Syntax is not null).Select(item => item.Slot.Address.NodePath)
+            .Concat(conversions.Where(conversion => conversion.Address.Syntax is not null).Select(conversion => conversion.Address.NodePath)).Distinct();
+        foreach (var path in commandPaths)
+        {
+            var pending = NbtTextExtractor.Extract(source.Location, document, source.Chunk, limits).PendingCommands.SingleOrDefault(item => item.Address.NodePath.Equals(path))
                 ?? throw new EditRejectedException(EditFailure.Precondition, "NBT syntax target is not an actual command field");
-            var changed = WorldCommandEdits.Rewrite(pending, group.ToArray(), profile, limits);
-            edits.Add(TypedEdit.Replace(group.Key, new NbtString(pending.Command), new NbtString(new UTF8Encoding(false, true).GetString(changed))));
+            var changed = WorldCommandEdits.Rewrite(pending, literal.Where(item => item.Slot.Address.Syntax is not null && item.Slot.Address.NodePath.Equals(path)).ToArray(), profile, limits,
+                conversions.Where(conversion => conversion.Address.Syntax is not null && conversion.Address.NodePath.Equals(path)).ToArray());
+            edits.Add(TypedEdit.Replace(path, new NbtString(pending.Command), new NbtString(new UTF8Encoding(false, true).GetString(changed))));
         }
         foreach (var item in literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null)) edits.Add(TypedEdit.Replace(item.Slot.Address.NodePath, new NbtString(item.Slot.SourceText), new NbtString(item.Reply.Text)));
-        foreach (var group in literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is not null).GroupBy(item => item.Slot.Address.NodePath))
-        {
-            if (NbtLocator.Resolve(document.Root, group.Key).Value is not NbtString text) throw new EditRejectedException(EditFailure.Precondition, "Embedded JSON source is not a string");
-            edits.Add(TypedEdit.Replace(group.Key, text, new NbtString(WorldJsonEdits.RewriteJson(text.Value, group.ToArray(), limits))));
-        }
         var expected = TypedTreeEdits.Apply(document, edits);
         if (NbtTextExtractor.Profile(source.Location, expected).Id != profile.Id) throw new NotSupportedException("Data version migration requires its explicit profile conversion");
         return expected;
