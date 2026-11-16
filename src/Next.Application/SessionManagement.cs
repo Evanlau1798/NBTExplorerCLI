@@ -55,7 +55,7 @@ public sealed partial class TranslationSessionService
         foreach (var id in sessions)
         {
             var source = Read(id);
-            foreach (var candidate in source.Slots.Where(item => item.State == SessionSlotState.Translated))
+            foreach (var candidate in source.Slots.Where(item => item.State is SessionSlotState.Translated or SessionSlotState.Applied && item.Reply is not null))
                 if (MemoryKey(source, candidate, glossaryVersion) == key)
                 {
                     if (result.Count >= 100_000) throw new InvalidDataException("Memory candidate budget exceeded");

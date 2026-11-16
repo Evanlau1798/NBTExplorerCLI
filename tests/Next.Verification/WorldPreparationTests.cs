@@ -14,7 +14,7 @@ internal static class WorldPreparationTests
 {
     private const string Advancement = "datapacks/p/data/test/advancement/a.json";
     private const string AdvancementJson = "{\"display\":{\"title\":{\"text\":\"Title\",\"extra\":[{\"text\":\"Tail\"}],\"color\":\"red\",\"clickEvent\":{\"action\":\"run_command\",\"value\":\"Title\"}}},\"n\":1e+02}";
-    private static string CreateWorld()
+    internal static string CreateWorld()
     {
         var root = WorldQueryTests.CreateWorld(); var level = WorldMetadataTests.Level(3953, WorldMetadataTests.Dimensions);
         var data = (NbtCompound)((NbtCompound)level.Root).Entries.Single().Value;

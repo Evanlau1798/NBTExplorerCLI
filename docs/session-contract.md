@@ -97,6 +97,26 @@ CLI integration have their owning contracts beyond this exchange/persistence API
 Implemented legacy retention and conservative reconstruction are documented in
 `legacy-mapping-contract.md`; source snapshots still confer no world-write authority.
 
+## Durable apply completion
+
+`Seal(sessionId, revision, operationId, planHash, engine)` reads the engine's current
+immutable journal and receipt. The journal must be a completed forward apply with
+every promised output verified. An older successful receipt retained during an
+interrupted rollback cannot authorize completion. The plan must bind the session's
+world and snapshot, and cover every translated slot with the exact validated value.
+Literal, key and reference operations share this check; explicit unchanged slots
+remain distinct from translations in the retained reply history.
+
+Completion appends a revisioned `apply` operation carrying the bound plan, prepared
+manifest and receipt, then marks the slots Applied in the same atomic session write.
+State loading replays this proof as well as the original replies. Partial applies,
+missing outputs, storage failures and CAS conflicts leave accepted replies available;
+recovery can finish the world before a retry seals the session. Same-input completion
+replays its historical result without another state write. Reply inputs are retained,
+not deleted or moved. New replies require an explicit reset of Applied slots; reset
+preserves the completion history. Applied translations remain available to advisory TM.
+This service does not add public CLI entry points.
+
 ## Context and work management
 
 Status distinguishes pending, translated, explicitly unchanged, conflict and applied

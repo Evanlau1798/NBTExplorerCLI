@@ -75,8 +75,9 @@ The language dependency names the exact output artifact/entry, locale, translati
 and decoded translated text. Archived language output also names its outer pack;
 standalone JSON has no pack. World, locale and text must agree with the operation.
 `TranslationKeyConversions.Verify` compares the complete physical document, including
-events and styles inside the selected component. Actual pack staging and dependency
-completion remain obligations of the later plan/apply services.
+events and styles inside the selected component. Plan/apply services stage all pack
+outputs and verify dependency completion; session sealing requires their complete
+durable receipt as described in [session-contract.md](session-contract.md).
 
 ## References and raw restore
 

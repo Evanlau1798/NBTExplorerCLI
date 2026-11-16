@@ -97,6 +97,8 @@ groups retain their known images and a non-success receipt for explicit recovery
 Existing dependency images are also rechecked before each reference-group commit;
 a third image stops further writes and produces a conflict receipt.
 
-Session completion/sealing and the complete public CLI workflow remain separate
-integration responsibilities. The journal service does not mark
-translation sessions complete merely because a subset of physical writes succeeded.
+`TranslationSessionService.Seal` consumes the current completed forward journal and
+its successful receipt, verifies exact session coverage, and persists a replayable
+completion in the session ledger. A subset of successful physical writes cannot
+complete a session. See [session-contract.md](session-contract.md). Public CLI
+integration remains separate.

@@ -7,6 +7,15 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("session-apply-pure-mixed-sealing", "session-apply", _ => SessionApplyTests.SuccessfulPureAndMixedAppliesSealOneDurableSession()),
+        new("session-apply-recovery-before-sealing", "session-apply", _ => SessionApplyTests.PartialApplyKeepsRepliesUntilRecoveryCompletesEveryOutput()),
+        new("session-apply-subset-cannot-seal", "session-apply", _ => SessionApplyTests.ACompleteSubsetReceiptCannotSealUnwrittenTranslations()),
+        new("session-apply-protect-and-reuse-applied", "session-apply", _ => SessionApplyTests.AppliedRepliesNeedResetAndRemainMemoryCandidates()),
+        new("session-apply-storage-cas", "session-apply", _ => SessionApplyTests.SealStorageFailuresAndCasKeepTheAcceptedReply()),
+        new("session-apply-incomplete-rollback", "session-apply", _ => SessionApplyTests.AnOlderSuccessDuringRollbackCannotSealCurrentState()),
+        new("session-apply-key-pack-dependency", "session-apply", _ => SessionApplyTests.KeyPackFailureCannotBeHiddenBySuccessfulWorldWrites()),
+        new("session-apply-reference-unchanged", "session-apply", _ => SessionApplyTests.LiveReferenceAndUnchangedNamesJoinTheSameSealedSession()),
+        new("session-apply-retained-proof-binding", "session-apply", _ => SessionApplyTests.RetainedCompletionMustReplayItsSuccessfulExactBinding()),
         new("reference-world-typed-complete-apply", "reference-world", _ => WorldReferenceTests.TypedGroupPreparesAndAppliesEveryDeclaredMember()),
         new("reference-world-explicit-membership", "reference-world", _ => WorldReferenceTests.AmbiguousTargetsAndForgedCompleteClaimsAreRejected()),
         new("reference-world-new-catalog-entry", "reference-world", _ => WorldReferenceTests.NewReferencesAfterPrepareCannotAuthorizeStaleWrites()),

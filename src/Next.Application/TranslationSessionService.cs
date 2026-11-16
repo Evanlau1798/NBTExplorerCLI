@@ -41,7 +41,9 @@ public sealed partial class TranslationSessionService(ITranslationSessionStore s
         if (replyBytes.Length > 67_108_864) throw new ArgumentException("Reply exceeds byte budget", nameof(replyBytes));
         var reply = SessionExchangeJson.ReadReply(new UTF8Encoding(false, true).GetString(replyBytes.Span)); var input = Hash256.Compute(replyBytes.Span);
         var (state, head) = Load(sessionId); var replay = Replay(state, reply.OperationId, input, "reply"); if (replay is not null) return replay;
-        var page = SessionPageProjection.Create(state, reply.Page); var validation = SessionReplyValidator.Validate(page, state.Slots.Select(item => item.Slot), reply, Formats(state));
+        var page = SessionPageProjection.Create(state, reply.Page); var pageIds = page.Slots.Select(slot => slot.SlotId).ToHashSet();
+        if (state.Slots.Any(slot => slot.State == SessionSlotState.Applied && pageIds.Contains(slot.Slot.Id.Digest))) throw new InvalidOperationException("Explicitly reset applied slots before submitting a new reply");
+        var validation = SessionReplyValidator.Validate(page, state.Slots.Select(item => item.Slot), reply, Formats(state));
         if (!validation.Valid) throw new SessionReplyRejectedException(validation.Issues);
         var translated = validation.Value!.Translations.ToDictionary(item => item.Slot.Id.Digest, item => item.Reply); var unchanged = validation.Value.UnchangedSlots.ToHashSet();
         var slots = state.Slots.Select(item => translated.TryGetValue(item.Slot.Id.Digest, out var value) ? item with { State = SessionSlotState.Translated, Reply = value }

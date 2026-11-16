@@ -83,22 +83,36 @@ internal static class SessionStateValidation
                     || operation.InputHash != hash) Invalid();
                 continue;
             }
-            if (operation!.Kind is not ("reply" or "command") || operation.InputBase64 is null || operation.InputBase64.Length > 89_478_488) Invalid();
+            if (operation!.Kind is not ("reply" or "command" or "apply") || operation.InputBase64 is null || operation.InputBase64.Length > 89_478_488) Invalid();
             byte[] bytes;
             try { bytes = Convert.FromBase64String(operation.InputBase64!); } catch (FormatException error) { throw new JsonException("Invalid retained reply", error); }
             if (Hash256.Compute(bytes) != operation.InputHash) Invalid();
-            if (operation.Kind == "command")
+            if (operation.Kind is "command" or "apply")
             {
-                var command = SessionCommandJson.Read(new UTF8Encoding(false, true).GetString(bytes));
-                if (command.OperationId != operation.OperationId || !operation.Slots.ToHashSet().SetEquals(command.Kind == SessionCommandKind.Reset ? command.ResetSlots : [])) Invalid();
                 var replaySlots = session.Slots.Select(item =>
                 {
                     var value = current.GetValueOrDefault(item.Slot.Id.Digest, (SessionSlotState.Pending, null));
                     return item with { State = value.Item1, Reply = value.Item2, Reason = null };
                 }).ToImmutableArray();
                 TranslationSession changed;
-                try { changed = SessionWorkspaceCommands.Apply(session with { Revision = operation.FromRevision, Slots = replaySlots, Workspace = workspace }, command); }
-                catch (ArgumentException error) { throw new JsonException("Invalid retained session command", error); }
+                try
+                {
+                    var replayState = session with { Revision = operation.FromRevision, Slots = replaySlots, Workspace = workspace };
+                    if (operation.Kind == "command")
+                    {
+                        var command = SessionCommandJson.Read(new UTF8Encoding(false, true).GetString(bytes));
+                        if (command.OperationId != operation.OperationId || !operation.Slots.ToHashSet().SetEquals(command.Kind == SessionCommandKind.Reset ? command.ResetSlots : [])) Invalid();
+                        changed = SessionWorkspaceCommands.Apply(replayState, command);
+                    }
+                    else
+                    {
+                        var completion = SessionApplyCompletionJson.Read(new UTF8Encoding(false, true).GetString(bytes));
+                        if (completion.OperationId != operation.OperationId || !operation.Slots.ToHashSet().SetEquals(slots.Keys)) Invalid();
+                        changed = SessionApplyCompletions.Apply(replayState, completion);
+                    }
+                }
+                catch (Exception error) when (error is ArgumentException or InvalidOperationException)
+                { throw new JsonException("Invalid retained session operation", error); }
                 workspace = changed.Workspace;
                 foreach (var item in changed.Slots) current[item.Slot.Id.Digest] = (item.State, item.Reply);
                 continue;
