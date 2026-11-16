@@ -50,7 +50,7 @@ internal static class PlanValidation
                 var input = inputs[artifact.RelativePath];
                 var newLanguageOutput = operation is KeyConversionPatch key && target.Artifact == key.Conversion.Dependency.LanguageArtifact;
                 if (!newLanguageOutput && input.Image.ExpectedAbsent) throw new ArgumentException("Semantic targets require an existing source image");
-                if (target.Syntax is not null && target.Syntax.PreimageHash != input.Image.Hash?.Hex)
+                if (target.Artifact.Kind == ArtifactKind.McFunction && target.Syntax is not null && target.Syntax.PreimageHash != input.Image.Hash?.Hex)
                     throw new ArgumentException("Syntax locator preimage differs from the plan's raw input");
             }
             if (operation is RestorePatch restore)
@@ -100,11 +100,36 @@ internal static class PlanValidation
         foreach (var group in addresses.GroupBy(address => (address.Artifact.WorldId, address.Artifact.RelativePath,
             address.Artifact.ContainerEntry, address.Chunk)))
         {
-            var paths = group.Select(address => address.NodePath.Segments.Concat(address.ComponentPath?.Segments ?? []).ToArray()).ToArray();
+            ValidateSyntaxBindings(group);
+            var paths = group.Select(address => address.NodePath.Segments.Concat(address.Syntax?.NodePath?.Segments ?? []).Concat(address.ComponentPath?.Segments ?? []).ToArray()).ToArray();
             Array.Sort(paths, ComparePaths);
             for (var index = 1; index < paths.Length; index++)
                 if (paths[index - 1].Length <= paths[index].Length && paths[index - 1].SequenceEqual(paths[index].Take(paths[index - 1].Length)))
                     throw new ArgumentException("Plan has overlapping target authorizations");
+        }
+    }
+    private static void ValidateSyntaxBindings(IEnumerable<SourceAddress> addresses)
+    {
+        foreach (var container in addresses.GroupBy(address => address.NodePath))
+        {
+            if (!container.Any(address => address.Syntax is not null)) continue;
+            if (container.Any(address => address.Syntax is null) || container.Select(address =>
+                (address.Syntax!.GrammarProfile, address.Syntax.GrammarVersion, address.Syntax.PreimageHash, address.Syntax.Encoding, address.Syntax.Newline)).Distinct().Count() != 1)
+                throw new ArgumentException("Plan has inconsistent syntax container bindings");
+            var spans = new List<SyntaxLocator>();
+            foreach (var leaf in container.GroupBy(address => address.Syntax!.NodePath))
+            {
+                var syntax = leaf.First().Syntax!;
+                if (leaf.Any(address => address.Syntax!.StartByte != syntax.StartByte || address.Syntax.LengthBytes != syntax.LengthBytes))
+                    throw new ArgumentException("One syntax node has inconsistent spans");
+                spans.Add(syntax);
+            }
+            var end = -1L;
+            foreach (var span in spans.OrderBy(syntax => syntax.StartByte))
+            {
+                if (span.StartByte < end) throw new ArgumentException("Plan has overlapping syntax nodes");
+                end = span.StartByte + span.LengthBytes;
+            }
         }
     }
     private static int ComparePaths(PathSegment[] left, PathSegment[] right)

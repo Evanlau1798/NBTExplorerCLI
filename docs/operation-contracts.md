@@ -134,7 +134,10 @@ equal the operation/dependency outputs; every output has an exact Present(hash) 
 precondition. Inputs and outputs reject duplicate Windows physical relative paths using
 ordinal case-insensitive comparison, including aliases with different artifact kinds.
 Semantic edits require an existing source image; a new language output may be Absent.
-Syntax preimage hashes must equal their raw artifact preconditions. Snapshot membership,
+Standalone mcfunction syntax hashes must equal the physical file precondition. For an
+archive entry or a decoded syntax string, the entry/decoded preimage hash is a separate
+binding from the outer artifact's raw hash. Preparation must resolve and verify both
+layers against the actual source; constructing a plan does not verify live bytes. Snapshot membership,
 freshness, complete scan coverage and actual profile support still require G03/G05 checks;
 the identity reference alone is not a substitute for loading that snapshot's metadata.
 
@@ -146,7 +149,11 @@ authorization. No output outside the declared operation set can be silently stag
 
 Across semantic operations the plan rejects equal and ancestor/descendant paths within
 the same physical artifact/entry and chunk. Dimension metadata and semantic roles do not disambiguate physical
-targets. Node and component paths are concatenated conservatively for conflict checking.
+targets. Physical node, syntax logical and component paths are concatenated
+conservatively for conflict checking. Targets in one syntax container must agree on
+grammar/version, decoded preimage hash, encoding and newline. One logical syntax node
+has one span, while different syntax nodes cannot have overlapping spans; independent
+component fragments within the same encoded syntax node may share its span.
 Rename destinations also participate, preventing a later operation from claiming the
 same destination. This is intentionally conservative; later services must explicitly
 resolve overlapping edits instead of choosing a last writer.

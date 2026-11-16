@@ -7,6 +7,8 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("plan-command-sibling-logical-targets", "contracts", _ => PlanSyntaxBoundaryTests.CommandSiblingsHaveSeparateLogicalTargets()),
+        new("plan-decoded-syntax-outer-hash-layers", "contracts", _ => PlanSyntaxBoundaryTests.DecodedSyntaxAndOuterArtifactHashesRemainSeparate()),
         new("session-explicit-storage-group-roots", "session", _ => SessionStorageGroupingTests.ExplicitRulesSurviveQueryCacheAndSessionRestart()),
         new("legacy-codec-aggregate-candidates", "legacy", _ => LegacyImportTests.ReportCodecEnforcesAggregateCandidates()),
         new("legacy-candidate-aggregate-budget", "legacy", _ => LegacyImportMappingTests.CandidateFanoutHasAnAggregateBudget()),
