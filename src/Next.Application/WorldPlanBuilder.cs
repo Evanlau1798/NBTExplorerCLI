@@ -11,6 +11,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     private readonly IWorldInventory inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
     public PatchPlan Build(WorldQuerySnapshot snapshot, IEnumerable<PatchOperation> operations)
         => Bind(snapshot, operations).Plan;
+    public PatchPlan Build(VerifiedBackup backup, IEnumerable<RestorePatch> operations)
+        => WorldRestorePlans.Build(inventory, backup, operations);
     internal BoundWorldPlan Bind(WorldQuerySnapshot snapshot, IEnumerable<PatchOperation> operations)
     {
         ArgumentNullException.ThrowIfNull(snapshot); ArgumentNullException.ThrowIfNull(operations);

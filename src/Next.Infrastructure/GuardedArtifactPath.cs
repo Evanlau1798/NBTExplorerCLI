@@ -73,9 +73,10 @@ internal sealed class GuardedArtifactPath : IDisposable
         catch { handle.Dispose(); throw; }
     }
 
-    internal static FileStream OpenFile(string path, FileMode mode, FileAccess access, FileShare share)
+    internal static FileStream OpenFile(string path, FileMode mode, FileAccess access, FileShare share, bool deleteAccess = false)
     {
-        var handle = OpenNative(path, access == FileAccess.Read ? 0x80000000u : 0xc0000000u, share, (uint)mode, 0x00200000);
+        var desired = (access == FileAccess.Read ? 0x80000000u : 0xc0000000u) | (deleteAccess ? 0x10000u : 0u);
+        var handle = OpenNative(path, desired, share, (uint)mode, 0x00200000);
         try
         {
             if ((File.GetAttributes(handle) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)

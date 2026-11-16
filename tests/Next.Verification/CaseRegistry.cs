@@ -7,6 +7,10 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("restore-raw-complete-staging", "restore", _ => WorldRestorePreparationTests.RawRestorePreparesAllImagesWithoutScanningOrParsing()),
+        new("restore-provenance-whole-set-failures", "restore", _ => WorldRestorePreparationTests.ProvenancePreimagesAndWholeSetFailuresAreRejected()),
+        new("restore-deletion-lifecycle", "restore", _ => WorldRestorePreparationTests.DeletionHasAnExplicitVerifiedLifecycle()),
+        new("restore-deletion-file-identity", "restore", _ => WorldRestorePreparationTests.DeletionBindsTheCheckedFileIdentity()),
         new("backup-raw-images-complete-restart", "recovery", _ => WorldBackupTests.RawImagesAreCompleteDurableAndIndependentOfParsing()),
         new("backup-failure-no-completion", "recovery", _ => WorldBackupTests.FailedOrStaleCaptureDoesNotPublishCompletion()),
         new("backup-manifest-store-trust", "recovery", _ => WorldBackupTests.ManifestAndStoreRejectAmbiguousOrForeignClaims()),

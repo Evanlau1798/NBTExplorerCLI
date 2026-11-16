@@ -398,7 +398,7 @@ Literal and key edits sharing one encoded leaf are composed from the original sn
 before a single physical splice. Native SNBT components inside JSON follow the same rule
 and preserve raw bytes outside the selected component.
 
-Creating missing directories, reference synchronization, restore and
+Creating missing directories, reference synchronization and journal-backed
 commit/recovery remain unsupported until their service paths are implemented and verified.
 Preparation does not change the original world.
 
@@ -421,3 +421,28 @@ read back successfully.
 rechecks the requested blob before returning bytes; an unlisted artifact is rejected.
 Backup validation covers byte integrity and manifest membership. Restore plans must bind
 the current world's raw images separately, then use the same staging and commit engine.
+
+## Raw restore preparation
+
+`WorldPlanBuilder.Build(VerifiedBackup, restoreOperations)` accepts explicit subsets of
+one verified backup. Each operation retains its own ID and declares its exact current
+raw images. Membership, target image, manifest hash, world and current preconditions
+are checked before a plan is returned. The raw snapshot identity binds present current
+images and the complete declared path set; absent current files remain explicit plan
+preconditions. No scan, Minecraft metadata or successful parser is required.
+
+`WorldPlanPreparation.Prepare(VerifiedBackup, plan, worldOffline)` rebinds that policy and
+uses the same complete-output staging pipeline as semantic plans. Every raw candidate
+is flushed and checked against its verified backup bytes, then all candidates and current
+preimages are checked again before exposing a PreparedManifest. Later stage failures,
+candidate tampering and changed backup blobs clean the whole set without world writes.
+
+An absent backup target produces a Delete intent with an absent postimage and no
+manifest candidate path. `IArtifactStorage.StageDelete` retains a separate empty staging
+marker and writer lease. It requires flush, verify and a matching current image before
+explicit commit; the marker never replaces the source with an empty file. Deletion uses
+the same checked handle with DELETE access and excludes external renames/content writes
+until handle-based deletion completes, then checks absence by readback.
+An uncertain deletion attempt preserves its marker for recovery;
+Dispose of an unattempted candidate only removes the marker. This primitive does not
+provide a complete journal, automatic rollback or a world-level restore command.

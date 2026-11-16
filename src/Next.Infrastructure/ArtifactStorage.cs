@@ -24,11 +24,15 @@ public sealed class ArtifactStorage : IArtifactStorage
         return ReadFile(path.Target);
     }
     public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)
+        => StageCore(artifact, preimage, bytes, delete: false);
+    public IArtifactCandidate StageDelete(ArtifactAddress artifact, ArtifactImage preimage)
+        => StageCore(artifact, preimage, ReadOnlyMemory<byte>.Empty, delete: true);
+    private IArtifactCandidate StageCore(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, bool delete)
     {
         ArgumentNullException.ThrowIfNull(preimage);
         if (bytes.Length > MaximumBytes) throw new IOException("Artifact exceeds 64 MiB limit");
         var path = GuardedArtifactPath.Acquire(root, world, artifact);
-        try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io); }
+        try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io, delete); }
         catch { path.Dispose(); throw; }
     }
     internal static byte[] ReadFile(string path)

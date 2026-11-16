@@ -7,13 +7,15 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
 {
     private readonly GuardedArtifactPath path;
     private readonly ArtifactFileIo io;
+    private readonly ArtifactImage stagedImage;
     private bool flushed, verified, committed, disposed, attempted;
     public string CandidatePath { get; }
     public ArtifactImage Preimage { get; }
     public ArtifactImage Postimage { get; }
-    public ArtifactCandidate(GuardedArtifactPath path, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, ArtifactFileIo io)
+    public ArtifactCandidate(GuardedArtifactPath path, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, ArtifactFileIo io, bool delete = false)
     {
-        this.path = path; this.io = io; Preimage = preimage; Postimage = ArtifactImage.Present(Hash256.Compute(bytes.Span));
+        this.path = path; this.io = io; Preimage = preimage; stagedImage = ArtifactImage.Present(Hash256.Compute(bytes.Span));
+        Postimage = delete ? ArtifactImage.Absent : stagedImage;
         if (ArtifactStorage.Image(path.Target) != preimage) throw new ArtifactConflictException("Source differs from expected preimage");
         CandidatePath = Path.Combine(Path.GetDirectoryName(path.Target)!, ".nbtcli-" + Guid.NewGuid().ToString("N") + ".candidate");
         var created = false;
@@ -36,7 +38,7 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
         RequireActive(); ArgumentNullException.ThrowIfNull(verify); verified = false;
         if (!flushed) throw new InvalidOperationException("Candidate must be flushed before verification");
         var bytes = ArtifactStorage.ReadFile(CandidatePath);
-        if (ArtifactImage.Present(Hash256.Compute(bytes)) != Postimage) throw new ArtifactConflictException("Candidate differs from staged postimage");
+        if (ArtifactImage.Present(Hash256.Compute(bytes)) != stagedImage) throw new ArtifactConflictException("Candidate differs from staged image");
         using var input = new MemoryStream(bytes, writable: false); verify(input);
         verified = true;
     }
@@ -44,19 +46,25 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
     {
         RequireActive();
         if (!verified) throw new InvalidOperationException("Commit requires a verified candidate");
-        if (ArtifactStorage.Image(CandidatePath) != Postimage) throw new ArtifactConflictException("Candidate changed after verification");
+        if (ArtifactStorage.Image(CandidatePath) != stagedImage) throw new ArtifactConflictException("Candidate changed after verification");
         using var source = OpenSource();
         var current = source is null ? ArtifactStorage.Image(path.Target) : ArtifactStorage.Image(source);
         if (current != Preimage) throw new ArtifactConflictException("Source changed before commit");
         if (Preimage == Postimage) { File.Delete(CandidatePath); committed = true; return; }
         attempted = true;
-        try { io.Replace(CandidatePath, path.Target, Preimage.ExpectedAbsent); }
+        try
+        {
+            if (Postimage.ExpectedAbsent) io.Delete(source!);
+            else io.Replace(CandidatePath, path.Target, Preimage.ExpectedAbsent);
+        }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         { throw new ArtifactCommitException("Replace failed; inspect pre/postimages before recovery", error); }
         committed = true;
+        if (Postimage.ExpectedAbsent) source?.Dispose();
         try
         {
             if (ArtifactStorage.Image(path.Target) != Postimage) throw new IOException("Committed image differs from expected postimage");
+            if (Postimage.ExpectedAbsent) File.Delete(CandidatePath);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         { throw new ArtifactCommitException("Committed image failed readback; recovery required", error); }
@@ -69,7 +77,8 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
     private FileStream? OpenSource()
     {
         if (Preimage.ExpectedAbsent) return null;
-        try { return GuardedArtifactPath.OpenFile(path.Target, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete); }
+        try { return GuardedArtifactPath.OpenFile(path.Target, FileMode.Open, FileAccess.Read,
+            Postimage.ExpectedAbsent ? FileShare.Read : FileShare.Read | FileShare.Delete, deleteAccess: Postimage.ExpectedAbsent); }
         catch (FileNotFoundException) { throw new ArtifactConflictException("Expected source disappeared before commit"); }
     }
     public void Dispose()

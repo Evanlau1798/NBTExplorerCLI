@@ -19,4 +19,6 @@ public interface IArtifactStorage
 {
     byte[] Read(ArtifactAddress artifact);
     IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes);
+    IArtifactCandidate StageDelete(ArtifactAddress artifact, ArtifactImage preimage)
+        => throw new NotSupportedException("Deletion staging is not implemented");
 }
