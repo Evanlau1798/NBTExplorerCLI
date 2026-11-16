@@ -376,8 +376,8 @@ entries, are explicit plan outputs and dependencies; incompatible pack formats a
 different existing key values are rejected. Literal percent signs use one fixed percent
 argument and a language pattern that preserves them without interpreting user text.
 
-A missing language JSON may be declared under a known resource pack when its parent
-directory already exists. A new resource ZIP can declare its language entries and profile
+A missing language JSON may be declared under a known resource pack, including absent
+namespace/language directories. A new resource ZIP can declare its language entries and profile
 metadata together. Both use expectedAbsent raw preconditions, stage as part of the same
 complete output set and reject files created after preview. New ZIPs are deterministic,
 bounded, parsed and verified against every declared entry image before staging succeeds.
@@ -398,7 +398,7 @@ Literal and key edits sharing one encoded leaf are composed from the original sn
 before a single physical splice. Native SNBT components inside JSON follow the same rule
 and preserve raw bytes outside the selected component.
 
-Creating missing directories, reference synchronization and journal-backed
+Reference synchronization and journal-backed
 commit/recovery remain unsupported until their service paths are implemented and verified.
 Preparation does not change the original world.
 
@@ -446,3 +446,14 @@ until handle-based deletion completes, then checks absence by readback.
 An uncertain deletion attempt preserves its marker for recovery;
 Dispose of an unattempted candidate only removes the marker. This primitive does not
 provide a complete journal, automatic rollback or a world-level restore command.
+
+Missing output parents do not require preview or staging to create formal directories.
+Plans reject physical input/output file paths that are ancestors of another declared
+file, using case-insensitive component boundaries before any candidate is staged.
+An expectedAbsent candidate stages in the nearest existing guarded ancestor on the same
+NTFS volume. Before reading the current target, staging/commit validates and holds any
+parents that have appeared since discovery; reparse paths are rejected before target reads.
+Only explicit commit creates and guards remaining parents, then atomically moves the
+candidate without overwriting an externally created target. Already absent deletion
+creates no directories. A failed commit may retain newly created parents and its candidate
+for recovery; unattempted Dispose removes only its candidate and leaves parents absent.

@@ -10,21 +10,22 @@ internal sealed class GuardedArtifactPath : IDisposable
     private readonly List<SafeFileHandle> directories = [];
     private IDisposable? writer;
     public string Target { get; }
-    private GuardedArtifactPath(string target) => Target = target;
+    public string StagingDirectory { get; private set; }
+    private GuardedArtifactPath(string target) => (Target, StagingDirectory) = (target, Path.GetDirectoryName(target)!);
 
-    public static GuardedArtifactPath Acquire(string root, Guid world, ArtifactAddress artifact)
+    public static GuardedArtifactPath Acquire(string root, Guid world, ArtifactAddress artifact, bool allowMissingParents = false)
     {
         ArgumentNullException.ThrowIfNull(artifact);
         if (artifact.WorldId != world || artifact.ContainerEntry is not null || artifact.RelativePath.Split('/').Any(part => part.StartsWith(".nbtcli-", StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("Requires a nonreserved physical artifact for the bound world", nameof(artifact));
-        return AcquireCore(root, artifact.RelativePath, directory: false);
+        return AcquireCore(root, artifact.RelativePath, directory: false, allowMissingParents);
     }
     internal static GuardedArtifactPath AcquireDirectory(string root, string relativeDirectory)
     {
         if (relativeDirectory.Length != 0) ArtifactAddress.ValidatePath(relativeDirectory, entry: false);
         return AcquireCore(root, relativeDirectory, directory: true);
     }
-    private static GuardedArtifactPath AcquireCore(string root, string relativePath, bool directory)
+    private static GuardedArtifactPath AcquireCore(string root, string relativePath, bool directory, bool allowMissingParents = false)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Artifact access requires validated Windows NTFS");
         var full = Path.GetFullPath(root); var drive = Path.GetPathRoot(full)!;
@@ -49,15 +50,36 @@ internal sealed class GuardedArtifactPath : IDisposable
             var parent = directory ? target : Path.GetDirectoryName(target)!;
             var current = drive;
             lease.HoldDirectory(current);
+            lease.StagingDirectory = current;
             foreach (var segment in parent[drive.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
             {
-                current = Path.Combine(current, segment); lease.HoldDirectory(current);
+                current = Path.Combine(current, segment);
+                try { lease.HoldDirectory(current); }
+                catch (FileNotFoundException) when (allowMissingParents && current.StartsWith(Path.TrimEndingDirectorySeparator(full) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) { break; }
+                lease.StagingDirectory = current;
             }
             return lease;
         }
         catch { lease.Dispose(); throw; }
     }
     internal void HoldWriter(ArtifactWriterLock shared) => writer = shared.Acquire();
+    internal bool HoldParents(bool create)
+    {
+        var parent = Path.GetDirectoryName(Target)!;
+        if (parent == StagingDirectory) return true;
+        var current = StagingDirectory;
+        foreach (var segment in Path.GetRelativePath(current, parent).Split(Path.DirectorySeparatorChar))
+        {
+            current = Path.Combine(current, segment);
+            try { HoldDirectory(current); }
+            catch (FileNotFoundException)
+            {
+                if (!create) return false;
+                Directory.CreateDirectory(current); HoldDirectory(current);
+            }
+        }
+        return true;
+    }
     internal static bool SupportsVolume(DriveType type, string format) => type is DriveType.Fixed or DriveType.Removable && format == "NTFS";
 
     private void HoldDirectory(string path)

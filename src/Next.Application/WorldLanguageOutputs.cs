@@ -23,9 +23,8 @@ internal static class WorldLanguageOutputs
                 && archiveSource.Outcome == SourceOutcome.Success && archiveSource.Capability.Read == SupportLevel.Supported && archiveSource.Pack?.Kind == PackSourceKind.ResourcePack;
             if (!knownArchive && snapshot.Discovery.Inventory.Entries.Any(entry => entry.RelativePath.Equals(outer.RelativePath, StringComparison.OrdinalIgnoreCase)))
                 throw new EditRejectedException(EditFailure.Precondition, "Existing language output must be included as a supported exact source");
-            var parent = outer.RelativePath.LastIndexOf('/') is var slash && slash >= 0 ? outer.RelativePath[..slash] : "";
-            if (parent.Length != 0 && !snapshot.Discovery.Inventory.DirectoryPaths.Contains(parent, StringComparer.Ordinal))
-                throw new NotSupportedException("New output requires an existing non-reparse parent directory");
+            if (snapshot.Discovery.Inventory.Entries.Any(entry => outer.RelativePath.StartsWith(entry.RelativePath + "/", StringComparison.OrdinalIgnoreCase)))
+                throw new EditRejectedException(EditFailure.Precondition, "New output has an unusable parent path");
             var profile = MinecraftProfiles.ForId(conversion.Profile) ?? throw new NotSupportedException("Unknown generated language profile");
             PackMetadata pack; string packRoot; Hash256? metadataHash = null;
             string entryPath;

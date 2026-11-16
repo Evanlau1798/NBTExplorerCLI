@@ -7,6 +7,13 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("prepare-missing-parent-explicit-commit", "directories", _ => MissingOutputDirectoryTests.ParentsAppearOnlyDuringExplicitCommit()),
+        new("prepare-missing-parent-reparse-race", "directories", _ => MissingOutputDirectoryTests.ReparseOrExternallyCreatedTargetsAreNotAdopted()),
+        new("prepare-missing-language-directories", "directories", _ => MissingOutputDirectoryTests.LanguagePlansCanDeclareAbsentNamespaceParents()),
+        new("prepare-missing-parent-invalid-paths", "directories", _ => MissingOutputDirectoryTests.InvalidParentsAndMissingWorldRootAreRejected()),
+        new("prepare-missing-restore-directories", "directories", _ => MissingOutputDirectoryTests.RestoreCanStageUnderAbsentParents()),
+        new("prepare-planned-file-parent-conflicts", "directories", _ => MissingOutputDirectoryTests.PlannedFilesCannotAlsoBeParentDirectories()),
+        new("plan-physical-file-ancestor-conflicts", "directories", _ => MissingOutputDirectoryTests.PhysicalInputAndOutputAncestorsConflictInTheSharedPlan()),
         new("restore-raw-complete-staging", "restore", _ => WorldRestorePreparationTests.RawRestorePreparesAllImagesWithoutScanningOrParsing()),
         new("restore-provenance-whole-set-failures", "restore", _ => WorldRestorePreparationTests.ProvenancePreimagesAndWholeSetFailuresAreRejected()),
         new("restore-deletion-lifecycle", "restore", _ => WorldRestorePreparationTests.DeletionHasAnExplicitVerifiedLifecycle()),

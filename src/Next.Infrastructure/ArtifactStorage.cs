@@ -31,7 +31,7 @@ public sealed class ArtifactStorage : IArtifactStorage
     {
         ArgumentNullException.ThrowIfNull(preimage);
         if (bytes.Length > MaximumBytes) throw new IOException("Artifact exceeds 64 MiB limit");
-        var path = GuardedArtifactPath.Acquire(root, world, artifact);
+        var path = GuardedArtifactPath.Acquire(root, world, artifact, allowMissingParents: preimage.ExpectedAbsent);
         try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io, delete); }
         catch { path.Dispose(); throw; }
     }

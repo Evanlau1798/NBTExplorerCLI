@@ -16,8 +16,9 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
     {
         this.path = path; this.io = io; Preimage = preimage; stagedImage = ArtifactImage.Present(Hash256.Compute(bytes.Span));
         Postimage = delete ? ArtifactImage.Absent : stagedImage;
-        if (ArtifactStorage.Image(path.Target) != preimage) throw new ArtifactConflictException("Source differs from expected preimage");
-        CandidatePath = Path.Combine(Path.GetDirectoryName(path.Target)!, ".nbtcli-" + Guid.NewGuid().ToString("N") + ".candidate");
+        var current = path.HoldParents(create: false) ? ArtifactStorage.Image(path.Target) : ArtifactImage.Absent;
+        if (current != preimage) throw new ArtifactConflictException("Source differs from expected preimage");
+        CandidatePath = Path.Combine(path.StagingDirectory, ".nbtcli-" + Guid.NewGuid().ToString("N") + ".candidate");
         var created = false;
         try
         {
@@ -47,15 +48,16 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
         RequireActive();
         if (!verified) throw new InvalidOperationException("Commit requires a verified candidate");
         if (ArtifactStorage.Image(CandidatePath) != stagedImage) throw new ArtifactConflictException("Candidate changed after verification");
-        using var source = OpenSource();
-        var current = source is null ? ArtifactStorage.Image(path.Target) : ArtifactStorage.Image(source);
+        var parents = path.HoldParents(create: false);
+        using var source = parents ? OpenSource() : null;
+        var current = source is not null ? ArtifactStorage.Image(source) : parents ? ArtifactStorage.Image(path.Target) : ArtifactImage.Absent;
         if (current != Preimage) throw new ArtifactConflictException("Source changed before commit");
         if (Preimage == Postimage) { File.Delete(CandidatePath); committed = true; return; }
         attempted = true;
         try
         {
             if (Postimage.ExpectedAbsent) io.Delete(source!);
-            else io.Replace(CandidatePath, path.Target, Preimage.ExpectedAbsent);
+            else { path.HoldParents(create: true); io.Replace(CandidatePath, path.Target, Preimage.ExpectedAbsent); }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         { throw new ArtifactCommitException("Replace failed; inspect pre/postimages before recovery", error); }

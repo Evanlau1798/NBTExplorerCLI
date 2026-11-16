@@ -13,6 +13,12 @@ internal static class PlanValidation
             ArgumentNullException.ThrowIfNull(input.Image);
         }
         foreach (var output in plan.Outputs) Physical(plan, output.Artifact);
+        var physicalPaths = plan.Preconditions.Select(input => input.Artifact.RelativePath)
+            .Concat(plan.Outputs.Select(output => output.Artifact.RelativePath)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var orderedPaths = physicalPaths.Select(path => path + "/").Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        for (var index = 1; index < orderedPaths.Length; index++)
+            if (orderedPaths[index].StartsWith(orderedPaths[index - 1], StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("A physical artifact cannot also be another artifact's parent directory");
         var inputs = plan.Preconditions.ToDictionary(item => item.Artifact.RelativePath, StringComparer.OrdinalIgnoreCase);
         var outputs = plan.Outputs.ToDictionary(item => item.Artifact.RelativePath, StringComparer.OrdinalIgnoreCase);
         foreach (var output in plan.Outputs)
