@@ -50,5 +50,13 @@ internal static class ReceiptTests
         Reject(() => initial.Revise(1, restored.Results, true));
         Reject(() => initial.Revise(2, [Result("c", OperationOutcome.Applied)], true));
         Reject(() => restored.Revise(3, [Result("a", OperationOutcome.Applied), Result("b", OperationOutcome.Applied)], true));
+        Require(restored.Revise(3, [Result("a", OperationOutcome.Conflict), Result("b", OperationOutcome.RecoveryRequired)], false).Requested == 2
+            && restored.Counts[OperationOutcome.RolledBack] == 2, "部分rollback的已還原成員可在後續觀察轉Conflict或RecoveryRequired，原證據保留");
+        var noop = new ApplyReceipt(Hash, 1, ["a"], [Result("a", OperationOutcome.Unchanged)], false);
+        Require(noop.Revise(2, [Result("a", OperationOutcome.Conflict)], false).Counts[OperationOutcome.Conflict] == 1
+            && noop.Revise(2, [Result("a", OperationOutcome.RecoveryRequired)], false).Counts[OperationOutcome.RecoveryRequired] == 1
+            && noop.Counts[OperationOutcome.Unchanged] == 1, "後續真實內容改變或不可讀也能重分類unchanged，舊版證據不變");
+        Reject(() => noop.Revise(2, [Result("a", OperationOutcome.Applied)], true));
+        Reject(() => noop.Revise(2, [Result("a", OperationOutcome.RolledBack)], true));
     }
 }

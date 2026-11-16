@@ -44,6 +44,8 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
     }
     private PreparedWorldPlan PrepareOutputs(PatchPlan plan, Func<OutputDeclaration, ArtifactPrecondition, PreparedArtifactBytes> create)
     {
+        var access = inventory.AccessBinding;
+        if (access is null || access != storage.AccessBinding) throw new ArgumentException("Preparation inventory and storage must bind the same world root");
         var candidates = new List<IArtifactCandidate>(); var artifacts = new List<PreparedArtifact>();
         try
         {
@@ -58,7 +60,8 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
             // Parsed projections remain valid only while every staged postimage still matches.
             foreach (var candidate in candidates) candidate.Verify(_ => { });
             WorldPlanBuilder.CheckPreimages(inventory, plan);
-            return new(plan, new PreparedManifest(plan, artifacts), candidates);
+            if (inventory.AccessBinding != access || storage.AccessBinding != access) throw new ArtifactConflictException("World root access changed during preparation");
+            return new(plan, new PreparedManifest(plan, artifacts), candidates, access);
         }
         catch (Exception error)
         {
@@ -72,7 +75,9 @@ public sealed class PreparedWorldPlan : IDisposable
     public PatchPlan Plan { get; }
     public PreparedManifest Manifest { get; }
     internal IReadOnlyList<IArtifactCandidate> Candidates { get; }
-    internal PreparedWorldPlan(PatchPlan plan, PreparedManifest manifest, IReadOnlyList<IArtifactCandidate> candidates) => (Plan, Manifest, Candidates) = (plan, manifest, candidates);
+    internal Hash256 AccessBinding { get; }
+    internal PreparedWorldPlan(PatchPlan plan, PreparedManifest manifest, IReadOnlyList<IArtifactCandidate> candidates, Hash256 accessBinding)
+        => (Plan, Manifest, Candidates, AccessBinding) = (plan, manifest, candidates, accessBinding);
     public void Dispose() => Cleanup(Candidates);
     internal static void Cleanup(IEnumerable<IArtifactCandidate> candidates)
     {

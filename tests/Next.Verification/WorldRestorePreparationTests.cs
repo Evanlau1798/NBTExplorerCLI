@@ -60,6 +60,7 @@ internal static class WorldRestorePreparationTests
     }
     private sealed class FaultStorage(IArtifactStorage inner, string mode) : IArtifactStorage
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         private IArtifactCandidate? first;
         public byte[] Read(ArtifactAddress artifact) => inner.Read(artifact);
         public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)

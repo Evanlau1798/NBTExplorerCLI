@@ -119,8 +119,9 @@ Success requires all operations Applied/Unchanged and all dependencies complete.
 
 Recovery creates a strictly newer receipt over the same IDs and plan hash. Unresolved
 RecoveryRequired may become a resolved image, conflict, failure, cancellation or remain
-unresolved. Applied may become RolledBack, Conflict or RecoveryRequired. Other terminal
-records must remain identical. Earlier receipts stay immutable; results from different
+unresolved. Applied may become RolledBack, Conflict or RecoveryRequired. Unchanged and
+RolledBack may become Conflict or RecoveryRequired after later conflicting or unavailable
+readbacks. Other terminal records must remain identical. Earlier receipts stay immutable; results from different
 revisions are never added together. Restoring data does not make the original apply a
 success.
 
@@ -398,8 +399,8 @@ Literal and key edits sharing one encoded leaf are composed from the original sn
 before a single physical splice. Native SNBT components inside JSON follow the same rule
 and preserve raw bytes outside the selected component.
 
-Reference synchronization and journal-backed
-commit/recovery remain unsupported until their service paths are implemented and verified.
+Reference synchronization remains unsupported until its service path is implemented
+and verified. Durable apply/rollback services are described in [apply-recovery.md](apply-recovery.md).
 Preparation does not change the original world.
 
 ## Verified raw backups

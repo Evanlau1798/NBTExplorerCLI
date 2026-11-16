@@ -69,6 +69,7 @@ internal static class WorldPreparationTests
     }
     private sealed class FailedSecondStage(IArtifactStorage inner) : IArtifactStorage
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         private int count;
         public byte[] Read(ArtifactAddress artifact) => inner.Read(artifact);
         public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)
@@ -76,6 +77,7 @@ internal static class WorldPreparationTests
     }
     private sealed class MutateMetadataInventory(IWorldInventory inner, Action change) : IWorldInventory
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         private int metadataReads;
         public Guid WorldId => inner.WorldId;
         public WorldInventorySnapshot Enumerate(int maxEntries = 100_000) => inner.Enumerate(maxEntries);
@@ -87,6 +89,7 @@ internal static class WorldPreparationTests
     }
     private sealed class TamperEarlierCandidate(IArtifactStorage inner) : IArtifactStorage
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         private IArtifactCandidate? first;
         public byte[] Read(ArtifactAddress artifact) => inner.Read(artifact);
         public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)

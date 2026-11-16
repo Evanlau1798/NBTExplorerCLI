@@ -8,6 +8,7 @@ public sealed class WorldInventory : IWorldInventory
     private readonly string root;
     private readonly ArtifactStorage storage;
     public Guid WorldId { get; }
+    public Hash256 AccessBinding => storage.AccessBinding;
     public WorldInventory(string root, Guid worldId)
     {
         storage = new(root, worldId); this.root = Path.GetFullPath(root); WorldId = worldId;

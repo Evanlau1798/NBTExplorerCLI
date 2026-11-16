@@ -13,6 +13,7 @@ internal static class NewLanguagePreparationTests
 {
     private sealed class FailSecondStage(IArtifactStorage inner) : IArtifactStorage
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         private int stages;
         public byte[] Read(ArtifactAddress artifact) => inner.Read(artifact);
         public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)

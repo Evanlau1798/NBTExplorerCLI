@@ -2,6 +2,7 @@ using Microsoft.Win32.SafeHandles;
 using Next.Domain;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Buffers.Binary;
 
 namespace Next.Infrastructure;
 
@@ -24,6 +25,18 @@ internal sealed class GuardedArtifactPath : IDisposable
     {
         if (relativeDirectory.Length != 0) ArtifactAddress.ValidatePath(relativeDirectory, entry: false);
         return AcquireCore(root, relativeDirectory, directory: true);
+    }
+    internal static Hash256 AccessBinding(string root, Guid world)
+    {
+        using var lease = AcquireDirectory(root, "");
+        if (!GetFileInformationByHandleEx(lease.directories[^1], 18, out var identity, 24))
+            throw new IOException("Cannot identify the bound NTFS root", new Win32Exception(Marshal.GetLastPInvokeError()));
+        Span<byte> key = stackalloc byte[40];
+        world.TryWriteBytes(key);
+        BinaryPrimitives.WriteUInt64LittleEndian(key[16..], identity.VolumeSerialNumber);
+        BinaryPrimitives.WriteUInt64LittleEndian(key[24..], identity.FileIdLow);
+        BinaryPrimitives.WriteUInt64LittleEndian(key[32..], identity.FileIdHigh);
+        return Hash256.Compute([.. "nbtcli.next.ntfs-directory-v1\0"u8, .. key]);
     }
     private static GuardedArtifactPath AcquireCore(string root, string relativePath, bool directory, bool allowMissingParents = false)
     {
@@ -118,6 +131,16 @@ internal sealed class GuardedArtifactPath : IDisposable
     }
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
     private static extern SafeFileHandle CreateFileW(string path, uint access, FileShare share, IntPtr security, uint mode, uint flags, IntPtr template);
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeFileIdentity
+    {
+        public ulong VolumeSerialNumber;
+        public ulong FileIdLow;
+        public ulong FileIdHigh;
+    }
+    [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandleEx(SafeFileHandle handle, int informationClass, out NativeFileIdentity information, uint size);
 
     public void Dispose()
     {

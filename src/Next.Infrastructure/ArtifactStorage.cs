@@ -5,6 +5,7 @@ namespace Next.Infrastructure;
 
 public sealed class ArtifactStorage : IArtifactStorage
 {
+    public Hash256 AccessBinding => GuardedArtifactPath.AccessBinding(root, world);
     internal const int MaximumBytes = 67_108_864;
     private readonly string root;
     private readonly Guid world;

@@ -108,6 +108,8 @@ public sealed class ApplyReceipt
                     or OperationOutcome.Failed or OperationOutcome.Conflict or OperationOutcome.Cancelled or OperationOutcome.RolledBack
                     or OperationOutcome.RecoveryRequired,
                 OperationOutcome.Applied => current.Outcome is OperationOutcome.RolledBack or OperationOutcome.RecoveryRequired or OperationOutcome.Conflict,
+                OperationOutcome.Unchanged => current.Outcome is OperationOutcome.RecoveryRequired or OperationOutcome.Conflict,
+                OperationOutcome.RolledBack => current.Outcome is OperationOutcome.RecoveryRequired or OperationOutcome.Conflict,
                 _ => false
             };
             if (!allowed) throw new ArgumentException("Terminal outcome cannot be reclassified without an unresolved recovery or rollback", nameof(results));

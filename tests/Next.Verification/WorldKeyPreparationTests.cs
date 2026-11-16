@@ -14,6 +14,7 @@ internal static class WorldKeyPreparationTests
 {
     private sealed class FailPackStage(IArtifactStorage inner) : IArtifactStorage
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         public byte[] Read(ArtifactAddress artifact) => inner.Read(artifact);
         public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)
             => artifact.Kind == ArtifactKind.Archive ? throw new IOException("Injected pack stage failure") : inner.Stage(artifact, preimage, bytes);

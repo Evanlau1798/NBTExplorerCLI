@@ -17,6 +17,7 @@ public interface IArtifactCandidate : IDisposable
 
 public interface IArtifactStorage
 {
+    Hash256? AccessBinding => null;
     byte[] Read(ArtifactAddress artifact);
     IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes);
     IArtifactCandidate StageDelete(ArtifactAddress artifact, ArtifactImage preimage)
