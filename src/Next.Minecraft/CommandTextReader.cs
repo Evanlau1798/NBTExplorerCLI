@@ -125,7 +125,7 @@ internal sealed partial class CommandTextReader
         var result = itemComponent is not null ? SnbtTextExtractor.ItemComponent(binding, source.Command[start..end], profile, itemComponent, limits, scope)
             : modern ? SnbtTextExtractor.Component(binding, source.Command[start..end], profile, limits, scope)
             : TextComponentExtractor.NativeJson(binding, bytes, profile, limits, scope);
-        var spans = modern ? null : CommandJsonSpans.Read(bytes);
+        var spans = modern ? null : NativeJsonStringSpans.Read(bytes, limits);
         MergeComponent(result, grammarPath, start, end, modern, spans);
         if (result.Diagnostics.IsEmpty) ComponentReferences(bytes, start, end, grammarPath, modern,
             itemTree: itemComponent is not null && itemComponent is not ("minecraft:custom_name" or "minecraft:item_name" or "minecraft:lore"));

@@ -45,7 +45,7 @@ internal sealed partial class CommandTextReader
         }
         else
         {
-            using var document = BoundedJson.ReadDecoded(bytes, limits); var spans = CommandJsonSpans.Read(bytes); VisitJson(document.RootElement, TypedPath.Root);
+            using var document = BoundedJson.ReadDecoded(bytes, limits); var spans = NativeJsonStringSpans.Read(bytes, limits); VisitJson(document.RootElement, TypedPath.Root);
             void VisitJson(JsonElement value, TypedPath path)
             {
                 if (value.ValueKind == JsonValueKind.Array) { var index = 0; foreach (var child in value.EnumerateArray()) VisitJson(child, At(path, index++)); return; }

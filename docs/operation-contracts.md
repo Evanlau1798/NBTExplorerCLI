@@ -116,6 +116,25 @@ records must remain identical. Earlier receipts stay immutable; results from dif
 revisions are never added together. Restoring data does not make the original apply a
 success.
 
+## Exact format preparation
+
+`NativeJsonEdits.ReplaceStrings` accepts exact typed paths and expected/replacement
+decoded strings. It validates the complete input, replaces only the selected value
+tokens, and reparses the candidate. BOM, whitespace, number spellings, property names
+and all unselected bytes survive. Escaped Java UTF16 code units remain strings; no-op
+values preserve their original token spelling. Duplicate, missing, non-string and stale
+targets fail before a candidate is returned. The bounded string-span reader is shared
+with command extraction and limits its locator retention estimate to 128 MiB.
+
+`Snbt.ReplaceMany` binds one immutable parsed snapshot to exact typed expected values.
+It rejects overlapping targets including no-op ancestors, updates the authorized logical
+tree, splices the original spans once, and reparses once to verify the complete result
+and fragment boundary. Complete documents and embedded fragments retain unselected raw
+bytes; typed arrays retain their kind. Both batch APIs accept at most 100,000 changes
+and enforce codec budgets against the final candidate, independent of request ordering.
+These format operations produce bytes; application preparation still verifies the
+source preimages, operation/profile authority and complete physical output set.
+
 ## Immutable plans and prepared output
 
 `PatchOperation` is a closed, explicitly tagged union: TypedPatch, LiteralPatch,

@@ -7,6 +7,11 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("prepare-snbt-batch-projection", "preparation", _ => SnbtBatchEditsTests.OneSnapshotPreservesFragmentAndProtectedBytes()),
+        new("prepare-snbt-batch-rejected-boundaries", "preparation", _ => SnbtBatchEditsTests.RejectedBatchesNeverReturnPartialChanges()),
+        new("prepare-json-order-independent-capacity", "preparation", _ => JsonTextEditsTests.CapacityDependsOnFinalCandidateNotRequestOrder()),
+        new("prepare-json-exact-token-projection", "preparation", _ => JsonTextEditsTests.ExactTokensPreserveProtectedBytesAndJavaStrings()),
+        new("prepare-json-invalid-bounded-requests", "preparation", _ => JsonTextEditsTests.InvalidOrUnboundedRequestsCannotProduceCandidates()),
         new("plan-command-sibling-logical-targets", "contracts", _ => PlanSyntaxBoundaryTests.CommandSiblingsHaveSeparateLogicalTargets()),
         new("plan-decoded-syntax-outer-hash-layers", "contracts", _ => PlanSyntaxBoundaryTests.DecodedSyntaxAndOuterArtifactHashesRemainSeparate()),
         new("session-explicit-storage-group-roots", "session", _ => SessionStorageGroupingTests.ExplicitRulesSurviveQueryCacheAndSessionRestart()),

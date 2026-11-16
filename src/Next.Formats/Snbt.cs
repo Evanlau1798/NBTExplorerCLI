@@ -55,6 +55,46 @@ public static class Snbt
             throw new SnbtException(SnbtError.Precondition, target.Span.StartByte, "Replacement changes syntax outside its exact node");
         return output;
     }
+    public static byte[] ReplaceMany(SnbtDocument document, IEnumerable<(TypedPath Path, LogicalMinecraftValue Expected, LogicalMinecraftValue Replacement)> changes)
+    {
+        ArgumentNullException.ThrowIfNull(document); ArgumentNullException.ThrowIfNull(changes);
+        var requested = changes.Take(100_001).ToArray();
+        if (requested.Length > 100_000 || requested.Any(change => change.Path is null || change.Expected is null || change.Replacement is null)) throw new ArgumentException("Invalid or oversized SNBT replacement set", nameof(changes));
+        var targets = requested.Select(change => (Change: change, Node: document.Resolve(change.Path))).OrderBy(item => item.Node.Span.StartByte).ToArray();
+        var end = -1;
+        foreach (var target in targets)
+        {
+            if (target.Node.Value != target.Change.Expected) throw new SnbtException(SnbtError.Precondition, target.Node.Span.StartByte, "SNBT node differs from expected value");
+            if (target.Node.Span.StartByte < end) throw new SnbtException(SnbtError.Precondition, target.Node.Span.StartByte, "SNBT batch has overlapping targets");
+            end = target.Node.Span.EndByte;
+        }
+        var changed = document.Root.Value; var edits = new List<(SnbtSpan Span, byte[] Bytes)>(); long length = document.Source.Length; long replacements = 0;
+        foreach (var target in targets)
+        {
+            var change = target.Change; if (change.Expected == change.Replacement) continue;
+            try { changed = ReplaceValue(changed, change.Path, 0, change.Expected, change.Replacement); }
+            catch (SnbtException error) when (error.Code == SnbtError.InvalidArrayElement) { throw new SnbtException(error.Code, target.Node.Span.StartByte, error.Message); }
+            var remaining = document.Limits.MaxDecodedBytes - replacements;
+            if (remaining <= 0) SnbtBudget.Limit(target.Node.Span.StartByte);
+            var bytes = Write(change.Replacement, document.Profile, document.Limits with { MaxDecodedBytes = remaining }); replacements += bytes.Length;
+            length = checked(length - target.Node.Span.LengthBytes + bytes.Length); edits.Add((target.Node.Span, bytes));
+        }
+        if (length > document.Limits.MaxDecodedBytes || length > Array.MaxLength) SnbtBudget.Limit(document.Root.Span.StartByte);
+        if (edits.Count == 0) return document.Source.ToArray();
+        var output = new byte[checked((int)length)]; var from = 0; var to = 0;
+        foreach (var edit in edits)
+        {
+            document.Source.AsSpan(from, edit.Span.StartByte - from).CopyTo(output.AsSpan(to)); to += edit.Span.StartByte - from;
+            edit.Bytes.CopyTo(output.AsSpan(to)); to += edit.Bytes.Length; from = edit.Span.EndByte;
+        }
+        document.Source.AsSpan()[from..].CopyTo(output.AsSpan(to));
+        var parsed = document.IsComplete ? ParseDocument(output, document.Profile, document.Limits)
+            : ParseFragment(output, document.ConsumedSpan.StartByte, document.Profile, document.Limits);
+        if (parsed.Root.Value != changed || parsed.Root.Span.StartByte != document.Root.Span.StartByte
+            || parsed.Root.Span.LengthBytes != document.Root.Span.LengthBytes + length - document.Source.Length)
+            throw new SnbtException(SnbtError.Precondition, document.Root.Span.StartByte, "Batch changed syntax outside its authorized nodes");
+        return output;
+    }
     private static LogicalMinecraftValue ReplaceValue(LogicalMinecraftValue value, TypedPath path, int depth,
         LogicalMinecraftValue expected, LogicalMinecraftValue replacement)
     {
