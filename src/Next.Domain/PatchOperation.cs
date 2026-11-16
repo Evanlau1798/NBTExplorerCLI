@@ -51,7 +51,7 @@ public sealed record KeyConversionPatch : PatchOperation
     public KeyConversionPatch(string id, TranslationKeyConversion conversion) : base(id, PatchKind.TranslationKeyConversion)
     {
         ArgumentNullException.ThrowIfNull(conversion);
-        _ = conversion.Replacement();
+        conversion.Validate();
         Conversion = conversion;
     }
     public override ImmutableArray<SourceAddress> Targets => [Conversion.Address,

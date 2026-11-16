@@ -7,6 +7,8 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("key-encoded-recipe-plan-roundtrip", "contracts", _ => EncodedKeyContractTests.OpaqueRecipeSurvivesPlanExchangeWithoutBecomingTypedEdit()),
+        new("key-encoded-layer-scope-rejection", "contracts", _ => EncodedKeyContractTests.EncodedLayerAndComponentScopeCannotBeForged()),
         new("prepare-world-name-hover-permitted", "preparation", _ => NameProtectionTests.NameHoverTextDoesNotChangeIdentifier()),
         new("prepare-world-identifying-name-protection", "preparation", _ => NameProtectionTests.LiteralNamesCannotBypassReferenceSynchronization()),
         new("prepare-world-native-json-archive-nbt-language", "preparation", _ => ContainerPreparationTests.NativeEncodedJsonArchiveNbtAndLanguageProfiles()),

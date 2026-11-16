@@ -55,13 +55,21 @@ text cannot become an arbitrary TypedEdit or authorize a number, UUID or event c
 
 ## Key conversion
 
-`TranslationKeyConversion` explicitly declares a profile/version and one of two rules
+`TranslationKeyConversion` explicitly declares a profile/version and one of two physical rules
 for structured NBT components: literal-string to translate component, or a unique `text`
 entry to `translate`. The source slot and its validated reply must match the exact
 location and preimage. The structured rule preserves every other entry and its order;
 existing `translate`, `with` or `fallback` fields and duplicate keys are rejected to
 avoid activating fields that were not literal semantics. Other component encodings
 need their own profile adapter; these synthetic rules do not claim Minecraft support.
+
+`EncodedTextToTranslate` instead retains the exact raw expected text as an NBT String,
+the component root, the source slot and its decoded-layer bindings. `Validate` requires
+the same artifact, physical storage layer, syntax preimage/grammar and component scope;
+the slot must be the root literal or its direct `text` member. `KeyConversionPatch`
+validates this recipe without parsing it. `Replacement` and the physical NBT apply
+helper reject it: the profile format adapter must parse and verify the actual source
+before performing any transformation. The recipe alone is not write authority.
 
 The language dependency names the exact output artifact/entry, locale, translation key
 and decoded translated text. Archived language output also names its outer pack;
@@ -236,7 +244,7 @@ TranslationKeyConversion=2, ReferenceSynchronization=3, ArtifactRestore=4), then
 | --- | --- |
 | Typed | Address; action byte Replace=0/Add=1/Remove=2/Rename=3; path; expected typed value; replacement-present byte and optional typed value; child-present byte and optional segment; optional new name |
 | Literal | Slot/reply bundle below |
-| Key conversion | Address; expected value; rule byte StructuredTextToTranslate=0/LiteralToTranslateComponent=1; profile text; int32 profile version; slot/reply bundle; language artifact; pack-present byte and optional pack artifact; locale/key/text texts |
+| Key conversion | Address; expected value; rule byte StructuredTextToTranslate=0/LiteralToTranslateComponent=1/EncodedTextToTranslate=2; profile text; int32 profile version; slot/reply bundle; language artifact; pack-present byte and optional pack artifact; locale/key/text texts |
 | References | Group identity; int64 group revision; member digest; completeness byte Complete=0/Incomplete=1/Unresolved=2; ordered members (address, expected/replacement texts, grammar text, int32 grammar version) |
 | Restore | Verified manifest hash; authorized artifacts sorted by ordinal relative path (artifact, current image, backup target image) |
 
