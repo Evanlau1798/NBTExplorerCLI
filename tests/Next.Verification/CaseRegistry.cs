@@ -7,6 +7,19 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("session-explicit-storage-group-roots", "session", _ => SessionStorageGroupingTests.ExplicitRulesSurviveQueryCacheAndSessionRestart()),
+        new("legacy-codec-aggregate-candidates", "legacy", _ => LegacyImportTests.ReportCodecEnforcesAggregateCandidates()),
+        new("legacy-candidate-aggregate-budget", "legacy", _ => LegacyImportMappingTests.CandidateFanoutHasAnAggregateBudget()),
+        new("legacy-projection-concurrent-user-change", "legacy", _ => LegacyImportMappingTests.ProjectionCannotRebaseOverUserOperation()),
+        new("legacy-fixed-input-retention", "legacy", context => LegacyImportTests.FixedLegacyInputsAreRetained(context.FixtureRoot)),
+        new("legacy-durable-retry-retention", "legacy", _ => LegacyImportTests.FailedPersistenceRetainsInputAndRetries()),
+        new("legacy-unique-mapping-session-snapshot", "legacy", _ => LegacyImportMappingTests.UniqueMappingUsesNormalValidationAndNewSnapshot()),
+        new("legacy-missing-malformed-no-guess", "legacy", _ => LegacyImportMappingTests.MissingEvidenceAndMalformedInputNeverGuess()),
+        new("session-snbt-container-groups", "session", _ => SessionGroupingSourceTests.SnbtContainersKeepOrderedMembers()),
+        new("session-management-stale-tampered-scope", "session", _ => SessionManagementTests.ManagementRejectsStaleTamperedAndUnknownScope()),
+        new("session-styled-component-group-order", "session", _ => SessionManagementTests.StyledFragmentsPreserveComponentOrder()),
+        new("session-context-groups-memory-candidates", "session", _ => SessionManagementTests.ContextOrderAndAdvisoryMemory()),
+        new("session-navigation-notes-reset-history", "session", _ => SessionManagementTests.NavigationNotesAndResetPreserveHistory()),
         new("session-placeholder-capacity-outcome", "session", _ => SessionExchangeTests.PlaceholderCapacityIsAnExplicitOutcome()),
         new("session-percent-java-reference", "session", context => PercentPlaceholderTests.IndependentJavaReference(context.FixtureRoot)),
         new("session-scanner-language-placeholders", "session", _ => SessionScannerTests.LanguageArgumentsUseProfileContract()),

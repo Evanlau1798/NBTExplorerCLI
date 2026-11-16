@@ -94,3 +94,57 @@ not a current-world lock or write authorization. Apply must independently verify
 current raw preimages, supported write profiles, protected structure and required
 reference groups. Navigation, grouping, TM, notes/reset, legacy import and public
 CLI integration have their owning contracts beyond this exchange/persistence API.
+Implemented legacy retention and conservative reconstruction are documented in
+`legacy-mapping-contract.md`; source snapshots still confer no world-write authority.
+
+## Context and work management
+
+Status distinguishes pending, translated, explicitly unchanged, conflict and applied
+counts; translated text does not count as a world write. Get uses an exact slot digest.
+Next reads the first pending page at or after the navigation cursor, wrapping once;
+it does not repeatedly regenerate a reply or change completion. A complete session
+has no pending page. Jump changes only the cursor and is a revisioned command.
+
+Note and glossary commands append text with origin and confirmation status. They
+retain existing entries and never change source text, slot identities or selector
+authorization. Reset first exposes a preview with exact slot IDs and revision. Its
+command requires explicit confirmation and exact nonempty slot scope. It clears
+only current progress/reply for those slots; all past reply inputs and receipts,
+notes, glossary, sources, page membership and cursor survive. Operation replay
+prevents duplicate effects and changed-input reuse conflicts.
+
+Management commands use `nbtcli.next.session-command` version 1. Their raw canonical
+input joins replies in the same atomic revision ledger. State validation replays
+both command and reply history and checks the final workspace and slot states.
+An optional workspace member keeps the previous version-1 session wire bytes
+unchanged until the first management command; old records remain readable.
+
+Groups have a source container, GroupId, ordered slot digests and member digest.
+They preserve numeric book page and sign line order and component text before its
+extra fragments. Every slot retains its original complete address; groups never
+join strings or proportionally split a translated string. Fixed source membership
+uses membership revision zero and survives navigation/translation revisions.
+
+Explicit command-storage component rules carry their exact root paths through the
+opaque query result into optional `source.contextRoots` session bindings. Warm cache
+hits retain the same rule policy, and restarting a session preserves each binding.
+Storage literals stay independent even when their keys are `text`, `extra` or `pages`.
+Root bindings must reference an existing component slot in the same artifact,
+dimension and chunk, with a containing physical path; duplicate/foreign bindings
+are rejected. Missing bindings in an older manually assembled storage-component
+session produce an explicit grouping error requesting a rescan, rather than a
+guessed group. Other session operations remain available. Records without bindings
+retain their previous version-1 wire bytes; bindings add no world-write authority.
+
+Memory lookup accepts an explicit bounded set of source sessions. It returns
+validated translated slots as separate candidates, with source session, slot,
+revision and provenance. Its key binds decoded source, source/target locales,
+context class, placeholder contract, glossary version and profile version.
+Identical source text in another context does not force a match. The caller must
+explicitly select a candidate and submit it through the normal validator; lookup
+never updates a slot. Notes and glossary confirmation are not rename authority.
+
+Notes/glossary permit at most 10,000 entries each, 16,384 UTF-16 units per text and
+1,024 for origins. Memory lookup accepts up to 256 distinct source sessions and
+100,000 candidates. The existing session JSON/token/operation budgets remain in
+force. Legacy input retention/mapping has its own import contract.

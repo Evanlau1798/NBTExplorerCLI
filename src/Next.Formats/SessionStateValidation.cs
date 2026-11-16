@@ -26,6 +26,19 @@ internal static class SessionStateValidation
         foreach (var slot in request.Slots)
             if (slot is null || slot.Address.Artifact.WorldId != source.WorldId || !ids.Add(slot.Id.Digest) || slot.SourceLocale != request.SourceLocale || slot.TargetLocale != request.TargetLocale
                 || !raw.TryGetValue(slot.Address.Artifact.RelativePath, out var input) || input.ContentHash is null || input.Artifact.Kind != slot.Address.Artifact.Kind) Invalid();
+        if (!source.ContextRoots.IsDefault)
+        {
+            if (source.ContextRoots.Length > request.Slots.Length) Invalid();
+            var byId = request.Slots.ToDictionary(slot => slot.Id.Digest); var rooted = new HashSet<Hash256>();
+            foreach (var root in source.ContextRoots)
+            {
+                if (root is null || root.SlotId is null || root.Container is null || !rooted.Add(root.SlotId) || !byId.TryGetValue(root.SlotId, out var slot)
+                    || !slot.Role.StartsWith("command_storage.component", StringComparison.Ordinal) || root.Container.Artifact != slot.Address.Artifact
+                    || root.Container.Dimension != slot.Address.Dimension || root.Container.Chunk != slot.Address.Chunk || root.Container.ComponentPath is not null || root.Container.Syntax is not null
+                    || root.Container.JsonTarget != JsonTargetKind.Value || root.Container.SemanticRole != "command_storage.component"
+                    || root.Container.NodePath.Segments.Length > slot.Address.NodePath.Segments.Length || !root.Container.NodePath.Segments.SequenceEqual(slot.Address.NodePath.Segments.Take(root.Container.NodePath.Segments.Length))) Invalid();
+            }
+        }
         if (!request.Formats.IsDefault)
         {
             var formats = new HashSet<Hash256>();
@@ -55,6 +68,7 @@ internal static class SessionStateValidation
         }
         if (members.Count != slots.Count) Invalid();
         var operations = new HashSet<Guid>(); var current = new Dictionary<Hash256, (SessionSlotState State, SlotReply? Reply)>();
+        SessionWorkspace? workspace = null;
         for (var index = 0; index < session.Operations.Length; index++)
         {
             var operation = session.Operations[index];
@@ -69,10 +83,26 @@ internal static class SessionStateValidation
                     || operation.InputHash != hash) Invalid();
                 continue;
             }
-            if (operation!.Kind != "reply" || operation.InputBase64 is null || operation.InputBase64.Length > 89_478_488) Invalid();
+            if (operation!.Kind is not ("reply" or "command") || operation.InputBase64 is null || operation.InputBase64.Length > 89_478_488) Invalid();
             byte[] bytes;
             try { bytes = Convert.FromBase64String(operation.InputBase64!); } catch (FormatException error) { throw new JsonException("Invalid retained reply", error); }
             if (Hash256.Compute(bytes) != operation.InputHash) Invalid();
+            if (operation.Kind == "command")
+            {
+                var command = SessionCommandJson.Read(new UTF8Encoding(false, true).GetString(bytes));
+                if (command.OperationId != operation.OperationId || !operation.Slots.ToHashSet().SetEquals(command.Kind == SessionCommandKind.Reset ? command.ResetSlots : [])) Invalid();
+                var replaySlots = session.Slots.Select(item =>
+                {
+                    var value = current.GetValueOrDefault(item.Slot.Id.Digest, (SessionSlotState.Pending, null));
+                    return item with { State = value.Item1, Reply = value.Item2, Reason = null };
+                }).ToImmutableArray();
+                TranslationSession changed;
+                try { changed = SessionWorkspaceCommands.Apply(session with { Revision = operation.FromRevision, Slots = replaySlots, Workspace = workspace }, command); }
+                catch (ArgumentException error) { throw new JsonException("Invalid retained session command", error); }
+                workspace = changed.Workspace;
+                foreach (var item in changed.Slots) current[item.Slot.Id.Digest] = (item.State, item.Reply);
+                continue;
+            }
             var reply = SessionExchangeJson.ReadReply(new UTF8Encoding(false, true).GetString(bytes));
             if (reply.OperationId != operation.OperationId || reply.Revision != operation.FromRevision || reply.Page < 0 || reply.Page >= session.Pages.Length
                 || !operation.Slots.ToHashSet().SetEquals(reply.Slots.Select(item => item.SlotId))) Invalid();
@@ -82,6 +112,7 @@ internal static class SessionStateValidation
             foreach (var translated in validated.Value!.Translations) current[translated.Slot.Id.Digest] = (SessionSlotState.Translated, translated.Reply);
             foreach (var unchanged in validated.Value.UnchangedSlots) current[unchanged] = (SessionSlotState.Unchanged, null);
         }
+        if (ContractJson.Write("nbtcli.next.session-workspace", new { workspace }) != ContractJson.Write("nbtcli.next.session-workspace", new { workspace = session.Workspace })) Invalid();
         foreach (var item in session.Slots)
         {
             var expected = current.GetValueOrDefault(item.Slot.Id.Digest, (SessionSlotState.Pending, null));

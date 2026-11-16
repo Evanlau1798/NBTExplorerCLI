@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Next.Application;
 
-public sealed class TranslationSessionService(ITranslationSessionStore store)
+public sealed partial class TranslationSessionService(ITranslationSessionStore store)
 {
     private readonly ITranslationSessionStore store = store ?? throw new ArgumentNullException(nameof(store));
     public SessionOperationReceipt Start(WorldQuerySnapshot snapshot, Guid sessionId, string sourceLocale, string targetLocale, Guid operationId, SessionPolicy? policy = null)
@@ -14,6 +14,7 @@ public sealed class TranslationSessionService(ITranslationSessionStore store)
         ArgumentNullException.ThrowIfNull(snapshot); var manifest = snapshot.Manifest;
         var source = new SessionSourceSnapshot(manifest.WorldId, manifest.SnapshotId, manifest.InputSources, manifest.Scope.Dimensions, manifest.Scope.Regions, manifest.Scope.Types, manifest.Scope.ArtifactPaths, manifest.Versions, manifest.CoverageComplete);
         var slots = snapshot.ReadSources().SelectMany(item => item.Text?.Occurrences ?? []).Take(100_001).Select(item => item.ToSlot(sourceLocale, targetLocale)).ToImmutableArray();
+        source = source with { ContextRoots = SessionStorageRoots.Build(snapshot, slots) };
         return Start(new(sessionId, source, sourceLocale, targetLocale, policy ?? new(), slots), operationId);
     }
     public TranslationSession Read(Guid sessionId) => Load(sessionId).State;

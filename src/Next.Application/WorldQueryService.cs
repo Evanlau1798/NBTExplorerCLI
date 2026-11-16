@@ -98,7 +98,7 @@ public sealed partial class WorldQueryService
                 foreach (var source in CachedArtifactResults.Bind(CachedArtifactResults.Read(store, descriptor, inventory.WorldId), sources).Sources) yield return source;
             }
         }
-        return new(manifest, Read);
+        return new(manifest, Read, context.Extraction.StorageRules);
     }
     private static bool CacheFailure(Exception error) => error is IOException or InvalidDataException or JsonException or NotSupportedException or ArgumentException or OverflowException;
 }

@@ -1,8 +1,49 @@
 # Read-only legacy mapping design
 
-This is the G01 mapping contract for the later G04/G08 importer. No legacy importer,
-filesystem migration or session persistence is implemented by this document. New core
+The G04 importer retains identified legacy inputs in a separate owned store, then
+reconstructs eligible text candidates against a supplied new scan snapshot. New core
 services never load a legacy assembly, launch an old CLI, or fall back to an old writer.
+
+## Implemented service boundary
+
+`LegacyImportService.Import` receives bytes, an explicit `LegacyInputProfile`, target
+snapshot/locales and an explicit world-rebind acknowledgement. It never opens the old
+WorldPath. An immutable version-1 report stores exact raw bytes as Base64, SHA-256,
+profile/importer version, target world/snapshot, locales, and one decision per parsed
+record. Unknown fields, historical notes/glossary/IDs/retry hints remain in the raw
+input. Old files are neither rewritten nor deleted. Settings, notes, glossary and key
+mapping are retained data; cache is RescanRequired, not trusted new state.
+
+Automatic reconstruction currently supports the identified legacy bossbar shape:
+`level.dat#Data/CustomBossEvents/{literal-key}/Name`, type `bossbar`, exact historical
+`Boss 血條 ({literal-key})` context, one unmerged slot, and one matching complete current
+occurrence with the same decoded original. This deliberately narrow mapping does not
+guess locale-specific contexts, list alignment, missing dimension/ZIP identity, command
+locations or other legacy paths. Those records retain their translations and receive
+RescanRequired/Conflict. Duplicate IDs and competing records for one new slot are all
+Conflict. Incomplete or scoped snapshots cannot prove uniqueness.
+
+Legacy schemas usually lack a source hash. A missing hash stays null and is reported
+separately from the verified current artifact hash. The optional explicit extension
+`SourceHashKind: "raw-artifact-sha256"` identifies a supplied SourceHash; an unidentified
+hash meaning is Unsupported. Changed text/hash is Conflict, never a stale mapping.
+
+`CreateSession` verifies the durable report, re-evaluates its raw input against the
+supplied opaque snapshot, and requires all records to be mapped. It uses ordinary
+session start/submit/validation with one existing slot per page. No translation is
+split or treated as AST, and records without a translation stay pending. Deterministic
+operation IDs make interrupted projection retryable; later user operations cause a
+conflict rather than silently rebasing the import. Session creation does not write the
+world or establish its current preimage; G05 must check that independently.
+
+Input is capped at 16 MiB, with bounded JSON depth/strings/tokens and 100,000 records
+or scanned occurrences. Reports permit at most 4,096 total candidate addresses and
+use the shared 64 MiB/1,000,000-token contract boundary. Oversized expansion fails
+explicitly before publishing a partial report; the caller retains the source input.
+The atomic immutable report store rejects foreign directories, preserves existing
+reports, and permits same-byte retries. Flush failure and lost receipt tests cover
+retention/retry; existing shared storage/session process tests cover the NTFS primitive.
+This is a domain API; public CLI and candidate-release migration remain later gates.
 
 ## Explicit input profiles
 

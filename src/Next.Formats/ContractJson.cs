@@ -27,6 +27,7 @@ internal static class ContractJson
         options.Converters.Add(new ArtifactJsonConverter());
         options.Converters.Add(new ImageJsonConverter());
         options.Converters.Add(new SlotJsonConverter());
+        options.Converters.Add(new SessionSourceJsonConverter());
         options.Converters.Add(new EditJsonConverter());
         options.Converters.Add(new OperationJsonConverter());
         return options;

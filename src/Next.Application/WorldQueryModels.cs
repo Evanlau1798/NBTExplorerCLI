@@ -12,7 +12,9 @@ public sealed record WorldQueryResult(WorldQuerySnapshot? Snapshot, CacheInspect
 public sealed class WorldQuerySnapshot
 {
     public ScanCacheManifest Manifest { get; }
+    public ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> StorageRules { get; }
     private readonly Func<IEnumerable<TextSourceExtraction>> read;
-    internal WorldQuerySnapshot(ScanCacheManifest manifest, Func<IEnumerable<TextSourceExtraction>> read) => (Manifest, this.read) = (manifest, read);
+    internal WorldQuerySnapshot(ScanCacheManifest manifest, Func<IEnumerable<TextSourceExtraction>> read, ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> storageRules)
+        => (Manifest, this.read, StorageRules) = (manifest, read, storageRules);
     public IEnumerable<TextSourceExtraction> ReadSources() => read();
 }
