@@ -7,6 +7,11 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("prepare-world-key-absent-language", "preparation", _ => NewLanguagePreparationTests.AbsentLanguageIsDeclaredBeforeStage()),
+        new("prepare-world-key-generated-pack", "preparation", _ => NewLanguagePreparationTests.GeneratedPackIsDeclaredBeforeStage()),
+        new("prepare-world-key-generated-pack-profiles-bounds", "preparation", _ => NewLanguagePreparationTests.GeneratedPackProfilesAndSizeLimits()),
+        new("prepare-world-key-new-output-authority", "preparation", _ => NewLanguagePreparationTests.NewOutputDeclarationsRequireExactResourceLanguagePaths()),
+        new("prepare-world-key-language-locale-rejection", "preparation", _ => NewLanguagePreparationTests.InvalidLocalesCannotBecomeLanguageDependencies()),
         new("prepare-world-key-component-field-rejection", "preparation", _ => KeyComponentAuthorityTests.PlainTextFieldsCannotGrantComponentAuthority()),
         new("prepare-world-key-nested-component-authority", "preparation", _ => KeyComponentAuthorityTests.NestedComponentsRemainAuthorized()),
         new("prepare-world-key-archive-json-source", "preparation", _ => KeyArchivePreparationTests.ArchivedJsonUsesContainerEntryAndExactPackProfile()),

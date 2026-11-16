@@ -23,21 +23,22 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         if (outputs.Any(artifact => artifact.WorldId != inventory.WorldId || artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Json or ArtifactKind.McFunction or ArtifactKind.Region or ArtifactKind.Entities or ArtifactKind.Archive))) throw new NotSupportedException("Physical artifact preparation profile is not implemented");
         static ArtifactAddress Outer(ArtifactAddress artifact) => artifact.ContainerEntry is null ? artifact : new(artifact.WorldId, artifact.RelativePath, artifact.Kind);
         var sources = snapshot.Discovery.Sources.Where(source => outputs.Contains(Outer(source.Location.Artifact))).ToDictionary(source => (source.Location.Artifact, source.Chunk));
+        var absent = WorldLanguageOutputs.AddAbsent(snapshot, requested, sources);
         var required = outputs.Select(artifact => (artifact, (ChunkPosition?)null)).Concat(requested.SelectMany(operation => operation.Targets).Select(address => (address.Artifact, address.Chunk))).Distinct().ToArray();
-        if (required.Any(key => !sources.TryGetValue(key, out var source) || source.ContentHash is null || source.Capability.Read != SupportLevel.Supported || source.Outcome != SourceOutcome.Success)) throw new EditRejectedException(EditFailure.Precondition, "Plan output has no supported exact source binding");
+        if (required.Any(key => !sources.TryGetValue(key, out var source) || source.ContentHash is null && !absent.Contains(Outer(key.Item1)) || source.Capability.Read != SupportLevel.Supported || source.Outcome != SourceOutcome.Success)) throw new EditRejectedException(EditFailure.Precondition, "Plan output has no supported exact source binding");
         var inputs = new Dictionary<ArtifactAddress, ArtifactPrecondition>();
-        void Input(ArtifactAddress artifact, Hash256 hash)
+        void Input(ArtifactAddress artifact, ArtifactImage image)
         {
-            var value = new ArtifactPrecondition(artifact, ArtifactImage.Present(hash));
+            var value = new ArtifactPrecondition(artifact, image);
             if (inputs.TryGetValue(artifact, out var prior) && prior != value) throw new ArtifactConflictException("Source metadata has inconsistent preimages"); inputs[artifact] = value;
         }
         foreach (var source in outputs.Select(artifact => sources[(artifact, null)]))
         {
-            Input(source.Location.Artifact, source.ContentHash!);
+            Input(source.Location.Artifact, absent.Contains(source.Location.Artifact) ? ArtifactImage.Absent : ArtifactImage.Present(source.ContentHash!));
             if (source.Location.Artifact.Kind != ArtifactKind.Archive && source.Location.PackRoot is { } root)
-                Input(new(inventory.WorldId, root + "/pack.mcmeta", ArtifactKind.Json), source.PackMetadataHash ?? throw new ArtifactConflictException("Pack metadata binding is missing"));
+                Input(new(inventory.WorldId, root + "/pack.mcmeta", ArtifactKind.Json), ArtifactImage.Present(source.PackMetadataHash ?? throw new ArtifactConflictException("Pack metadata binding is missing")));
         }
-        foreach (var metadata in snapshot.Discovery.MetadataSources.IsDefault ? [] : snapshot.Discovery.MetadataSources) Input(metadata.Artifact, metadata.ContentHash!);
+        foreach (var metadata in snapshot.Discovery.MetadataSources.IsDefault ? [] : snapshot.Discovery.MetadataSources) Input(metadata.Artifact, ArtifactImage.Present(metadata.ContentHash!));
         var plan = new PatchPlan(inventory.WorldId, snapshot.Manifest.SnapshotId, snapshot.Manifest.Versions.Profile, Policy, requested,
             inputs.Values, outputs.Select(artifact => new OutputDeclaration(artifact, OutputIntent.Write, Checks)), []);
         CheckPreimages(inventory, plan);
@@ -127,8 +128,9 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     {
         foreach (var input in plan.Preconditions)
         {
-            byte[] bytes; try { bytes = inventory.Read(input.Artifact); } catch (FileNotFoundException) { throw new ArtifactConflictException("A bound source disappeared"); }
-            if (ArtifactImage.Present(Hash256.Compute(bytes)) != input.Image) throw new ArtifactConflictException("A bound source changed");
+            ArtifactImage actual;
+            try { actual = ArtifactImage.Present(Hash256.Compute(inventory.Read(input.Artifact))); } catch (FileNotFoundException) { actual = ArtifactImage.Absent; }
+            if (actual != input.Image) throw new ArtifactConflictException("A bound source changed");
         }
     }
     private static void ValidateLiteral(LiteralTranslation translation, Hash256 snapshot)

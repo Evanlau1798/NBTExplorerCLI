@@ -376,6 +376,16 @@ entries, are explicit plan outputs and dependencies; incompatible pack formats a
 different existing key values are rejected. Literal percent signs use one fixed percent
 argument and a language pattern that preserves them without interpreting user text.
 
-New language files/packs, command key conversion, native SNBT key components, reference
-synchronization, restore and commit/recovery remain unsupported until their service paths
-are implemented and verified. Preparation does not change the original world.
+A missing language JSON may be declared under a known resource pack when its parent
+directory already exists. A new resource ZIP can declare its language entries and profile
+metadata together. Both use expectedAbsent raw preconditions, stage as part of the same
+complete output set and reject files created after preview. New ZIPs are deterministic,
+bounded, parsed and verified against every declared entry image before staging succeeds.
+World language dependencies require locale filenames containing only lowercase ASCII
+letters, digits, underscore, dot or hyphen. Invalid locales are rejected for existing and
+new directory/ZIP targets without normalization; session locale values remain unchanged.
+
+Creating missing directories, adding missing entries to existing ZIPs, command key
+conversion, native SNBT key components, reference synchronization, restore and
+commit/recovery remain unsupported until their service paths are implemented and verified.
+Preparation does not change the original world.

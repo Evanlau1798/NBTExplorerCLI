@@ -4,6 +4,11 @@ namespace Next.Minecraft;
 
 public static class MinecraftProfiles
 {
+    public static CapabilityProfile? ForId(string id) => id switch
+    {
+        "java-1.20.4" => Java1204, "java-1.21" => Java121, "java-1.21.5" => Java1215,
+        "java-26.1-snapshot-6" => Snapshot2616, _ => null
+    };
     public static PackFormatVersion RequiredResourcePackFormat(CapabilityProfile profile)
     {
         ArgumentNullException.ThrowIfNull(profile);

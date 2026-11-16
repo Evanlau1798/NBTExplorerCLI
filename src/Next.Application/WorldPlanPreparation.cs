@@ -19,11 +19,16 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
             {
                 var operations = plan.Operations.Where(operation => operation.RequiredOutputs.Contains(output.Artifact)).ToArray();
                 var input = plan.Preconditions.Single(item => item.Artifact == output.Artifact);
-                var bytes = inventory.Read(output.Artifact);
-                if (ArtifactImage.Present(Hash256.Compute(bytes)) != input.Image) throw new ArtifactConflictException("Source changed before preparation");
-                var transformed = WorldArtifactEdits.Create(output.Artifact, bytes, operations, bound.Sources.Values.Where(source => source.Location.Artifact.RelativePath == output.Artifact.RelativePath).ToArray(), snapshot.Limits);
+                PreparedArtifactBytes transformed;
+                if (input.Image.ExpectedAbsent) transformed = WorldLanguageOutputs.Create(output.Artifact, operations, snapshot.Limits);
+                else
+                {
+                    var bytes = inventory.Read(output.Artifact);
+                    if (ArtifactImage.Present(Hash256.Compute(bytes)) != input.Image) throw new ArtifactConflictException("Source changed before preparation");
+                    transformed = WorldArtifactEdits.Create(output.Artifact, bytes, operations, bound.Sources.Values.Where(source => source.Location.Artifact.RelativePath == output.Artifact.RelativePath).ToArray(), snapshot.Limits);
+                }
                 var candidate = storage.Stage(output.Artifact, input.Image, transformed.Bytes); candidates.Add(candidate); candidate.Flush(); candidate.Verify(transformed.Verify);
-                artifacts.Add(new(output.Artifact, candidate.CandidatePath, candidate.Postimage, output.RequiredChecks.Select(name => new ValidationCheck(name, true, name == "preimage" ? input.Image.Hash! : candidate.Postimage.Hash!))));
+                artifacts.Add(new(output.Artifact, candidate.CandidatePath, candidate.Postimage, output.RequiredChecks.Select(name => new ValidationCheck(name, true, name == "preimage" ? input.Image.Hash ?? plan.PlanHash : candidate.Postimage.Hash!))));
             }
             // Parsed projections remain valid only while every staged postimage still matches.
             foreach (var candidate in candidates) candidate.Verify(_ => { });
