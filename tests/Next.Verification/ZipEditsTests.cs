@@ -74,4 +74,37 @@ internal static class ZipEditsTests
         Reject<CodecException>(() => ZipArchiveValidation.ReplaceEntries(bytes, [("café.txt", hash, new byte[33])], new(MaxDecodedBytes: 32)));
         Require(bytes.SequenceEqual(original), "all accepted/rejected replacement requests leave input buffers immutable");
     }
+    public static void AdditionsPreserveRecordsAndEnforceAbsence()
+    {
+        foreach (var descriptor in new[] { false, true })
+        foreach (var stored in new[] { false, true })
+        {
+            var bytes = Archive(descriptor, stored); var original = bytes.ToArray();
+            Require(ZipArchiveValidation.AddEntries(bytes, []).SequenceEqual(original), "empty additions preserve all original bytes");
+            const string name = "new/雪.json";
+            var result = ZipArchiveValidation.AddEntries(bytes, [(name, "Added雪"u8.ToArray())]);
+            using var zip = ZipArchiveValidation.OpenRead(result); using var before = ZipArchiveValidation.OpenRead(bytes);
+            var end = bytes.Length - 22;
+            while (BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(end)) != 0x06054b50 || BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(end + 20)) != bytes.Length - end - 22) end--;
+            var central = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(end + 16)));
+            Require(result.AsSpan(0, central).SequenceEqual(bytes.AsSpan(0, central)) && zip.Comment == before.Comment && zip.Entries.Count == before.Entries.Count + 1, "entry addition preserves every original local record and archive comment");
+            foreach (var entry in before.Entries)
+            {
+                var actual = zip.GetEntry(entry.FullName)!;
+                Require(actual.Comment == entry.Comment && actual.LastWriteTime == entry.LastWriteTime && actual.ExternalAttributes == entry.ExternalAttributes, "unselected CP437/descriptors/stored/deflate metadata remains intact");
+                using var value = actual.Open(); using var data = new MemoryStream(); value.CopyTo(data); Require(data.ToArray().SequenceEqual("Original"u8.ToArray()), "old entry payload remains exact");
+            }
+            using (var value = zip.GetEntry(name)!.Open()) { using var data = new MemoryStream(); value.CopyTo(data); Require(data.ToArray().SequenceEqual("Added雪"u8.ToArray()), "UTF8 added entry matches declared bytes"); }
+            Reject<EditRejectedException>(() => ZipArchiveValidation.AddEntries(bytes, [("café.txt", [1])]));
+            Reject<EditRejectedException>(() => ZipArchiveValidation.AddEntries(bytes, [(name, [1]), (name, [2])]));
+            foreach (var invalid in new[] { "../escape", "a:b", "folder/", "/root" }) Reject<ArgumentException>(() => ZipArchiveValidation.AddEntries(bytes, [(invalid, [1])]));
+            Require(ZipArchiveValidation.AddEntries(bytes, [("new.txt", [1])], new(MaxDecodedBytes: 32)).Length > 0, "small decoded budget has a reachable addition control");
+            Reject<CodecException>(() => ZipArchiveValidation.AddEntries(bytes, [("new.txt", new byte[33])], new(MaxDecodedBytes: 32)));
+            Reject<CodecException>(() => ZipArchiveValidation.AddEntries(bytes, [("new.txt", [1])], new(MaxCompressedBytes: bytes.Length)));
+            Reject<CodecException>(() => ZipArchiveValidation.AddEntries(bytes, [("new.txt", [1])], new(MaxContainerEntries: 2)));
+            Reject<CodecException>(() => ZipArchiveValidation.AddEntries(bytes, [(new string('x', 65_536), [1])]));
+            Reject<CodecException>(() => ZipArchiveValidation.AddEntries(bytes, [(new string('雪', 32_768), [1])]));
+            Require(bytes.SequenceEqual(original), "addition and rejection paths preserve the original buffer");
+        }
+    }
 }

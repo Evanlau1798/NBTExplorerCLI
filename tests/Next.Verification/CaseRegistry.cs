@@ -7,6 +7,9 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("prepare-world-key-existing-pack-new-language", "preparation", _ => ArchiveLanguageCreationTests.MissingEntryUsesTheExistingOuterPreimage()),
+        new("prepare-world-key-same-pack-source-language", "preparation", _ => ArchiveLanguageCreationTests.PackDescriptionAndLanguageShareOneOutput()),
+        new("prepare-zip-added-entries-exact-absence", "preparation", _ => ZipEditsTests.AdditionsPreserveRecordsAndEnforceAbsence()),
         new("prepare-world-key-absent-language", "preparation", _ => NewLanguagePreparationTests.AbsentLanguageIsDeclaredBeforeStage()),
         new("prepare-world-key-generated-pack", "preparation", _ => NewLanguagePreparationTests.GeneratedPackIsDeclaredBeforeStage()),
         new("prepare-world-key-generated-pack-profiles-bounds", "preparation", _ => NewLanguagePreparationTests.GeneratedPackProfilesAndSizeLimits()),

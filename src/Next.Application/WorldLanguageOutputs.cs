@@ -9,17 +9,19 @@ namespace Next.Application;
 
 internal static class WorldLanguageOutputs
 {
-    internal static HashSet<ArtifactAddress> AddAbsent(WorldQuerySnapshot snapshot, IReadOnlyList<PatchOperation> operations,
+    internal static HashSet<ArtifactAddress> AddMissingLanguages(WorldQuerySnapshot snapshot, IReadOnlyList<PatchOperation> operations,
         Dictionary<(ArtifactAddress Artifact, ChunkPosition? Chunk), DiscoveredSource> sources)
     {
-        var absent = new HashSet<ArtifactAddress>(); long retained = 0;
+        var added = new HashSet<ArtifactAddress>(); long retained = 0;
         foreach (var operation in operations.OfType<KeyConversionPatch>())
         {
             var conversion = operation.Conversion; var language = conversion.Dependency.LanguageArtifact;
             if (!ResourceName(conversion.Dependency.Locale)) throw new EditRejectedException(EditFailure.Precondition, "Language locale must be a lowercase Minecraft resource filename");
             if (sources.ContainsKey((language, null))) continue;
             var outer = language.ContainerEntry is null ? language : conversion.Dependency.PackArtifact!;
-            if (!absent.Contains(outer) && snapshot.Discovery.Inventory.Entries.Any(entry => entry.RelativePath.Equals(outer.RelativePath, StringComparison.OrdinalIgnoreCase)))
+            var knownArchive = language.ContainerEntry is not null && sources.TryGetValue((outer, null), out var archiveSource)
+                && archiveSource.Outcome == SourceOutcome.Success && archiveSource.Capability.Read == SupportLevel.Supported && archiveSource.Pack?.Kind == PackSourceKind.ResourcePack;
+            if (!knownArchive && snapshot.Discovery.Inventory.Entries.Any(entry => entry.RelativePath.Equals(outer.RelativePath, StringComparison.OrdinalIgnoreCase)))
                 throw new EditRejectedException(EditFailure.Precondition, "Existing language output must be included as a supported exact source");
             var parent = outer.RelativePath.LastIndexOf('/') is var slash && slash >= 0 ? outer.RelativePath[..slash] : "";
             if (parent.Length != 0 && !snapshot.Discovery.Inventory.DirectoryPaths.Contains(parent, StringComparer.Ordinal))
@@ -57,9 +59,9 @@ internal static class WorldLanguageOutputs
             if (retained > snapshot.Limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Generated language declarations exceed retention budget");
             sources.Add((language, null), new(new(language, WorldSourceRole.Language, PackRoot: packRoot, PackKind: PackSourceKind.ResourcePack), null,
                 SourceOutcome.Success, null, null, new(Read: SupportLevel.Supported), pack, metadataHash));
-            absent.Add(outer);
+            added.Add(language);
         }
-        return absent;
+        return added;
     }
     private static bool ResourceName(string value) => value.Length != 0 && value.All(unit => char.IsAsciiLetterLower(unit) || char.IsAsciiDigit(unit) || unit is '_' or '-' or '.');
     internal static PreparedArtifactBytes Create(ArtifactAddress artifact, IReadOnlyList<PatchOperation> operations, DecodeLimits limits)

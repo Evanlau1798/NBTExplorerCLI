@@ -384,8 +384,12 @@ bounded, parsed and verified against every declared entry image before staging s
 World language dependencies require locale filenames containing only lowercase ASCII
 letters, digits, underscore, dot or hyphen. Invalid locales are rejected for existing and
 new directory/ZIP targets without normalization; session locale values remain unchanged.
+Missing language entries may also join an existing resource ZIP, bound to its complete
+raw preimage. Additions preserve old local records and central metadata, require absent
+unique entry names, and check final entry count, decoded bytes and ZIP size. Component
+and language targets inside one ZIP are prepared together as a single physical output.
 
-Creating missing directories, adding missing entries to existing ZIPs, command key
-conversion, native SNBT key components, reference synchronization, restore and
+Creating missing directories, command key conversion, native SNBT key components,
+reference synchronization, restore and
 commit/recovery remain unsupported until their service paths are implemented and verified.
 Preparation does not change the original world.

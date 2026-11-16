@@ -9,12 +9,19 @@ internal static class WorldArchiveEdits
     internal static PreparedArtifactBytes Create(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits)
     {
         using var archive = ZipArchiveValidation.OpenRead(bytes, limits);
-        var replacements = new List<(string Entry, Hash256 Expected, byte[] Replacement)>(); long retainedBytes = 0;
-        foreach (var group in operations.GroupBy(operation => operation.Targets.Where(address => address.Artifact.RelativePath == sources[0].Location.Artifact.RelativePath).Select(address => address.Artifact.ContainerEntry).Distinct().Single() ?? throw new EditRejectedException(EditFailure.Precondition, "ZIP operation requires an exact entry")))
+        var replacements = new List<(string Entry, Hash256 Expected, byte[] Replacement)>(); var additions = new List<(string Entry, byte[] Contents)>(); long retainedBytes = 0;
+        var targets = operations.SelectMany(operation => operation.Targets).Where(address => address.Artifact.RelativePath == sources[0].Location.Artifact.RelativePath)
+            .Select(address => address.Artifact.ContainerEntry ?? throw new EditRejectedException(EditFailure.Precondition, "ZIP operation requires an exact entry")).Distinct(StringComparer.Ordinal);
+        foreach (var name in targets)
         {
-            var source = sources.Single(item => item.Location.Artifact.ContainerEntry == group.Key);
-            var entry = archive.GetEntry(group.Key) ?? throw new EditRejectedException(EditFailure.Precondition, "ZIP source entry disappeared");
-            var original = new byte[checked((int)entry.Length)]; using (var stream = entry.Open()) stream.ReadExactly(original);
+            var target = new ArtifactAddress(sources[0].Location.Artifact.WorldId, sources[0].Location.Artifact.RelativePath, ArtifactKind.Archive, name);
+            var group = operations.Where(operation => operation.Targets.Any(address => address.Artifact == target)).ToArray();
+            var source = sources.Single(item => item.Location.Artifact.ContainerEntry == name);
+            var entry = archive.GetEntry(name); var missing = source.ContentHash is null;
+            if (missing && entry is not null || !missing && entry is null) throw new EditRejectedException(EditFailure.Precondition, "ZIP entry existence differs from its source binding");
+            if (missing && source.Location.Role != WorldSourceRole.Language) throw new NotSupportedException("New ZIP entries require declared language dependencies");
+            var original = entry is null ? "{}"u8.ToArray() : new byte[checked((int)entry.Length)];
+            if (entry is not null) { using var stream = entry.Open(); stream.ReadExactly(original); }
             PreparedArtifactBytes transformed;
             if (source.Location.Role == WorldSourceRole.Function) transformed = WorldCommandEdits.Create(source.Location.Artifact, original, group.ToArray(), source, limits);
             else if (source.Location.Role == WorldSourceRole.Structure)
@@ -29,9 +36,10 @@ internal static class WorldArchiveEdits
             retainedBytes = checked(retainedBytes + transformed.Bytes.Length);
             if (retainedBytes > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "ZIP transformed entry buffers exceed aggregate budget");
             using (var verify = new MemoryStream(transformed.Bytes, writable: false)) transformed.Verify(verify);
-            replacements.Add((group.Key, source.ContentHash!, transformed.Bytes));
+            if (missing) additions.Add((name, transformed.Bytes)); else replacements.Add((name, source.ContentHash!, transformed.Bytes));
         }
         var candidate = ZipArchiveValidation.ReplaceEntries(bytes, replacements, limits);
+        if (additions.Count != 0) candidate = ZipArchiveValidation.AddEntries(candidate, additions, limits);
         return new(candidate, stream => ZipArchiveValidation.Validate(WorldArtifactEdits.Read(stream), limits));
     }
 }
