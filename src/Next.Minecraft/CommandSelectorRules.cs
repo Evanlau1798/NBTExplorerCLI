@@ -19,6 +19,11 @@ internal sealed partial class CommandTextReader
                 var node = Member(name.Member); var start = token.Start + name.Start;
                 var address = locate?.Invoke(node, start, name.Length, "reference.selector.name") ?? Address(node, start, name.Length, "reference.selector.name");
                 Charge(address, name.Name); references.Add(new(address, name.Name, name.Negated));
+                if (selectorReference is not null)
+                {
+                    Charge(address, token.Text);
+                    selectorReference(new(new(address, name.Name, name.Negated), token.Text, parsed.Kind, parsed.EntityType, locate is null));
+                }
             }
             foreach (var diagnostic in parsed.Diagnostics)
             {

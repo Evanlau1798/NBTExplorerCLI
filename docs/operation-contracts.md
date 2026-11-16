@@ -399,8 +399,9 @@ Literal and key edits sharing one encoded leaf are composed from the original sn
 before a single physical splice. Native SNBT components inside JSON follow the same rule
 and preserve raw bytes outside the selected component.
 
-Reference synchronization remains unsupported until its service path is implemented
-and verified. Durable apply/rollback services are described in [apply-recovery.md](apply-recovery.md).
+Live typed reference synchronization uses the source and group authorization contract
+in [reference-analysis.md](reference-analysis.md). Unsupported reference domains remain
+blocked. Durable apply/rollback services are described in [apply-recovery.md](apply-recovery.md).
 Preparation does not change the original world.
 
 ## Verified raw backups

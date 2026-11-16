@@ -18,7 +18,7 @@ public static class NativeComponentReferences
     public static ComponentReferenceResult Json(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits? limits = null)
     {
         Check(source);
-        if (source.Artifact.Kind != ArtifactKind.Json && !(source.Artifact.Kind == ArtifactKind.Archive && source.Artifact.ContainerEntry?.EndsWith(".json", StringComparison.Ordinal) == true))
+        if (source.Artifact.Kind != ArtifactKind.Json && !(source.Artifact.Kind == ArtifactKind.Archive && (source.Artifact.ContainerEntry?.EndsWith(".json", StringComparison.Ordinal) == true || source.Artifact.ContainerEntry == "pack.mcmeta")))
             throw new ArgumentException("Native JSON components require a JSON artifact or exact JSON archive entry", nameof(source));
         return ReadJson(source, component, profile, limits ?? DecodeLimits.Default, null);
     }

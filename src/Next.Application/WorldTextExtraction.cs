@@ -15,7 +15,7 @@ public sealed partial class WorldTextExtraction
     public ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> StorageRules { get; }
     public WorldDiscoveryResult Discovery { get; }
     internal DecodeLimits Limits => request.Limits ?? DecodeLimits.Default;
-    internal IEnumerable<DiscoveredSource> ScanSources => Discovery.Sources.Where(source => source.DiagnosticCode != "InternalWriterLease");
+    internal IEnumerable<DiscoveredSource> ScanSources => Discovery.Sources.Where(source => source.DiagnosticCode is not ("InternalWriterLease" or "InternalCandidate"));
     public WorldTextExtraction(IWorldInventory inventory, ScanRequest request, IReadOnlyDictionary<ArtifactAddress, IReadOnlyList<StorageTextRule>>? storageRules = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inventory); ArgumentNullException.ThrowIfNull(request);

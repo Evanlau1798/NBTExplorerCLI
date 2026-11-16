@@ -117,9 +117,16 @@ public sealed partial class WorldApplyEngine
         active = Advance(active, direction, ApplyJournalPhase.Committing, 0, active.Journal.ReceiptHash);
         for (var index = 0; index < candidates.Count; index++)
         {
+            WorldReferenceMembers.Catalog(inventory, active.Header.Plan);
+            if (active.Header.Plan.Operations.Any(operation => operation is ReferencePatch))
+            {
+                images = Images(active.Header);
+                if (!Known(active.Header, images)) return Finish(active, images, direction, "Reference source changed between commits", cancellation);
+            }
             cancellation.ThrowIfCancellationRequested(); candidates[index].Commit();
             active = Advance(active, direction, ApplyJournalPhase.Committing, index + 1, active.Journal.ReceiptHash);
         }
+        WorldReferenceMembers.Catalog(inventory, active.Header.Plan);
         images = Images(active.Header);
         active = Advance(active, direction, ApplyJournalPhase.ReadBack, candidates.Count, active.Journal.ReceiptHash);
         return Finish(active, images, direction, "Readback did not complete every promised output", cancellation);

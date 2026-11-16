@@ -19,7 +19,7 @@ internal static class WorldArtifactEdits
         var source = sources.Single(item => item.Location.Artifact == artifact && item.Chunk is null);
         if (source.Location.Role == WorldSourceRole.Language && operations.Any(operation => operation is KeyConversionPatch)) return WorldLanguageEdits.Create(artifact, bytes, operations, limits);
         if (artifact.Kind == ArtifactKind.Nbt) return Nbt(bytes, operations, source, limits);
-        if (artifact.Kind == ArtifactKind.Json) return WorldJsonEdits.Create(bytes, operations, limits);
+        if (artifact.Kind == ArtifactKind.Json) return WorldJsonEdits.Create(bytes, operations, limits, artifact);
         if (artifact.Kind == ArtifactKind.McFunction) return WorldCommandEdits.Create(artifact, bytes, operations, source, limits);
         if (artifact.Kind is ArtifactKind.Region or ArtifactKind.Entities) return Region(bytes, operations, sources, limits);
         if (artifact.Kind == ArtifactKind.Archive) return WorldArchiveEdits.Create(bytes, operations, sources, limits);
@@ -38,7 +38,8 @@ internal static class WorldArtifactEdits
         edits.AddRange(operations.OfType<KeyConversionPatch>().Where(operation => operation.Conversion.Address.Artifact == source.Location.Artifact && operation.Conversion.Rule != KeyConversionRule.EncodedTextToTranslate).Select(operation =>
             TypedEdit.Replace(operation.Conversion.Address.NodePath, operation.Conversion.Expected, WorldKeyEdits.Replacement(operation.Conversion))));
         var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
-        var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation).ToArray();
+        var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation)
+            .Concat(WorldReferenceMembers.Literals(operations, source.Location.Artifact, source.Chunk)).ToArray();
         var encodedPaths = conversions.Where(conversion => conversion.Rule == KeyConversionRule.EncodedTextToTranslate && conversion.Address.Syntax is null).Select(conversion => conversion.Address.NodePath)
             .Concat(literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is not null).Select(item => item.Slot.Address.NodePath)).Distinct();
         foreach (var path in encodedPaths)
@@ -66,11 +67,13 @@ internal static class WorldArtifactEdits
     private static PreparedArtifactBytes Region(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits)
     {
         var original = RegionFile.Read(bytes); var output = bytes; var expected = new Dictionary<int, (RegionChunk Descriptor, Hash256 Payload)>();
-        foreach (var group in operations.GroupBy(operation => operation.Targets.Where(address => address.Artifact == sources[0].Location.Artifact && address.Chunk is not null).Select(address => address.Chunk).Distinct().Single() ?? throw new EditRejectedException(EditFailure.Precondition, "Region operation requires an exact chunk")))
+        var chunks = operations.SelectMany(operation => operation.Targets).Where(address => address.Artifact == sources[0].Location.Artifact && address.Chunk is not null).Select(address => address.Chunk!).Distinct();
+        foreach (var chunk in chunks)
         {
-            var index = group.Key.LocalZ * 32 + group.Key.LocalX;
-            var source = sources.Single(item => item.Chunk == group.Key); var before = original.ReadChunk(index, limits).Document;
-            var after = Transform(before, group.ToArray(), source, limits);
+            var index = chunk.LocalZ * 32 + chunk.LocalX;
+            var source = sources.Single(item => item.Chunk == chunk); var before = original.ReadChunk(index, limits).Document;
+            var group = operations.Where(operation => operation.Targets.Any(address => address.Artifact == source.Location.Artifact && address.Chunk == chunk)).ToArray();
+            var after = Transform(before, group, source, limits);
             output = RegionFile.Read(output).WithChunk(index, after, (NbtCompression)original.Chunks[index].CodecId, original.Chunks[index].Timestamp, limits);
             var prepared = RegionFile.Read(output);
             if (prepared.ReadChunk(index, limits).Document != after) throw new InvalidDataException("Region candidate differs from its authorized tree");

@@ -9,9 +9,9 @@ internal static class WorldCommandEdits
 {
     internal static PreparedArtifactBytes Create(ArtifactAddress artifact, byte[] bytes, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits)
     {
-        if (operations.Any(operation => operation is not (LiteralPatch or KeyConversionPatch))) throw new NotSupportedException("Command preparation requires exact literal or component key operations");
+        if (operations.Any(operation => operation is not (LiteralPatch or KeyConversionPatch or ReferencePatch))) throw new NotSupportedException("Command preparation requires explicit semantic operations");
         var profile = MinecraftProfiles.ForPackMetadata(source.Pack ?? throw new NotSupportedException("Command pack profile is missing")) ?? throw new NotSupportedException("Command pack profile is unknown");
-        var before = BindFunction(artifact, bytes, profile, source.Location.Dimension); var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation).ToArray();
+        var before = BindFunction(artifact, bytes, profile, source.Location.Dimension); var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation).Concat(WorldReferenceMembers.Literals(operations, artifact)).ToArray();
         var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
         var output = Rewrite(before, literal, profile, limits, conversions);
         return new(output, stream => Verify(before, BindFunction(artifact, WorldArtifactEdits.Read(stream), profile, source.Location.Dimension), literal, profile, limits, conversions));
@@ -29,7 +29,15 @@ internal static class WorldCommandEdits
         var encoding = new UTF8Encoding(false, true); var raw = encoding.GetBytes(source.Command);
         var bom = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 }; byte[] bytes = bom ? [0xef, 0xbb, 0xbf, .. raw] : raw;
         var roots = new HashSet<SourceAddress>();
-        var original = CommandTextExtractor.Extract(source, profile, limits, componentRoot: conversions.Count == 0 ? null : root => roots.Add(root)); var slots = original.Text.Occurrences.ToDictionary(item => item.Address);
+        var referenceTargets = new List<CommandSelectorReference>();
+        var references = translations.Any(item => item.Slot.Role == "reference.selector.name");
+        var original = CommandTextExtractor.Extract(source, profile, limits, componentRoot: conversions.Count == 0 ? null : root => roots.Add(root), selectorReference: references ? referenceTargets.Add : null);
+        var slots = original.Text.Occurrences.ToDictionary(item => item.Address);
+        foreach (var binding in referenceTargets.Where(binding => binding.Direct))
+        {
+            var reference = binding.Reference;
+            slots.Add(reference.Address, new(reference.Address, reference.Name, reference.Address.SemanticRole, true));
+        }
         foreach (var item in translations)
             if (!slots.TryGetValue(item.Slot.Address, out var actual) || actual.Text != item.Slot.SourceText || item.Slot.Address.Syntax is null) throw new EditRejectedException(EditFailure.Precondition, "Command slot differs from its decoded source");
         foreach (var conversion in conversions)
@@ -54,7 +62,7 @@ internal static class WorldCommandEdits
             else
             {
                 if (group.Count() != 1) throw new EditRejectedException(EditFailure.Precondition, "Command slot scope overlaps");
-                replacement = !modern && first.Slot.Role.StartsWith(source.Address.SemanticRole + ".text", StringComparison.Ordinal)
+                replacement = first.Slot.Role == "reference.selector.name" || !modern && first.Slot.Role.StartsWith(source.Address.SemanticRole + ".text", StringComparison.Ordinal)
                     ? NativeJsonEdits.ReplaceStrings("\"\""u8.ToArray(), [(TypedPath.Root, "", first.Reply.Text)], limits)
                     : Snbt.Write(new LogicalMinecraftLeaf(new NbtString(first.Reply.Text)), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaLegacy, limits);
             }
@@ -93,9 +101,10 @@ internal static class WorldCommandEdits
     {
         var original = CommandTextExtractor.Extract(before, profile, limits); var actual = CommandTextExtractor.Extract(after, profile, limits);
         var expected = original.Text.Occurrences.ToDictionary(item => SourceIdentity.Occurrence(item.Address).Digest, item => item.Text);
-        foreach (var item in translations) expected[SourceIdentity.Occurrence(item.Slot.Address).Digest] = item.Reply.Text;
+        foreach (var item in translations.Where(item => item.Slot.Role != "reference.selector.name")) expected[SourceIdentity.Occurrence(item.Slot.Address).Digest] = item.Reply.Text;
         static string Id(SourceAddress address) => SourceIdentity.Occurrence(address).Digest.Hex;
         var keys = original.Text.TranslationKeys.ToDictionary(item => Id(item.Address), item => item.Key, StringComparer.Ordinal);
+        var referenceChanges = translations.Where(item => item.Slot.Role == "reference.selector.name").ToDictionary(item => item.Slot.Address, item => item.Reply.Text);
         foreach (var conversion in conversions)
         {
             if (!expected.Remove(SourceIdentity.Occurrence(conversion.Slot.Address).Digest)) throw new EditRejectedException(EditFailure.Precondition, "Converted command slot is missing");
@@ -106,7 +115,7 @@ internal static class WorldCommandEdits
         if (result.Count != expected.Count || expected.Any(item => !result.TryGetValue(item.Key, out var value) || value != item.Value))
             throw new EditRejectedException(EditFailure.Precondition, "Command candidate text projection differs");
         if (!keys.Select(item => (item.Key, item.Value)).OrderBy(item => item.Item1, StringComparer.Ordinal).SequenceEqual(actual.Text.TranslationKeys.Select(item => (Id(item.Address), item.Key)).OrderBy(item => item.Item1, StringComparer.Ordinal))
-            || !original.References.Select(item => (Id(item.Address), item.Name, item.Negated)).OrderBy(item => item.Item1, StringComparer.Ordinal).SequenceEqual(actual.References.Select(item => (Id(item.Address), item.Name, item.Negated)).OrderBy(item => item.Item1, StringComparer.Ordinal))
+            || !original.References.Select(item => (Id(item.Address), referenceChanges.GetValueOrDefault(item.Address, item.Name), item.Negated)).OrderBy(item => item.Item1, StringComparer.Ordinal).SequenceEqual(actual.References.Select(item => (Id(item.Address), item.Name, item.Negated)).OrderBy(item => item.Item1, StringComparer.Ordinal))
             || !original.Text.Diagnostics.Select(item => (Id(item.Address), item.Code)).OrderBy(item => item.Item1, StringComparer.Ordinal).SequenceEqual(actual.Text.Diagnostics.Select(item => (Id(item.Address), item.Code)).OrderBy(item => item.Item1, StringComparer.Ordinal)))
             throw new EditRejectedException(EditFailure.Precondition, "Command candidate protected references or diagnostics differ");
     }

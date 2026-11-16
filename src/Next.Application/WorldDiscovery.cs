@@ -136,6 +136,11 @@ public static class WorldDiscovery
                     if (!Add(new(location, null, SourceOutcome.Irrelevant, "InternalWriterLease", null, new()))) break;
                     continue;
                 }
+                if (InternalCandidate(entry.RelativePath))
+                {
+                    if (!Add(new(location with { Role = WorldSourceRole.Irrelevant }, null, SourceOutcome.Irrelevant, "InternalCandidate", null, new()))) break;
+                    continue;
+                }
                 if (metadataHashes.TryGetValue(entry.RelativePath, out var metadataHash))
                 {
                     if (!Add(new(location, null, SourceOutcome.Success, null, metadataHash, new(Read: SupportLevel.Supported)))) break;
@@ -187,6 +192,12 @@ public static class WorldDiscovery
             }
         }
         return Finish();
+    }
+    private static bool InternalCandidate(string path)
+    {
+        var name = path[(path.LastIndexOf('/') + 1)..];
+        return name.Length == 50 && name.StartsWith(".nbtcli-", StringComparison.OrdinalIgnoreCase)
+            && name.EndsWith(".candidate", StringComparison.OrdinalIgnoreCase) && Guid.TryParseExact(name.AsSpan(8, 32), "N", out _);
     }
 }
 

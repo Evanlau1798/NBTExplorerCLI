@@ -42,7 +42,11 @@ internal sealed partial class NbtTextReader
             }
         }
         if (identity == "minecraft:lectern" && Field(value, "Book", path) is { } book) Item(book, At(path, "Book"), "lectern.book");
-        if (identity == "minecraft:command_block" && Field(value, "Command", path) is { } command)
+        if (identity == "minecraft:command_block") StoredCommand(value, path);
+    }
+    private void StoredCommand(NbtValue value, TypedPath path)
+    {
+        if (Field(value, "Command", path) is { } command)
         {
             if (command is NbtString text) output.Command(At(path, "Command"), text.Value);
             else output.Diagnostic(At(path, "Command"), "InvalidCommand");
@@ -55,6 +59,7 @@ internal sealed partial class NbtTextReader
         var identity = rawIdentity is NbtString id ? MinecraftIdentifier.DefaultNamespace(id.Value) : knownIdentity!;
         if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingEntityIdentity"); return; }
         Component(Field(value, "CustomName", path), At(path, "CustomName"), identity == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name");
+        if (identity == "minecraft:command_block_minecart") StoredCommand(value, path);
         if (identity == "minecraft:text_display") Component(Field(value, "text", path), At(path, "text"), "text_display.text");
         Player(value, path);
         foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);

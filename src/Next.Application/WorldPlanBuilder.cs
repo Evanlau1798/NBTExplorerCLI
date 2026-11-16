@@ -19,7 +19,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         if (snapshot.Manifest.WorldId != inventory.WorldId) throw new ArgumentException("Snapshot belongs to another world", nameof(snapshot));
         var requested = operations.Take(100_001).ToArray();
         if (requested.Length > 100_000 || requested.Any(operation => operation is null)) throw new ArgumentException("Invalid or oversized operation set", nameof(operations));
-        if (requested.Any(operation => operation is not (LiteralPatch or TypedPatch or KeyConversionPatch))) throw new NotSupportedException("This preparation path requires explicit literal, key conversion or typed operations");
+        if (requested.Any(operation => operation is not (LiteralPatch or TypedPatch or KeyConversionPatch or ReferencePatch))) throw new NotSupportedException("This preparation path requires explicit semantic operations");
+        var referenceInputs = WorldReferenceService.Validate(inventory, snapshot, requested.OfType<ReferencePatch>());
         if (requested.OfType<TypedPatch>().Any(operation => operation.Address.Artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Region or ArtifactKind.Entities))) throw new NotSupportedException("Typed edits require an NBT document");
         var outputs = requested.SelectMany(operation => operation.RequiredOutputs).Distinct().ToArray();
         if (outputs.Any(artifact => artifact.WorldId != inventory.WorldId || artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Json or ArtifactKind.McFunction or ArtifactKind.Region or ArtifactKind.Entities or ArtifactKind.Archive))) throw new NotSupportedException("Physical artifact preparation profile is not implemented");
@@ -42,6 +43,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
                 Input(new(inventory.WorldId, root + "/pack.mcmeta", ArtifactKind.Json), ArtifactImage.Present(source.PackMetadataHash ?? throw new ArtifactConflictException("Pack metadata binding is missing")));
         }
         foreach (var metadata in snapshot.Discovery.MetadataSources.IsDefault ? [] : snapshot.Discovery.MetadataSources) Input(metadata.Artifact, ArtifactImage.Present(metadata.ContentHash!));
+        foreach (var input in referenceInputs) Input(input.Artifact, input.Image);
         var plan = new PatchPlan(inventory.WorldId, snapshot.Manifest.SnapshotId, snapshot.Manifest.Versions.Profile, Policy, requested,
             inputs.Values, outputs.Select(artifact => new OutputDeclaration(artifact, OutputIntent.Write, Checks)), []);
         CheckPreimages(inventory, plan);
@@ -141,6 +143,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     }
     internal static void CheckPreimages(IWorldInventory inventory, PatchPlan plan)
     {
+        WorldReferenceMembers.Catalog(inventory, plan);
         foreach (var input in plan.Preconditions)
         {
             ArtifactImage actual;

@@ -7,7 +7,7 @@ namespace Next.Minecraft;
 
 public static class DataTextExtractor
 {
-    public static TextExtractionResult Json(WorldSourceLocation source, byte[] json, WorldMetadata metadata, DecodeLimits? limits = null, SnapshotScope? scope = null)
+    public static TextExtractionResult Json(WorldSourceLocation source, byte[] json, WorldMetadata metadata, DecodeLimits? limits = null, SnapshotScope? scope = null, Action<SourceAddress>? componentRoot = null)
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(metadata);
         limits ??= DecodeLimits.Default;
@@ -27,7 +27,7 @@ public static class DataTextExtractor
         else if (output.CouldInclude("bossbar.name"))
         {
             var address = new SourceAddress(source.Artifact, new([PathSegment.ForKey("Name")]), "bossbar.name", source.Dimension);
-            output.Merge(TextComponentExtractor.Json(address, Encoding.UTF8.GetBytes(name.GetRawText()), metadata.Profile, limits, output.Scope));
+            output.Merge(TextComponentExtractor.Json(address, Encoding.UTF8.GetBytes(name.GetRawText()), metadata.Profile, limits, output.Scope, componentRoot));
         }
         return output.Finish();
     }

@@ -7,8 +7,13 @@ namespace Next.Application;
 
 internal static class WorldJsonEdits
 {
-    internal static PreparedArtifactBytes Create(byte[] bytes, IReadOnlyList<PatchOperation> operations, DecodeLimits limits)
+    internal static PreparedArtifactBytes Create(byte[] bytes, IReadOnlyList<PatchOperation> operations, DecodeLimits limits, ArtifactAddress? artifact = null)
     {
+        if (operations.Any(operation => operation is ReferencePatch))
+        {
+            if (artifact is null) throw new ArgumentException("References require an exact JSON artifact", nameof(artifact));
+            operations = operations.Where(operation => operation is not ReferencePatch).Concat(WorldReferenceMembers.Literals(operations, artifact).Select((item, index) => new LiteralPatch("reference-" + index, item))).ToArray();
+        }
         if (operations.Any(operation => operation is KeyConversionPatch)) return WorldJsonKeyEdits.Create(bytes, operations, limits);
         if (operations.Any(operation => operation is not LiteralPatch)) throw new NotSupportedException("JSON preparation requires exact literal value slots");
         return CreateLiterals(bytes, operations.Cast<LiteralPatch>().Select(operation => operation.Translation).ToArray(), limits);

@@ -15,6 +15,7 @@ internal sealed partial class CommandTextReader
     private readonly DecodeLimits limits;
     private readonly SnapshotScope scope;
     private readonly Action<SourceAddress>? componentRoot;
+    private readonly Action<CommandSelectorReference>? selectorReference;
     private readonly Hash256 hash;
     private readonly int byteBase;
     private readonly string newline;
@@ -27,10 +28,11 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
         this.componentRoot = componentRoot;
+        this.selectorReference = selectorReference;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
         byteBase = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 } ? 3 : 0;

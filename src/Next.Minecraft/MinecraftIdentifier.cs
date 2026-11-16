@@ -1,9 +1,10 @@
 namespace Next.Minecraft;
 
-internal static class MinecraftIdentifier
+public static class MinecraftIdentifier
 {
-    internal static string DefaultNamespace(string value)
+    public static string DefaultNamespace(string value)
     {
+        ArgumentNullException.ThrowIfNull(value);
         var separator = value.IndexOf(':');
         return separator < 0 ? "minecraft:" + value : separator == 0 ? "minecraft" + value : value;
     }

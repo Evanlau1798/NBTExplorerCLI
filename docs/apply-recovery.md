@@ -91,6 +91,12 @@ deletion after handle disposition. This is not a kernel or power-loss guarantee.
 Reserved candidates left by killed processes are retained as recovery evidence; this
 service does not yet garbage-collect all orphan candidates or immutable history.
 
-Reference synchronization, session completion/sealing and the complete public CLI
-workflow are separate integration responsibilities. The journal service does not mark
+Plans containing reference synchronization also recheck the relevant source catalog
+before and between physical commits. New sources stop the stale group; interrupted
+groups retain their known images and a non-success receipt for explicit recovery.
+Existing dependency images are also rechecked before each reference-group commit;
+a third image stops further writes and produces a conflict receipt.
+
+Session completion/sealing and the complete public CLI workflow remain separate
+integration responsibilities. The journal service does not mark
 translation sessions complete merely because a subset of physical writes succeeded.

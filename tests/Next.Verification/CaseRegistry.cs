@@ -7,6 +7,23 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("reference-world-typed-complete-apply", "reference-world", _ => WorldReferenceTests.TypedGroupPreparesAndAppliesEveryDeclaredMember()),
+        new("reference-world-explicit-membership", "reference-world", _ => WorldReferenceTests.AmbiguousTargetsAndForgedCompleteClaimsAreRejected()),
+        new("reference-world-new-catalog-entry", "reference-world", _ => WorldReferenceTests.NewReferencesAfterPrepareCannotAuthorizeStaleWrites()),
+        new("reference-world-unknown-domains", "reference-world", _ => WorldReferenceTests.DynamicAndUntypedReferenceDomainsAreBlocked()),
+        new("reference-private-candidate-catalog", "reference-world", _ => WorldReferenceTests.StagedPrivateCandidatesDoNotBecomeWorldSources()),
+        new("reference-world-composite-visible-name", "reference-world", _ => WorldReferenceSafetyTests.CompositeNamesUseVisiblePartsWithoutHoverText()),
+        new("reference-world-collision-context", "reference-world", _ => WorldReferenceSafetyTests.CollisionsAndExecutionContextDoNotWidenGroups()),
+        new("reference-world-new-source-during-commit", "reference-world", _ => WorldReferenceSafetyTests.ANewSourceDuringCommitRequiresRecoveryWithoutFurtherWrites()),
+        new("reference-world-changed-dependency-during-commit", "reference-world", _ => WorldReferenceSafetyTests.ChangedExistingDependenciesStopTheNextReferenceWrite()),
+        new("reference-world-stale-partial-snapshot", "reference-world", _ => WorldReferenceSafetyTests.SnapshotDriftAndPartialScopeRejectBeforePlanning()),
+        new("reference-world-unicode-negated-name", "reference-world", _ => WorldReferenceSafetyTests.UnicodeQuotedNamesAndNegatedReferencesRoundTrip()),
+        new("reference-world-archive-functions", "reference-world", _ => WorldReferenceFormatsTests.ArchiveFunctionsKeepUnselectedEntries()),
+        new("reference-world-native-nbt-profiles", "reference-world", _ => WorldReferenceFormatsTests.NativeNbtProfilesKeepTheirPhysicalLayout()),
+        new("reference-world-replacement-budget", "reference-world", _ => WorldReferenceSafetyTests.ProposedNameOutputRespectsTheSnapshotBudget()),
+        new("reference-world-lazy-input-budget", "reference-world", _ => WorldReferenceSafetyTests.LazyNameInputsStopAtTheAggregateBudget()),
+        new("reference-world-lazy-address-budget", "reference-world", _ => WorldReferenceSafetyTests.LazyNameAddressesAlsoConsumeTheRetentionBudget()),
+        new("reference-world-stored-minecart-command", "reference-world", _ => WorldReferenceFormatsTests.StoredMinecartCommandsAreRealReferenceMembers()),
         new("reference-selector-exact-tokens", "references", _ => NativeReferenceTests.SelectorTokensPreserveExactLocations()),
         new("reference-native-original-addresses", "references", _ => NativeReferenceTests.NativeSelectorsUseOriginalAddresses()),
         new("reference-native-dynamic-coverage", "references", _ => NativeReferenceTests.DynamicNativeComponentsRemainUnresolved()),

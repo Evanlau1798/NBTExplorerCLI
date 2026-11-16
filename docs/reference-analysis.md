@@ -23,11 +23,31 @@ Dynamic NBT/score content, click events, unsupported hover actions and malformed
 event shapes keep coverage unresolved. Existing component diagnostics also block
 coverage. This conservative policy does not authorize rewriting these values.
 
-These format-level results are not world-wide write authority. A subsequent service
-must bind a live source snapshot, identify named targets and typed static references,
-validate complete group membership, reject unknown or dynamic coverage, and stage
-the entire declared group through the single world preparation/apply path. Neither
-a caller-supplied Complete claim nor matching display strings proves that group.
+These format-level results are not world-wide write authority. Neither a caller's
+Complete claim nor matching display strings proves an authorized group.
 
-Automatic reference synchronization is not yet connected to `WorldPlanBuilder`.
-Ordinary literal/key operations continue to protect identifying names.
+`WorldReferenceService.Create` accepts explicitly selected identifying-name slot
+translations from a complete, unfiltered world snapshot. It rereads the live source
+set, binds native entity types and composes visible plain names from literal parts
+and extras. Hover text remains separate. Names using dynamic content are unresolved.
+The service never adds another same-spelled entity to the requested edits. It rejects
+unselected potential targets, collisions and references to the replacement name.
+
+The currently supported synchronization domain consists of static NBT entity
+CustomNames, direct typed entity selectors in functions or stored command fields,
+and typed selectors in native JSON/NBT components. Region chunks and exact ZIP
+entries retain their full addresses; each outer artifact has one candidate. Player
+selectors are separate from entity CustomName. Untyped/contextual selectors,
+unknown or dynamic grammar, encoded command selectors and named command/JSON
+templates block affected synchronization until their explicit domain is supported.
+
+`WorldPlanBuilder` recomputes the complete typed membership, including unchanged
+visible name parts, before accepting a ReferencePatch. The plan binds every relevant
+source preimage; discovery checks the source set before preparation and each commit.
+A newly introduced source causes conflict or an incomplete recovery receipt, never
+continued stale writes or success. Native private GUID candidates are excluded from
+semantic discovery; reserved-prefix lookalikes still fail closed.
+
+All group outputs use the existing stage/verify/apply/recovery path and immutable
+receipts. Ordinary literal/key operations continue to protect identifying names.
+This internal service is not a public CLI or Minecraft runtime acceptance.
