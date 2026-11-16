@@ -17,7 +17,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         if (snapshot.Manifest.WorldId != inventory.WorldId) throw new ArgumentException("Snapshot belongs to another world", nameof(snapshot));
         var requested = operations.Take(100_001).ToArray();
         if (requested.Length > 100_000 || requested.Any(operation => operation is null)) throw new ArgumentException("Invalid or oversized operation set", nameof(operations));
-        if (requested.Any(operation => operation is not (LiteralPatch or TypedPatch))) throw new NotSupportedException("This preparation path requires explicit literal or typed operations");
+        if (requested.Any(operation => operation is not (LiteralPatch or TypedPatch or KeyConversionPatch))) throw new NotSupportedException("This preparation path requires explicit literal, key conversion or typed operations");
         if (requested.OfType<TypedPatch>().Any(operation => operation.Address.Artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Region or ArtifactKind.Entities))) throw new NotSupportedException("Typed edits require an NBT document");
         var outputs = requested.SelectMany(operation => operation.RequiredOutputs).Distinct().ToArray();
         if (outputs.Any(artifact => artifact.WorldId != inventory.WorldId || artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Json or ArtifactKind.McFunction or ArtifactKind.Region or ArtifactKind.Entities or ArtifactKind.Archive))) throw new NotSupportedException("Physical artifact preparation profile is not implemented");
@@ -44,17 +44,19 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         var scope = new SnapshotScope(snapshot.Manifest.Scope.Dimensions, snapshot.Manifest.Scope.Regions, snapshot.Manifest.Scope.Types, outputs.Select(artifact => artifact.RelativePath));
         var rules = snapshot.StorageRules.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<StorageTextRule>)pair.Value);
         var extraction = new WorldTextExtraction(inventory, new(scope, snapshot.Limits), rules);
-        var literal = requested.OfType<LiteralPatch>().ToDictionary(operation => operation.Translation.Slot.Address); var found = new HashSet<SourceAddress>();
+        var literal = requested.OfType<LiteralPatch>().Select(operation => operation.Translation)
+            .Concat(requested.OfType<KeyConversionPatch>().Select(operation => new LiteralTranslation(operation.Conversion.Slot, operation.Conversion.Reply)))
+            .ToDictionary(translation => translation.Slot.Address); var found = new HashSet<SourceAddress>();
         foreach (var row in extraction.ReadSources())
         {
             if (!sources.TryGetValue((row.Source.Location.Artifact, row.Source.Chunk), out var expected)) continue;
             if (row.Source.Location != expected.Location || row.Source.ContentHash != expected.ContentHash || row.Source.PackMetadataHash != expected.PackMetadataHash) throw new ArtifactConflictException("Source interpretation changed after scanning");
             foreach (var occurrence in row.Text?.Occurrences ?? [])
-                if (literal.TryGetValue(occurrence.Address, out var operation))
+                if (literal.TryGetValue(occurrence.Address, out var translation))
                 {
-                    var slot = operation.Translation.Slot;
+                    var slot = translation.Slot;
                     if (!found.Add(occurrence.Address) || slot.SourceText != occurrence.Text || slot.Context != occurrence.Context || slot.AllowedEmpty != occurrence.AllowedEmpty) throw new EditRejectedException(EditFailure.Precondition, "Literal operation differs from its actual source slot");
-                    ValidateLiteral(operation.Translation, snapshot.Manifest.SnapshotId.Digest);
+                    ValidateLiteral(translation, snapshot.Manifest.SnapshotId.Digest);
                 }
         }
         if (found.Count != literal.Count) throw new EditRejectedException(EditFailure.Precondition, "Literal target is not an extracted text slot");
@@ -67,8 +69,59 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
             _ = NbtTextExtractor.Profile(sources[group.Key].Location, document);
             _ = TypedTreeEdits.Apply(document, group.Select(operation => operation.Edit));
         }
+        foreach (var operation in requested.OfType<KeyConversionPatch>())
+        {
+            var conversion = operation.Conversion; var address = conversion.Address; var source = sources[(address.Artifact, address.Chunk)];
+            if (IdentifyingName(conversion.Slot.Role)) throw new EditRejectedException(EditFailure.Precondition, "Identifying name conversion requires verified reference authority");
+            var bytes = ReadSource(source, snapshot.Limits);
+            CapabilityProfile profile; var roots = new List<SourceAddress>();
+            if (source.Location.Role is WorldSourceRole.PackJson or WorldSourceRole.PackMetadata && source.Pack is { } pack)
+            {
+                profile = MinecraftProfiles.ForPackMetadata(pack) ?? throw new NotSupportedException("Key conversion pack profile is unknown");
+                _ = PackTextExtractor.Extract(source.Location, bytes, pack, snapshot.Limits, snapshot.Manifest.Scope, roots.Add);
+                _ = WorldJsonKeyEdits.Convert(bytes, [conversion], snapshot.Limits);
+            }
+            else
+            {
+                var document = address.Chunk is { } chunk ? Next.Formats.RegionFile.Read(bytes).ReadChunk(chunk.LocalZ * 32 + chunk.LocalX, snapshot.Limits).Document : WorldArtifactEdits.ReadNbt(bytes, snapshot.Limits).Document;
+                profile = NbtTextExtractor.Profile(source.Location, document);
+                var embedded = conversion.Rule == KeyConversionRule.EncodedTextToTranslate && address.Syntax is null && address.ComponentPath is not null && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json";
+                var native = conversion.Rule != KeyConversionRule.EncodedTextToTranslate && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
+                if (!embedded && !native) throw new NotSupportedException("Key conversion encoding profile is not implemented");
+                _ = NbtTextExtractor.Extract(source.Location, document, source.Chunk, snapshot.Limits, snapshot.StorageRules.GetValueOrDefault(address.Artifact, []), snapshot.Manifest.Scope, snapshot.Discovery.Metadata?.Profile, roots.Add);
+                if (embedded)
+                {
+                    if (NbtLocator.Resolve(document.Root, address.NodePath).Value is not NbtString text) throw new EditRejectedException(EditFailure.Precondition, "Encoded component source is not a string");
+                    _ = WorldKeyEdits.RewriteJson(text.Value, [conversion], snapshot.Limits);
+                }
+                else _ = TypedTreeEdits.Apply(document, [TypedEdit.Replace(address.NodePath, conversion.Expected, WorldKeyEdits.Replacement(conversion))]);
+            }
+            if (profile.Id != conversion.Profile || profile.Version != conversion.ProfileVersion) throw new NotSupportedException("Key conversion requires its exact text profile");
+            if (!roots.Contains(address))
+                throw new EditRejectedException(EditFailure.Precondition, "Key conversion target is not a profile-declared text component");
+            var language = sources[(conversion.Dependency.LanguageArtifact, null)];
+            if (language.Location.Role != WorldSourceRole.Language || language.Pack?.Kind != PackSourceKind.ResourcePack)
+                throw new EditRejectedException(EditFailure.Precondition, "Key conversion language dependency is not an exact resource language source");
+            if (!language.Pack.DeclaresSupport(MinecraftProfiles.RequiredResourcePackFormat(profile))) throw new NotSupportedException("Resource language pack does not support the target component profile");
+            var languagePath = language.Location.Artifact.ContainerEntry ?? language.Location.Artifact.RelativePath;
+            if (!languagePath.EndsWith("/" + conversion.Dependency.Locale + ".json", StringComparison.Ordinal)) throw new EditRejectedException(EditFailure.Precondition, "Language dependency locale differs from its path");
+        }
         CheckPreimages(inventory, plan);
         return new(plan, sources.ToImmutableDictionary());
+    }
+    private byte[] ReadSource(DiscoveredSource source, DecodeLimits limits)
+    {
+        var artifact = source.Location.Artifact;
+        var outer = artifact.ContainerEntry is null ? artifact : new ArtifactAddress(artifact.WorldId, artifact.RelativePath, artifact.Kind);
+        var bytes = inventory.Read(outer);
+        if (artifact.ContainerEntry is { } name)
+        {
+            using var zip = Next.Formats.ZipArchiveValidation.OpenRead(bytes, limits);
+            var entry = zip.GetEntry(name) ?? throw new ArtifactConflictException("Bound ZIP entry disappeared");
+            bytes = new byte[checked((int)entry.Length)]; using var stream = entry.Open(); stream.ReadExactly(bytes);
+        }
+        if (Hash256.Compute(bytes) != source.ContentHash) throw new ArtifactConflictException("Bound source payload changed");
+        return bytes;
     }
     internal static void CheckPreimages(IWorldInventory inventory, PatchPlan plan)
     {
@@ -81,7 +134,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     private static void ValidateLiteral(LiteralTranslation translation, Hash256 snapshot)
     {
         var slot = translation.Slot;
-        if (translation.Reply.Text != slot.SourceText && slot.Role is "entity.name" or "armor_stand.name" or "entity.name.fallback" or "armor_stand.name.fallback")
+        if (translation.Reply.Text != slot.SourceText && IdentifyingName(slot.Role))
             throw new EditRejectedException(EditFailure.Precondition, "Identifying names require an explicitly verified complete reference synchronization");
         var id = Guid.NewGuid(); var pageId = Hash256.Compute([]); var format = MinecraftPlaceholderProfiles.ForRole(slot.Role);
         var page = new SessionPage(id, 0, snapshot, 0, pageId, slot.SourceLocale, slot.TargetLocale, "literal-v1", false, [new(slot.Id.Digest, slot.SourceTextHash, slot.SourceText, slot.Context, slot.AllowedEmpty, slot.Placeholders.Tokens, format)]);
@@ -89,6 +142,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         var validation = SessionReplyValidator.Validate(page, [slot], reply, new Dictionary<Hash256, PlaceholderFormat> { [slot.Id.Digest] = format });
         if (!validation.Valid) throw new SessionReplyRejectedException(validation.Issues);
     }
+    private static bool IdentifyingName(string role) => role is "entity.name" or "armor_stand.name" or "entity.name.fallback" or "armor_stand.name.fallback";
 }
 
 internal sealed record BoundWorldPlan(PatchPlan Plan, ImmutableDictionary<(ArtifactAddress Artifact, ChunkPosition? Chunk), DiscoveredSource> Sources);

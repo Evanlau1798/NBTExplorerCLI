@@ -11,13 +11,13 @@ internal static class SnbtTextExtractor
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemComponent(name, root, TypedPath.Root), false);
     internal static TextExtractionResult Component(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Component(root, TypedPath.Root, source.SemanticRole), false);
-    internal static TextExtractionResult LegacyItemTag(SourceAddress source, string syntax, CapabilityProfile profile, string? itemId, DecodeLimits limits, SnapshotScope scope)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.LegacyTag(root, itemId));
-    internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.BlockEntity(root, TypedPath.Root, knownIdentity));
-    internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Entity(root, TypedPath.Root, knownIdentity));
-    private static TextExtractionResult Read(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<NbtTextReader, NbtValue> extract, bool compound = true)
+    internal static TextExtractionResult LegacyItemTag(SourceAddress source, string syntax, CapabilityProfile profile, string? itemId, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.LegacyTag(root, itemId), componentRoot: componentRoot);
+    internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.BlockEntity(root, TypedPath.Root, knownIdentity), componentRoot: componentRoot);
+    internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Entity(root, TypedPath.Root, knownIdentity), componentRoot: componentRoot);
+    private static TextExtractionResult Read(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<NbtTextReader, NbtValue> extract, bool compound = true, Action<SourceAddress>? componentRoot = null)
     {
         if (source.Syntax is not null || source.ComponentPath is not null) throw new CodecException(CodecError.UnsupportedProfile, 0, "Nested syntax binding is unsupported");
         var encoding = new UTF8Encoding(false, true);
@@ -27,7 +27,7 @@ internal static class SnbtTextExtractor
         var document = MinecraftNbtAdapter.Encode(new("", parsed.Root.Value), profile, limits);
         if (compound && document.Root is not NbtCompound) throw new SnbtException(SnbtError.InvalidToken, 0, "Item tag requires an SNBT compound");
         var binding = new SourceAddress(source.Artifact, TypedPath.Root, source.SemanticRole, source.Dimension, source.Chunk);
-        var output = new TextExtractionCollector(binding, false, limits, scope);
+        var output = new TextExtractionCollector(binding, false, limits, scope) { ComponentRoot = componentRoot is null ? null : address => componentRoot(Bind(address)) };
         extract(new(binding, profile, profile, output, limits), document.Root);
         var result = output.Finish();
         return new(result.Occurrences.Select(value => value with { Address = Bind(value.Address) }).ToImmutableArray(),

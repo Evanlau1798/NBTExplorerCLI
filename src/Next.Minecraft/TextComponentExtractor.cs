@@ -8,36 +8,36 @@ namespace Next.Minecraft;
 public static class TextComponentExtractor
 {
     private static readonly string[] ContentKeys = ["text", "translate", "score", "selector", "keybind", "nbt"];
-    public static TextExtractionResult Json(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null)
+    public static TextExtractionResult Json(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null, Action<SourceAddress>? componentRoot = null)
     {
         var modern = Check(source, profile);
         var embedded = source.Artifact.Kind is ArtifactKind.Nbt or ArtifactKind.Region or ArtifactKind.Entities
             || source.Artifact.Kind == ArtifactKind.Archive && source.Artifact.ContainerEntry?.EndsWith(".nbt", StringComparison.Ordinal) == true;
         if (embedded && modern) throw Unsupported();
-        return ReadJson(source, component, profile, limits, scope, embedded);
+        return ReadJson(source, component, profile, limits, scope, embedded, componentRoot);
     }
-    public static TextExtractionResult EmbeddedJsonString(SourceAddress source, string component, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null)
+    public static TextExtractionResult EmbeddedJsonString(SourceAddress source, string component, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null, Action<SourceAddress>? componentRoot = null)
     {
         if (Check(source, profile)) throw Unsupported();
-        return ReadJson(source, NativeJsonStrings.EncodeJavaDocument(component, limits), profile, limits, scope, true);
+        return ReadJson(source, NativeJsonStrings.EncodeJavaDocument(component, limits), profile, limits, scope, true, componentRoot);
     }
     internal static TextExtractionResult NativeJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope)
     {
-        _ = Check(source, profile); return ReadJson(source, component, profile, limits, scope, false);
+        _ = Check(source, profile); return ReadJson(source, component, profile, limits, scope, false, null);
     }
-    private static TextExtractionResult ReadJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits? limits, SnapshotScope? scope, bool embedded)
+    private static TextExtractionResult ReadJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits? limits, SnapshotScope? scope, bool embedded, Action<SourceAddress>? componentRoot)
     {
         limits ??= DecodeLimits.Default;
         using var json = BoundedJson.ReadDecoded(component, limits);
-        var collector = new TextExtractionCollector(source, embedded, limits, scope);
+        var collector = new TextExtractionCollector(source, embedded, limits, scope) { ComponentRoot = componentRoot };
         JsonValue(json.RootElement, TypedPath.Root, source.SemanticRole, profile.Features[ProfileFacet.TextSchema], collector);
         return collector.Finish();
     }
-    public static TextExtractionResult Nbt(SourceAddress source, NbtValue component, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null)
+    public static TextExtractionResult Nbt(SourceAddress source, NbtValue component, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null, Action<SourceAddress>? componentRoot = null)
     {
         if (!Check(source, profile)) throw Unsupported();
         limits ??= DecodeLimits.Default; _ = BinaryNbt.MeasureDocument(new("", component), limits);
-        var collector = new TextExtractionCollector(source, false, limits, scope);
+        var collector = new TextExtractionCollector(source, false, limits, scope) { ComponentRoot = componentRoot };
         WalkNbt(component, TypedPath.Root, source.SemanticRole, profile, collector);
         return collector.Finish();
     }
@@ -52,7 +52,7 @@ public static class TextComponentExtractor
     }
     private static void JsonValue(JsonElement value, TypedPath path, string role, FormatFeature schema, TextExtractionCollector output, bool argument = false)
     {
-        if (value.ValueKind == JsonValueKind.String) { output.Literal(path, NativeJsonStrings.Read(value), role); return; }
+        if (value.ValueKind == JsonValueKind.String) { output.RegisterComponent(output.Address(path, role)); output.Literal(path, NativeJsonStrings.Read(value), role); return; }
         if (argument && value.ValueKind is JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False) return;
         if (value.ValueKind == JsonValueKind.Array)
         {
@@ -65,6 +65,7 @@ public static class TextComponentExtractor
         var objectContent = modern && schema.Version == 2 && (fields.ContainsKey("object") || fields.ContainsKey("atlas") || fields.ContainsKey("player"));
         var contents = ContentKeys.Count(fields.ContainsKey) + (objectContent ? 1 : 0);
         if (contents != 1) { output.Diagnostic(path, contents > 1 ? "AmbiguousComponent" : "UnknownComponent"); return; }
+        output.RegisterComponent(output.Address(path, role));
         if (fields.TryGetValue("selector", out var selector) && selector.ValueKind != JsonValueKind.String) { output.Diagnostic(At(path, "selector"), "InvalidComponent"); return; }
         if (objectContent && fields.TryGetValue("object", out var objectKind) && (objectKind.ValueKind != JsonValueKind.String || NativeJsonStrings.Read(objectKind) is not ("atlas" or "player")))
         { output.Diagnostic(path, "UnknownComponent"); return; }
@@ -106,7 +107,7 @@ public static class TextComponentExtractor
     }
     private static void WalkNbt(NbtValue value, TypedPath path, string role, CapabilityProfile profile, TextExtractionCollector output, bool argument = false)
     {
-        if (value is NbtString textValue) { output.Literal(path, textValue.Value, role); return; }
+        if (value is NbtString textValue) { output.RegisterComponent(output.Address(path, role)); output.Literal(path, textValue.Value, role); return; }
         if (argument && value is NbtByte or NbtShort or NbtInt or NbtLong or NbtFloat or NbtDouble) return;
         if (value is NbtList list)
         {
@@ -126,6 +127,7 @@ public static class TextComponentExtractor
         var objectContent = profile.Features[ProfileFacet.TextSchema].Version == 2 && (fields.ContainsKey("object") || fields.ContainsKey("atlas") || fields.ContainsKey("player"));
         var contents = ContentKeys.Count(fields.ContainsKey) + (objectContent ? 1 : 0);
         if (contents != 1) { output.Diagnostic(path, contents > 1 ? "AmbiguousComponent" : "UnknownComponent"); return; }
+        output.RegisterComponent(output.Address(path, role));
         if (fields.TryGetValue("selector", out var selector) && selector is not NbtString) { output.Diagnostic(At(path, "selector"), "InvalidComponent"); return; }
         if (objectContent && fields.TryGetValue("object", out var objectKind) && objectKind is not NbtString { Value: "atlas" or "player" })
         { output.Diagnostic(path, "UnknownComponent"); return; }

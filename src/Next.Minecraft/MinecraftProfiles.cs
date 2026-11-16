@@ -4,6 +4,15 @@ namespace Next.Minecraft;
 
 public static class MinecraftProfiles
 {
+    public static PackFormatVersion RequiredResourcePackFormat(CapabilityProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        return new(profile.Id switch
+        {
+            "java-1.20.4" => 22, "java-1.21" => 34, "java-1.21.5" => 55, "java-26.1-snapshot-6" => 80,
+            _ => throw new CodecException(CodecError.UnsupportedProfile, 0, "Unknown required pack format")
+        }, 0);
+    }
     public static CapabilityProfile? ForPackMetadata(PackMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);

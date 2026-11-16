@@ -7,13 +7,13 @@ namespace Next.Minecraft;
 public static class NbtTextExtractor
 {
     public static TextExtractionResult Extract(WorldSourceLocation source, NbtDocument document, ChunkPosition? chunk = null, DecodeLimits? limits = null,
-        IReadOnlyList<StorageTextRule>? storageRules = null, SnapshotScope? scope = null, CapabilityProfile? layoutProfile = null)
+        IReadOnlyList<StorageTextRule>? storageRules = null, SnapshotScope? scope = null, CapabilityProfile? layoutProfile = null, Action<SourceAddress>? componentRoot = null)
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(document);
         limits ??= DecodeLimits.Default; _ = BinaryNbt.MeasureDocument(document, limits);
         var profile = Profile(source, document);
         var binding = new SourceAddress(source.Artifact, TypedPath.Root, "source.document", source.Dimension, chunk);
-        var output = new TextExtractionCollector(binding, false, limits, scope);
+        var output = new TextExtractionCollector(binding, false, limits, scope) { ComponentRoot = componentRoot };
         var reader = new NbtTextReader(binding, profile, layoutProfile ?? profile, output, limits);
         switch (source.Role)
         {
@@ -65,8 +65,8 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
     {
         if (value is null || !output.CouldInclude(role)) return;
         var source = new SourceAddress(binding.Artifact, path, role, binding.Dimension, binding.Chunk);
-        if (modern) output.Merge(TextComponentExtractor.Nbt(source, value, profile, limits, output.Scope));
-        else if (value is NbtString json) output.Merge(TextComponentExtractor.EmbeddedJsonString(source, json.Value, profile, limits, output.Scope));
+        if (modern) output.Merge(TextComponentExtractor.Nbt(source, value, profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
+        else if (value is NbtString json) output.Merge(TextComponentExtractor.EmbeddedJsonString(source, json.Value, profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
         else output.Diagnostic(path, "InvalidJsonComponentString");
     }
     private void Literal(NbtValue? value, TypedPath path, string role)

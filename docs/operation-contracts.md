@@ -366,5 +366,16 @@ preparation verifies one chunk tree at a time and retains
 only its descriptor and payload hash for persisted verification. Entry output buffers and
 nested replacement strings have aggregate retention bounds as well as per-transform limits.
 
-Key/reference conversion, restore and commit/recovery remain explicit unsupported
-boundaries until their service paths are implemented and verified.
+Key conversion binds the exact live text component root declared by its source profile,
+not every string slot (plain book titles/authors cannot become components). Native NBT,
+native JSON, legacy embedded JSON and JSON/SNBT/embedded JSON book pages can convert the
+selected literal component to `translate`, preserving sibling text, style and events.
+Entity/armor stand identifying name conversions require reference authority even when
+the requested text equals the old name. Existing resource language files, including ZIP
+entries, are explicit plan outputs and dependencies; incompatible pack formats and
+different existing key values are rejected. Literal percent signs use one fixed percent
+argument and a language pattern that preserves them without interpreting user text.
+
+New language files/packs, command key conversion, native SNBT key components, reference
+synchronization, restore and commit/recovery remain unsupported until their service paths
+are implemented and verified. Preparation does not change the original world.

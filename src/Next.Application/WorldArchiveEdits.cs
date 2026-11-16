@@ -10,7 +10,7 @@ internal static class WorldArchiveEdits
     {
         using var archive = ZipArchiveValidation.OpenRead(bytes, limits);
         var replacements = new List<(string Entry, Hash256 Expected, byte[] Replacement)>(); long retainedBytes = 0;
-        foreach (var group in operations.GroupBy(operation => operation.Targets.Select(address => address.Artifact.ContainerEntry).Distinct().Single() ?? throw new EditRejectedException(EditFailure.Precondition, "ZIP operation requires an exact entry")))
+        foreach (var group in operations.GroupBy(operation => operation.Targets.Where(address => address.Artifact.RelativePath == sources[0].Location.Artifact.RelativePath).Select(address => address.Artifact.ContainerEntry).Distinct().Single() ?? throw new EditRejectedException(EditFailure.Precondition, "ZIP operation requires an exact entry")))
         {
             var source = sources.Single(item => item.Location.Artifact.ContainerEntry == group.Key);
             var entry = archive.GetEntry(group.Key) ?? throw new EditRejectedException(EditFailure.Precondition, "ZIP source entry disappeared");
@@ -23,6 +23,7 @@ internal static class WorldArchiveEdits
                 var output = expected == parsed.Document ? original : CompressedNbt.WriteDocument(expected, parsed.Compression, limits);
                 transformed = new(output, stream => { if (WorldArtifactEdits.ReadNbt(WorldArtifactEdits.Read(stream), limits).Document != expected) throw new InvalidDataException("ZIP NBT candidate projection differs"); });
             }
+            else if (source.Location.Role == WorldSourceRole.Language && group.Any(operation => operation is KeyConversionPatch)) transformed = WorldLanguageEdits.Create(source.Location.Artifact, original, group.ToArray(), limits);
             else if (source.Location.Role is WorldSourceRole.PackJson or WorldSourceRole.PackMetadata or WorldSourceRole.Language) transformed = WorldJsonEdits.Create(original, group.ToArray(), limits);
             else throw new NotSupportedException("Unknown ZIP entry preparation profile");
             retainedBytes = checked(retainedBytes + transformed.Bytes.Length);

@@ -7,8 +7,21 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("prepare-world-key-component-field-rejection", "preparation", _ => KeyComponentAuthorityTests.PlainTextFieldsCannotGrantComponentAuthority()),
+        new("prepare-world-key-nested-component-authority", "preparation", _ => KeyComponentAuthorityTests.NestedComponentsRemainAuthorized()),
+        new("prepare-world-key-archive-json-source", "preparation", _ => KeyArchivePreparationTests.ArchivedJsonUsesContainerEntryAndExactPackProfile()),
+        new("prepare-world-key-json-snbt-layers", "preparation", _ => EncodedKeyPreparationTests.JsonSnbtAndEmbeddedComponentKeepAllOtherLayers()),
+        new("prepare-world-key-native-json", "preparation", _ => EncodedKeyPreparationTests.NativeJsonComponentPreservesPhysicalFraming()),
+        new("prepare-json-key-batch-projection", "preparation", _ => JsonKeyEditsTests.BatchComponentFieldsKeepProtectedBytesAndFraming()),
+        new("prepare-json-key-rejected-authority", "preparation", _ => JsonKeyEditsTests.RejectedConversionsDoNotGuessOrExpandAuthority()),
+        new("prepare-world-key-field-authority", "preparation", _ => KeyFieldAuthorityTests.PlainBookMetadataDoesNotBecomeAComponent()),
         new("key-encoded-recipe-plan-roundtrip", "contracts", _ => EncodedKeyContractTests.OpaqueRecipeSurvivesPlanExchangeWithoutBecomingTypedEdit()),
         new("key-encoded-layer-scope-rejection", "contracts", _ => EncodedKeyContractTests.EncodedLayerAndComponentScopeCannotBeForged()),
+        new("prepare-world-key-encoded-json-root", "preparation", _ => EncodedKeyPreparationTests.LegacyJsonComponentUsesItsExactDecodedRoot()),
+        new("prepare-world-key-archive-stage-failure", "preparation", _ => WorldKeyPreparationTests.ArchivedLanguageAndPackFailureAreOnePreparedSet()),
+        new("prepare-world-key-pack-profile-collision", "preparation", _ => WorldKeyPreparationTests.PackMismatchAndLanguageCollisionPreserveWorld()),
+        new("prepare-world-name-key-protection", "preparation", _ => WorldKeyPreparationTests.IdentifyingKeyConversionRequiresReferenceAuthority()),
+        new("prepare-world-component-key-language", "preparation", _ => WorldKeyPreparationTests.ModernComponentAndLanguageDependencyPrepareTogether()),
         new("prepare-world-name-hover-permitted", "preparation", _ => NameProtectionTests.NameHoverTextDoesNotChangeIdentifier()),
         new("prepare-world-identifying-name-protection", "preparation", _ => NameProtectionTests.LiteralNamesCannotBypassReferenceSynchronization()),
         new("prepare-world-native-json-archive-nbt-language", "preparation", _ => ContainerPreparationTests.NativeEncodedJsonArchiveNbtAndLanguageProfiles()),

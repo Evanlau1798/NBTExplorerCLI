@@ -7,6 +7,7 @@ internal sealed class TextExtractionCollector(SourceAddress source, bool embedde
 {
     internal SnapshotScope Scope { get; } = scope ?? SnapshotScope.All;
     internal DecodeLimits Limits { get; } = limits;
+    internal Action<SourceAddress>? ComponentRoot { get; init; }
     internal bool Includes(string role) => WorldSourceScope.IncludesRole(role, Scope);
     internal bool CouldInclude(string role) => WorldSourceScope.CouldIncludeRole(role, Scope);
     private readonly List<TextOccurrence> occurrences = [];
@@ -42,6 +43,11 @@ internal sealed class TextExtractionCollector(SourceAddress source, bool embedde
     {
         if (!Includes("command.block")) return;
         var address = Address(path, "command.block"); Charge(address, command); commands.Add(new(address, command));
+    }
+    internal void RegisterComponent(SourceAddress address)
+    {
+        if (ComponentRoot is null) return;
+        Charge(address, ""); ComponentRoot(address);
     }
     internal void Unclassified(TypedPath path, string text)
     {

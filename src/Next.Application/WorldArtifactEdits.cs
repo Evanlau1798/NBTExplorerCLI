@@ -17,6 +17,7 @@ internal static class WorldArtifactEdits
     internal static PreparedArtifactBytes Create(ArtifactAddress artifact, byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits)
     {
         var source = sources.Single(item => item.Location.Artifact == artifact && item.Chunk is null);
+        if (source.Location.Role == WorldSourceRole.Language && operations.Any(operation => operation is KeyConversionPatch)) return WorldLanguageEdits.Create(artifact, bytes, operations, limits);
         if (artifact.Kind == ArtifactKind.Nbt) return Nbt(bytes, operations, source, limits);
         if (artifact.Kind == ArtifactKind.Json) return WorldJsonEdits.Create(bytes, operations, limits);
         if (artifact.Kind == ArtifactKind.McFunction) return WorldCommandEdits.Create(artifact, bytes, operations, source, limits);
@@ -34,6 +35,13 @@ internal static class WorldArtifactEdits
     {
         var profile = NbtTextExtractor.Profile(source.Location, document);
         var edits = operations.OfType<TypedPatch>().Select(operation => operation.Edit).ToList();
+        edits.AddRange(operations.OfType<KeyConversionPatch>().Where(operation => operation.Conversion.Address.Artifact == source.Location.Artifact && operation.Conversion.Rule != KeyConversionRule.EncodedTextToTranslate).Select(operation =>
+            TypedEdit.Replace(operation.Conversion.Address.NodePath, operation.Conversion.Expected, WorldKeyEdits.Replacement(operation.Conversion))));
+        foreach (var group in operations.OfType<KeyConversionPatch>().Where(operation => operation.Conversion.Rule == KeyConversionRule.EncodedTextToTranslate).GroupBy(operation => operation.Conversion.Address.NodePath))
+        {
+            if (NbtLocator.Resolve(document.Root, group.Key).Value is not NbtString text) throw new EditRejectedException(EditFailure.Precondition, "Encoded component source is not a string");
+            edits.Add(TypedEdit.Replace(group.Key, text, new NbtString(WorldKeyEdits.RewriteJson(text.Value, group.Select(operation => operation.Conversion).ToArray(), limits))));
+        }
         var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation).ToArray();
         foreach (var group in literal.Where(item => item.Slot.Address.Syntax is not null).GroupBy(item => item.Slot.Address.NodePath))
         {
@@ -55,7 +63,7 @@ internal static class WorldArtifactEdits
     private static PreparedArtifactBytes Region(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits)
     {
         var original = RegionFile.Read(bytes); var output = bytes; var expected = new Dictionary<int, (RegionChunk Descriptor, Hash256 Payload)>();
-        foreach (var group in operations.GroupBy(operation => operation.Targets.Select(address => address.Chunk).Distinct().Single() ?? throw new EditRejectedException(EditFailure.Precondition, "Region operation requires an exact chunk")))
+        foreach (var group in operations.GroupBy(operation => operation.Targets.Where(address => address.Artifact == sources[0].Location.Artifact && address.Chunk is not null).Select(address => address.Chunk).Distinct().Single() ?? throw new EditRejectedException(EditFailure.Precondition, "Region operation requires an exact chunk")))
         {
             var index = group.Key.LocalZ * 32 + group.Key.LocalX;
             var source = sources.Single(item => item.Chunk == group.Key); var before = original.ReadChunk(index, limits).Document;

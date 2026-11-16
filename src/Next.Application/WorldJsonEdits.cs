@@ -9,6 +9,7 @@ internal static class WorldJsonEdits
 {
     internal static PreparedArtifactBytes Create(byte[] bytes, IReadOnlyList<PatchOperation> operations, DecodeLimits limits)
     {
+        if (operations.Any(operation => operation is KeyConversionPatch)) return WorldJsonKeyEdits.Create(bytes, operations, limits);
         if (operations.Any(operation => operation is not LiteralPatch || operation.Targets.Any(address => address.JsonTarget != JsonTargetKind.Value))) throw new NotSupportedException("JSON preparation requires exact literal value slots");
         var literals = operations.Cast<LiteralPatch>().Select(operation => operation.Translation).ToArray();
         var changes = literals.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null)

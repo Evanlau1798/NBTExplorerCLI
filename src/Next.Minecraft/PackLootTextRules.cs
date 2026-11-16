@@ -80,7 +80,7 @@ public static partial class PackTextExtractor
                 if (!NestedItemScope(output)) break;
                 var tagPath = At(path, "tag");
                 if (value.TryGetNativeProperty("tag", out var tag) && tag.ValueKind == JsonValueKind.String)
-                    output.Merge(SnbtTextExtractor.LegacyItemTag(output.Address(tagPath, "item.tag"), NativeJsonStrings.Read(tag), profile, itemId, output.Limits, output.Scope));
+                    output.Merge(SnbtTextExtractor.LegacyItemTag(output.Address(tagPath, "item.tag"), NativeJsonStrings.Read(tag), profile, itemId, output.Limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
                 else output.Diagnostic(tagPath, "InvalidLegacyTagString");
                 break;
         }

@@ -20,7 +20,7 @@ public static partial class PackTextExtractor
     {
         if (value.ValueKind == JsonValueKind.String)
         {
-            output.Merge(SnbtTextExtractor.BlockEntity(output.Address(path, "container.name"), NativeJsonStrings.Read(value), profile, output.Limits, output.Scope)); return;
+            output.Merge(SnbtTextExtractor.BlockEntity(output.Address(path, "container.name"), NativeJsonStrings.Read(value), profile, output.Limits, output.Scope, componentRoot: output.ComponentRoot is null ? null : output.RegisterComponent)); return;
         }
         if (!value.TryGetNativeProperty("id", out var identity) || identity.ValueKind != JsonValueKind.String) { output.Diagnostic(path, "MissingBlockEntityIdentity"); return; }
         var id = MinecraftIdentifier.DefaultNamespace(NativeJsonStrings.Read(identity));
@@ -54,7 +54,7 @@ public static partial class PackTextExtractor
     {
         if (value.ValueKind == JsonValueKind.String)
         {
-            output.Merge(SnbtTextExtractor.Entity(output.Address(path, "entity.name"), NativeJsonStrings.Read(value), profile, output.Limits, output.Scope)); return;
+            output.Merge(SnbtTextExtractor.Entity(output.Address(path, "entity.name"), NativeJsonStrings.Read(value), profile, output.Limits, output.Scope, componentRoot: output.ComponentRoot is null ? null : output.RegisterComponent)); return;
         }
         if (!value.TryGetNativeProperty("id", out var identity) || identity.ValueKind != JsonValueKind.String) { output.Diagnostic(path, "MissingEntityIdentity"); return; }
         var id = MinecraftIdentifier.DefaultNamespace(NativeJsonStrings.Read(identity));

@@ -8,7 +8,7 @@ namespace Next.Minecraft;
 
 public static partial class PackTextExtractor
 {
-    public static TextExtractionResult Extract(WorldSourceLocation source, byte[] json, PackMetadata metadata, DecodeLimits? limits = null, SnapshotScope? scope = null)
+    public static TextExtractionResult Extract(WorldSourceLocation source, byte[] json, PackMetadata metadata, DecodeLimits? limits = null, SnapshotScope? scope = null, Action<SourceAddress>? componentRoot = null)
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(metadata);
         if (source.PackKind != metadata.Kind || source.PackRoot is null) throw new ArgumentException("Requires exact pack identity and metadata", nameof(source));
@@ -18,7 +18,7 @@ public static partial class PackTextExtractor
         using var document = BoundedJson.ReadDecoded(json, limits);
         var root = document.RootElement;
         var binding = new SourceAddress(source.Artifact, TypedPath.Root, "pack.text", source.Dimension);
-        var output = new TextExtractionCollector(binding, false, limits, scope);
+        var output = new TextExtractionCollector(binding, false, limits, scope) { ComponentRoot = componentRoot };
         if (source.Role == WorldSourceRole.Language && metadata.Kind == PackSourceKind.ResourcePack)
         {
             if (root.ValueKind != JsonValueKind.Object) output.Diagnostic(TypedPath.Root, "InvalidLanguageObject");
@@ -62,7 +62,7 @@ public static partial class PackTextExtractor
         {
             if (!output.CouldInclude(role)) return;
             var address = new SourceAddress(source.Artifact, path, role, source.Dimension);
-            output.Merge(TextComponentExtractor.Json(address, Encoding.UTF8.GetBytes(value.GetRawText()), profile, limits, output.Scope));
+            output.Merge(TextComponentExtractor.Json(address, Encoding.UTF8.GetBytes(value.GetRawText()), profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
         }
         void RawComponent(JsonElement value, TypedPath path, string role)
         {
@@ -70,7 +70,7 @@ public static partial class PackTextExtractor
             if (profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt") { Component(value, path, role); return; }
             if (value.ValueKind != JsonValueKind.String) { output.Diagnostic(path, "InvalidJsonComponentString"); return; }
             var address = new SourceAddress(source.Artifact, path, role, source.Dimension);
-            output.Merge(TextComponentExtractor.EmbeddedJsonString(address, NativeJsonStrings.Read(value), profile, limits, output.Scope));
+            output.Merge(TextComponentExtractor.EmbeddedJsonString(address, NativeJsonStrings.Read(value), profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
         }
     }
     private static string Entry(WorldSourceLocation source)
