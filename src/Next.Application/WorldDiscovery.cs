@@ -8,7 +8,7 @@ namespace Next.Application;
 public sealed record ScanRequest(SnapshotScope Scope, DecodeLimits? Limits = null, int MaximumSources = 100_000);
 public sealed record DiscoveredSource(WorldSourceLocation Location, ChunkPosition? Chunk, SourceOutcome Outcome,
     string? DiagnosticCode, Hash256? ContentHash, OperationSupport Capability, PackMetadata? Pack = null, Hash256? PackMetadataHash = null);
-public sealed record WorldDiscoveryResult(WorldMetadata? Metadata, SnapshotScope Scope, WorldInventorySnapshot Inventory, ImmutableArray<DiscoveredSource> Sources, string? DiagnosticCode)
+public sealed record WorldDiscoveryResult(WorldMetadata? Metadata, SnapshotScope Scope, WorldInventorySnapshot Inventory, ImmutableArray<DiscoveredSource> Sources, string? DiagnosticCode, ImmutableArray<ManifestSource> MetadataSources = default)
 {
     // Catalog completeness covers enumeration and container headers; payload extraction is a separate stage.
     public bool Complete => DiagnosticCode is null && Sources.All(source => source.Outcome is SourceOutcome.Success or SourceOutcome.Irrelevant);
@@ -28,7 +28,8 @@ public static class WorldDiscovery
         var changedPacks = new HashSet<string>(StringComparer.Ordinal);
         WorldMetadata? metadata = null; string? diagnostic = physical.DiagnosticCode;
         WorldDiscoveryResult Finish() => new(metadata, request.Scope, physical, sources.Select(source => source.Location.PackRoot is { } root && changedPacks.Contains(root) && source.Outcome == SourceOutcome.Success
-            ? source with { Outcome = SourceOutcome.Failed, DiagnosticCode = "PackMetadataChanged", Capability = new() } : source).ToImmutableArray(), diagnostic);
+            ? source with { Outcome = SourceOutcome.Failed, DiagnosticCode = "PackMetadataChanged", Capability = new() } : source).ToImmutableArray(), diagnostic,
+            metadataHashes.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new ManifestSource(new(inventory.WorldId, pair.Key, ArtifactKind.Nbt), pair.Value, SourceOutcome.Success)).ToImmutableArray());
         bool Add(DiscoveredSource source)
         {
             cancellationToken.ThrowIfCancellationRequested();

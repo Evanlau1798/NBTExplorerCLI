@@ -7,6 +7,10 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("prepare-world-mixed-complete-no-commit", "preparation", _ => WorldPreparationTests.MixedCandidatesAreCompleteAndNeverCommit()),
+        new("prepare-world-scoped-metadata-binding", "preparation", _ => WorldPreparationTests.ScopedPlansRetainInterpretationPreimages()),
+        new("prepare-world-command-layers", "preparation", _ => CommandPreparationTests.ExactCommandLayersPreserveFramingAndReferences()),
+        new("prepare-world-stale-authority-stage-failure", "preparation", _ => WorldPreparationTests.MissingAuthorityStaleSourceAndStageFailurePreserveWorld()),
         new("prepare-snbt-batch-projection", "preparation", _ => SnbtBatchEditsTests.OneSnapshotPreservesFragmentAndProtectedBytes()),
         new("prepare-snbt-batch-rejected-boundaries", "preparation", _ => SnbtBatchEditsTests.RejectedBatchesNeverReturnPartialChanges()),
         new("prepare-json-order-independent-capacity", "preparation", _ => JsonTextEditsTests.CapacityDependsOnFinalCandidateNotRequestOrder()),

@@ -325,3 +325,24 @@ additional plan/receipt fixtures express all nine outcomes over one frozen opera
 The fixture manifest includes 50 files, preserving the original 16 baseline entries.
 The nine-outcome positive plan uses nine distinct physical artifacts. The original
 same-file pre/postimage contradiction remains as a rejected `conflicting-images` fixture.
+
+## World candidate preparation
+
+`WorldPlanBuilder` binds explicit literal slots and typed edits to live standalone NBT,
+JSON or mcfunction sources from a `WorldQuerySnapshot`. It re-extracts literal scope,
+uses the shared reply validator, and records raw output, world metadata and directory
+pack metadata preimages even when the query excludes metadata payloads. Preview only
+reads sources; it checks preimages again after binding instead of rebasing changed input.
+
+`WorldPlanPreparation.Prepare` requires the caller's offline-world acknowledgement and
+reconstructs the exact plan policy/hash. It stages and flushes every physical output,
+then verifies the entire set and rechecks sources before exposing a `PreparedWorldPlan`.
+Failure cleans the whole uncommitted set; disposal only cleans candidates. The returned
+manifest is evidence of preparation, not a commit receipt or immunity to later changes.
+NBT readback checks the exact authorized typed tree; JSON and command edits splice only
+selected string tokens. Commands also re-extract slot values, keys, references and
+diagnostics. Legacy SNBT values that require physical command line breaks are rejected.
+
+This preparation subset does not yet implement Region/ZIP, nested JSON syntax, NBT
+commands, key/reference conversion, restore or commit/recovery. Those remain explicit
+unsupported boundaries until their service paths are implemented and verified.

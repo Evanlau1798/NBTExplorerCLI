@@ -13,8 +13,10 @@ public sealed class WorldQuerySnapshot
 {
     public ScanCacheManifest Manifest { get; }
     public ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> StorageRules { get; }
+    internal WorldDiscoveryResult Discovery { get; }
+    internal DecodeLimits Limits { get; }
     private readonly Func<IEnumerable<TextSourceExtraction>> read;
-    internal WorldQuerySnapshot(ScanCacheManifest manifest, Func<IEnumerable<TextSourceExtraction>> read, ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> storageRules)
-        => (Manifest, this.read, StorageRules) = (manifest, read, storageRules);
+    internal WorldQuerySnapshot(ScanCacheManifest manifest, Func<IEnumerable<TextSourceExtraction>> read, ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> storageRules, WorldDiscoveryResult discovery, DecodeLimits limits)
+        => (Manifest, this.read, StorageRules, Discovery, Limits) = (manifest, read, storageRules, discovery, limits);
     public IEnumerable<TextSourceExtraction> ReadSources() => read();
 }
