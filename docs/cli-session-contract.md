@@ -2,9 +2,10 @@
 
 `translate <action> <world>` exposes the durable session service. These commands
 write tool state, never world content. World translation apply, key conversion,
-pack generation and agent configuration are separate integration work.
+pack generation are separate integration work. Agent preferences use the
+[agent contract](cli-agent-contract.md).
 
-All actions accept `--session-id <guid>`, `--state-root <directory>`, `--output
+All non-help actions accept `--session-id <guid>`, `--state-root <directory>`, `--output
 <new-file>`, `--help` and the global `--ui-locale`. Session ID is required except
 for `start`, which can generate one. Retain the returned ID. State and exports
 must be outside the world; existing output files are preserved. The default state
@@ -14,7 +15,7 @@ repositories for sessions and cache. No legacy executable or state is loaded.
 | Action | Additional options and behavior |
 | --- | --- |
 | `help` | No world required; lists implemented actions. `help translate` also works. |
-| `start` | Required `source-language`, `target-language`; optional `operation-id`, `page-size`, `page-bytes`, `types`, `path`, `dimension`, `region`, `match-pattern`, `standalone`, `no-group`. |
+| `start` | `source-language`, `target-language` are required unless confirmed agent defaults exist; optional `operation-id`, `page-size`, `page-bytes`, `types`, `path`, `dimension`, `region`, `match-pattern`, `standalone`, `no-group`. |
 | `status` | Returns progress and compares the current scoped world snapshot with the session snapshot. |
 | `export` | Optional zero-based `page`, reply-template `operation-id`, `no-group`. Returns page JSON, reply template, prompt and context-group projection. |
 | `next` | Optional `reply <file-or-dash>`, `no-group`; persists a valid reply before returning the next pending page. |
@@ -34,6 +35,8 @@ of a truncated session. Page size is 1–100000 slots;
 the serialized prompt budget is 1024–67108864 UTF-8 bytes (default 65536). A single
 slot that cannot fit is ResourceLimit, not an empty or shortened page. Source and
 target language values belong to the session and are independent of UI locale.
+Confirmed agent languages/preferred page size supply omitted options; explicit
+flags override them. Updating preferences does not rewrite existing sessions.
 
 Every occurrence has its own slot even when source text is identical. This is now
 the default; `--standalone` acknowledges the former opt-in behavior. No plaintext
@@ -88,7 +91,7 @@ candidates require explicit source sessions, context, languages, placeholder and
 glossary/profile compatibility; lookup does not submit or accept a translation.
 Notes/glossary and group presentation never authorize a world rename/write.
 
-This interface does not yet close agent setup/submit/status, legacy import CLI,
-world translation apply/sealing, convert, language export or pack management.
+Agent setup/submit/status has its own contract. This interface does not yet close
+legacy import CLI, world translation apply/sealing, convert, language export or pack management.
 Those capabilities remain required. Minecraft load, RSS/performance, power loss
 and release acceptance are later gates.

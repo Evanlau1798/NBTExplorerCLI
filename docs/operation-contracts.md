@@ -471,3 +471,11 @@ Only explicit commit creates and guards remaining parents, then atomically moves
 candidate without overwriting an externally created target. Already absent deletion
 creates no directories. A failed commit may retain newly created parents and its candidate
 for recovery; unattempted Dispose removes only its candidate and leaves parents absent.
+
+Agent configuration uses `nbtcli.next.agent-questionnaire` and
+`nbtcli.next.agent-configuration`, version 1. Answers bind operation/world/revision;
+confirmed state retains the raw input/hash and consecutive submission receipts.
+Questionnaires are bounded to 16384 UTF-8 bytes and state to 1024 submissions.
+Exact historical resends do not overwrite newer preferences; defaults affect only
+new sessions. Preferences and explanatory instructions grant no world authority.
+Public workflow and compatibility details are in [agent CLI](cli-agent-contract.md).

@@ -3,7 +3,11 @@ using Next.Domain;
 
 namespace Next.Infrastructure;
 
-public sealed class ArtifactSizeLimitException() : IOException("Artifact exceeds 64 MiB limit");
+public sealed class ArtifactSizeLimitException : IOException
+{
+    public ArtifactSizeLimitException() : this(ArtifactStorage.MaximumBytes) { }
+    internal ArtifactSizeLimitException(int maximumBytes) : base(maximumBytes == ArtifactStorage.MaximumBytes ? "Artifact exceeds 64 MiB limit" : $"Artifact exceeds {maximumBytes} byte limit") { }
+}
 
 public sealed class ArtifactStorage : IArtifactStorage
 {
@@ -22,9 +26,13 @@ public sealed class ArtifactStorage : IArtifactStorage
         writer = new(this.root);
     }
     public byte[] Read(ArtifactAddress artifact)
+        => ReadBounded(artifact, MaximumBytes);
+    public byte[] ReadBounded(ArtifactAddress artifact, int maximumBytes)
     {
+        if (maximumBytes is < 1 or > MaximumBytes) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
         using var path = GuardedArtifactPath.Acquire(root, world, artifact);
-        return ReadFile(path.Target);
+        using var stream = GuardedArtifactPath.OpenFile(path.Target, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        return ReadStream(stream, maximumBytes);
     }
     public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)
         => StageCore(artifact, preimage, bytes, delete: false);
@@ -41,7 +49,11 @@ public sealed class ArtifactStorage : IArtifactStorage
     internal static byte[] ReadFile(string path)
     {
         using var stream = GuardedArtifactPath.OpenFile(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-        if (stream.Length > MaximumBytes) throw new ArtifactSizeLimitException();
+        return ReadStream(stream, MaximumBytes);
+    }
+    private static byte[] ReadStream(Stream stream, int maximumBytes)
+    {
+        if (stream.Length > maximumBytes) throw new ArtifactSizeLimitException(maximumBytes);
         var bytes = new byte[checked((int)stream.Length)]; stream.ReadExactly(bytes);
         return bytes;
     }

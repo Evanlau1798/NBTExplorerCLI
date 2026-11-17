@@ -31,9 +31,16 @@ internal static class SessionCommands
         if (request.Subcommand == "start")
         {
             options = new ScanOptions(request); policy = new(request.Number("page-size", 30, 1, 100_000), request.Number("page-bytes", 65_536, 1024, 67_108_864));
-            sourceLanguage = Required(request, "source-language"); targetLanguage = Required(request, "target-language");
+            sourceLanguage = request.Get("source-language"); targetLanguage = request.Get("target-language");
         }
         var context = new WriteContext(request.Input!, request);
+        if (request.Subcommand == "start")
+        {
+            var configuration = sourceLanguage is null || targetLanguage is null || !request.Flag("page-size") ? AgentCommands.Configuration(context) : null;
+            sourceLanguage ??= configuration?.SourceLanguage ?? throw new CliFailure("INVALID_ARGUMENTS", "Supply --source-language or confirm an agent configuration");
+            targetLanguage ??= configuration?.TargetLanguage ?? throw new CliFailure("INVALID_ARGUMENTS", "Supply --target-language or confirm an agent configuration");
+            if (!request.Flag("page-size") && configuration is not null) policy = policy! with { MaximumPageSlots = configuration.PreferredItemsPerPage };
+        }
         var service = new TranslationSessionService(new FileSystemTranslationSessionStore(Path.Combine(context.State, "sessions")));
         if (request.Subcommand == "start")
         {

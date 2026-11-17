@@ -17,19 +17,19 @@ public static class CliApplication
             var rest = CliArguments.ExtractLocale(args, out locale, out command);
             var request = CliArguments.Parse(rest, locale); command = request.Command;
             object data;
-            if (command == "help" || request.Flag("help") || command == "translate" && request.Subcommand == "help")
+            if (command == "help" || request.Flag("help") || request.Subcommand == "help")
             {
                 var subject = command == "help" ? request.Input : command;
                 if (subject is not null) subject = CliArguments.Canonical(subject);
                 data = new { usage = "nbtcli-next <command> [options]", commands = CliArguments.Commands,
-                    subject, subcommand = request.Subcommand, subcommands = subject == "translate" ? SessionCommands.Subcommands : Array.Empty<string>(),
+                    subject, subcommand = request.Subcommand, subcommands = subject switch { "translate" => SessionCommands.Subcommands, "agent" => AgentCommands.Subcommands, _ => Array.Empty<string>() },
                     options = (subject is null ? Array.Empty<string>() : CliArguments.Allowed(subject, request.Subcommand)).Select(option => "--" + option).Append("--ui-locale").ToArray() };
                 command = "help";
             }
             else if (command == "version") data = new { product = "nbtcli-next", version = typeof(CliApplication).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0] };
-            else if (command is "scan" or "extract" or "validate" or "capabilities" or "set" or "batch" or "plan" or "apply" or "recover" or "status" or "backup" or "restore" or "translate")
+            else if (command is "scan" or "extract" or "validate" or "capabilities" or "set" or "batch" or "plan" or "apply" or "recover" or "status" or "backup" or "restore" or "translate" or "agent")
             {
-                var result = command == "translate" ? SessionCommands.Execute(request) : command is "scan" or "extract" or "validate" or "capabilities" ? ScanCommands.Execute(request) : WriteCommands.Execute(request);
+                var result = command == "agent" ? AgentCommands.Execute(request) : command == "translate" ? SessionCommands.Execute(request) : command is "scan" or "extract" or "validate" or "capabilities" ? ScanCommands.Execute(request) : WriteCommands.Execute(request);
                 var json = CommandOutputJson.Write(command, result.Data, result.Outcome, result.Code, result.Code is null ? null : Message(result.Code, locale));
                 if (request.Get("output") is { } file)
                 {
@@ -95,6 +95,7 @@ public static class CliApplication
             "PREPARATION_FAILED" => en ? "Preparation failed before commit; inspect validation results." : "準備階段失敗，尚未提交；請核對驗證結果。",
             "ROLLED_BACK" => en ? "The plan was rolled back." : "計畫已回復至套用前狀態。",
             "READ_ERROR" => en ? "The source could not be read." : "無法讀取來源。",
+            "AGENT_STATE_IO" => en ? "Agent state could not be confirmed; retry the exact questionnaire after resolving the I/O error." : "無法確認 agent 設定狀態；排除 I/O 錯誤後請重送同一份問卷。",
             _ => en ? "The operation failed." : "操作失敗。"
         };
     }

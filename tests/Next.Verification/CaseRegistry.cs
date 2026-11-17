@@ -7,6 +7,14 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("cli-agent-stdin-early-byte-limit", "cli-agent", _ => CliAgentInputTests.OversizedStdinIsRefusedBeforeEof()),
+        new("cli-agent-history-capacity-and-integrity", "cli-agent", _ => AgentConfigurationTests.BoundedHistoryRetainsExactReplayAndRejectsCorruption()),
+        new("cli-agent-atomic-update-retry", "cli-agent", _ => CliAgentTests.ABlockedAtomicUpdateOffersAnExactRetryAndPreservesConfiguration()),
+        new("cli-agent-request-byte-budget", "cli-agent", _ => CliAgentTests.OversizedQuestionnairesAreRejectedBeforePublication()),
+        new("cli-agent-questionnaire-replay-defaults", "cli-agent", _ => CliAgentTests.QuestionnaireSubmissionPersistsRawInputAndDefaultsWithoutStartingASession()),
+        new("cli-agent-invalid-and-cas", "cli-agent", _ => CliAgentTests.InvalidAnswersAndRevisionConflictsPreserveTheAcceptedConfiguration()),
+        new("cli-agent-state-and-world-ownership", "cli-agent", _ => CliAgentTests.ExistingExportsUnownedStateAndForeignWorldAnswersAreProtected()),
+        new("cli-agent-help-and-missing", "cli-agent", _ => CliAgentTests.HelpAndMissingConfigurationAreExplicitAndReadOnlyForTheWorld()),
         new("cli-session-selection-before-slot-budget", "cli-session", _ => SessionSelectionBudgetTests.SelectionPrecedesTheSessionSlotLimit()),
         new("cli-session-preferences-failure-preserves-work", "cli-session", _ => CliSessionTests.PreferenceFailuresRetainAcceptedWorkAndDoNotConsumeReplies()),
         new("cli-session-start-presentation-replay", "cli-session", _ => CliSessionTests.StartReplayBindsTheRetainedGroupPresentationPreference()),

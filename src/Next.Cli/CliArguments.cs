@@ -9,7 +9,7 @@ internal sealed class CliFailure(string code, string? details = null, object? da
 }
 internal sealed record CliArguments(string Command, string? Input, IReadOnlyDictionary<string, string?> Options, string Locale, string? Subcommand = null)
 {
-    internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "translate"];
+    internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "translate", "agent"];
     internal static string Canonical(string name) => name switch { "ls" => "list", "find" => "search", "scan-world" => "scan", "extract-text" => "extract", "--help" or "-h" => "help", "--version" or "-v" => "version", _ => name };
     internal static string[] Allowed(string command, string? subcommand = null) => command switch
     {
@@ -28,6 +28,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         "backup" => ["path", "state-root", "output", "help"],
         "restore" => ["manifest-hash", "path", "apply", "world-offline", "state-root", "output", "help"],
         "translate" => SessionCommands.Allowed(subcommand ?? "help"),
+        "agent" => AgentCommands.Allowed(subcommand ?? "help"),
         "help" or "version" or "capabilities" => ["help"],
         _ => throw new CliFailure("UNKNOWN_COMMAND")
     };
@@ -53,7 +54,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
     internal static CliArguments Parse(string[] args, string locale)
     {
         var command = Canonical(args.Length == 0 ? "help" : args[0]); string? subcommand = null;
-        if (command == "translate")
+        if (command is "translate" or "agent")
         {
             subcommand = args.Length > 1 && !args[1].StartsWith('-') ? args[1] : "help";
             if (args.Length > 1 && !args[1].StartsWith('-')) args = [args[0], .. args.Skip(2)];
