@@ -28,6 +28,7 @@ public sealed partial class WorldApplyEngine
         LoadedJournal? active = null;
         try
         {
+            using var resourceScope = ResourceOutputPolicy.Guard(inventory, prepared.Plan);
             if (prepared.AccessBinding != Access()) throw new ArgumentException("Prepared candidates belong to a different world root", nameof(prepared));
             if (Load(prepared.Plan.PlanHash) is not null) { prepared.Dispose(); return Recover(prepared.Plan.PlanHash, true, cancellation: cancellation); }
             WorldPlanBuilder.RequireReferencePolicy(prepared.Plan);
@@ -61,6 +62,7 @@ public sealed partial class WorldApplyEngine
     public ApplyReceipt Recover(Hash256 planHash, bool worldOffline, bool rollback = false, CancellationToken cancellation = default)
     {
         Offline(worldOffline); var active = Load(planHash) ?? throw new ApplyJournalMissingException();
+        using var resourceScope = ResourceOutputPolicy.Guard(inventory, active.Header.Plan);
         ApplyReceiptJson.ValidateStorageBudget(active.Header.Plan, MaximumReceiptReasonCodeUnits);
         var previous = Receipt(active);
         var direction = rollback || active.Journal.Direction == ApplyDirection.Rollback ? ApplyDirection.Rollback : ApplyDirection.Forward;
@@ -120,6 +122,8 @@ public sealed partial class WorldApplyEngine
     }
     private ApplyReceipt Commit(LoadedJournal active, IReadOnlyList<IArtifactCandidate> candidates, ApplyDirection direction, CancellationToken cancellation)
     {
+        using var resourceScope = ResourceOutputPolicy.Guard(inventory, active.Header.Plan);
+        ResourceOutputPolicy.CheckCatalog(inventory, active.Header.Plan);
         if (active.Header.AccessBinding != Access()) throw new ArtifactConflictException("Journal target root differs from the current write authority");
         foreach (var candidate in candidates) candidate.Verify(_ => { });
         var images = Images(active.Header);
@@ -127,16 +131,20 @@ public sealed partial class WorldApplyEngine
         active = Advance(active, direction, ApplyJournalPhase.Committing, 0, active.Journal.ReceiptHash);
         for (var index = 0; index < candidates.Count; index++)
         {
+            using var currentResourceScope = ResourceOutputPolicy.Guard(inventory, active.Header.Plan);
+            ResourceOutputPolicy.CheckCatalog(inventory, active.Header.Plan);
             WorldReferenceMembers.Catalog(inventory, active.Header.Plan);
-            if (active.Header.Plan.Operations.Any(operation => operation is ReferencePatch))
+            if (active.Header.Plan.Operations.Any(operation => operation is ReferencePatch or ResourcePatch))
             {
                 images = Images(active.Header);
-                if (!Known(active.Header, images)) return Finish(active, images, direction, "Reference source changed between commits", cancellation);
+                if (!Known(active.Header, images)) return Finish(active, images, direction, "Semantic dependency changed between commits", cancellation);
             }
             cancellation.ThrowIfCancellationRequested(); candidates[index].Commit();
             active = Advance(active, direction, ApplyJournalPhase.Committing, index + 1, active.Journal.ReceiptHash);
         }
         WorldReferenceMembers.Catalog(inventory, active.Header.Plan);
+        using var finalResourceScope = ResourceOutputPolicy.Guard(inventory, active.Header.Plan);
+        ResourceOutputPolicy.CheckCatalog(inventory, active.Header.Plan);
         images = Images(active.Header);
         active = Advance(active, direction, ApplyJournalPhase.ReadBack, candidates.Count, active.Journal.ReceiptHash);
         return Finish(active, images, direction, "Readback did not complete every promised output", cancellation);

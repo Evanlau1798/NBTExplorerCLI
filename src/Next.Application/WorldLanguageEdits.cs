@@ -11,28 +11,31 @@ internal static class WorldLanguageEdits
         if (operations.Any(operation => operation is not (LiteralPatch or KeyConversionPatch))) throw new NotSupportedException("Language output requires literal values or declared conversion dependencies");
         var literal = operations.OfType<LiteralPatch>().ToArray();
         var current = NativeJsonEdits.ReplaceStrings(bytes, literal.Select(operation => (operation.Translation.Slot.Address.NodePath, operation.Translation.Slot.SourceText, operation.Translation.Reply.Text)), limits);
+        var dependencies = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion.Dependency).ToArray();
+        if (dependencies.Any(dependency => dependency.LanguageArtifact != artifact)) throw new EditRejectedException(EditFailure.Precondition, "Language output differs from its declared dependency");
+        return AddValues(current, dependencies.Select(dependency => (dependency.Key, WorldKeyEdits.LanguageText(dependency.Text, limits))), limits);
+    }
+    internal static PreparedArtifactBytes AddValues(byte[] current, IEnumerable<(string Key, string Text)> values, DecodeLimits limits)
+    {
         using var parsed = BoundedJson.ReadDecoded(current, limits);
         if (parsed.RootElement.ValueKind != JsonValueKind.Object) throw new EditRejectedException(EditFailure.Precondition, "Language output must be a JSON object");
         var expected = parsed.RootElement.EnumerateObject().ToDictionary(NativeJsonStrings.PropertyName, item => NativeJsonStrings.Read(item.Value), StringComparer.Ordinal);
         var additions = new List<byte[]>(); long retained = current.Length; var hasProperties = expected.Count != 0;
-        foreach (var operation in operations.OfType<KeyConversionPatch>())
+        foreach (var (name, text) in values)
         {
-            var dependency = operation.Conversion.Dependency;
-            var text = WorldKeyEdits.LanguageText(dependency.Text, limits);
-            if (dependency.LanguageArtifact != artifact) throw new EditRejectedException(EditFailure.Precondition, "Language output differs from its declared dependency");
-            if (expected.TryGetValue(dependency.Key, out var old))
+            if (expected.TryGetValue(name, out var old))
             {
                 if (old != text) throw new EditRejectedException(EditFailure.Precondition, "Language key already has different content");
                 continue;
             }
             static byte[] Encode(string value, DecodeLimits policy) => NativeJsonEdits.ReplaceStrings("\"\""u8.ToArray(), [(TypedPath.Root, "", value)], policy);
-            var key = Encode(dependency.Key, limits); var value = Encode(text, limits);
+            var key = Encode(name, limits); var value = Encode(text, limits);
             var length = checked((hasProperties ? 1 : 0) + key.Length + 1 + value.Length); retained = checked(retained + length);
             if (retained > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Language additions exceed aggregate output budget");
             var addition = new byte[length]; var position = 0;
             if (hasProperties) addition[position++] = (byte)',';
             key.CopyTo(addition.AsSpan(position)); position += key.Length; addition[position++] = (byte)':'; value.CopyTo(addition.AsSpan(position));
-            additions.Add(addition); expected.Add(dependency.Key, text); hasProperties = true;
+            additions.Add(addition); expected.Add(name, text); hasProperties = true;
         }
         var output = current;
         if (additions.Count != 0)

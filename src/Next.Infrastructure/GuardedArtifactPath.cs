@@ -76,6 +76,18 @@ internal sealed class GuardedArtifactPath : IDisposable
         catch { lease.Dispose(); throw; }
     }
     internal void HoldWriter(ArtifactWriterLock shared) => writer = shared.Acquire();
+    internal void HoldExistingBranch(string ancestor, string relativeDirectory)
+    {
+        var current = Path.GetFullPath(ancestor);
+        var prefix = Path.EndsInDirectorySeparator(current) ? current : current + Path.DirectorySeparatorChar;
+        if (current != StagingDirectory && !StagingDirectory.StartsWith(prefix, StringComparison.Ordinal))
+            throw new ArgumentException("Branch must start at an already held ancestor", nameof(ancestor));
+        ArtifactAddress.ValidatePath(relativeDirectory, entry: false);
+        foreach (var segment in relativeDirectory.Split('/'))
+        {
+            current = Path.Combine(current, segment); HoldDirectory(current);
+        }
+    }
     internal bool HoldParents(bool create)
     {
         var parent = Path.GetDirectoryName(Target)!;

@@ -3,7 +3,7 @@ using Next.Domain;
 
 namespace Next.Infrastructure;
 
-public sealed class WorldInventory : IWorldInventory
+public sealed class WorldInventory : IWorldInventory, IResourceOutputScope
 {
     private readonly string root;
     private readonly ArtifactStorage storage;
@@ -78,4 +78,5 @@ public sealed class WorldInventory : IWorldInventory
         return Finish();
     }
     public byte[] Read(ArtifactAddress artifact) => storage.Read(artifact);
+    public IDisposable GuardResourceOutput(ResourceGeneration generation) => ResourceScopeGuard.Acquire(root, generation);
 }

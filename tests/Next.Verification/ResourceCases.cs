@@ -1,0 +1,34 @@
+namespace Next.Verification;
+
+internal static class ResourceCases
+{
+    internal static readonly VerificationCase[] Cases =
+    [
+        new("resource-output-deep-native-handles", "resource-output", context => ResourceScopeHandleTests.DeepScopeRetainsALinearNumberOfNativeHandles(context.ArtifactRoot)),
+        new("resource-output-native-branch-authority", "resource-output", _ => ResourceScopeHandleTests.BranchesRequireHeldAncestorsAndRejectMetadataReparsePoints()),
+        new("resource-output-legacy-safe-locations", "resource-output", _ => ResourceOutputTests.LegacyWorldResourceLocationsRemainAvailableWithoutGameplayAuthority()),
+        new("resource-output-nested-opaque-metadata", "resource-output", _ => ResourceOutputTests.NestedOpaqueMetadataUsesItsDeclaredKindDuringDirectoryMerge()),
+        new("resource-output-formats-engine", "resource-output", _ => ResourceOutputTests.AllFormatsUsePlansReadbackReplayAndRawRollback()),
+        new("resource-output-gameplay-scope", "resource-output", _ => ResourceOutputTests.GameplayScopesCannotBorrowResourceOutputAuthority()),
+        new("resource-output-scope-change-cleanup", "resource-output", _ => ResourceOutputTests.ScopeChangesRefuseApplyAndDisposeEveryCandidate()),
+        new("resource-output-frozen-merge-conflicts", "resource-output", _ => ResourceOutputTests.FrozenMergePreservesOpaqueBytesAndConflictingValuesNeverOverwrite()),
+        new("resource-output-known-unknown-scopes", "resource-output", _ => ResourceOutputTests.KnownResourceScopesAllowAndUnknownWorldMetadataRefuses()),
+        new("resource-output-interruption-recover", "resource-output", _ => ResourceOutputTests.InterruptedDirectoryGenerationRecoversWithTheOriginalEngine()),
+        new("resource-output-midcommit-scope-change", "resource-output", _ => ResourceOutputTests.AWorldMarkerAppearingBetweenCommitsCannotBypassRecoveryAccounting()),
+        new("resource-output-midcommit-dependencies", "resource-output", _ => ResourceOutputTests.DirectoryDependenciesAndNewMembersAreRecheckedBeforeEachCommit()),
+        new("resource-input-output-catalog-budget", "resource-input", _ => ResourceBudgetTests.AggregateInputAndOutputCatalogBudgetsRefuseBeforeReadingPayloads()),
+        new("resource-input-freeze-zip-directory", "resource-input", _ => ResourceInputTests.ZipAndDirectoryInputsFreezeExactBytesAndVerifyEveryStoredObject()),
+        new("resource-input-invalid-prepublish", "resource-input", _ => ResourceInputTests.InvalidResourceSourcesRefuseBeforePublishingReusableInputs()),
+        new("resource-input-changed-source", "resource-input", _ => ResourceInputTests.ChangedSourceCatalogContentOrRootCannotPublishAnAcceptedIndex()),
+        new("resource-input-verify-all-blobs", "resource-input", _ => ResourceInputTests.EveryRawBlobAndDeclaredEntryAreVerifiedOnLoad()),
+        new("resource-contract-path-allocation", "resource-contracts", options => ResourceContractTests.PathValidationAllocationIsBounded(options.ArtifactRoot)),
+        new("resource-contract-path-compatibility", "resource-contracts", _ => ResourceContractTests.SharedPathValidationKeepsItsExistingAddressSemantics()),
+        new("resource-contract-derived-path-budget", "resource-contracts", _ => ResourceContractTests.DerivedOutputsStayInsideTheFullPathAndRetentionBudgets()),
+        new("resource-contract-composed-path-length", "resource-contracts", _ => ResourceContractTests.ComposedOutputLengthIsCheckedInAdditionToInputLengths()),
+        new("resource-contract-windows-physical-names", "resource-contracts", _ => ResourceContractTests.WindowsPhysicalNamesAreRejectedBeforeARecipeIsAccepted()),
+        new("resource-contract-semantic-outputs", "resource-contracts", _ => ResourceContractTests.SemanticOutputsAndCanonicalOrder()),
+        new("resource-contract-authority-and-bounds", "resource-contracts", _ => ResourceContractTests.RejectsAuthorityEscapesAndBoundedInputs()),
+        new("resource-contract-strict-exchange-receipts", "resource-contracts", _ => ResourceContractTests.StrictExchangeAndReceipts()),
+        new("resource-contract-preserve-five-baseline", "resource-contracts", options => ResourceContractTests.AcceptedFiveOperationsKeepExactHashAndWire(options.FixtureRoot)),
+    ];
+}

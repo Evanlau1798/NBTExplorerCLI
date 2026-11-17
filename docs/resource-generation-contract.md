@@ -7,9 +7,11 @@ The original five-kind baseline is recorded in
 `fixtures/contracts/pre-resource-operations.json`, captured from the accepted
 `655f0fe` source before adding the new kind.
 
-This is the Domain/Formats contract. The existing world preparation path refuses
-this kind until a dedicated resource preparation service is integrated.
-Public `translate export-lang` and `translate create-pack` remain integration work.
+`ResourceInputService` freezes verified ZIP/directory inputs in immutable backup
+objects. `ResourceOutputService` builds and prepares this dedicated kind, then
+uses the existing apply/journal/readback/recovery engine. The gameplay snapshot
+preparation path still refuses this kind. Public `translate export-lang` and
+`translate create-pack` remain integration work.
 
 | Format | Destination | Complete physical output set |
 | --- | --- | --- |
@@ -34,11 +36,11 @@ Merge input declares an immutable blob hash and the complete path/hash/length
 manifest. It must include exact `pack.mcmeta`. Non-root entries are limited to
 `assets/`; gameplay `data/` entries cannot borrow resource-generation authority.
 Paths are relative, representable as UTF-8 and safe for physical Windows paths;
-case aliases, traversal and ambiguous separators are refused. The future reader
-must verify the blob and every entry against this manifest, validate metadata and
-resource-pack shape, and preserve all undeclared content. Declared hashes are
+case aliases, traversal and ambiguous separators are refused. The reader
+verifies the blob and every entry against this manifest, validates metadata and
+resource-pack shape, and preserves all undeclared content. Declared hashes are
 not evidence that a caller-supplied blob has already been verified.
-Preparation must classify the actual destination as a resource output scope;
+Preparation classifies the actual destination as a resource output scope;
 gameplay directories cannot be repurposed as pack destinations. Existing pack
 metadata and opaque contents are retained; differing opaque bytes or language
 values at an existing claimed key are conflicts, not implicit overwrite grants.
@@ -63,7 +65,27 @@ complete preparation/check set. Raw bytes may only enter later preparation as
 verified merge inputs; they are not a generation payload.
 
 One operation counts once even when it promises multiple files. Applied results
-require proofs for every physical output. A dedicated preparation service must
-stage and verify the whole set, bind its actual output root, and then use the
-existing backup/journal/commit/readback/recovery engine. Those filesystem and
-public CLI obligations are not established by this pure protocol checkpoint.
+require proofs for every physical output. Preparation stages and verifies the
+whole set and binds its actual output root. Commit and recovery inspect the
+physical scope again; directory pack members and preserved file preconditions
+are checked before each commit. Output roots must already exist on local NTFS.
+Every ancestor carrying `level.dat` is validated, including its separate registry
+where required. Every actual output path is checked relative to every world
+ancestor. Metadata and gameplay/dimension subtrees are refused; safe resource
+locations such as root `resources.zip`, named resource directories,
+`.nbtcli_translate` language files and `resourcepacks/` remain available.
+Malformed or unknown ancestor metadata is refused. Nested world
+markers cannot hide a more distant gameplay ancestor. Existing metadata handles
+remain open during the operation. Scope checks are repeated between commits to
+detect newly appearing markers; this does not claim atomic exclusion of an
+arbitrary external process creating new files between the check and replacement.
+Ancestor directory handles are acquired once; separate metadata branches add only
+their own directory segments. The native handle witness uses live process handle
+deltas and checks release after disposal; it does not measure peak RSS.
+
+Immutable input capture validates before publishing its reusable resource index.
+Source changes refuse capture; interrupted capture may leave verified raw backup
+objects, without a completed resource input index. Frozen inputs and prepared
+postimages are independent of later source-path changes. Resource output tests
+cover native NTFS writes, injected I/O interruption and recovery; public CLI,
+Minecraft loading, power loss and peak RSS remain separate gates.

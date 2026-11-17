@@ -44,7 +44,7 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
         ArgumentNullException.ThrowIfNull(plan);
         if (!worldOffline && !plan.Outputs.IsEmpty) throw new ArgumentException("Candidate staging requires the caller's offline-world acknowledgement", nameof(worldOffline));
     }
-    private PreparedWorldPlan PrepareOutputs(PatchPlan plan, Func<OutputDeclaration, ArtifactPrecondition, PreparedArtifactBytes> create)
+    internal PreparedWorldPlan PrepareOutputs(PatchPlan plan, Func<OutputDeclaration, ArtifactPrecondition, PreparedArtifactBytes> create)
     {
         var access = inventory.AccessBinding;
         if (access is null || access != storage.AccessBinding) throw new ArgumentException("Preparation inventory and storage must bind the same world root");
