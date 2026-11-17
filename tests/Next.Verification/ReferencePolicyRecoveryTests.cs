@@ -10,6 +10,63 @@ namespace Next.Verification;
 
 internal static class ReferencePolicyRecoveryTests
 {
+    public static void ReplayAndStatusReadFailuresRetainExistingPartialJournalIdentity()
+    {
+        var world = WorldReferenceTests.CreateWorld(); var work = ScratchDirectory.CreateChild();
+        try
+        {
+            var frame = PreparedLegacyFrame(world, work); Materialize(world, frame, frame.Legacy.Prepared.Artifacts.Take(1));
+            var before = Directory.EnumerateFiles(world, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+            foreach (var name in new[] { "TryReplay", "Status" })
+            {
+                var engine = new WorldApplyEngine(new WorldInventory(world, frame.Legacy.Plan.WorldId), new ArtifactStorage(world, frame.Legacy.Plan.WorldId), frame.Objects, new RefuseRead());
+                var method = typeof(Next.Cli.CliApplication).Assembly.GetType("Next.Cli.WriteExecution")!.GetMethod(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+                object result;
+                try { result = method.Invoke(null, [engine, name == "TryReplay" ? (object)frame.Legacy.Plan : frame.Legacy.Plan.PlanHash, world, State(work)])!; }
+                catch (System.Reflection.TargetInvocationException failure) { throw new InvalidOperationException("initial " + name + " read failure for a partial journal must preserve recovery context", failure.InnerException); }
+                Require((int)result.GetType().GetProperty("Exit")!.GetValue(result)! == 7, "a prior partial journal cannot be hidden by an unreadable initial pointer");
+                using var output = System.Text.Json.JsonDocument.Parse(CommandOutputJson.Write("apply", result.GetType().GetProperty("Data")!.GetValue(result))); var data = output.RootElement.GetProperty("data");
+                Require(data.GetProperty("planHash").GetString() == frame.Legacy.Plan.PlanHash.Hex && data.GetProperty("recovery").GetProperty("world").GetString() == Path.GetFullPath(world)
+                    && data.GetProperty("recovery").GetProperty("stateRoot").GetString() == Path.GetFullPath(State(work)), "both replay and status retain their parsed recovery identity");
+            }
+            Require(before.All(pair => File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value)), "read failures do not modify the existing partial world");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
+    private sealed class RefuseRead : IApplyJournalStore
+    {
+        public byte[]? Read(Hash256 hash) => throw new IOException("Injected initial journal lookup failure");
+        public void Write(Hash256 hash, ReadOnlyMemory<byte> bytes, Hash256? expected) => throw new InvalidOperationException("Unreadable replay cannot write");
+    }
+    public static void PolicyRefusalStatusIoKeepsRecoveryIdentity()
+    {
+        var world = WorldReferenceTests.CreateWorld(); var work = ScratchDirectory.CreateChild();
+        try
+        {
+            var frame = PreparedLegacyFrame(world, work); Materialize(world, frame, frame.Legacy.Prepared.Artifacts.Take(1));
+            var before = Directory.EnumerateFiles(world, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+            var store = new FailPolicyStatus(frame.Journals);
+            var engine = new WorldApplyEngine(new WorldInventory(world, frame.Legacy.Plan.WorldId), new ArtifactStorage(world, frame.Legacy.Plan.WorldId), frame.Objects, store);
+            var method = typeof(Next.Cli.CliApplication).Assembly.GetType("Next.Cli.WriteExecution")!.GetMethod("Recover", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            object result;
+            try { result = method.Invoke(null, [engine, frame.Legacy.Plan.PlanHash, world, State(work), false])!; }
+            catch (System.Reflection.TargetInvocationException failure) { throw new InvalidOperationException("policy refusal followed by failed status must preserve recovery identity", failure.InnerException); }
+            Require((int)result.GetType().GetProperty("Exit")!.GetValue(result)! == 7 && store.Reads == 2, "controlled fault follows the actual policy refusal, not the first journal read");
+            using var output = System.Text.Json.JsonDocument.Parse(CommandOutputJson.Write("recover", result.GetType().GetProperty("Data")!.GetValue(result))); var data = output.RootElement.GetProperty("data");
+            Require(data.GetProperty("planHash").GetString() == frame.Legacy.Plan.PlanHash.Hex && data.GetProperty("recovery").GetProperty("world").GetString() == Path.GetFullPath(world)
+                && before.All(pair => File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value)), "policy/status failure retains exact context and writes no world content");
+            Require(data.GetProperty("policyRepair").GetString() == "rollback-and-create-new-reference-plan"
+                && data.GetProperty("recovery").GetProperty("repair").GetString() == data.GetProperty("policyRepair").GetString(), "policy refusal has one consistent rollback/replan repair across both projections");
+            Require(Run(work, "recover", world, "--plan-hash", frame.Legacy.Plan.PlanHash.Hex, "--state-root", State(work), "--world-offline", "--rollback").Exit == 8, "the retained identity still supports an explicit real CLI rollback after removing the read fault");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
+    private sealed class FailPolicyStatus(IApplyJournalStore inner) : IApplyJournalStore
+    {
+        public int Reads { get; private set; }
+        public byte[]? Read(Hash256 hash) => ++Reads == 1 ? inner.Read(hash) : throw new IOException("Injected status read after reference policy refusal");
+        public void Write(Hash256 hash, ReadOnlyMemory<byte> bytes, Hash256? expected) => throw new InvalidOperationException("Policy refusal must not publish journal changes");
+    }
     private sealed class StopPrepared(IApplyJournalStore inner) : IApplyJournalStore
     {
         public byte[]? Read(Hash256 hash) => inner.Read(hash);

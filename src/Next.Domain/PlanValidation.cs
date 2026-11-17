@@ -28,6 +28,7 @@ internal static class PlanValidation
         var restored = new HashSet<ArtifactAddress>();
         var edited = new HashSet<ArtifactAddress>();
         var targets = new List<SourceAddress>();
+        var languageClaims = new Dictionary<SourceAddress, (string Locale, string Text)>();
         var requiredCount = 0;
         foreach (var operation in plan.Operations)
         {
@@ -48,7 +49,7 @@ internal static class PlanValidation
                     if (output.Intent != OutputIntent.Write) throw new ArgumentException("Semantic edits cannot declare raw artifact deletion");
                 }
             }
-            foreach (var target in MutationTargets(operation))
+            foreach (var target in MutationTargets(operation, languageClaims))
             {
                 if (targets.Count >= 100_000) throw new ArgumentException("Plan exceeds the aggregate target budget");
                 targets.Add(target);
@@ -91,13 +92,16 @@ internal static class PlanValidation
         ArgumentNullException.ThrowIfNull(artifact);
         if (artifact.WorldId != plan.WorldId || artifact.ContainerEntry is not null) throw new ArgumentException("Expected a physical artifact in the plan world");
     }
-    private static IEnumerable<SourceAddress> MutationTargets(PatchOperation operation)
+    private static IEnumerable<SourceAddress> MutationTargets(PatchOperation operation, Dictionary<SourceAddress, (string Locale, string Text)> languageClaims)
     {
         if (operation is KeyConversionPatch key)
         {
             // The profile root proves the conversion; sibling component fields do not share its literal mutation.
             yield return key.Conversion.Slot.Address;
-            yield return operation.Targets[1];
+            var language = operation.Targets[1]; var claim = (key.Conversion.Dependency.Locale, key.Conversion.Dependency.Text);
+            if (languageClaims.TryGetValue(language, out var prior))
+            { if (prior != claim) throw new ArgumentException("Shared language targets require identical locale and content"); }
+            else { languageClaims.Add(language, claim); yield return language; }
             yield break;
         }
         foreach (var address in operation.Targets) yield return address;

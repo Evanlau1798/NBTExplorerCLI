@@ -27,9 +27,9 @@ public static class CliApplication
                 command = "help";
             }
             else if (command == "version") data = new { product = "nbtcli-next", version = typeof(CliApplication).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0] };
-            else if (command is "scan" or "extract" or "validate" or "capabilities" or "set" or "batch" or "plan" or "apply" or "recover" or "status" or "backup" or "restore" or "translate" or "agent" or "import-legacy")
+            else if (command is "scan" or "extract" or "validate" or "capabilities" or "set" or "batch" or "plan" or "apply" or "recover" or "status" or "backup" or "restore" or "convert" or "translate" or "agent" or "import-legacy")
             {
-                var result = command == "import-legacy" ? LegacyCommands.Execute(request) : command == "agent" ? AgentCommands.Execute(request) : command == "translate" ? SessionCommands.Execute(request) : command is "scan" or "extract" or "validate" or "capabilities" ? ScanCommands.Execute(request) : WriteCommands.Execute(request);
+                var result = command == "convert" ? ConvertCommands.Execute(request) : command == "import-legacy" ? LegacyCommands.Execute(request) : command == "agent" ? AgentCommands.Execute(request) : command == "translate" ? SessionCommands.Execute(request) : command is "scan" or "extract" or "validate" or "capabilities" ? ScanCommands.Execute(request) : WriteCommands.Execute(request);
                 var json = CommandOutputJson.Write(command, result.Data, result.Outcome, result.Code, result.Code is null ? null : Message(result.Code, locale));
                 if (request.Get("output") is { } file)
                 {

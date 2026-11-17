@@ -9,7 +9,7 @@ internal sealed class CliFailure(string code, string? details = null, object? da
 }
 internal sealed record CliArguments(string Command, string? Input, IReadOnlyDictionary<string, string?> Options, string Locale, string? Subcommand = null)
 {
-    internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "translate", "agent", "import-legacy"];
+    internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "convert", "translate", "agent", "import-legacy"];
     internal static string Canonical(string name) => name switch { "ls" => "list", "find" => "search", "scan-world" => "scan", "extract-text" => "extract", "--help" or "-h" => "help", "--version" or "-v" => "version", _ => name };
     internal static string[] Allowed(string command, string? subcommand = null) => command switch
     {
@@ -27,6 +27,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         "status" => ["plan-hash", "state-root", "output", "help"],
         "backup" => ["path", "state-root", "output", "help"],
         "restore" => ["manifest-hash", "path", "apply", "world-offline", "state-root", "output", "help"],
+        "convert" => ["lang", "prefix", "keepdup", "no-backup", "language-output", "apply", "world-offline", "state-root", "output", "path", "dimension", "region", "types", "match-pattern", "workers", "verbose", "help"],
         "translate" => SessionCommands.Allowed(subcommand ?? "help"),
         "agent" => AgentCommands.Allowed(subcommand ?? "help"),
         "import-legacy" => ["input", "profile", "import-id", "list", "source-language", "target-language", "acknowledge-world-rebind", "create-session", "state-root", "output", "limit", "offset", "help"],
@@ -69,12 +70,12 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
             if (!positional && arg != "-" && arg.StartsWith('-'))
             {
                 var separator = arg.IndexOf('='); var name = separator < 0 ? arg : arg[..separator];
-                name = name switch { "--q" or "-q" => "query", "-h" => "help", _ when name.StartsWith("--", StringComparison.Ordinal) => name[2..], _ => throw new CliFailure("UNKNOWN_OPTION", arg) };
+                name = name switch { "--q" or "-q" => "query", "-h" => "help", "-k" when command == "convert" => "keepdup", "-v" when command == "convert" => "verbose", _ when name.StartsWith("--", StringComparison.Ordinal) => name[2..], _ => throw new CliFailure("UNKNOWN_OPTION", arg) };
                 if (command == "scan") name = name switch { "summary-only" => "summary", "items" => "show-items", _ => name };
                 if (command == "extract") name = name switch { "no-limit" => "all", "deduplicate" => "unique", _ => name };
                 if (!allowed.Contains(name)) throw new CliFailure("UNKNOWN_OPTION", arg);
                 string? value = null;
-                if (name == "types" && command is "get" or "list" or "search" || name is "help" or "summary" or "show-items" or "refresh" or "no-cache" or "all" or "unique" or "quick" or "verbose" or "debug" or "apply" or "world-offline" or "rollback" or "standalone" or "no-group" or "confirm" or "acknowledge-world-rebind" or "create-session" or "list" or "direct" or "keys" or "synchronize-references" or "legacy") { if (separator >= 0) throw new CliFailure("INVALID_ARGUMENTS", "Boolean flags take no value"); }
+                if (name == "types" && command is "get" or "list" or "search" || name is "help" or "summary" or "show-items" or "refresh" or "no-cache" or "all" or "unique" or "quick" or "verbose" or "debug" or "apply" or "world-offline" or "rollback" or "standalone" or "no-group" or "confirm" or "acknowledge-world-rebind" or "create-session" or "list" or "direct" or "keys" or "synchronize-references" or "legacy" or "keepdup" or "no-backup") { if (separator >= 0) throw new CliFailure("INVALID_ARGUMENTS", "Boolean flags take no value"); }
                 else
                 {
                     value = separator >= 0 ? arg[(separator + 1)..] : ++index < args.Length && !args[index].StartsWith("--", StringComparison.Ordinal) ? args[index] : throw new CliFailure("INVALID_ARGUMENTS", "Missing option value");

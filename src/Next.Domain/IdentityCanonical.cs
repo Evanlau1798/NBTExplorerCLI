@@ -6,6 +6,13 @@ internal static class IdentityCanonical
 {
     internal const int MaximumBytes = 67_108_864;
 
+    internal static SnapshotScope ReadSnapshotScope(StableIdentity identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        if (identity.Kind != IdentityKind.Snapshot || !identity.IsValid) throw new ArgumentException("Expected a valid snapshot identity", nameof(identity));
+        return new Reader(identity.Canonical.AsSpan()).SnapshotScope();
+    }
+
     internal static Guid ReadWorld(StableIdentity identity)
     {
         if (!identity.IsValid) throw new ArgumentException("Expected a valid world-bound identity", nameof(identity));
@@ -31,6 +38,12 @@ internal static class IdentityCanonical
     private ref struct Reader(ReadOnlySpan<byte> bytes)
     {
         private ReadOnlySpan<byte> _remaining = bytes;
+
+        public SnapshotScope SnapshotScope()
+        {
+            Header(IdentityKind.Snapshot); _ = World(); return ScopeBody();
+        }
+        private SnapshotScope ScopeBody() => new(Set(), Set(), Set(), Set());
 
         public Guid WorldReference(IdentityKind kind)
         {
@@ -128,7 +141,7 @@ internal static class IdentityCanonical
         private StableIdentity Snapshot()
         {
             var world = World();
-            var scope = new SnapshotScope(Set(), Set(), Set(), Set());
+            var scope = ScopeBody();
             var versions = new InterpretationVersions(Text(), Text(), Text(), Text());
             var count = Count(100_000);
             var sources = new ManifestSource[count];

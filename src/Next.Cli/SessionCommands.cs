@@ -133,10 +133,10 @@ internal static class SessionCommands
         return new(new { status, sourceFresh = fresh, snapshotId = state.Source.SnapshotId, currentSnapshotId = current.Manifest.SnapshotId,
             repair = fresh ? null : "start-new-session" }, fresh ? null : "CONFLICT", fresh ? "Success" : "Conflict", fresh ? 0 : 3);
     }
-    internal static WorldQuerySnapshot Query(WriteContext context, SnapshotScope scope)
+    internal static WorldQuerySnapshot Query(WriteContext context, SnapshotScope scope, WorldQueryPurpose purpose = WorldQueryPurpose.Session, int workers = 2)
     {
         var result = new WorldQueryService(context.Inventory, new FileSystemScanCacheStore(Path.Combine(context.State, "cache")))
-            .QueryAsync(new(new(scope), WorldQueryPurpose.Session)).GetAwaiter().GetResult();
+            .QueryAsync(new(new(scope), purpose, new(Workers: workers))).GetAwaiter().GetResult();
         var snapshot = result.Snapshot ?? throw new CliFailure("INCOMPLETE_SOURCE", "World query was interrupted");
         if (!snapshot.Manifest.CoverageComplete)
         {
@@ -149,7 +149,7 @@ internal static class SessionCommands
                 if (failures.Count < 100 && (source.DiagnosticCode is not null || source.Outcome != SourceOutcome.Success)) failures.Add(new { source.Source.Location, source.Outcome, source.DiagnosticCode });
             }
             var classified = ScanProjection.Classify(new { repair = "repair-source-and-retry", sources = failures, snapshot.Manifest.CatalogDiagnosticCode }, false, resource, unreadable, failed, unsupported);
-            throw new CliFailure(classified.Code!, "Session requires complete selected source coverage", classified.Data);
+            throw new CliFailure(classified.Code!, purpose == WorldQueryPurpose.Convert ? "Conversion requires complete selected source coverage" : "Session requires complete selected source coverage", classified.Data);
         }
         return snapshot;
     }

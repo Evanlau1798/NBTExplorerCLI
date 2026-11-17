@@ -21,8 +21,8 @@ internal sealed class WriteContext
     }
     internal IWorldBackupStore Objects() => new FileSystemWorldBackupStore(Path.Combine(State, "objects"));
     internal WorldApplyEngine Engine() => new(Inventory, Storage, Objects(), new FileSystemApplyJournalStore(Path.Combine(State, "journals")));
-    internal WorldQuerySnapshot Query() => new WorldQueryService(Inventory, new FileSystemScanCacheStore(Path.Combine(State, "cache")))
-        .QueryAsync(new(new(SnapshotScope.All))).GetAwaiter().GetResult().Snapshot ?? throw new CliFailure("INCOMPLETE_SOURCE", "World query was interrupted");
+    internal WorldQuerySnapshot Query(SnapshotScope? scope = null) => new WorldQueryService(Inventory, new FileSystemScanCacheStore(Path.Combine(State, "cache")))
+        .QueryAsync(new(new(scope ?? SnapshotScope.All))).GetAwaiter().GetResult().Snapshot ?? throw new CliFailure("INCOMPLETE_SOURCE", "World query was interrupted");
     internal ArtifactImage Image(ArtifactAddress artifact)
     {
         try { return ArtifactImage.Present(Hash256.Compute(Inventory.Read(artifact))); }
@@ -34,5 +34,12 @@ internal sealed class WriteContext
             ".mca" or ".mcr" => relative.StartsWith("entities/", StringComparison.Ordinal) || relative.Contains("/entities/", StringComparison.Ordinal) ? ArtifactKind.Entities : ArtifactKind.Region,
             ".mcfunction" => ArtifactKind.McFunction, _ => Path.GetFileName(relative) == "pack.mcmeta" ? ArtifactKind.Json : ArtifactKind.Nbt };
         return new(Inventory.WorldId, relative, kind);
+    }
+    internal ArtifactAddress Language(string path)
+    {
+        var parts = path.Split('#');
+        if (parts.Length > 2) throw new ArgumentException("Language output requires one exact artifact and optional entry");
+        var outer = Artifact(parts[0]);
+        return parts.Length == 1 ? outer : new ArtifactAddress(outer.WorldId, outer.RelativePath, ArtifactKind.Archive, parts[1]);
     }
 }

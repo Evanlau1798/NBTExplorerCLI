@@ -2,6 +2,7 @@ namespace Next.Domain;
 
 public static class SourceIdentity
 {
+    public static SnapshotScope ReadSnapshotScope(StableIdentity identity) => IdentityCanonical.ReadSnapshotScope(identity);
     public static StableIdentity Artifact(ArtifactAddress artifact)
     {
         ArgumentNullException.ThrowIfNull(artifact);

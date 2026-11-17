@@ -60,7 +60,7 @@ public sealed partial class WorldApplyEngine
     }
     public ApplyReceipt Recover(Hash256 planHash, bool worldOffline, bool rollback = false, CancellationToken cancellation = default)
     {
-        Offline(worldOffline); var active = Load(planHash) ?? throw new FileNotFoundException("No journal for the requested plan");
+        Offline(worldOffline); var active = Load(planHash) ?? throw new ApplyJournalMissingException();
         ApplyReceiptJson.ValidateStorageBudget(active.Header.Plan, MaximumReceiptReasonCodeUnits);
         var previous = Receipt(active);
         var direction = rollback || active.Journal.Direction == ApplyDirection.Rollback ? ApplyDirection.Rollback : ApplyDirection.Forward;
@@ -158,3 +158,5 @@ public sealed partial class WorldApplyEngine
 
 public sealed record WorldApplyStatus(Hash256 PlanHash, ApplyDirection Direction, ApplyJournalPhase Phase, long Sequence,
     Hash256 BackupManifestHash, ApplyReceipt? Receipt);
+
+public sealed class ApplyJournalMissingException() : FileNotFoundException("No journal for the requested plan");

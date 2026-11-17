@@ -7,6 +7,7 @@ product. File-based session/agent management has separate CLI contracts;
 same apply/recover commands. Explicit [legacy batch migration](cli-legacy-batch-contract.md)
 maps safely reconstructed old requests to these operations. [Session key plans](cli-key-plan-contract.md)
 generate exact conversion operations and their necessary language/pack outputs.
+[World conversion](cli-convert-contract.md) reuses those operations without a session.
 This document covers the new versioned operations input.
 
 | Command | Input and options |
@@ -56,6 +57,8 @@ operations with distinct IDs. Each operation uses the existing `id`, `kind`,
 `payload` contract from the [operation model](operation-contracts.md). A typed
 payload contains a versioned source `address` and a versioned `typed-edit`.
 Addresses can be obtained from `get`; expected values are explicit preconditions.
+An exported semantic plan retains its canonical snapshot scope; `apply` rebuilds
+that exact scope rather than assuming an unfiltered scan.
 Literal, key and reference intents retain the existing G05 validators. Raw restore
 intents use `restore` or an exported raw restore plan rather than this semantic
 request path. Unknown fields, duplicate members, unsupported families/versions,
@@ -105,6 +108,34 @@ CLI wrapper/export error. Journal headers also have to pass their reader budgets
 before publication. Over-budget requests fail before the first replacement.
 Engine receipt reasons are nonempty when required and at most 256 UTF-16 code
 units; CLI error details are at most 4096. Only diagnostics are abbreviated.
+
+Apply/recovery I/O failures may occur after physical commits. Journal lookups in
+`apply` replay and `status` use the same protected error response. Exit 7 /
+`RECOVERY_REQUIRED` preserves `planHash`, `recovery.world`, `recovery.stateRoot`
+and a machine repair action. Use these exact values with `status` then `recover`;
+do not infer that the world is unchanged. Before journal publication there may
+be no journal, indicated by `journalMayBeAbsent`. Inspect the retained plan and
+current sources before replanning in that case. A definitively absent journal
+on initial recovery retains exit 5 / `FILE_NOT_FOUND` and the supplied identity.
+Other missing persistence objects after execution begins remain unconfirmed.
+A successfully returned durable receipt survives a subsequent status read
+failure, but `receiptIsTerminal` is
+false until the current pointer can be confirmed. When no receipt is available,
+`unconfirmedOperations` conserves all parsed IDs as RecoveryRequired; these are
+observations, without a fabricated durable revision. Recovery by hash alone may
+have no parsed operation set and leaves that projection null. Recovery identity
+is bounded before engine execution; results and IDs are never truncated.
+Known I/O failures aggregated during native candidate cleanup use this same
+recovery response. A saved receipt is read once when available, and retained
+alongside the cleanup failure. A reference-policy refusal still reports exit 4
+when its status is readable; if that status read fails, exit 7 retains both the
+recovery identity. Both `recovery.repair` and `policyRepair` then direct explicit
+rollback and replanning; forward resume remains refused.
+
+A cleanup I/O failure can leave reserved `.candidate` files containing derived
+output bytes. Recovery repairs the promised world artifacts; it does not collect
+those old candidates or immutable history. They retain their filesystem access
+controls and may consume disk space. Automatic garbage collection is not provided.
 
 Backups contain verified immutable raw blobs and manifests. Without `--path`,
 backup selects the physical inventory excluding tool-reserved `.nbtcli-*` names;

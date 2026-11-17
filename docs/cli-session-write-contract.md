@@ -21,8 +21,8 @@ There is no old executable fallback or inferred write from a session reply.
 [Key planning](cli-key-plan-contract.md) uses explicit `--keys` and declares its
 required language/pack outputs. Canonical `plan` always requires one mode. The
 old `apply`/`apply-keys` names are preview aliases with explicit migration data;
-global `apply` performs the world commit. Standalone resource export and convert
-remain separate integration work.
+global `apply` performs the world commit. [World conversion](cli-convert-contract.md)
+has its own explicit source selection; standalone resource export remains integration work.
 
 Plan requires the exact current session revision and every slot to be Translated
 or Unchanged. Pending, conflict or already-applied slots require inspecting or

@@ -4,6 +4,18 @@ internal static class CliWorkflowCases
 {
     internal static readonly VerificationCase[] Cases =
     [
+        new("cli-convert-empty-plan-roundtrip", "cli-convert", _ => CliConvertTests.EmptyConversionPlansRoundTripWithoutResourceOrGameplayWrites()),
+        new("cli-write-replay-status-initial-io", "cli-write-recovery", _ => ReferencePolicyRecoveryTests.ReplayAndStatusReadFailuresRetainExistingPartialJournalIdentity()),
+        new("cli-write-native-cleanup-io-identity", "cli-write-recovery", _ => CliWriteRecoveryTests.RealCandidateCleanupFailuresKeepRecoveryIdentityAndSavedReceipt()),
+        new("cli-write-policy-status-io-identity", "cli-write-recovery", _ => ReferencePolicyRecoveryTests.PolicyRefusalStatusIoKeepsRecoveryIdentity()),
+        new("cli-write-missing-journal-classification", "cli-write-recovery", _ => CliWriteRecoveryTests.MissingJournalKeepsItsNotFoundClassification()),
+        new("cli-write-postcommit-io-identity", "cli-write-recovery", _ => CliWriteRecoveryTests.PostcommitJournalFailuresKeepRecoveryIdentityAndHonestAccounting()),
+        new("cli-convert-scoped-existing-language", "cli-convert", _ => CliConvertTests.ScopedInputsBindExistingLanguageDependenciesWithoutWideningSelection()),
+        new("cli-convert-scoped-plan-apply", "cli-convert", _ => CliConvertTests.ScopedPlansApplyTheirOriginalScopeAndKeepUnselectedNames()),
+        new("cli-convert-preview-dedup-context", "cli-convert", _ => CliConvertTests.PreviewApplyAndContextAwareDeduplicationUseTheSharedPipeline()),
+        new("cli-convert-language-backup", "cli-convert", _ => CliConvertTests.LanguageLocaleAndOptionalBackupNeverDisableRequiredRecovery()),
+        new("cli-convert-name-option-refusal", "cli-convert", _ => CliConvertTests.UnsafeNamesAndInvalidOptionsRefuseBeforeWorldMutation()),
+        new("cli-convert-shared-language-conflict", "cli-convert", _ => CliConvertTests.SharedLanguageTargetsCannotDisagreeOnLocaleOrContent()),
         new("cli-key-plan-generated-field-conflict", "cli-key", _ => CliKeyPlanTests.GeneratedFieldsCannotCompeteWithExplicitTypedEdits()),
         new("cli-key-plan-bounded-lazy-input", "cli-key", _ => CliKeyPlanTests.LazyKeyInputsAreChargedBeforeTheNextUnboundedAllocation()),
         new("cli-key-plan-apply-alias-migration", "cli-key", _ => CliKeyPlanTests.LegacyApplyNamesExposeExplicitPreviewMigrationWithoutWriting()),

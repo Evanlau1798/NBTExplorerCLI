@@ -27,15 +27,20 @@ public static class CommandOutputJson
     public static string Write(string command, object? data, string outcome = "Success", string? code = null, string? message = null, string? details = null)
         => ContractJson.SerializeBounded(new Envelope("nbtcli.next.cli", 1, code is null, command, outcome, data, code is null ? null : new(code, message ?? code,
             details is { Length: > MaximumDiagnosticCodeUnits } ? details[..(MaximumDiagnosticCodeUnits - 1)] + "…" : details)), Options);
-    public static object RejectedOperations(IReadOnlyList<string> operationIds, string phase) => new
+    public static object RejectedOperations(IReadOnlyList<string> operationIds, string phase) => new { validation = OperationResults(operationIds, phase, OperationOutcome.Skipped) };
+    public static object UnconfirmedOperations(IReadOnlyList<string> operationIds) => OperationResults(operationIds, "ApplyStateUnconfirmed", OperationOutcome.RecoveryRequired);
+    private static object OperationResults(IReadOnlyList<string> operationIds, string phase, OperationOutcome selected) => new
     {
-        validation = new { phase, requested = operationIds.Count,
-            results = operationIds.Select(operationId => new { operationId, outcome = OperationOutcome.Skipped, reason = phase }).ToArray(),
-            counts = Enum.GetValues<OperationOutcome>().Select(outcome => new { outcome, count = outcome == OperationOutcome.Skipped ? operationIds.Count : 0 }).ToArray() }
+        phase, requested = operationIds.Count,
+        results = operationIds.Select(operationId => new { operationId, outcome = selected, reason = phase }).ToArray(),
+        counts = Enum.GetValues<OperationOutcome>().Select(outcome => new { outcome, count = outcome == selected ? operationIds.Count : 0 }).ToArray()
     };
     public static void ValidateRejectionBudget(IReadOnlyList<string> operationIds)
-        => ValidateEnvelopeHeadroom(Write("restore", RejectedOperations(operationIds, "PreparationRejected"), "Unsupported", "PREPARATION_FAILED",
+    {
+        ValidateEnvelopeHeadroom(Write("restore", RejectedOperations(operationIds, "PreparationRejected"), "Unsupported", "PREPARATION_FAILED",
             new string('\uffff', 256), new string('\uffff', MaximumDiagnosticCodeUnits)));
+        ValidateEnvelopeHeadroom(Write("convert", UnconfirmedOperations(operationIds), "RecoveryRequired", "RECOVERY_REQUIRED", new string('\uffff', 256)));
+    }
     internal static void ValidateEnvelopeHeadroom(string json)
     {
         // Reserve space for CLI state fields and the bounded export diagnostic around an intact receipt.

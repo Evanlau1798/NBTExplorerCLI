@@ -38,6 +38,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         if (outputs.Any(artifact => artifact.WorldId != inventory.WorldId || artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Json or ArtifactKind.McFunction or ArtifactKind.Region or ArtifactKind.Entities or ArtifactKind.Archive))) throw new NotSupportedException("Physical artifact preparation profile is not implemented");
         static ArtifactAddress Outer(ArtifactAddress artifact) => artifact.ContainerEntry is null ? artifact : new(artifact.WorldId, artifact.RelativePath, artifact.Kind);
         var sources = snapshot.Discovery.Sources.Where(source => outputs.Contains(Outer(source.Location.Artifact))).ToDictionary(source => (source.Location.Artifact, source.Chunk));
+        WorldLanguageOutputs.BindExisting(inventory, snapshot, requested, sources);
         var addedLanguages = WorldLanguageOutputs.AddMissingLanguages(snapshot, requested, sources);
         var absent = addedLanguages.Select(Outer).Where(artifact => sources[(artifact, null)].ContentHash is null).ToHashSet();
         var required = outputs.Select(artifact => (artifact, (ChunkPosition?)null)).Concat(requested.SelectMany(operation => operation.Targets).Select(address => (address.Artifact, address.Chunk))).Distinct().ToArray();

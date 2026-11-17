@@ -9,6 +9,35 @@ namespace Next.Application;
 
 internal static class WorldLanguageOutputs
 {
+    internal static void BindExisting(IWorldInventory inventory, WorldQuerySnapshot snapshot, IReadOnlyList<PatchOperation> operations,
+        Dictionary<(ArtifactAddress Artifact, ChunkPosition? Chunk), DiscoveredSource> sources)
+    {
+        var languages = operations.OfType<KeyConversionPatch>().Select(item => item.Conversion.Dependency.LanguageArtifact)
+            .Distinct().Where(artifact => !sources.ContainsKey((artifact, null))).ToArray();
+        if (languages.Length == 0) return;
+        var wanted = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var language in languages)
+        {
+            var outer = language.ContainerEntry is null ? language : new ArtifactAddress(language.WorldId, language.RelativePath, language.Kind);
+            if (!sources.ContainsKey((outer, null))) wanted.Add(language.RelativePath);
+            var assets = language.RelativePath.LastIndexOf("/assets/", StringComparison.Ordinal);
+            if (language.ContainerEntry is null && assets >= 0) wanted.Add(language.RelativePath[..assets] + "/pack.mcmeta");
+        }
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in snapshot.Discovery.Inventory.Entries)
+            if (wanted.Contains(entry.RelativePath)) paths.Add(entry.RelativePath);
+        if (paths.Count == 0) return;
+        // Output dependencies are read independently; they never widen the gameplay snapshot or its slot selection.
+        var discovery = WorldDiscovery.Discover(inventory, new(new([], [], [], paths), snapshot.Limits));
+        if (discovery.DiagnosticCode is { } diagnostic)
+        {
+            if (diagnostic == "SourceLimitExceeded") throw new CodecException(CodecError.LimitExceeded, 0, diagnostic);
+            throw new EditRejectedException(EditFailure.Precondition, "Language dependency discovery is incomplete: " + diagnostic);
+        }
+        foreach (var source in discovery.Sources)
+            if (sources.TryAdd((source.Location.Artifact, source.Chunk), source) && sources.Count > 100_000)
+                throw new CodecException(CodecError.LimitExceeded, 0, "Combined plan sources exceed the source budget");
+    }
     internal static HashSet<ArtifactAddress> AddMissingLanguages(WorldQuerySnapshot snapshot, IReadOnlyList<PatchOperation> operations,
         Dictionary<(ArtifactAddress Artifact, ChunkPosition? Chunk), DiscoveredSource> sources)
     {
@@ -42,7 +71,7 @@ internal static class WorldLanguageOutputs
             }
             else
             {
-                var owner = snapshot.Discovery.Sources.Where(source => source.Pack?.Kind == PackSourceKind.ResourcePack && source.Location.PackRoot is { } root
+                var owner = sources.Values.Concat(snapshot.Discovery.Sources).Where(source => source.Pack?.Kind == PackSourceKind.ResourcePack && source.Location.PackRoot is { } root
                     && language.RelativePath.StartsWith(root + "/assets/", StringComparison.Ordinal) && source.PackMetadataHash is not null)
                     .OrderByDescending(source => source.Location.PackRoot!.Length).FirstOrDefault()
                     ?? throw new EditRejectedException(EditFailure.Precondition, "Missing language output requires a known exact resource pack");

@@ -14,6 +14,12 @@ mutations. Native composition first checks every original root preimage, then
 retains child conversions when transforming a containing root. This changes no
 canonical operation payload or existing legal plan hash.
 
+Several key operations may share one language target only when locale and content
+are identical. The common validator coalesces that output claim, while preserving
+every component target, generated-field conflict and operation receipt. Conflicting
+claims still reject. `SourceIdentity.ReadSnapshotScope` exposes all four sets from
+a validated canonical SnapshotId; exported semantic plans rebind that same scope.
+
 ## Text slots
 
 `TextSlot` binds a complete `SourceAddress`, decoded text, context, source/target locale,

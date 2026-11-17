@@ -3,7 +3,9 @@
 `translate <action> <world>` exposes the durable session service. These commands
 write tool state, never world content. Direct world translation uses
 [session plan, existing apply/recover and seal](cli-session-write-contract.md);
-key conversion and pack generation remain integration work. Agent preferences use the
+[key conversion](cli-key-plan-contract.md) and [convert](cli-convert-contract.md)
+use the same verified writer. Standalone language export and pack generation remain
+integration work. Agent preferences use the
 [agent contract](cli-agent-contract.md).
 
 All non-help actions accept `--session-id <guid>`, `--state-root <directory>`, `--output
@@ -96,6 +98,6 @@ glossary/profile compatibility; lookup does not submit or accept a translation.
 Notes/glossary and group presentation never authorize a world rename/write.
 
 Agent setup/submit/status and [legacy import/report](cli-legacy-contract.md) have
-their own contracts. [Key plans](cli-key-plan-contract.md) create required language/pack dependencies; convert and standalone language export/pack management remain integration work.
+their own contracts. [Key plans](cli-key-plan-contract.md) create required language/pack dependencies; [convert](cli-convert-contract.md) is a separate source-to-key workflow. Standalone language export/pack management remain integration work.
 Those capabilities remain required. Minecraft load, RSS/performance, power loss
 and release acceptance are later gates.

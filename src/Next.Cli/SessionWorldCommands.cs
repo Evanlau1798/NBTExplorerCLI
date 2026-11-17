@@ -38,10 +38,7 @@ internal static class SessionWorldCommands
                 {
                     if (languagePath is not null)
                     {
-                        var parts = languagePath.Split('#');
-                        if (parts.Length > 2) throw new ArgumentException("Language output requires one exact artifact and optional entry");
-                        var outer = context.Artifact(parts[0]);
-                        var language = parts.Length == 1 ? outer : new ArtifactAddress(outer.WorldId, outer.RelativePath, ArtifactKind.Archive, parts[1]);
+                        var language = context.Language(languagePath);
                         var translated = state.Slots.Where(slot => slot.State == SessionSlotState.Translated).Select(slot => new LiteralTranslation(slot.Slot, slot.Reply!));
                         var keys = new WorldKeyConversionService(context.Inventory).Create(snapshot, translated, language, request.Get("prefix") ?? "map.");
                         var converted = keys.Select(key => key.Conversion.Slot.Address).ToHashSet();

@@ -20,8 +20,8 @@ internal static class WriteCommands
         {
             var hash = new Hash256(Required(request, "plan-hash"));
             var engine = context.Engine();
-            if (request.Command == "status") return Status(engine.ReadStatus(hash));
-            return Recover(engine, hash, request.Flag("rollback"));
+            if (request.Command == "status") return WriteExecution.Status(engine, hash, context.Root, context.State);
+            return Recover(context, engine, hash, request.Flag("rollback"));
         }
         if (request.Command == "backup")
         {
@@ -52,7 +52,7 @@ internal static class WriteCommands
             });
             if (!write) return Preview(plan);
             using var prepared = Prepare(plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage).Prepare(backup, plan, true));
-            var restoreEngine = context.Engine(); return Receipt(restoreEngine.Apply(prepared, true), restoreEngine);
+            var restoreEngine = context.Engine(); return Apply(prepared, restoreEngine, context.Root, context.State);
         }
         if (request.Command == "apply")
         {
@@ -60,13 +60,13 @@ internal static class WriteCommands
             var ids = plan.Operations.Select(operation => operation.Id).ToArray();
             CommandOutputJson.ValidateRejectionBudget(ids);
             if (plan.WorldId != context.Inventory.WorldId) throw Rejected(ids, new ArtifactConflictException("Plan belongs to another world root"), "PlanRejected");
-            if (engine.ReadStatus(plan.PlanHash) is not null) return Recover(engine, plan.PlanHash);
+            if (WriteExecution.TryReplay(engine, plan, context.Root, context.State) is { } replay) return replay;
             _ = BeforeCommit(ids, "PlanRejected", () =>
             {
                 foreach (var input in plan.Preconditions) if (context.Image(input.Artifact) != input.Image) throw new ArtifactConflictException("Plan preimage no longer matches the exact source");
                 return plan;
             });
-            if (plan.Operations.All(operation => operation is RestorePatch))
+            if (!plan.Operations.IsEmpty && plan.Operations.All(operation => operation is RestorePatch))
             {
                 var backup = BeforeCommit(ids, "PlanRejected", () =>
                 {
@@ -75,10 +75,10 @@ internal static class WriteCommands
                     return new WorldBackupService(context.Inventory, context.Objects()).Load(hashes[0]);
                 });
                 using var prepared = Prepare(plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage).Prepare(backup, plan, true));
-                return Receipt(engine.Apply(prepared, true), engine);
+                return Apply(prepared, engine, context.Root, context.State);
             }
-            using var candidate = Prepare(plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage).Prepare(context.Query(), plan, true));
-            return Receipt(engine.Apply(candidate, true), engine);
+            using var candidate = Prepare(plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage).Prepare(context.Query(SourceIdentity.ReadSnapshotScope(plan.SnapshotId)), plan, true));
+            return Apply(candidate, engine, context.Root, context.State);
         }
         IReadOnlyList<PatchOperation> operations;
         if (request.Command == "set")
@@ -92,12 +92,12 @@ internal static class WriteCommands
         else operations = OperationSetJson.Read(CliInput.Read(request.Command == "batch" ? request.Input! : Required(request, "request")));
         return ExecuteOperations(context, operations, write);
     }
-    internal static CliResult ExecuteOperations(WriteContext context, IReadOnlyList<PatchOperation> operations, bool write)
+    internal static CliResult ExecuteOperations(WriteContext context, IReadOnlyList<PatchOperation> operations, bool write, WorldQuerySnapshot? suppliedSnapshot = null)
     {
         CommandOutputJson.ValidateRejectionBudget(operations.Select(operation => operation.Id).ToArray());
         var bound = BeforeCommit(operations.Select(operation => operation.Id).ToArray(), "PlanRejected", () =>
         {
-            var snapshot = context.Query(); var outputs = operations.SelectMany(operation => operation.RequiredOutputs).ToHashSet();
+            var snapshot = suppliedSnapshot ?? context.Query(); var outputs = operations.SelectMany(operation => operation.RequiredOutputs).ToHashSet();
             var blocked = snapshot.Manifest.InputSources.FirstOrDefault(source => outputs.Contains(source.Artifact) && source.Outcome is SourceOutcome.Failed or SourceOutcome.Unsupported or SourceOutcome.Cancelled);
             if (blocked is not null)
             {
@@ -110,7 +110,7 @@ internal static class WriteCommands
         });
         if (!write) return Preview(bound.Plan);
         using var output = Prepare(bound.Plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage).Prepare(bound.Snapshot, bound.Plan, true));
-        var applyEngine = context.Engine(); return Receipt(applyEngine.Apply(output, true), applyEngine);
+        var applyEngine = context.Engine(); return Apply(output, applyEngine, context.Root, context.State);
     }
     private static CliResult Preview(PatchPlan plan) => new(new { preview = true, plan = Json(PatchPlanJson.Write(plan)) }, Export: PatchPlanJson.Write(plan));
     private static PreparedWorldPlan Prepare(IReadOnlyList<PatchOperation> operations, Func<PreparedWorldPlan> prepare)
@@ -126,16 +126,10 @@ internal static class WriteCommands
         var code = CliApplication.Code(error); if (phase == "PreparationRejected" && code == "READ_ERROR") code = "PREPARATION_FAILED";
         return new(code, error.Message, CommandOutputJson.RejectedOperations(operationIds, phase));
     }
-    private static CliResult Receipt(ApplyReceipt receipt, WorldApplyEngine engine) => Status(engine.ReadStatus(receipt.PlanHash), receipt);
-    private static CliResult Recover(WorldApplyEngine engine, Hash256 hash, bool rollback = false)
-    {
-        try { return Receipt(engine.Recover(hash, true, rollback), engine); }
-        catch (ReferencePolicyException error)
-        {
-            var current = Status(engine.ReadStatus(hash));
-            return current with { Data = new { journal = current.Data, repair = "rollback-and-create-new-reference-plan", policyError = error.Message }, Code = "UNSUPPORTED_SOURCE", Outcome = "Unsupported", Exit = 4, Export = null };
-        }
-    }
+    internal static CliResult Apply(PreparedWorldPlan prepared, WorldApplyEngine engine, string root, string state)
+        => WriteExecution.Apply(prepared, engine, root, state);
+    private static CliResult Recover(WriteContext context, WorldApplyEngine engine, Hash256 hash, bool rollback = false)
+        => WriteExecution.Recover(engine, hash, context.Root, context.State, rollback);
     internal static CliResult Status(WorldApplyStatus? state, ApplyReceipt? fallback = null)
     {
         var receipt = state?.Receipt ?? fallback;
