@@ -75,18 +75,18 @@ internal static class SessionCommands
         }
         var state = service.Read(id);
         if (state.Source.WorldId != context.Inventory.WorldId) throw new ArtifactConflictException("Session belongs to a different world root");
-        var groups = request.Subcommand is "export" or "next" or "submit" ? Groups(service, id, request, context) : [];
+        var groups = request.Subcommand is "export" or "next" or "submit" ? Groups(service, id, request, context, state) : [];
         switch (request.Subcommand)
         {
             case "status":
                 return Status(context, state);
             case "get":
-                var item = service.Get(id, new(Required(request, "slot-id"))); var slot = item.Slot;
+                var item = TranslationSessionService.Get(state, new(Required(request, "slot-id"))); var slot = item.Slot;
                 return new(new { slot = new { slotId = slot.Id.Digest, slot.SourceTextHash, slot.SourceText, slot.Context, slot.Role, slot.SourceLocale, slot.TargetLocale,
                     slot.AllowedEmpty, placeholders = slot.Placeholders.Tokens, item.Format, item.State, item.Reason,
                     reply = item.Reply is { } translation ? new { translation.TargetLocale, translation.Text } : null } });
             case "export":
-                var page = service.Export(id, request.Number("page", state.Workspace?.CurrentPage ?? 0, 0, Math.Max(0, state.Pages.Length - 1)));
+                var page = TranslationSessionService.Export(state, request.Number("page", state.Workspace?.CurrentPage ?? 0, 0, Math.Max(0, state.Pages.Length - 1)));
                 var prompt = SessionExchangeJson.Prompt(page, operationId);
                 return new(new { page = Json(SessionExchangeJson.WritePage(page)), replyTemplate = Json(SessionExchangeJson.ReplyTemplate(page, operationId)), prompt,
                     groups }, Export: prompt);
@@ -104,7 +104,7 @@ internal static class SessionCommands
                 else if (request.Subcommand == "submit") throw new CliFailure("INVALID_ARGUMENTS", "Missing --reply");
                 var status = service.Status(id); var next = status.Pending + status.Conflict == 0 ? null : service.Next(id);
                 return new(new { receipt = accepted, status, nextPage = next is null ? (JsonElement?)null : Json(SessionExchangeJson.WritePage(next)), groups });
-            case "groups": return new(new { groups = service.Groups(id).Skip(request.Number("offset", 0, 0, 2_000_000)).Take(request.Number("limit", 100, 1, 10_000)).Select(Group).ToArray() });
+            case "groups": return new(new { groups = TranslationSessionService.Groups(state).Skip(request.Number("offset", 0, 0, 2_000_000)).Take(request.Number("limit", 100, 1, 10_000)).Select(Group).ToArray() });
             case "memory":
                 var sources = Required(request, "source-sessions").Split(',').Select(GuidValue).ToArray();
                 var candidates = service.Memory(id, new(Required(request, "slot-id")), sources, Required(request, "glossary-version"));
@@ -123,8 +123,8 @@ internal static class SessionCommands
         }
     }
     private static FileSystemSessionPreferencesStore Preferences(WriteContext context) => new(Path.Combine(context.State, "session-preferences"));
-    private static object[] Groups(TranslationSessionService service, Guid id, CliArguments request, WriteContext context)
-        => request.Flag("no-group") || Preferences(context).Read(id) == false ? [] : service.Groups(id).Select(Group).ToArray();
+    private static object[] Groups(TranslationSessionService service, Guid id, CliArguments request, WriteContext context, TranslationSession? state = null)
+        => request.Flag("no-group") || Preferences(context).Read(id) == false ? [] : TranslationSessionService.Groups(state ?? service.Read(id)).Select(Group).ToArray();
     private static object Group(SessionContextGroup group) => new { group.Kind, groupId = group.GroupId.Digest, memberDigest = group.MemberDigest.Digest, group.Slots };
     internal static SnapshotScope Scope(TranslationSession state) => new(state.Source.Dimensions, state.Source.Regions, state.Source.Types, state.Source.ArtifactPaths);
     internal static CliResult Status(WriteContext context, TranslationSession state)

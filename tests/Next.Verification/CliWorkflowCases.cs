@@ -81,6 +81,7 @@ internal static class CliWorkflowCases
         new("cli-session-limits-and-read-errors", "cli-session", _ => CliSessionTests.LimitsAndUnreadableSourcesKeepTheirActualClassification()),
         new("cli-session-local-memory", "cli-session", _ => CliSessionTests.MemoryCandidatesUseOnlyValidatedLocalSessionReplies()),
         new("cli-session-file-exchange-replay", "cli-session", _ => CliSessionTests.FileExchangePersistsRepliesBeforeReturningTheNextPage()),
+        new("cli-session-single-read-projection", "cli-session", context => CliSessionTests.ReadProjectionsReuseOneDecodedSession(context.ArtifactRoot)),
         new("cli-session-reply-and-source-freshness", "cli-session", _ => CliSessionTests.InvalidAndStaleRepliesPreserveWorkEvenWhenTheCacheIsFresh()),
         new("cli-session-management-cas-reset", "cli-session", _ => CliSessionTests.ManagementCommandsUseRevisionCasAndRetainResetHistory()),
         new("cli-session-selection-help-export", "cli-session", _ => CliSessionTests.SelectionHelpAndRejectedExportsNeverWriteTheWorld()),

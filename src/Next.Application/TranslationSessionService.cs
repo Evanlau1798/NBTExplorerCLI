@@ -34,9 +34,10 @@ public sealed partial class TranslationSessionService(ITranslationSessionStore s
         var session = new TranslationSession(request.SessionId, 0, request.Source, request.SourceLocale, request.TargetLocale, request.Policy, slots, SessionPageBuilder.Build(request), [receipt]);
         return Save(session, receipt, null);
     }
-    public SessionPage Export(Guid sessionId, int page)
+    public SessionPage Export(Guid sessionId, int page) => Export(Read(sessionId), page);
+    public static SessionPage Export(TranslationSession state, int page)
     {
-        var state = Read(sessionId); var result = SessionPageProjection.Create(state, page);
+        var result = SessionPageProjection.Create(state, page);
         if (Encoding.UTF8.GetByteCount(SessionExchangeJson.Prompt(result, Guid.NewGuid())) > state.Policy.MaximumPageBytes) throw new InvalidDataException("Stored session page exceeds its byte policy");
         return result;
     }

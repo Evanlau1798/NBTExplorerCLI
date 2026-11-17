@@ -13,7 +13,9 @@ public sealed partial class TranslationSessionService
         ArgumentNullException.ThrowIfNull(state); var counts = state.Slots.GroupBy(item => item.State).ToDictionary(group => group.Key, group => group.Count());
         return new(state.SessionId, state.Revision, state.Workspace?.CurrentPage ?? 0, state.Pages.Length, state.Slots.Length, counts.GetValueOrDefault(SessionSlotState.Pending), counts.GetValueOrDefault(SessionSlotState.Translated), counts.GetValueOrDefault(SessionSlotState.Unchanged), counts.GetValueOrDefault(SessionSlotState.Conflict), counts.GetValueOrDefault(SessionSlotState.Applied));
     }
-    public SessionSlot Get(Guid id, Hash256 slotId) => Read(id).Slots.SingleOrDefault(slot => slot.Slot.Id.Digest == slotId) ?? throw new KeyNotFoundException("Unknown session slot");
+    public SessionSlot Get(Guid id, Hash256 slotId) => Get(Read(id), slotId);
+    public static SessionSlot Get(TranslationSession state, Hash256 slotId)
+        => state.Slots.SingleOrDefault(slot => slot.Slot.Id.Digest == slotId) ?? throw new KeyNotFoundException("Unknown session slot");
     public SessionPage Next(Guid id)
     {
         var state = Read(id); var pending = state.Slots.Where(slot => slot.State is SessionSlotState.Pending or SessionSlotState.Conflict).Select(slot => slot.Slot.Id.Digest).ToHashSet();
@@ -41,10 +43,9 @@ public sealed partial class TranslationSessionService
         if (requested.Length is < 1 or > 100_000 || requested.Any(slot => slot is null || !known.ContainsKey(slot)) || requested.Distinct().Count() != requested.Length) throw new ArgumentException("Invalid reset slot scope", nameof(slotIds));
         return new(state.Revision, Ids(requested), requested.Count(slot => known[slot].Reply is not null));
     }
-    public ImmutableArray<SessionContextGroup> Groups(Guid id)
-    {
-        var state = Read(id); return SessionContextGrouping.Build(state.Slots.Select(item => item.Slot), state.Source.ContextRoots);
-    }
+    public ImmutableArray<SessionContextGroup> Groups(Guid id) => Groups(Read(id));
+    public static ImmutableArray<SessionContextGroup> Groups(TranslationSession state)
+        => SessionContextGrouping.Build(state.Slots.Select(item => item.Slot), state.Source.ContextRoots);
     public ImmutableArray<TranslationMemoryCandidate> Memory(Guid targetSession, Hash256 slotId, IEnumerable<Guid> sourceSessions, string glossaryVersion)
     {
         ArgumentNullException.ThrowIfNull(sourceSessions); ArgumentException.ThrowIfNullOrWhiteSpace(glossaryVersion);

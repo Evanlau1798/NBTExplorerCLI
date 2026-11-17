@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Next.Application;
+using Next.Cli;
 using Next.Domain;
 using Next.Infrastructure;
 using Next.Formats;
@@ -19,6 +21,59 @@ internal static class CliSessionTests
     private static string FileInput(string work, string name, string json)
     { var file = Path.Combine(work, name); File.WriteAllText(file, json, new UTF8Encoding(false)); return file; }
     private static SessionReply Reply(JsonDocument page) => SessionExchangeJson.ReadReply(page.RootElement.GetProperty("data").GetProperty("replyTemplate").GetRawText());
+    public static void ReadProjectionsReuseOneDecodedSession(string? artifactRoot)
+    {
+        var world = WorldQueryTests.CreateWorld(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
+        try
+        {
+            const int commands = 512;
+            var functions = Enumerable.Range(0, commands).Select(index => $"tellraw @s \"Measured session slot {index:D3}\"\n");
+            File.WriteAllText(Path.Combine(world, WorldQueryTests.Function(0)), string.Concat(functions), new UTF8Encoding(false));
+            using var started = Start(work, world, id, "--page-size", "8", "--no-group");
+            var stateRoot = Path.Combine(work, "state");
+            var store = new FileSystemTranslationSessionStore(Path.Combine(stateRoot, "sessions"));
+            var service = new TranslationSessionService(store);
+            var state = service.Read(id);
+            Require(state.Slots.Length == commands + 2, "the persisted corpus must have the exact number of distinct source slots");
+            var slot = state.Slots[0].Slot;
+            var sourceHash = Hash256.Compute(store.Read(id)!);
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            _ = service.Read(id);
+            var singleRead = GC.GetAllocatedBytesForCurrentThread() - before;
+            // Allow bounded page formatting overhead while still rejecting another whole session decode.
+            var budget = singleRead + singleRead / 8;
+
+            (JsonDocument Result, long Bytes) Measure(string action, params string[] options)
+            {
+                using var output = new StringWriter();
+                var arguments = new[] { "translate", action, world, "--session-id", id.ToString(), "--state-root", stateRoot }.Concat(options).ToArray();
+                var allocated = GC.GetAllocatedBytesForCurrentThread();
+                var exit = CliApplication.Run(arguments, output);
+                var bytes = GC.GetAllocatedBytesForCurrentThread() - allocated;
+                Require(exit == 0, "CLI projection failed: " + output);
+                return (JsonDocument.Parse(output.ToString()), bytes);
+            }
+            var get = Measure("get", "--slot-id", slot.Id.Digest.Hex);
+            using var getResult = get.Result;
+            var row = getResult.RootElement.GetProperty("data").GetProperty("slot");
+            Require(row.GetProperty("slotId").GetString() == slot.Id.Digest.Hex && row.GetProperty("sourceText").GetString() == slot.SourceText,
+                "get must return the exact requested slot from the world-bound session");
+            var export = Measure("export", "--page", "0", "--no-group");
+            using var exportResult = export.Result;
+            var page = SessionExchangeJson.ReadPage(exportResult.RootElement.GetProperty("data").GetProperty("page").GetRawText());
+            Require(page.Revision == state.Revision && page.Slots.Length == 8 && Hash256.Compute(store.Read(id)!) == sourceHash,
+                "export must return the persisted page without consuming or rewriting the session");
+            if (artifactRoot is not null)
+            {
+                Directory.CreateDirectory(artifactRoot);
+                File.WriteAllText(Path.Combine(artifactRoot, "session-projection-allocation.json"),
+                    JsonSerializer.Serialize(new { slots = state.Slots.Length, singleRead, budget, getBytes = get.Bytes, exportBytes = export.Bytes }));
+            }
+            Require(get.Bytes <= budget && export.Bytes <= budget,
+                $"One session decode allocated {singleRead:N0} bytes; get {get.Bytes:N0}, export {export.Bytes:N0}; limit {budget:N0}");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
     public static void FileExchangePersistsRepliesBeforeReturningTheNextPage()
     {
         var world = WorldQueryTests.CreateWorld(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
