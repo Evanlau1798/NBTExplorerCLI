@@ -6,6 +6,7 @@ internal static class ResourceCases
     [
         new("cli-resource-explicit-source-metadata", "cli-resource", _ => CliResourceTests.ExplicitExternalPackOptionsUseFrozenSessionValuesWithoutSourceMetadata()),
         new("resource-output-scope-allocation", "resource-output", context => ResourceScopeHandleTests.MetadataProtectionDoesNotMultiplyDimensionAndOutputAllocations(context.ArtifactRoot)),
+        new("resource-output-apply-image-allocation", "resource-output", context => ResourceOutputTests.ApplyImageVerificationDoesNotMaterializeEachRead(context.ArtifactRoot)),
         new("cli-resource-directory-merge-conflict", "cli-resource", _ => CliResourceTests.DirectoryMergeAliasAndExistingKeyConflictsPreserveBothInputsAndOutputs()),
         new("resource-output-relative-placement", "resource-output", _ => ResourcePlacementTests.RelativeOutputDirectoriesAreExactPlanPathsAndAppearOnlyAtCommit()),
         new("resource-output-descendant-world-scope", "resource-output", _ => ResourcePlacementTests.NestedWorldGameplayCannotHideBelowThePhysicalOutputAnchor()),

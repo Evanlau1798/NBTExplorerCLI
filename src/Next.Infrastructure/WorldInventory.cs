@@ -78,5 +78,6 @@ public sealed class WorldInventory : IWorldInventory, IResourceOutputScope
         return Finish();
     }
     public byte[] Read(ArtifactAddress artifact) => storage.Read(artifact);
+    public ArtifactImage ReadImage(ArtifactAddress artifact) => storage.ReadImage(artifact);
     public IDisposable GuardResourceOutput(ResourceGeneration generation) => ResourceScopeGuard.Acquire(root, generation);
 }

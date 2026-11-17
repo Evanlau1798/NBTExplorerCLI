@@ -45,8 +45,7 @@ public sealed partial class WorldApplyEngine
         var images = new Dictionary<ArtifactAddress, ArtifactImage?>();
         foreach (var input in header.Plan.Preconditions)
         {
-            try { images.Add(input.Artifact, ArtifactImage.Present(Hash256.Compute(inventory.Read(input.Artifact)))); }
-            catch (FileNotFoundException) { images.Add(input.Artifact, ArtifactImage.Absent); }
+            try { images.Add(input.Artifact, inventory.ReadImage(input.Artifact)); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { images.Add(input.Artifact, null); }
         }
         return images;

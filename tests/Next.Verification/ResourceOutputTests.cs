@@ -226,6 +226,38 @@ internal static class ResourceOutputTests
             finally { Directory.Delete(root, true); Directory.Delete(state, true); }
         }
     }
+    public static void ApplyImageVerificationDoesNotMaterializeEachRead(string? artifactRoot)
+    {
+        var root = ScratchDirectory.CreateChild(); var state = ScratchDirectory.CreateChild();
+        try
+        {
+            var opaque = new byte[4 * 1024 * 1024]; opaque[0] = 7; opaque[^1] = 31;
+            const string opaquePath = "Translations/assets/test/opaque.bin";
+            Put(root, opaquePath, opaque);
+            Put(root, "Translations/pack.mcmeta", "{\"pack\":{\"pack_format\":34,\"description\":\"Retained\"}}"u8.ToArray());
+            var request = new ResourceGeneration(World, ResourceOutputFormat.DirectoryPack, "Translations",
+                Enumerable.Range(0, 8).Select(index => new ResourceLanguage($"zz_{index:D2}", [new("map.test", "Value")])), new(34, 0));
+            var inventory = new WorldInventory(root, World); var storage = new ArtifactStorage(root, World);
+            var objects = new FileSystemWorldBackupStore(Path.Combine(state, "objects"));
+            var engine = new WorldApplyEngine(inventory, storage, objects, new FileSystemApplyJournalStore(Path.Combine(state, "journals")));
+            var service = new ResourceOutputService(inventory, storage, objects);
+            using var prepared = service.Prepare(service.Build(request), true);
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var receipt = engine.Apply(prepared, true);
+            var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            if (artifactRoot is not null)
+            {
+                Directory.CreateDirectory(artifactRoot);
+                File.WriteAllText(Path.Combine(artifactRoot, "apply-image-allocation.json"),
+                    System.Text.Json.JsonSerializer.Serialize(new { allocatedBytes = bytes, retainedBytes = opaque.Length, outputs = prepared.Manifest.Artifacts.Length }));
+            }
+            Require(receipt.Success && receipt.Results.Single().Proofs.Length == 9
+                && File.ReadAllBytes(Path.Combine(root, opaquePath)).AsSpan().SequenceEqual(opaque),
+                "durable apply must prove every output and preserve its exact retained dependency");
+            Require(bytes < 48L * 1024 * 1024, $"Apply allocated {bytes:N0} bytes for a 4 MiB retained dependency across 9 verified outputs");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(state, true); }
+    }
     public static void LegacyWorldResourceLocationsRemainAvailableWithoutGameplayAuthority()
     {
         foreach (var format in new[] { ResourceOutputFormat.ZipPack, ResourceOutputFormat.LanguageFiles, ResourceOutputFormat.DirectoryPack })

@@ -34,6 +34,16 @@ public sealed class ArtifactStorage : IArtifactStorage
         using var stream = GuardedArtifactPath.OpenFile(path.Target, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         return ReadStream(stream, maximumBytes);
     }
+    internal ArtifactImage ReadImage(ArtifactAddress artifact)
+    {
+        try
+        {
+            using var path = GuardedArtifactPath.Acquire(root, world, artifact);
+            using var stream = GuardedArtifactPath.OpenFile(path.Target, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            return Image(stream);
+        }
+        catch (FileNotFoundException) { return ArtifactImage.Absent; }
+    }
     public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)
         => StageCore(artifact, preimage, bytes, delete: false);
     public IArtifactCandidate StageDelete(ArtifactAddress artifact, ArtifactImage preimage)
