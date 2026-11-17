@@ -19,7 +19,7 @@ internal static class SessionCommands
             "status" => [], "export" => ["page", "operation-id", "no-group"], "next" => ["reply", "no-group"], "submit" => ["reply", "no-group"],
             "get" => ["slot-id"], "jump" => ["request"], "note" or "glossary" => ["request", "limit", "offset"],
             "reset" => ["request", "confirm"], "groups" => ["limit", "offset"], "memory" => ["slot-id", "source-sessions", "glossary-version", "limit", "offset"],
-            "plan" => ["direct", "revision", "operation-id"], "seal" => ["revision", "operation-id", "plan-hash"],
+            "plan" => ["direct", "revision", "operation-id", "synchronize-references"], "seal" => ["revision", "operation-id", "plan-hash"],
             _ => throw new CliFailure("UNKNOWN_COMMAND", "Unknown translate subcommand")
         };
         return ["session-id", "state-root", "output", "help", .. options];

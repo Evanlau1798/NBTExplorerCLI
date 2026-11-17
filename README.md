@@ -6,6 +6,8 @@ Windows x64 / .NET 10 的獨立新核心，直接開發於本目錄。舊版位�
 
 通用 set/batch/plan、apply/status/recover 及 verified backup/restore 已接入新版服務，預設預覽與寫入條件見 [編輯命令契約](docs/cli-edit-contract.md)。`translate` 提供 [檔案式 session 管理](docs/cli-session-contract.md)及 [direct plan → apply/recover → seal](docs/cli-session-write-contract.md)；`agent setup/submit/status/help` 提供版本化問卷與可重送設定，見 [agent 契約](docs/cli-agent-contract.md)。`import-legacy` 保留舊資料、匯出報告並在完整證據下建立 session，見 [legacy CLI 契約](docs/cli-legacy-contract.md)。key conversion、legacy batch、convert/pack/lang 仍在整合。操作與交換規格見 [操作契約](docs/operation-contracts.md)，session 及封存見 [session 契約](docs/session-contract.md)，唯讀映射見 [legacy mapping](docs/legacy-mapping-contract.md)。世界寫入須明確套用並確認離線；預覽與管理命令不寫世界。
 
+識別名稱與引用的同步需明確使用 `translate plan --direct --synchronize-references`；完整世界範圍、typed 群組、共同碰撞檢查與舊 journal 的回退方式見 [引用同步契約](docs/cli-reference-contract.md)。raw TypedEdit 與引用群組須分開規劃並重新掃描。
+
 ## 建置與驗證
 
 SDK 鎖定於 `global.json`。可使用已安裝的相同 SDK，或本機隔離工具鏈 `.tools/dotnet/dotnet.exe`；`.tools/` 不提交、不修改系統 SDK。Codec 的 SharpZipLib 1.4.2 由 packages.lock.json 固定，NuGet.Config 清除隱藏 fallback folders。

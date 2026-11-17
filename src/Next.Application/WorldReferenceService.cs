@@ -7,7 +7,30 @@ namespace Next.Application;
 public sealed class WorldReferenceService(IWorldInventory inventory)
 {
     private readonly IWorldInventory inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
+    public static bool IsIdentifyingName(string role) => role is "entity.name" or "armor_stand.name" or "entity.name.fallback" or "armor_stand.name.fallback";
     public ReferencePatch Create(WorldQuerySnapshot snapshot, string operationId, IEnumerable<LiteralTranslation> names)
+    {
+        var input = ReadNames(snapshot, names);
+        return new(operationId, Build(snapshot, input.Index, input.Changes));
+    }
+    public ImmutableArray<ReferencePatch> CreateGroups(WorldQuerySnapshot snapshot, string operationPrefix, IEnumerable<LiteralTranslation> names)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationPrefix); var input = ReadNames(snapshot, names);
+        var groups = input.Changes.Keys.Select(address => input.Index.Parts[address].Target).Distinct()
+            .GroupBy(target => (target.Type, Before: target.Name, After: Updated(target, input.Changes, snapshot.Limits.MaxDecodedBytes)))
+            .OrderBy(group => group.Key.Type, StringComparer.Ordinal).ThenBy(group => group.Key.Before, StringComparer.Ordinal).ThenBy(group => group.Key.After, StringComparer.Ordinal).ToArray();
+        ValidateFinalNames(snapshot, input.Index, input.Changes);
+        var output = ImmutableArray.CreateBuilder<ReferencePatch>(); long retained = 0; var members = 0;
+        foreach (var group in groups)
+        {
+            var synchronization = Build(snapshot, input.Index, group.SelectMany(target => target.Parts).Where(part => input.Changes.ContainsKey(part.Address))
+                .ToDictionary(part => part.Address, part => input.Changes[part.Address]));
+            Charge(synchronization, snapshot.Limits, ref retained, ref members);
+            output.Add(new(operationPrefix + "-" + output.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), synchronization));
+        }
+        return output.ToImmutable();
+    }
+    private (NameIndex Index, Dictionary<SourceAddress, (string Before, string After)> Changes) ReadNames(WorldQuerySnapshot snapshot, IEnumerable<LiteralTranslation> names)
     {
         ArgumentNullException.ThrowIfNull(snapshot); ArgumentNullException.ThrowIfNull(names);
         var requested = new List<LiteralTranslation>(); long retained = 0;
@@ -23,50 +46,78 @@ public sealed class WorldReferenceService(IWorldInventory inventory)
             requested.Add(item);
         }
         if (requested.Count == 0) throw new ArgumentException("Empty name translation set", nameof(names));
-        var scan = new WorldReferenceScan(inventory, snapshot); var changes = new Dictionary<SourceAddress, (string Before, string After)>();
-        var parts = scan.Targets.SelectMany(target => target.Parts).ToDictionary(part => part.Address);
+        var index = new NameIndex(new WorldReferenceScan(inventory, snapshot)); var changes = new Dictionary<SourceAddress, (string Before, string After)>();
         foreach (var item in requested)
         {
-            if (!parts.TryGetValue(item.Slot.Address, out var actual) || actual.Text != item.Slot.SourceText || actual.Context != item.Slot.Context || actual.AllowedEmpty != item.Slot.AllowedEmpty
+            if (!index.Parts.TryGetValue(item.Slot.Address, out var actual) || actual.Part.Text != item.Slot.SourceText || actual.Part.Context != item.Slot.Context || actual.Part.AllowedEmpty != item.Slot.AllowedEmpty
                 || !changes.TryAdd(item.Slot.Address, (item.Slot.SourceText, item.Reply.Text))) WorldReferenceScan.Reject("A requested name differs from its exact source slot");
         }
-        return new(operationId, Build(snapshot, scan, changes));
+        return (index, changes);
     }
     internal static ImmutableArray<ArtifactPrecondition> Validate(IWorldInventory inventory, WorldQuerySnapshot snapshot, IEnumerable<ReferencePatch> patches)
     {
         var requested = patches.ToArray(); if (requested.Length == 0) return [];
-        var scan = new WorldReferenceScan(inventory, snapshot);
-        var names = scan.Targets.SelectMany(target => target.Parts).ToDictionary(part => part.Address);
+        var scan = new WorldReferenceScan(inventory, snapshot); var index = new NameIndex(scan);
+        var allChanges = new Dictionary<SourceAddress, (string Before, string After)>(); long retained = 0; var members = 0;
         foreach (var patch in requested)
         {
-            var changes = patch.Synchronization.Members.Where(member => names.ContainsKey(member.Address))
+            Charge(patch.Synchronization, snapshot.Limits, ref retained, ref members);
+            var changes = patch.Synchronization.Members.Where(member => index.Parts.ContainsKey(member.Address))
                 .ToDictionary(member => member.Address, member => (member.ExpectedText, member.ReplacementText));
-            var expected = Build(snapshot, scan, changes); var supplied = patch.Synchronization;
+            var expected = Build(snapshot, index, changes); var supplied = patch.Synchronization;
             if (expected.GroupId != supplied.GroupId || expected.GroupRevision != supplied.GroupRevision || expected.MemberDigest != supplied.MemberDigest || !expected.Members.SequenceEqual(supplied.Members))
                 WorldReferenceScan.Reject("Reference synchronization is not the complete live typed group");
+            foreach (var change in changes)
+                if (!allChanges.TryAdd(change.Key, change.Value)) WorldReferenceScan.Reject("A name part belongs to multiple synchronization groups");
         }
+        ValidateFinalNames(snapshot, index, allChanges);
         return scan.Inputs;
     }
-    private static ReferenceSynchronization Build(WorldQuerySnapshot snapshot, WorldReferenceScan scan, IReadOnlyDictionary<SourceAddress, (string Before, string After)> changes)
+    private static void Charge(ReferenceSynchronization group, DecodeLimits limits, ref long retained, ref int members)
+    {
+        foreach (var member in group.Members)
+        {
+            retained = checked(retained + TextExtractionBudget.RecordBytes(member.Address, (long)member.ExpectedText.Length + member.ReplacementText.Length));
+            if (++members > 100_000 || retained > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Combined reference groups exceed the snapshot member budget");
+        }
+    }
+    private sealed class NameIndex
+    {
+        internal WorldNamedTarget[] Targets { get; }
+        internal Dictionary<SourceAddress, (WorldNamedTarget Target, TextOccurrence Part)> Parts { get; }
+        internal ILookup<(string Type, string Name), WorldNamedTarget> ByName { get; }
+        internal ILookup<string, WorldNameUse> Uses { get; }
+        internal NameIndex(WorldReferenceScan scan)
+        {
+            Targets = scan.Targets.ToArray(); Parts = Targets.SelectMany(target => target.Parts.Select(part => (target, part))).ToDictionary(row => row.part.Address, row => (row.target, row.part));
+            ByName = Targets.ToLookup(target => (target.Type, target.Name)); Uses = scan.Uses.ToLookup(use => use.Name, StringComparer.Ordinal);
+        }
+    }
+    private static string Updated(WorldNamedTarget target, IReadOnlyDictionary<SourceAddress, (string Before, string After)> changes, long maximumBytes)
+    {
+        long characters = 0;
+        foreach (var part in target.Parts) characters = checked(characters + (changes.TryGetValue(part.Address, out var value) ? value.After.Length : part.Text.Length));
+        if (characters * 2 > maximumBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Composed name exceeds the snapshot budget");
+        return string.Concat(target.Parts.Select(part => changes.TryGetValue(part.Address, out var value) ? value.After : part.Text));
+    }
+    private static void ValidateFinalNames(WorldQuerySnapshot snapshot, NameIndex index, IReadOnlyDictionary<SourceAddress, (string Before, string After)> changes)
+    {
+        var final = index.Targets.Select(target => (target.Type, Before: target.Name, After: Updated(target, changes, snapshot.Limits.MaxDecodedBytes)));
+        if (final.GroupBy(target => (target.Type, target.After)).Any(group => group.Select(target => target.Before).Distinct(StringComparer.Ordinal).Skip(1).Any()))
+            WorldReferenceScan.Reject("Distinct typed name groups cannot merge into one final identifier");
+    }
+    private static ReferenceSynchronization Build(WorldQuerySnapshot snapshot, NameIndex index, IReadOnlyDictionary<SourceAddress, (string Before, string After)> changes)
     {
         if (changes.Count == 0) WorldReferenceScan.Reject("Reference group has no explicitly named targets");
-        var actualParts = scan.Targets.SelectMany(target => target.Parts).ToDictionary(part => part.Address);
-        var targets = scan.Targets.Where(target => target.Parts.Any(part => changes.ContainsKey(part.Address))).ToArray();
-        if (targets.Length == 0 || changes.Any(change => !actualParts.TryGetValue(change.Key, out var part) || part.Text != change.Value.Before))
+        if (changes.Any(change => !index.Parts.TryGetValue(change.Key, out var part) || part.Part.Text != change.Value.Before))
             WorldReferenceScan.Reject("Reference group name preimages differ");
+        var targets = changes.Keys.Select(address => index.Parts[address].Target).Distinct().ToArray();
         var first = targets[0]; var type = first.Type; var oldName = first.Name;
-        string Updated(WorldNamedTarget target)
-        {
-            long characters = 0;
-            foreach (var part in target.Parts) characters = checked(characters + (changes.TryGetValue(part.Address, out var value) ? value.After.Length : part.Text.Length));
-            if (characters * 2 > snapshot.Limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Composed name exceeds the snapshot budget");
-            return string.Concat(target.Parts.Select(part => changes.TryGetValue(part.Address, out var value) ? value.After : part.Text));
-        }
-        var newName = Updated(first);
-        if (targets.Any(target => target.Type != type || target.Name != oldName || Updated(target) != newName)) WorldReferenceScan.Reject("A typed name group requires one consistent old and new identifier");
+        var newName = Updated(first, changes, snapshot.Limits.MaxDecodedBytes);
+        if (targets.Any(target => target.Type != type || target.Name != oldName || Updated(target, changes, snapshot.Limits.MaxDecodedBytes) != newName)) WorldReferenceScan.Reject("A typed name group requires one consistent old and new identifier");
         var roots = targets.Select(target => target.Root).ToHashSet();
-        var unselectedSameName = scan.Targets.Any(target => target.Type == type && target.Name == oldName && !roots.Contains(target.Root));
-        if (oldName != newName && scan.Targets.Any(target => target.Type == type && target.Name == newName && !roots.Contains(target.Root))) WorldReferenceScan.Reject("The replacement identifier collides with another named target");
+        var unselectedSameName = index.ByName[(type, oldName)].Any(target => !roots.Contains(target.Root));
+        if (oldName != newName && index.ByName[(type, newName)].Any(target => !roots.Contains(target.Root))) WorldReferenceScan.Reject("The replacement identifier collides with another named target");
         var members = new List<ReferenceMember>(); long retained = 0;
         void Member(SourceAddress address, string before, string after, FormatFeature grammar)
         {
@@ -76,7 +127,7 @@ public sealed class WorldReferenceService(IWorldInventory inventory)
         }
         foreach (var target in targets)
             foreach (var part in target.Parts) Member(part.Address, part.Text, changes.TryGetValue(part.Address, out var value) ? value.After : part.Text, target.Grammar);
-        foreach (var use in scan.Uses)
+        foreach (var use in index.Uses[oldName].Concat(oldName == newName ? [] : index.Uses[newName]))
         {
             if (use.Name != oldName && use.Name != newName || use.Kind is 'a' or 'p' or 'r') continue;
             if (use.Kind is not ('e' or 'n') || use.Type is null) WorldReferenceScan.Reject("Reference target domain is not proven independently of players or execution context");

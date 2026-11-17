@@ -27,7 +27,7 @@ repositories for sessions and cache. No legacy executable or state is loaded.
 | `reset` | Required versioned `request`; previews scope and retained history by default. `confirm` executes a command whose own `confirmed` field is true. |
 | `groups` | Read context-group projections with optional `limit`/`offset`. |
 | `memory` | Required `slot-id`, comma-separated `source-sessions`, `glossary-version`; optional `limit`/`offset`. Returns validated local candidates and provenance. |
-| `plan` | Required `direct`, exact `revision`; optional plan `operation-id`. Exports a literal PatchPlan for existing `apply`. |
+| `plan` | Required `direct`, exact `revision`; optional plan `operation-id`, explicit `synchronize-references`. Exports a PatchPlan for existing `apply`; name groups require complete global authority. |
 | `seal` | Required original `revision`, retained `operation-id`, `plan-hash`. Records completion only from full durable world proof. |
 
 `start` requires complete selected-source coverage. It uses the shared verified

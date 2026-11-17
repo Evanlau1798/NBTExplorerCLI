@@ -50,4 +50,14 @@ semantic discovery; reserved-prefix lookalikes still fail closed.
 
 All group outputs use the existing stage/verify/apply/recovery path and immutable
 receipts. Ordinary literal/key operations continue to protect identifying names.
-This internal service is not a public CLI or Minecraft runtime acceptance.
+`CreateGroups` binds all requested visible name parts to the same complete scan,
+partitions whole typed old/new identities deterministically and rejects collective
+final-name collisions. The common validator checks the combined namespace even
+for independently supplied ReferencePatch operations. Aggregate members across
+the set are limited to 100000 and the snapshot's retained-byte budget.
+
+The public opt-in [CLI workflow](cli-reference-contract.md) uses these same
+services. Multiple-group plans bind `world-prepare-name-groups-v2` into the plan
+and journal; legacy v1 multiple-group forward recovery/new completion is refused,
+while verified rollback and immutable historical receipts remain available.
+This is not Minecraft runtime or release acceptance.

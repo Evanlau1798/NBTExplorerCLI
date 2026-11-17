@@ -30,6 +30,7 @@ public sealed partial class WorldApplyEngine
         {
             if (prepared.AccessBinding != Access()) throw new ArgumentException("Prepared candidates belong to a different world root", nameof(prepared));
             if (Load(prepared.Plan.PlanHash) is not null) { prepared.Dispose(); return Recover(prepared.Plan.PlanHash, true, cancellation: cancellation); }
+            WorldPlanBuilder.RequireReferencePolicy(prepared.Plan);
             if (prepared.Plan.WorldId != inventory.WorldId) throw new ArtifactConflictException("Prepared plan belongs to another world");
             if (prepared.Plan.Preconditions.IsEmpty) return prepared.Manifest.Receipt(prepared.Plan, 0, [], true);
             if (prepared.Candidates.Count != prepared.Manifest.Artifacts.Length) throw new ArgumentException("Incomplete prepared candidate set", nameof(prepared));
@@ -65,6 +66,7 @@ public sealed partial class WorldApplyEngine
         var direction = rollback || active.Journal.Direction == ApplyDirection.Rollback ? ApplyDirection.Rollback : ApplyDirection.Forward;
         if (previous is not null && (active.Journal.Phase == ApplyJournalPhase.Completed && direction == active.Journal.Direction
             || previous.Results.Any(result => result.Outcome is OperationOutcome.Conflict or OperationOutcome.Cancelled or OperationOutcome.Failed or OperationOutcome.Unsupported or OperationOutcome.Skipped))) return previous;
+        if (direction == ApplyDirection.Forward) WorldPlanBuilder.RequireReferencePolicy(active.Header.Plan);
         var candidates = new List<IArtifactCandidate>();
         try
         {

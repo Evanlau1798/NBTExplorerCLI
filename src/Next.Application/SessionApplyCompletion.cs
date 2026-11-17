@@ -34,6 +34,7 @@ public sealed partial class WorldApplyEngine
         var receipt = Receipt(active);
         if (active.Journal.Direction != ApplyDirection.Forward || active.Journal.Phase != ApplyJournalPhase.Completed || receipt?.Success != true)
             throw new InvalidOperationException("The current journal must have completed its forward apply successfully");
+        WorldPlanBuilder.RequireReferencePolicy(active.Header.Plan);
         return new(operationId, sessionId, revision, active.Header.Plan, active.Header.Prepared, receipt);
     }
 }

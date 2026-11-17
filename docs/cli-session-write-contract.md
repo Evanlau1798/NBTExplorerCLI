@@ -28,12 +28,14 @@ shared session query, with the same profile and completeness requirements. A
 changed snapshot conflicts and preserves every accepted reply; start a new
 session from current sources rather than rebasing stored translations silently.
 
-Each selected slot becomes one LiteralTranslation, including explicit Unchanged
+In ordinary direct mode, each selected slot becomes one LiteralTranslation, including explicit Unchanged
 replies with their original text. Existing format adapters keep unchanged source
 images byte-for-byte. Field names, styles, events, UUIDs and unselected tree fields
 are outside this authorization. Changed identifying entity/armor-stand names
-require explicit reference-synchronization authority and are refused by this
-literal workflow. An optional plan `--operation-id <guid>` fixes the
+require explicit [reference synchronization](cli-reference-contract.md) via
+`--synchronize-references`; the default literal mode continues to refuse them.
+Proven name groups replace their individual literals without duplicating members.
+An optional plan `--operation-id <guid>` fixes the
 operation-ID namespace; otherwise the preview returns a generated ID. Retain
 the exported canonical `nbtcli.next.patch-plan` and its plan hash. An exact
 preview retry can use the same operation ID while sources and revision match.

@@ -19,7 +19,7 @@ internal static class WriteCommands
             var hash = new Hash256(Required(request, "plan-hash"));
             var engine = context.Engine();
             if (request.Command == "status") return Status(engine.ReadStatus(hash));
-            return Receipt(engine.Recover(hash, true, request.Flag("rollback")), engine);
+            return Recover(engine, hash, request.Flag("rollback"));
         }
         if (request.Command == "backup")
         {
@@ -58,7 +58,7 @@ internal static class WriteCommands
             var ids = plan.Operations.Select(operation => operation.Id).ToArray();
             CommandOutputJson.ValidateRejectionBudget(ids);
             if (plan.WorldId != context.Inventory.WorldId) throw Rejected(ids, new ArtifactConflictException("Plan belongs to another world root"), "PlanRejected");
-            if (engine.ReadStatus(plan.PlanHash) is not null) return Receipt(engine.Recover(plan.PlanHash, true), engine);
+            if (engine.ReadStatus(plan.PlanHash) is not null) return Recover(engine, plan.PlanHash);
             _ = BeforeCommit(ids, "PlanRejected", () =>
             {
                 foreach (var input in plan.Preconditions) if (context.Image(input.Artifact) != input.Image) throw new ArtifactConflictException("Plan preimage no longer matches the exact source");
@@ -121,6 +121,15 @@ internal static class WriteCommands
         return new(code, error.Message, CommandOutputJson.RejectedOperations(operationIds, phase));
     }
     private static CliResult Receipt(ApplyReceipt receipt, WorldApplyEngine engine) => Status(engine.ReadStatus(receipt.PlanHash), receipt);
+    private static CliResult Recover(WorldApplyEngine engine, Hash256 hash, bool rollback = false)
+    {
+        try { return Receipt(engine.Recover(hash, true, rollback), engine); }
+        catch (ReferencePolicyException error)
+        {
+            var current = Status(engine.ReadStatus(hash));
+            return current with { Data = new { journal = current.Data, repair = "rollback-and-create-new-reference-plan", policyError = error.Message }, Code = "UNSUPPORTED_SOURCE", Outcome = "Unsupported", Exit = 4, Export = null };
+        }
+    }
     internal static CliResult Status(WorldApplyStatus? state, ApplyReceipt? fallback = null)
     {
         var receipt = state?.Receipt ?? fallback;

@@ -28,10 +28,20 @@ internal static class SessionWorldCommands
                     throw new CliFailure("CONFLICT", "Retain this session; inspect its revision and complete all pending replies before planning", Repair("inspect-session-status-and-complete-replies"));
                 var snapshot = SessionCommands.Query(context, SessionCommands.Scope(state));
                 if (snapshot.Manifest.SnapshotId != state.Source.SnapshotId) throw new CliFailure("CONFLICT", "World sources changed; retain this session and start a new session from current sources", Repair("start-new-session"));
-                var operations = state.Slots.Select(slot => (PatchOperation)new LiteralPatch("session-" + operation.ToString("N") + "-" + slot.Slot.Id.Digest.Hex,
-                    new(slot.Slot, slot.Reply ?? new(slot.Slot.Id, slot.Slot.SourceTextHash, slot.Slot.TargetLocale, slot.Slot.SourceText)))).ToArray();
+                var literals = state.Slots.Select(slot => new LiteralTranslation(slot.Slot, slot.Reply ?? new(slot.Slot.Id, slot.Slot.SourceTextHash, slot.Slot.TargetLocale, slot.Slot.SourceText))).ToArray();
+                var operations = literals.Select(translation => (PatchOperation)new LiteralPatch("session-" + operation.ToString("N") + "-" + translation.Slot.Id.Digest.Hex, translation)).ToArray();
                 CommandOutputJson.ValidateRejectionBudget(operations.Select(item => item.Id).ToArray());
-                var plan = WriteCommands.BeforeCommit(operations.Select(item => item.Id).ToArray(), "PlanRejected", () => new WorldPlanBuilder(context.Inventory).Build(snapshot, operations));
+                var plan = WriteCommands.BeforeCommit(operations.Select(item => item.Id).ToArray(), "PlanRejected", () =>
+                {
+                    var names = literals.Where(item => WorldReferenceService.IsIdentifyingName(item.Slot.Role) && item.Reply.Text != item.Slot.SourceText).ToArray();
+                    if (request.Flag("synchronize-references") && names.Length != 0)
+                    {
+                        var groups = new WorldReferenceService(context.Inventory).CreateGroups(snapshot, "reference-" + operation.ToString("N"), names);
+                        var members = groups.SelectMany(group => group.Targets).ToHashSet();
+                        operations = operations.Where(item => !members.Contains(((LiteralPatch)item).Translation.Slot.Address)).Concat(groups).ToArray();
+                    }
+                    return new WorldPlanBuilder(context.Inventory).Build(snapshot, operations);
+                });
                 var json = PatchPlanJson.Write(plan);
                 using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 1024 });
                 return new(new { preview = true, sessionId = id, revision, operationId = operation, plan = document.RootElement.Clone() }, Export: json);
@@ -48,6 +58,8 @@ internal static class SessionWorldCommands
         }
         catch (FileNotFoundException error) when (seal)
         { throw new CliFailure("FILE_NOT_FOUND", error.Message, Repair("inspect-apply-status-and-retry-seal")); }
+        catch (ReferencePolicyException error) when (seal)
+        { throw new CliFailure("UNSUPPORTED_SOURCE", error.Message, Repair("rollback-and-create-new-reference-plan")); }
         catch (Exception error) when (seal && error is ArgumentException or ArtifactConflictException)
         { throw new CliFailure("CONFLICT", error.Message, Repair("inspect-session-status-and-apply-proof")); }
         catch (Exception error) when (seal && error is IOException or UnauthorizedAccessException && CliApplication.Code(error) != "RESOURCE_LIMIT")

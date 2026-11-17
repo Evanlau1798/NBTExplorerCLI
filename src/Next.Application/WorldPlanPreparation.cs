@@ -27,6 +27,7 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
     public PreparedWorldPlan Prepare(WorldQuerySnapshot snapshot, PatchPlan plan, bool worldOffline)
     {
         ArgumentNullException.ThrowIfNull(snapshot); CheckOffline(plan, worldOffline);
+        WorldPlanBuilder.RequireReferencePolicy(plan);
         var bound = new WorldPlanBuilder(inventory).Bind(snapshot, plan.Operations);
         if (bound.Plan.PlanHash != plan.PlanHash) throw new ArtifactConflictException("Plan differs from its exact source/output policy");
         return PrepareOutputs(plan, (output, input) =>

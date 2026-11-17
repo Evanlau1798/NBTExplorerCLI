@@ -7,6 +7,17 @@ namespace Next.Application;
 public sealed class WorldPlanBuilder(IWorldInventory inventory)
 {
     internal const string Policy = "world-prepare-v1";
+    private const string MultipleReferencePolicy = "world-prepare-name-groups-v2";
+    internal static void RequireReferencePolicy(PatchPlan plan)
+    {
+        RequireReferenceComposition(plan.Operations);
+        if (plan.Operations.OfType<ReferencePatch>().Skip(1).Any() && plan.PolicyVersion != MultipleReferencePolicy) throw new ReferencePolicyException();
+    }
+    private static void RequireReferenceComposition(IEnumerable<PatchOperation> operations)
+    {
+        if (operations.OfType<ReferencePatch>().Any() && operations.OfType<TypedPatch>().Any())
+            throw new ReferencePolicyException("Raw typed edits cannot join semantic reference synchronization; use separate plans and a fresh scan, or rollback old combined journals before replanning.");
+    }
     internal static readonly string[] Checks = ["parse", "preimage", "profile", "projection"];
     private readonly IWorldInventory inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
     public PatchPlan Build(WorldQuerySnapshot snapshot, IEnumerable<PatchOperation> operations)
@@ -20,6 +31,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         var requested = operations.Take(100_001).ToArray();
         if (requested.Length > 100_000 || requested.Any(operation => operation is null)) throw new ArgumentException("Invalid or oversized operation set", nameof(operations));
         if (requested.Any(operation => operation is not (LiteralPatch or TypedPatch or KeyConversionPatch or ReferencePatch))) throw new NotSupportedException("This preparation path requires explicit semantic operations");
+        RequireReferenceComposition(requested);
         var referenceInputs = WorldReferenceService.Validate(inventory, snapshot, requested.OfType<ReferencePatch>());
         if (requested.OfType<TypedPatch>().Any(operation => operation.Address.Artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Region or ArtifactKind.Entities))) throw new NotSupportedException("Typed edits require an NBT document");
         var outputs = requested.SelectMany(operation => operation.RequiredOutputs).Distinct().ToArray();
@@ -44,7 +56,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         }
         foreach (var metadata in snapshot.Discovery.MetadataSources.IsDefault ? [] : snapshot.Discovery.MetadataSources) Input(metadata.Artifact, ArtifactImage.Present(metadata.ContentHash!));
         foreach (var input in referenceInputs) Input(input.Artifact, input.Image);
-        var plan = new PatchPlan(inventory.WorldId, snapshot.Manifest.SnapshotId, snapshot.Manifest.Versions.Profile, Policy, requested,
+        var policy = requested.OfType<ReferencePatch>().Skip(1).Any() ? MultipleReferencePolicy : Policy;
+        var plan = new PatchPlan(inventory.WorldId, snapshot.Manifest.SnapshotId, snapshot.Manifest.Versions.Profile, policy, requested,
             inputs.Values, outputs.Select(artifact => new OutputDeclaration(artifact, OutputIntent.Write, Checks)), []);
         CheckPreimages(inventory, plan);
         var scope = new SnapshotScope(snapshot.Manifest.Scope.Dimensions, snapshot.Manifest.Scope.Regions, snapshot.Manifest.Scope.Types, outputs.Select(artifact => artifact.RelativePath));
@@ -78,7 +91,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         foreach (var operation in requested.OfType<KeyConversionPatch>())
         {
             var conversion = operation.Conversion; var address = conversion.Address; var source = sources[(address.Artifact, address.Chunk)];
-            if (IdentifyingName(conversion.Slot.Role)) throw new EditRejectedException(EditFailure.Precondition, "Identifying name conversion requires verified reference authority");
+            if (WorldReferenceService.IsIdentifyingName(conversion.Slot.Role)) throw new EditRejectedException(EditFailure.Precondition, "Identifying name conversion requires verified reference authority");
             var bytes = ReadSource(source, snapshot.Limits);
             CapabilityProfile profile; var roots = new List<SourceAddress>();
             if (source.Location.Role == WorldSourceRole.Function && source.Pack is { } functionPack)
@@ -154,7 +167,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     private static void ValidateLiteral(LiteralTranslation translation, Hash256 snapshot)
     {
         var slot = translation.Slot;
-        if (translation.Reply.Text != slot.SourceText && IdentifyingName(slot.Role))
+        if (translation.Reply.Text != slot.SourceText && WorldReferenceService.IsIdentifyingName(slot.Role))
             throw new EditRejectedException(EditFailure.Precondition, "Identifying names require an explicitly verified complete reference synchronization");
         var id = Guid.NewGuid(); var pageId = Hash256.Compute([]); var format = MinecraftPlaceholderProfiles.ForRole(slot.Role);
         var page = new SessionPage(id, 0, snapshot, 0, pageId, slot.SourceLocale, slot.TargetLocale, "literal-v1", false, [new(slot.Id.Digest, slot.SourceTextHash, slot.SourceText, slot.Context, slot.AllowedEmpty, slot.Placeholders.Tokens, format)]);
@@ -162,7 +175,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         var validation = SessionReplyValidator.Validate(page, [slot], reply, new Dictionary<Hash256, PlaceholderFormat> { [slot.Id.Digest] = format });
         if (!validation.Valid) throw new SessionReplyRejectedException(validation.Issues);
     }
-    private static bool IdentifyingName(string role) => role is "entity.name" or "armor_stand.name" or "entity.name.fallback" or "armor_stand.name.fallback";
 }
 
 internal sealed record BoundWorldPlan(PatchPlan Plan, ImmutableDictionary<(ArtifactAddress Artifact, ChunkPosition? Chunk), DiscoveredSource> Sources);
+
+public sealed class ReferencePolicyException(string message = "Multiple reference groups require the current verified policy; create a fresh plan, or rollback legacy pending journals before replanning.") : NotSupportedException(message);

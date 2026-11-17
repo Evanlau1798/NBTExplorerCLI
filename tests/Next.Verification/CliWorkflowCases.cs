@@ -4,6 +4,16 @@ internal static class CliWorkflowCases
 {
     internal static readonly VerificationCase[] Cases =
     [
+        new("cli-reference-plan-raw-typed-composition", "cli-reference", _ => CliReferencePlanTests.RawTypedEditsCannotInvalidateASemanticReferenceGroup()),
+        new("cli-reference-policy-legacy-forward-rollback", "cli-reference", _ => ReferencePolicyRecoveryTests.LegacyMultipleGroupsCannotResumeForwardButRemainRollbackable()),
+        new("cli-reference-policy-legacy-completed-seal", "cli-reference", _ => ReferencePolicyRecoveryTests.LegacyCompletedReceiptsRemainHistoryWithoutIssuingANewSeal()),
+        new("cli-reference-policy-current-recover-seal", "cli-reference", _ => ReferencePolicyRecoveryTests.CurrentMultipleGroupsRecoverAndSealWithTheirVerifiedPolicy()),
+        new("cli-reference-plan-aggregate-member-budget", "cli-reference", _ => CliReferencePlanTests.MemberBudgetsApplyAcrossAllGroupsBeforePlanPublication()),
+        new("cli-reference-plan-combined-core-guard", "cli-reference", _ => CliReferencePlanTests.IndividuallyValidGroupsCannotBypassCombinedPlanValidation()),
+        new("cli-reference-plan-cross-group-merge", "cli-reference", _ => CliReferencePlanTests.DistinctOldIdentifiersCannotMergeThroughIndependentGroups()),
+        new("cli-reference-plan-typed-groups", "cli-reference", _ => CliReferencePlanTests.ExplicitAuthorityBuildsCompleteSingleAndMultipleTypedGroups()),
+        new("cli-reference-plan-missing-scope-untyped", "cli-reference", _ => CliReferencePlanTests.MissingMembersFilteredScopeAndUntypedUsesPreserveAllWork()),
+        new("cli-reference-plan-fragmented-target", "cli-reference", _ => CliReferencePlanTests.FragmentedNamesAreGroupedByTheWholeTypedTarget()),
         new("cli-session-write-unchanged-no-write-contract", "cli-session-write", _ => CliSessionWriteTests.ExplicitUnchangedSlotsKeepTheirAcceptedNoWriteCompletionContract()),
         new("cli-session-status-captured-reset", "cli-session-write", _ => SessionStatusConsistencyTests.TheStatusBranchUsesItsCapturedSessionDuringAnInterleavedReset()),
         new("cli-session-write-public-legacy-through-seal", "cli-session-write", _ => CliSessionWriteTests.PublicLegacyImportFlowsThroughPlanApplyAndSealWithoutRebuildingNbt()),
