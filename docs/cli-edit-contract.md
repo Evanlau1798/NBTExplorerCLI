@@ -63,7 +63,9 @@ the same planner. Legacy batch JSON has not yet been wired to a migration adapte
 `--output` creates a new file outside the world and preserves existing files.
 For previews it exports the raw patch-plan family, usable by `apply --plan`.
 For backup it exports the raw backup manifest; for apply/status/recover it exports
-the raw apply-receipt family. Stdout always remains the CLI envelope. Existing
+the raw apply-receipt family. Stdout always remains the CLI envelope. These
+raw exports preserve the exact codec/prompt content without an added newline;
+CLI-envelope exports and stdout remain newline-delimited. Existing
 destinations are checked before a world write, and publication still checks
 absence atomically. If a later export fails, stdout retains actual operation data
 with a nonzero export error; the export result must not conceal a completed apply.

@@ -4,6 +4,10 @@ The G04 importer retains identified legacy inputs in a separate owned store, the
 reconstructs eligible text candidates against a supplied new scan snapshot. New core
 services never load a legacy assembly, launch an old CLI, or fall back to an old writer.
 
+The public `import-legacy` report/projection workflow is documented in the
+[legacy CLI contract](cli-legacy-contract.md); service and schema guarantees below
+remain the authority for reconstruction.
+
 ## Implemented service boundary
 
 `LegacyImportService.Import` receives bytes, an explicit `LegacyInputProfile`, target

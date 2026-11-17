@@ -91,7 +91,7 @@ candidates require explicit source sessions, context, languages, placeholder and
 glossary/profile compatibility; lookup does not submit or accept a translation.
 Notes/glossary and group presentation never authorize a world rename/write.
 
-Agent setup/submit/status has its own contract. This interface does not yet close
-legacy import CLI, world translation apply/sealing, convert, language export or pack management.
+Agent setup/submit/status and [legacy import/report](cli-legacy-contract.md) have
+their own contracts. World translation apply/sealing, convert, language export and pack management remain integration work.
 Those capabilities remain required. Minecraft load, RSS/performance, power loss
 and release acceptance are later gates.

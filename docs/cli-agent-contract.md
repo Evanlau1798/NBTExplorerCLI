@@ -73,12 +73,13 @@ session deliberately, with its own identity. Legacy unversioned config/questionn
 data, including all old quality commitments, remain covered by the read-only
 legacy retention/import service with raw bytes/provenance. They are not silently
 adopted as confirmed new preferences; copy/reconfirm intended values in a generated
-questionnaire. Public legacy import/report commands remain integration work. The
+questionnaire. [Public legacy import/report](cli-legacy-contract.md) retains and
+exposes this data without automatic adoption. The
 instructions now describe the protected slot protocol; promise checkboxes cannot
 replace actual local validation.
 
 World scope is the existing NTFS directory binding, not a portable world UUID.
 Byte-identical other roots cannot adopt a questionnaire as that world's confirmed
 state. No old executable, cache/config folder or writer is called. World translation
-apply/key/pack integration, public legacy import, performance/RSS, Minecraft load
+apply/key/pack integration, legacy batch, performance/RSS, Minecraft load
 and release acceptance remain separate required work.

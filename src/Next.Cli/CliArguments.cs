@@ -9,7 +9,7 @@ internal sealed class CliFailure(string code, string? details = null, object? da
 }
 internal sealed record CliArguments(string Command, string? Input, IReadOnlyDictionary<string, string?> Options, string Locale, string? Subcommand = null)
 {
-    internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "translate", "agent"];
+    internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "translate", "agent", "import-legacy"];
     internal static string Canonical(string name) => name switch { "ls" => "list", "find" => "search", "scan-world" => "scan", "extract-text" => "extract", "--help" or "-h" => "help", "--version" or "-v" => "version", _ => name };
     internal static string[] Allowed(string command, string? subcommand = null) => command switch
     {
@@ -29,6 +29,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         "restore" => ["manifest-hash", "path", "apply", "world-offline", "state-root", "output", "help"],
         "translate" => SessionCommands.Allowed(subcommand ?? "help"),
         "agent" => AgentCommands.Allowed(subcommand ?? "help"),
+        "import-legacy" => ["input", "profile", "import-id", "list", "source-language", "target-language", "acknowledge-world-rebind", "create-session", "state-root", "output", "limit", "offset", "help"],
         "help" or "version" or "capabilities" => ["help"],
         _ => throw new CliFailure("UNKNOWN_COMMAND")
     };
@@ -73,7 +74,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
                 if (command == "extract") name = name switch { "no-limit" => "all", "deduplicate" => "unique", _ => name };
                 if (!allowed.Contains(name)) throw new CliFailure("UNKNOWN_OPTION", arg);
                 string? value = null;
-                if (name == "types" && command is "get" or "list" or "search" || name is "help" or "summary" or "show-items" or "refresh" or "no-cache" or "all" or "unique" or "quick" or "verbose" or "debug" or "apply" or "world-offline" or "rollback" or "standalone" or "no-group" or "confirm") { if (separator >= 0) throw new CliFailure("INVALID_ARGUMENTS", "Boolean flags take no value"); }
+                if (name == "types" && command is "get" or "list" or "search" || name is "help" or "summary" or "show-items" or "refresh" or "no-cache" or "all" or "unique" or "quick" or "verbose" or "debug" or "apply" or "world-offline" or "rollback" or "standalone" or "no-group" or "confirm" or "acknowledge-world-rebind" or "create-session" or "list") { if (separator >= 0) throw new CliFailure("INVALID_ARGUMENTS", "Boolean flags take no value"); }
                 else
                 {
                     value = separator >= 0 ? arg[(separator + 1)..] : ++index < args.Length && !args[index].StartsWith("--", StringComparison.Ordinal) ? args[index] : throw new CliFailure("INVALID_ARGUMENTS", "Missing option value");

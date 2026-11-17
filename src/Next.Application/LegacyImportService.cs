@@ -30,24 +30,32 @@ public sealed class LegacyImportService(ILegacyImportStore store)
         var slots = snapshot.ReadSources().SelectMany(row => row.Text?.Occurrences ?? []).Select(item => item.ToSlot(bundle.SourceLocale, bundle.TargetLocale)).ToDictionary(slot => slot.Id.Digest);
         var selected = bundle.Items.Select(item => slots[item.SlotId!]).ToImmutableArray();
         var translations = bundle.Items.ToDictionary(item => item.SlotId!, item => item.Translation);
-        var id = Operation(bundle.ImportId, "session"); var manifest = snapshot.Manifest;
+        var id = SessionId(bundle.ImportId); var manifest = snapshot.Manifest;
         var source = new SessionSourceSnapshot(manifest.WorldId, manifest.SnapshotId, manifest.InputSources, manifest.Scope.Dimensions, manifest.Scope.Regions, manifest.Scope.Types, manifest.Scope.ArtifactPaths, manifest.Versions, manifest.CoverageComplete);
         var request = new SessionStartRequest(id, source, bundle.SourceLocale, bundle.TargetLocale, new(MaximumPageSlots: 1), selected);
         sessions.Start(request, Operation(bundle.ImportId, "start"));
         var allowed = Enumerable.Range(0, selected.Length).Select(page => Operation(bundle.ImportId, "page:" + page.ToString(System.Globalization.CultureInfo.InvariantCulture))).Append(Operation(bundle.ImportId, "start")).ToHashSet();
+        var revision = 0L;
         for (var pageNumber = 0; pageNumber < selected.Length; pageNumber++)
         {
             var operation = Operation(bundle.ImportId, "page:" + pageNumber.ToString(System.Globalization.CultureInfo.InvariantCulture));
             var state = sessions.Read(id);
             if (state.Operations.Any(item => !allowed.Contains(item.OperationId))) throw new IOException("Imported session has subsequent user operations");
-            if (state.Operations.Any(item => item.OperationId == operation)) continue;
-            var page = SessionPageProjection.Create(state, pageNumber); var text = translations[page.Slots.Single().SlotId]; if (text is null) continue;
+            var page = SessionPageProjection.Create(state, pageNumber, revision); var text = translations[page.Slots.Single().SlotId];
+            if (text is null)
+            {
+                if (state.Operations.Any(item => item.OperationId == operation)) throw new ArtifactConflictException("No import reply was declared for this operation identity");
+                continue;
+            }
             var reply = new SessionReply(operation, id, page.Revision, page.SnapshotId, page.Page, page.PageId, page.TargetLocale,
                 [new(page.Slots[0].SlotId, page.Slots[0].SourceTextHash, SessionReplyState.Translated, text)]);
             sessions.Submit(id, Encoding.UTF8.GetBytes(SessionExchangeJson.WriteReply(reply)));
+            revision++;
         }
         return id;
     }
+    public static Guid SessionId(Hash256 importId)
+    { ArgumentNullException.ThrowIfNull(importId); return Operation(importId, "session"); }
     private static Guid Operation(Hash256 id, string purpose) => new(Convert.FromHexString(TextRevision.Compute(id.Hex + ":" + purpose).Hex).AsSpan(0, 16));
     private static LegacyImportBundle Evaluate(LegacyInputProfile profile, ReadOnlyMemory<byte> input, WorldQuerySnapshot snapshot, string sourceLocale, string targetLocale, bool acknowledged)
     {
@@ -58,7 +66,7 @@ public sealed class LegacyImportService(ILegacyImportStore store)
         var inputHash = Hash256.Compute(bytes); var id = LegacyImportIdentity.Compute(profile, inputHash, manifest.WorldId, manifest.SnapshotId, sourceLocale, targetLocale, acknowledged);
         var duplicates = parsed.Records.Where(record => record.Id is not null).GroupBy(record => record.Id, StringComparer.Ordinal).Where(group => group.Count() > 1).Select(group => group.Key!).ToHashSet(StringComparer.Ordinal);
         var available = snapshot.ReadSources().SelectMany(row => (row.Text?.Occurrences ?? []).Select(text => (Text: text, Hash: row.Source.ContentHash))).Take(100_001).ToArray();
-        if (available.Length > 100_000) throw new IOException("Legacy mapping candidate budget exceeded");
+        if (available.Length > 100_000) throw new LegacyImportLimitException("Legacy mapping candidate budget exceeded");
         var locations = available.Where(row => row.Text.Address.Artifact.RelativePath == "level.dat" && row.Text.Address.Artifact.ContainerEntry is null
             && row.Text.Address.Syntax is null && row.Text.Address.Dimension is null && row.Text.Address.Chunk is null).ToLookup(row => row.Text.Address.NodePath);
         var retainedCandidates = 0;
@@ -81,7 +89,7 @@ public sealed class LegacyImportService(ILegacyImportStore store)
             if (!LegacySlotMapping.TryBossbar(record, out var path, out var legacyContext)) return Result(LegacyImportDecision.RescanRequired, "LegacyLocationTypeContextOrShapeMissing");
             var candidates = locations[path].ToArray();
             retainedCandidates = checked(retainedCandidates + candidates.Length);
-            if (retainedCandidates > 4096) throw new IOException("Legacy report exceeds aggregate candidate budget");
+            if (retainedCandidates > 4096) throw new LegacyImportLimitException("Legacy report exceeds aggregate candidate budget");
             var addresses = candidates.Select(row => row.Text.Address).ToImmutableArray();
             if (candidates.Length == 0) return Result(LegacyImportDecision.RescanRequired, "LegacyLocationMissing");
             if (candidates.Length != 1) return Result(LegacyImportDecision.Conflict, "AmbiguousLegacySlotShape", addresses);
@@ -93,3 +101,5 @@ public sealed class LegacyImportService(ILegacyImportStore store)
         }
     }
 }
+
+public sealed class LegacyImportLimitException(string message) : IOException(message);
