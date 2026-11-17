@@ -82,12 +82,21 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         if (found.Count != literal.Count) throw new EditRejectedException(EditFailure.Precondition, "Literal target is not an extracted text slot");
         foreach (var operation in requested.OfType<TypedPatch>())
             if (operation.Address.Dimension != sources[(operation.Address.Artifact, operation.Address.Chunk)].Location.Dimension) throw new EditRejectedException(EditFailure.Precondition, "Typed target source binding differs");
-        foreach (var group in requested.OfType<TypedPatch>().GroupBy(operation => (operation.Address.Artifact, operation.Address.Chunk)))
+        foreach (var artifactGroup in requested.OfType<TypedPatch>().GroupBy(operation => operation.Address.Artifact))
         {
-            var bytes = inventory.Read(group.Key.Artifact);
-            var document = group.Key.Chunk is { } chunk ? Next.Formats.RegionFile.Read(bytes).ReadChunk(chunk.LocalZ * 32 + chunk.LocalX, snapshot.Limits).Document : WorldArtifactEdits.ReadNbt(bytes, snapshot.Limits).Document;
-            _ = NbtTextExtractor.Profile(sources[group.Key].Location, document);
-            _ = TypedTreeEdits.Apply(document, group.Select(operation => operation.Edit));
+            var artifact = artifactGroup.Key;
+            var bytes = inventory.Read(artifact);
+            if (Hash256.Compute(bytes) != sources[(artifact, null)].ContentHash)
+                throw new ArtifactConflictException("Typed source payload changed during plan validation");
+            var region = artifact.Kind is ArtifactKind.Region or ArtifactKind.Entities ? Next.Formats.RegionFile.Read(bytes) : null;
+            foreach (var group in artifactGroup.GroupBy(operation => operation.Address.Chunk))
+            {
+                var document = group.Key is { } chunk
+                    ? region!.ReadChunk(chunk.LocalZ * 32 + chunk.LocalX, snapshot.Limits).Document
+                    : WorldArtifactEdits.ReadNbt(bytes, snapshot.Limits).Document;
+                _ = NbtTextExtractor.Profile(sources[(artifact, group.Key)].Location, document);
+                _ = TypedTreeEdits.Apply(document, group.Select(operation => operation.Edit));
+            }
         }
         foreach (var operation in requested.OfType<KeyConversionPatch>())
         {

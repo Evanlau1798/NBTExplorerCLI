@@ -72,17 +72,69 @@ public sealed class RegionFile
             var current = ReadChunk(index, limits).Document;
             if (previous.CodecId == (byte)codec && current == document) return snapshot.ToArray();
         }
+        var append = EncodeAppend(index, document, codec, timestamp, snapshot.Length, limits);
+        return AppendChunks([append], snapshot.Length + append.Sectors * 4096);
+    }
+
+    public (byte[] Bytes, IReadOnlyDictionary<int, (RegionChunk Descriptor, Hash256 Payload)> Expected) WithEditedChunks(
+        IEnumerable<int> indices, Func<int, NbtDocument, NbtDocument> edit, DecodeLimits? limits = null)
+    {
+        ArgumentNullException.ThrowIfNull(indices);
+        ArgumentNullException.ThrowIfNull(edit);
+        limits ??= DecodeLimits.Default;
+        limits.Validate();
+        var appends = new List<ChunkAppend>();
+        var expected = new Dictionary<int, (RegionChunk Descriptor, Hash256 Payload)>();
+        var length = snapshot.Length;
+        foreach (var index in indices)
+        {
+            var chunk = Existing(index);
+            if (expected.ContainsKey(index)) throw new ArgumentException("Region edit indices must be distinct", nameof(indices));
+            var before = ReadChunk(index, limits).Document;
+            var after = edit(index, before) ?? throw new InvalidDataException("Region edit returned no document");
+            if (before == after)
+            {
+                expected.Add(index, (chunk, Hash256.Compute(snapshot.AsSpan(chunk.SectorOffset * 4096 + 5, chunk.PayloadLength))));
+                continue;
+            }
+            var codec = (NbtCompression)chunk.CodecId;
+            var append = EncodeAppend(index, after, codec, chunk.Timestamp, length, limits);
+            // Verify the exact bytes that will be copied into the new sector.
+            if (CompressedNbt.ReadDocument(append.Payload, codec, limits).Document != after)
+                throw new InvalidDataException("Region candidate differs from its authorized tree");
+            var descriptor = new RegionChunk(index, append.Offset / 4096, (byte)append.Sectors, append.Payload.Length,
+                chunk.CodecId, false, chunk.Timestamp);
+            expected.Add(index, (descriptor, Hash256.Compute(append.Payload)));
+            appends.Add(append);
+            length += append.Sectors * 4096;
+        }
+        return (AppendChunks(appends, length), expected);
+    }
+
+    private sealed record ChunkAppend(int Index, NbtCompression Codec, uint Timestamp, int Offset, int Sectors, byte[] Payload);
+
+    private static ChunkAppend EncodeAppend(int index, NbtDocument document, NbtCompression codec, uint timestamp, int offset, DecodeLimits limits)
+    {
         var payload = CompressedNbt.WriteDocument(document, codec, limits);
         var sectors = checked(((long)payload.Length + 5 + 4095) / 4096);
-        var offset = (long)snapshot.Length / 4096;
-        var length = checked(snapshot.Length + sectors * 4096);
-        if (sectors > 255 || offset > 0xffffff || length > MaximumArtifactBytes)
-            throw new CodecException(CodecError.LimitExceeded, snapshot.Length, "Region candidate exceeds sector or artifact capacity");
-        var candidate = new byte[(int)length]; snapshot.CopyTo(candidate, 0);
-        BinaryPrimitives.WriteUInt32BigEndian(candidate.AsSpan(index * 4), checked((uint)((offset << 8) | sectors)));
-        BinaryPrimitives.WriteUInt32BigEndian(candidate.AsSpan(4096 + index * 4), timestamp);
-        BinaryPrimitives.WriteUInt32BigEndian(candidate.AsSpan(snapshot.Length), checked((uint)payload.Length + 1));
-        candidate[snapshot.Length + 4] = (byte)codec; payload.CopyTo(candidate, snapshot.Length + 5);
+        if (sectors > 255 || offset / 4096 > 0xffffff || offset + sectors * 4096 > MaximumArtifactBytes)
+            throw new CodecException(CodecError.LimitExceeded, offset, "Region candidate exceeds sector or artifact capacity");
+        return new(index, codec, timestamp, offset, (int)sectors, payload);
+    }
+
+    private byte[] AppendChunks(IEnumerable<ChunkAppend> appends, int length)
+    {
+        var candidate = new byte[length];
+        snapshot.CopyTo(candidate, 0);
+        foreach (var chunk in appends)
+        {
+            var location = ((chunk.Offset / 4096) << 8) | chunk.Sectors;
+            BinaryPrimitives.WriteUInt32BigEndian(candidate.AsSpan(chunk.Index * 4), checked((uint)location));
+            BinaryPrimitives.WriteUInt32BigEndian(candidate.AsSpan(4096 + chunk.Index * 4), chunk.Timestamp);
+            BinaryPrimitives.WriteUInt32BigEndian(candidate.AsSpan(chunk.Offset), checked((uint)chunk.Payload.Length + 1));
+            candidate[chunk.Offset + 4] = (byte)chunk.Codec;
+            chunk.Payload.CopyTo(candidate, chunk.Offset + 5);
+        }
         return candidate;
     }
 

@@ -8,6 +8,7 @@ internal static class CaseRegistry
     public static readonly VerificationCase[] Cases =
     [
         .. BenchmarkCases.Cases,
+        new("prepare-region-batch-bounded-allocation", "preparation", _ => RegionBatchPreparationTests.ManyChunkEditsPreserveExactBytesWithinAllocationBudget()),
         new("cli-protocol-command-help-locale", "cli-protocol", _ => CliProtocolTests.EveryRegisteredSurfaceHasMatchingHelpAndLocaleStableErrors()),
         new("cli-protocol-nine-state-receipts", "cli-protocol", _ => CliProtocolTests.NineReceiptOutcomesKeepCountsAndExitClassification()),
         new("cli-protocol-locale-fallback", "cli-protocol", _ => CliProtocolTests.MissingMessageKeysHaveSafeLocalizedFallbacks()),

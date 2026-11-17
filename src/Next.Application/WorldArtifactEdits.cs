@@ -65,19 +65,20 @@ internal static class WorldArtifactEdits
     }
     private static PreparedArtifactBytes Region(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits)
     {
-        var original = RegionFile.Read(bytes); var output = bytes; var expected = new Dictionary<int, (RegionChunk Descriptor, Hash256 Payload)>();
-        var chunks = operations.SelectMany(operation => operation.Targets).Where(address => address.Artifact == sources[0].Location.Artifact && address.Chunk is not null).Select(address => address.Chunk!).Distinct();
-        foreach (var chunk in chunks)
+        var original = RegionFile.Read(bytes);
+        var artifact = sources[0].Location.Artifact;
+        static int Index(ChunkPosition chunk) => chunk.LocalZ * 32 + chunk.LocalX;
+        var groups = operations.SelectMany(operation => operation.Targets
+            .Where(address => address.Artifact == artifact && address.Chunk is not null)
+            .Select(address => address.Chunk!).Distinct().Select(chunk => (Chunk: chunk, Operation: operation)))
+            .GroupBy(item => item.Chunk).ToArray();
+        var byChunk = groups.ToDictionary(group => Index(group.Key));
+        var bySource = sources.Where(source => source.Chunk is not null).ToDictionary(source => source.Chunk!);
+        var (output, expected) = original.WithEditedChunks(groups.Select(group => Index(group.Key)), (index, before) =>
         {
-            var index = chunk.LocalZ * 32 + chunk.LocalX;
-            var source = sources.Single(item => item.Chunk == chunk); var before = original.ReadChunk(index, limits).Document;
-            var group = operations.Where(operation => operation.Targets.Any(address => address.Artifact == source.Location.Artifact && address.Chunk == chunk)).ToArray();
-            var after = Transform(before, group, source, limits);
-            output = RegionFile.Read(output).WithChunk(index, after, (NbtCompression)original.Chunks[index].CodecId, original.Chunks[index].Timestamp, limits);
-            var prepared = RegionFile.Read(output);
-            if (prepared.ReadChunk(index, limits).Document != after) throw new InvalidDataException("Region candidate differs from its authorized tree");
-            expected.Add(index, (prepared.Chunks[index], Hash256.Compute(prepared.CompressedPayload(index))));
-        }
+            var group = byChunk[index];
+            return Transform(before, group.Select(item => item.Operation).ToArray(), bySource[group.Key], limits);
+        }, limits);
         return new(output, stream =>
         {
             var candidate = RegionFile.Read(Read(stream));
