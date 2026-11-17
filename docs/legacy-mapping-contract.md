@@ -1,5 +1,9 @@
 # Read-only legacy mapping design
 
+The separate [legacy batch adapter](cli-legacy-batch-contract.md) preserves raw
+input and provenance before mapping explicit old edits to the normal planner.
+It is selected by `batch --legacy`, rather than an `import-legacy` session profile.
+
 The G04 importer retains identified legacy inputs in a separate owned store, then
 reconstructs eligible text candidates against a supplied new scan snapshot. New core
 services never load a legacy assembly, launch an old CLI, or fall back to an old writer.

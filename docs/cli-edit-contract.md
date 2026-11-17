@@ -4,13 +4,14 @@ These entry points use the same new planner, preparation, verified backup and
 durable apply/recovery services as the application API. They never invoke the old
 product. File-based session/agent management has separate CLI contracts;
 [direct session plans and completion](cli-session-write-contract.md) use these
-same apply/recover commands. Key conversion and the legacy batch importer remain integration work.
+same apply/recover commands. Explicit [legacy batch migration](cli-legacy-batch-contract.md)
+maps safely reconstructed old requests to these operations. Key conversion remains integration work.
 This document covers the new versioned operations input.
 
 | Command | Input and options |
 | --- | --- |
 | `set <world>` | `path`, one node selector (`pointer`, `segments` or unique legacy node path), `chunk`/`dimension` for regions, `compression`, one of `value`/`value-file`, `operation-id`, `apply`, `world-offline`, `state-root`, `output` |
-| `batch <file-or-dash>` | `world`, `apply`, `world-offline`, `state-root`, `output` |
+| `batch <file-or-dash>` | `world`, optional `legacy` with required `migration-report`, `apply`, `world-offline`, `state-root`, `output` |
 | `plan <world>` | `request`, `state-root`, `output` |
 | `apply <world>` | `plan`, `world-offline`, `state-root`, `output` |
 | `status <world>` | `plan-hash`, `state-root`, `output` |
@@ -59,7 +60,8 @@ intents use `restore` or an exported raw restore plan rather than this semantic
 request path. Unknown fields, duplicate members, unsupported families/versions,
 empty requests and invalid bindings are rejected. `batch - --world <world>` reads
 the same request from stdin. Set and batch resolve the same typed intent through
-the same planner. Legacy batch JSON has not yet been wired to a migration adapter.
+the same planner. Legacy batch JSON requires the explicit migration mode and report;
+it is never inferred from an unversioned request.
 
 `--output` creates a new file outside the world and preserves existing files.
 For previews it exports the raw patch-plan family, usable by `apply --plan`.

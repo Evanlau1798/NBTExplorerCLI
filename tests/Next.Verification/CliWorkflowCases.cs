@@ -4,6 +4,13 @@ internal static class CliWorkflowCases
 {
     internal static readonly VerificationCase[] Cases =
     [
+        new("cli-legacy-batch-partial-key-ambiguity", "cli-legacy-batch", _ => CliLegacyBatchTests.LegacySeparatorsCannotChooseBetweenTwoDifferentTypedPaths()),
+        new("cli-legacy-batch-input-backup-boundaries", "cli-legacy-batch", _ => CliLegacyBatchTests.InputLimitsReportIoAndDisabledConvenienceBackupKeepRecoverySafe()),
+        new("cli-legacy-batch-region-windows-ambiguity", "cli-legacy-batch", _ => CliLegacyBatchTests.RegionAndWindowsPathsBindExactChunksAndRejectAmbiguity()),
+        new("cli-legacy-batch-native-error-classification", "cli-legacy-batch", _ => CliLegacyBatchTests.NativeReadFailuresAndInvalidTypedValuesKeepTheirErrorClassification()),
+        new("cli-legacy-batch-preview-raw-provenance", "cli-legacy-batch", _ => CliLegacyBatchTests.ExplicitLegacyPreviewRetainsBytesAndUsesTheNormalWriter()),
+        new("cli-legacy-batch-typed-defaults", "cli-legacy-batch", _ => CliLegacyBatchTests.TypedValuesApplyWithSafeDefaultsAndOldIdsRemainProvenance()),
+        new("cli-legacy-batch-refusal-report", "cli-legacy-batch", _ => CliLegacyBatchTests.InvalidOrAmbiguousMappingsAndReportFailuresNeverWriteWorlds()),
         new("cli-reference-plan-raw-typed-composition", "cli-reference", _ => CliReferencePlanTests.RawTypedEditsCannotInvalidateASemanticReferenceGroup()),
         new("cli-reference-policy-legacy-forward-rollback", "cli-reference", _ => ReferencePolicyRecoveryTests.LegacyMultipleGroupsCannotResumeForwardButRemainRollbackable()),
         new("cli-reference-policy-legacy-completed-seal", "cli-reference", _ => ReferencePolicyRecoveryTests.LegacyCompletedReceiptsRemainHistoryWithoutIssuingANewSeal()),

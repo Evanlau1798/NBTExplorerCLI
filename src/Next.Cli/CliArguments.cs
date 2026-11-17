@@ -20,7 +20,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         "extract" => ["path", "dimension", "region", "types", "limit", "offset", "all", "unique", "match-pattern", "output", "refresh", "no-cache", "cache-root", "workers", "verbose", "debug", "help"],
         "validate" => ["path", "dimension", "region", "types", "limit", "offset", "quick", "refresh", "no-cache", "cache-root", "workers", "verbose", "debug", "help"],
         "set" => ["path", "pointer", "segments", "chunk", "dimension", "compression", "value", "value-file", "operation-id", "apply", "world-offline", "state-root", "output", "help"],
-        "batch" => ["world", "apply", "world-offline", "state-root", "output", "help"],
+        "batch" => ["world", "legacy", "migration-report", "apply", "world-offline", "state-root", "output", "help"],
         "plan" => ["request", "state-root", "output", "help"],
         "apply" => ["plan", "world-offline", "state-root", "output", "help"],
         "recover" => ["plan-hash", "world-offline", "rollback", "state-root", "output", "help"],
@@ -74,7 +74,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
                 if (command == "extract") name = name switch { "no-limit" => "all", "deduplicate" => "unique", _ => name };
                 if (!allowed.Contains(name)) throw new CliFailure("UNKNOWN_OPTION", arg);
                 string? value = null;
-                if (name == "types" && command is "get" or "list" or "search" || name is "help" or "summary" or "show-items" or "refresh" or "no-cache" or "all" or "unique" or "quick" or "verbose" or "debug" or "apply" or "world-offline" or "rollback" or "standalone" or "no-group" or "confirm" or "acknowledge-world-rebind" or "create-session" or "list" or "direct" or "synchronize-references") { if (separator >= 0) throw new CliFailure("INVALID_ARGUMENTS", "Boolean flags take no value"); }
+                if (name == "types" && command is "get" or "list" or "search" || name is "help" or "summary" or "show-items" or "refresh" or "no-cache" or "all" or "unique" or "quick" or "verbose" or "debug" or "apply" or "world-offline" or "rollback" or "standalone" or "no-group" or "confirm" or "acknowledge-world-rebind" or "create-session" or "list" or "direct" or "synchronize-references" or "legacy") { if (separator >= 0) throw new CliFailure("INVALID_ARGUMENTS", "Boolean flags take no value"); }
                 else
                 {
                     value = separator >= 0 ? arg[(separator + 1)..] : ++index < args.Length && !args[index].StartsWith("--", StringComparison.Ordinal) ? args[index] : throw new CliFailure("INVALID_ARGUMENTS", "Missing option value");

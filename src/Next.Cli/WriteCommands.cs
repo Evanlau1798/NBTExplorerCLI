@@ -11,6 +11,8 @@ internal static class WriteCommands
     {
         var write = request.Command is "apply" or "recover" || request.Flag("apply");
         if (write && !request.Flag("world-offline")) throw new CliFailure("INVALID_ARGUMENTS", "Writing requires --world-offline after closing Minecraft and other writers");
+        if (request.Command == "batch" && request.Flag("legacy")) return LegacyBatchCommands.Execute(request);
+        if (request.Flag("migration-report")) throw new CliFailure("INVALID_ARGUMENTS", "--migration-report requires explicit --legacy");
         if (request.Command == "set" && (request.Flag("value") == request.Flag("value-file"))) throw new CliFailure("INVALID_ARGUMENTS", "Choose exactly one --value or --value-file typed-NBT document");
         var root = request.Command == "batch" ? Required(request, "world") : request.Input!;
         var context = new WriteContext(root, request);
@@ -88,6 +90,10 @@ internal static class WriteCommands
             operations = [new TypedPatch(request.Get("operation-id") ?? "edit-0", source.Address(selected.Path), TypedEdit.Replace(selected.Path, selected.Node.Nbt!, value))];
         }
         else operations = OperationSetJson.Read(CliInput.Read(request.Command == "batch" ? request.Input! : Required(request, "request")));
+        return ExecuteOperations(context, operations, write);
+    }
+    internal static CliResult ExecuteOperations(WriteContext context, IReadOnlyList<PatchOperation> operations, bool write)
+    {
         CommandOutputJson.ValidateRejectionBudget(operations.Select(operation => operation.Id).ToArray());
         var bound = BeforeCommit(operations.Select(operation => operation.Id).ToArray(), "PlanRejected", () =>
         {
