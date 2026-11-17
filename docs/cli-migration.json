@@ -1,0 +1,52 @@
+{
+  "schemaFamily": "nbtcli.next.cli-migration",
+  "schemaVersion": 1,
+  "sourceInventory": "legacy-cli-inventory.json",
+  "aliases": {
+    "scan-world": "scan",
+    "extract-text": "extract",
+    "ls": "list",
+    "find": "search",
+    "translate-session": "translate"
+  },
+  "developmentCommandsRemoved": ["core-test", "test", "debug-scan"],
+  "parameterChanges": [
+    {
+      "old": "--lang as global UI locale",
+      "new": "--ui-locale zh-TW|en-US",
+      "scope": "all commands; translation --lang retains its documented data meaning"
+    },
+    {
+      "old": "implicit first-letter value aliases and bare boolean words",
+      "new": "explicit documented aliases and --flag",
+      "scope": "all commands; unknown or repeated options return exit 2"
+    },
+    {
+      "old": "backup --suffix creates a sibling world directory",
+      "new": "backup --suffix names a verified manifest in stateRoot; retain objects and restore by manifestHash",
+      "scope": "backup; --path selects raw artifacts, --output exports the same raw manifest"
+    },
+    {
+      "old": "translate apply / apply-keys directly writes output",
+      "new": "retained aliases preview and return explicit commitArguments / completeArguments",
+      "scope": "translate; apply and seal remain explicit steps"
+    },
+    {
+      "old": "translation resource --output has no canonical plan export",
+      "new": "--output DIR selects resources; --plan-output FILE exports the canonical plan",
+      "scope": "translate export-lang / create-pack; --apply --world-offline opts into writing"
+    }
+  ],
+  "exitCodes": {
+    "0": "complete success",
+    "1": "unexpected internal error",
+    "2": "invalid command or arguments",
+    "3": "conflict or ambiguous target",
+    "4": "unsupported or incomplete source",
+    "5": "read, validation, preparation, export or apply failure; inspect error.code",
+    "6": "resource or pattern limit",
+    "7": "recovery required; retain recovery identity",
+    "8": "terminal rollback, not successful forward apply",
+    "130": "cancelled receipt; graceful Ctrl+C is not claimed"
+  }
+}

@@ -1,7 +1,9 @@
 using System.Text.Json;
+using System.Globalization;
 using Next.Application;
 using Next.Domain;
 using Next.Formats;
+using Next.Infrastructure;
 
 namespace Next.Cli;
 
@@ -14,6 +16,12 @@ internal static class WriteCommands
         if (request.Command == "batch" && request.Flag("legacy")) return LegacyBatchCommands.Execute(request);
         if (request.Flag("migration-report")) throw new CliFailure("INVALID_ARGUMENTS", "--migration-report requires explicit --legacy");
         if (request.Command == "set" && (request.Flag("value") == request.Flag("value-file"))) throw new CliFailure("INVALID_ARGUMENTS", "Choose exactly one --value or --value-file typed-NBT document");
+        var suffix = request.Get("suffix");
+        if (suffix is not null)
+        {
+            if (string.IsNullOrWhiteSpace(suffix) || suffix.Length > 64 || suffix.Contains('/')) throw new CliFailure("INVALID_ARGUMENTS", "Backup suffix must be one filename segment of 1–64 UTF-16 units");
+            ArtifactAddress.ValidatePath(suffix, false);
+        }
         var root = request.Command == "batch" ? Required(request, "world") : request.Input!;
         var context = new WriteContext(root, request);
         if (request.Command is "status" or "recover")
@@ -38,7 +46,16 @@ internal static class WriteCommands
                 artifacts = catalog.Entries.Where(entry => !entry.IsDirectory && !Path.GetFileName(entry.RelativePath).StartsWith(".nbtcli-", StringComparison.OrdinalIgnoreCase)).Select(entry => context.Artifact(entry.RelativePath)).ToArray();
             }
             var backup = new WorldBackupService(context.Inventory, context.Objects()).Create(artifacts.Select(artifact => new ArtifactPrecondition(artifact, context.Image(artifact))));
-            return new(new { manifestHash = backup.ManifestHash, manifest = Json(BackupManifestJson.Write(backup.Manifest)) }, Export: BackupManifestJson.Write(backup.Manifest));
+            var json = BackupManifestJson.Write(backup.Manifest);
+            var backupPath = suffix is null ? null : Path.Combine(context.State, "backup_" + suffix + "_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmssfffffff", CultureInfo.InvariantCulture) + "_" + Guid.NewGuid().ToString("N") + ".json");
+            object Data(bool published) => new { manifestHash = backup.ManifestHash, manifest = Json(json), stateRoot = context.State, backupPath, namedManifestPublished = published };
+            if (backupPath is not null)
+            {
+                try { QueryExportFile.WriteNew(backupPath, json); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+                { throw new CliFailure("EXPORT_FAILED", error.Message, Data(false)); }
+            }
+            return new(Data(backupPath is not null), Export: json);
         }
         if (request.Command == "restore")
         {

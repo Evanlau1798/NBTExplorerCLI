@@ -1,6 +1,8 @@
 # File-based translation sessions
 
-`translate <action> <world>` exposes the durable session service. These commands
+`translate <action> <world>` exposes the durable session service. The retained
+`translate-session` root alias accepts the same actions and options; help and
+all machine results identify the canonical `translate` command. These commands
 manage durable tool state. Direct world translation uses
 [session plan, existing apply/recover and seal](cli-session-write-contract.md);
 [key conversion](cli-key-plan-contract.md) and [convert](cli-convert-contract.md)

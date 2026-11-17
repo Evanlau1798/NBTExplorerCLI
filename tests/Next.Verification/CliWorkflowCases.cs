@@ -4,6 +4,10 @@ internal static class CliWorkflowCases
 {
     internal static readonly VerificationCase[] Cases =
     [
+        new("cli-compat-session-root-alias", "cli-compat", _ => CliCompatibilityTests.LegacyRootAliasUsesTheCanonicalSessionContract()),
+        new("cli-compat-backup-name-publication-failure", "cli-compat", _ => CliCompatibilityTests.AFailedNamedPublicationKeepsTheCompletedVerifiedBackup()),
+        new("cli-compat-backup-named-manifest", "cli-compat", _ => CliCompatibilityTests.NamedBackupsPublishVerifiedManifestsAndRestoreRawBytes()),
+        new("cli-compat-backup-invalid-name", "cli-compat", _ => CliCompatibilityTests.InvalidBackupNamesAndExistingExportsCannotPublishState()),
         new("cli-convert-empty-plan-roundtrip", "cli-convert", _ => CliConvertTests.EmptyConversionPlansRoundTripWithoutResourceOrGameplayWrites()),
         new("cli-write-replay-status-initial-io", "cli-write-recovery", _ => ReferencePolicyRecoveryTests.ReplayAndStatusReadFailuresRetainExistingPartialJournalIdentity()),
         new("cli-write-native-cleanup-io-identity", "cli-write-recovery", _ => CliWriteRecoveryTests.RealCandidateCleanupFailuresKeepRecoveryIdentityAndSavedReceipt()),

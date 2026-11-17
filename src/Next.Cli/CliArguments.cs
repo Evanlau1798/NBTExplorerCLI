@@ -10,7 +10,7 @@ internal sealed class CliFailure(string code, string? details = null, object? da
 internal sealed record CliArguments(string Command, string? Input, IReadOnlyDictionary<string, string?> Options, string Locale, string? Subcommand = null)
 {
     internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "convert", "translate", "agent", "import-legacy"];
-    internal static string Canonical(string name) => name switch { "ls" => "list", "find" => "search", "scan-world" => "scan", "extract-text" => "extract", "--help" or "-h" => "help", "--version" or "-v" => "version", _ => name };
+    internal static string Canonical(string name) => name switch { "ls" => "list", "find" => "search", "scan-world" => "scan", "extract-text" => "extract", "translate-session" => "translate", "--help" or "-h" => "help", "--version" or "-v" => "version", _ => name };
     internal static string[] Allowed(string command, string? subcommand = null) => command switch
     {
         "get" => ["path", "pointer", "segments", "chunk", "dimension", "entry", "compression", "types", "help"],
@@ -25,7 +25,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         "apply" => ["plan", "world-offline", "state-root", "output", "help"],
         "recover" => ["plan-hash", "world-offline", "rollback", "state-root", "output", "help"],
         "status" => ["plan-hash", "state-root", "output", "help"],
-        "backup" => ["path", "state-root", "output", "help"],
+        "backup" => ["path", "suffix", "state-root", "output", "help"],
         "restore" => ["manifest-hash", "path", "apply", "world-offline", "state-root", "output", "help"],
         "convert" => ["lang", "prefix", "keepdup", "no-backup", "language-output", "apply", "world-offline", "state-root", "output", "path", "dimension", "region", "types", "match-pattern", "workers", "verbose", "help"],
         "translate" => SessionCommands.Allowed(subcommand ?? "help"),

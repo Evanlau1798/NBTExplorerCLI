@@ -18,7 +18,7 @@ This document covers the new versioned operations input.
 | `apply <world>` | `plan`, `world-offline`, `state-root`, `output` |
 | `status <world>` | `plan-hash`, `state-root`, `output` |
 | `recover <world>` | `plan-hash`, `world-offline`, optional `rollback`, `state-root`, `output` |
-| `backup <world>` | Optional exact physical `path`, `state-root`, `output` |
+| `backup <world>` | Optional exact physical `path`, `suffix`, `state-root`, `output` |
 | `restore <world>` | `manifest-hash`, optional exact physical `path`, `apply`, `world-offline`, `state-root`, `output` |
 
 `--ui-locale`, `--help` and `help <command>` retain the common protocol. World paths
@@ -143,6 +143,25 @@ an incomplete or resource-limited catalog cannot produce an apparently completed
 backup. `restore` verifies the manifest/blobs before planning, binds current raw
 images, then stages every target before commit. Missing/corrupt targets need not
 pass a text or NBT parser. Only manifest-authorized artifacts are selected.
+
+`backup --suffix <name>` also publishes an immutable named raw manifest directly
+under the returned `stateRoot`: `backup_<name>_<UTC timestamp>_<unique ID>.json`.
+`data.backupPath` identifies it and `namedManifestPublished` confirms publication.
+The suffix is one nonblank safe filename segment, at most 64 UTF-16 units;
+separators, control characters and Windows-ambiguous trailing dots/spaces fail
+before state publication. Each invocation gets a new name; the manifest hash and
+content-addressed blobs remain shared. `--output FILE` independently exports the
+same manifest and preserves existing destinations. Without a suffix, no named
+reference is created and `backupPath` is null. Naming failure returns nonzero
+`EXPORT_FAILED` with `namedManifestPublished=false`, the verified manifest/hash and
+state root still available; it does not invalidate already verified objects.
+
+This replaces the old sibling directory copy: retain the named manifest **and**
+the state's `objects` repository. A manifest alone is an index, not a portable
+copy of world contents. Restore with its `manifestHash` and the same `--state-root`;
+restoration still uses the verified planner/apply path. Naming never disables
+required preimage backups or journals. Migration mappings are machine-readable in
+[cli-migration.json](cli-migration.json).
 
 World IDs here use the existing NTFS directory scope binding. They are not portable
 world UUIDs. A byte-identical other root cannot consume a plan or backup as the
