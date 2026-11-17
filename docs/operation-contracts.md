@@ -3,7 +3,9 @@
 These are pure Domain contracts. They perform no filesystem operations and do not
 establish offline-world, atomic replace, journal, actual grammar completeness or disk
 readback guarantees. Storage and scanner services must establish those facts before
-constructing the corresponding claims. The CLI currently exposes none of these edits.
+constructing the corresponding claims. Generic edits and the durable write/restore
+pipeline now have [CLI adapters](cli-edit-contract.md); translation/session adapters
+remain separate integration work.
 
 ## Text slots
 
@@ -327,6 +329,15 @@ image proof, then recomputes requested, all nine counts and success. Those redun
 fields are claims that must match, not trusted values. Pending and unknown terminal
 statuses cannot deserialize into an outcome. A non-image failed/cancelled receipt may be
 exchanged before preparation; a fabricated Applied record cannot use that path.
+
+Durable receipt/header writers validate byte, token and depth budgets with their
+shared reader before publication. Preparation additionally bounds the worst-case
+receipt (IDs, proofs, counts, revision and diagnostics) before any world commit,
+reserving 64 KiB for the CLI envelope. Dynamic engine reasons use at most 256 UTF-16
+code units and cannot be empty where an outcome requires a reason. These limits
+reject oversized plans; they never truncate operation identities or user content.
+`WorldApplyEngine.ReadStatus` returns direction, phase, sequence, backup manifest
+hash and any receipt from the same loaded journal, including unfinished recovery.
 
 All DTO constructor fields are required, including explicit null for inapplicable fields;
 unknown or duplicate members are rejected. Output is deterministic in canonical collection

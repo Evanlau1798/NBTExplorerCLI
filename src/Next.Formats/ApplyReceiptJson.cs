@@ -15,9 +15,21 @@ public static class ApplyReceiptJson
     public static string Write(ApplyReceipt receipt)
     {
         ArgumentNullException.ThrowIfNull(receipt);
-        return ContractJson.Write(Family, new ReceiptDto(receipt.PlanHash, receipt.Revision, receipt.RequestedOperationIds.ToArray(),
+        return ContractJson.WriteForStorage(Family, new ReceiptDto(receipt.PlanHash, receipt.Revision, receipt.RequestedOperationIds.ToArray(),
             receipt.Results.Select(result => new ResultDto(result.OperationId, result.Outcome, result.Reason, result.Proofs.ToArray())).ToArray(),
             receipt.DependenciesComplete, receipt.Requested, receipt.Counts.OrderBy(item => item.Key).Select(item => new CountDto(item.Key, item.Value)).ToArray(), receipt.Success));
+    }
+    public static void ValidateStorageBudget(PatchPlan plan, int maximumReasonCodeUnits)
+    {
+        ArgumentNullException.ThrowIfNull(plan); ArgumentOutOfRangeException.ThrowIfLessThan(maximumReasonCodeUnits, 1);
+        var image = ArtifactImage.Present(Hash256.Compute([]));
+        var reason = new string('\uffff', maximumReasonCodeUnits);
+        // Size-only upper bound, never a receipt or an authorization: every proof has the largest image shape.
+        var results = plan.Operations.Select(operation => new ResultDto(operation.Id, OperationOutcome.RecoveryRequired, reason,
+            operation.RequiredOutputs.Distinct().Select(artifact => new ImageProof(ImageProofKind.Postimage, artifact, image, image)).ToArray())).ToArray();
+        var json = ContractJson.WriteForStorage(Family, new ReceiptDto(plan.PlanHash, long.MaxValue, plan.Operations.Select(operation => operation.Id).ToArray(),
+            results, false, plan.Operations.Length, Enum.GetValues<OperationOutcome>().Select(outcome => new CountDto(outcome, plan.Operations.Length)).ToArray(), false));
+        CommandOutputJson.ValidateEnvelopeHeadroom(json);
     }
     public static ApplyReceipt Read(string json, PatchPlan plan, PreparedManifest? prepared = null) => ContractJson.Read(json, Family, data =>
     {

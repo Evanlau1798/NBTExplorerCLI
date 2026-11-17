@@ -26,11 +26,22 @@ public static class CliApplication
                 command = "help";
             }
             else if (command == "version") data = new { product = "nbtcli-next", version = typeof(CliApplication).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0] };
-            else if (command is "scan" or "extract" or "validate" or "capabilities")
+            else if (command is "scan" or "extract" or "validate" or "capabilities" or "set" or "batch" or "plan" or "apply" or "recover" or "status" or "backup" or "restore")
             {
-                var result = ScanCommands.Execute(request);
+                var result = command is "scan" or "extract" or "validate" or "capabilities" ? ScanCommands.Execute(request) : WriteCommands.Execute(request);
                 var json = CommandOutputJson.Write(command, result.Data, result.Outcome, result.Code, result.Code is null ? null : Message(result.Code, locale));
-                if (request.Get("output") is { } file) QueryExportFile.WriteNew(file, json + Environment.NewLine);
+                if (request.Get("output") is { } file)
+                {
+                    try { QueryExportFile.WriteNew(file, (result.Export ?? json) + Environment.NewLine); }
+                    catch (ArtifactConflictException error)
+                    {
+                        output.WriteLine(CommandOutputJson.Write(command, result.Data, "Conflict", "CONFLICT", Message("CONFLICT", locale), error.Message)); return 3;
+                    }
+                    catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+                    {
+                        output.WriteLine(CommandOutputJson.Write(command, result.Data, "Failed", "EXPORT_FAILED", Message("EXPORT_FAILED", locale), error.Message)); return 5;
+                    }
+                }
                 output.WriteLine(json); return result.Exit;
             }
             else data = ReadCommands.Execute(request);
@@ -38,25 +49,28 @@ public static class CliApplication
         }
         catch (Exception error)
         {
-            var code = error switch
-            {
-                CliFailure failure => failure.Code,
-                ArtifactConflictException => "CONFLICT",
-                FileNotFoundException or DirectoryNotFoundException => "FILE_NOT_FOUND",
-                UnauthorizedAccessException => "ACCESS_DENIED",
-                ArtifactSizeLimitException or JsonOutputLimitException => "RESOURCE_LIMIT",
-                CodecException { Code: CodecError.LimitExceeded } => "RESOURCE_LIMIT",
-                CodecException { Code: CodecError.UnsupportedProfile } or NotSupportedException => "UNSUPPORTED_SOURCE",
-                CodecException or JsonException => "MALFORMED_SOURCE",
-                IOException => "READ_ERROR",
-                ArgumentException => "INVALID_ARGUMENTS",
-                _ => "INTERNAL_ERROR"
-            };
+            var code = Code(error);
             var exit = code switch { "UNKNOWN_COMMAND" or "UNKNOWN_OPTION" or "INVALID_ARGUMENTS" or "CHUNK_REQUIRED" => 2, "CONFLICT" or "AMBIGUOUS_PATH" => 3, "UNSUPPORTED_SOURCE" or "INCOMPLETE_SOURCE" => 4, "RESOURCE_LIMIT" or "PATTERN_TIMEOUT" => 6, "INTERNAL_ERROR" => 1, _ => 5 };
             var outcome = exit == 3 ? "Conflict" : exit == 4 ? "Unsupported" : "Failed";
-            output.WriteLine(CommandOutputJson.Write(CliArguments.Canonical(command), null, outcome, code, Message(code, locale), error.Message)); return exit;
+            output.WriteLine(CommandOutputJson.Write(CliArguments.Canonical(command), (error as CliFailure)?.Result, outcome, code, Message(code, locale), error.Message)); return exit;
         }
     }
+    internal static string Code(Exception error) => error switch
+    {
+        CliFailure failure => failure.Code,
+        ArtifactConflictException => "CONFLICT",
+        EditRejectedException { Failure: EditFailure.Missing or EditFailure.Ambiguous or EditFailure.Precondition } => "CONFLICT",
+        EditRejectedException => "INVALID_ARGUMENTS",
+        FileNotFoundException or DirectoryNotFoundException => "FILE_NOT_FOUND",
+        UnauthorizedAccessException => "ACCESS_DENIED",
+        ArtifactSizeLimitException or JsonOutputLimitException or CodecException { Code: CodecError.LimitExceeded } => "RESOURCE_LIMIT",
+        CodecException { Code: CodecError.UnsupportedProfile } or NotSupportedException => "UNSUPPORTED_SOURCE",
+        CodecException or JsonException => "MALFORMED_SOURCE",
+        InvalidDataException => "INVALID_DATA",
+        IOException => "READ_ERROR",
+        ArgumentException => "INVALID_ARGUMENTS",
+        _ => "INTERNAL_ERROR"
+    };
     private static string Message(string code, string locale)
     {
         var en = locale == "en-US";
@@ -70,9 +84,14 @@ public static class CliApplication
             "AMBIGUOUS_PATH" or "CONFLICT" => en ? "The target is ambiguous or has changed." : "目標有歧義或來源已變動。",
             "UNSUPPORTED_SOURCE" or "INCOMPLETE_SOURCE" => en ? "The source is unsupported or incomplete." : "來源不支援或不完整。",
             "MALFORMED_SOURCE" => en ? "The source data is malformed." : "來源資料格式損壞。",
+            "INVALID_DATA" => en ? "The data failed validation." : "資料未通過驗證。",
             "ACCESS_DENIED" => en ? "Access denied." : "拒絕存取。",
             "RESOURCE_LIMIT" => en ? "The resource limit was exceeded." : "超過資源上限。",
             "PATTERN_TIMEOUT" => en ? "The match pattern timed out." : "比對模式已逾時。",
+            "EXPORT_FAILED" => en ? "The export failed; inspect the operation results." : "匯出失敗；請核對操作結果。",
+            "RECOVERY_REQUIRED" => en ? "Recovery is required; inspect every operation result." : "需要復原；請核對每項操作結果。",
+            "PREPARATION_FAILED" => en ? "Preparation failed before commit; inspect validation results." : "準備階段失敗，尚未提交；請核對驗證結果。",
+            "ROLLED_BACK" => en ? "The plan was rolled back." : "計畫已回復至套用前狀態。",
             "READ_ERROR" => en ? "The source could not be read." : "無法讀取來源。",
             _ => en ? "The operation failed." : "操作失敗。"
         };

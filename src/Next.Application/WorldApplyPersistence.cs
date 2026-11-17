@@ -60,6 +60,8 @@ public sealed partial class WorldApplyEngine
     private ApplyReceipt Finish(LoadedJournal active, IReadOnlyDictionary<ArtifactAddress, ArtifactImage?> images,
         ApplyDirection direction, string reason, CancellationToken cancellation, bool dependenciesVerified = true)
     {
+        if (string.IsNullOrWhiteSpace(reason)) reason = "Apply did not complete; inspect the journal and current images";
+        if (reason.Length > MaximumReceiptReasonCodeUnits) reason = reason[..(MaximumReceiptReasonCodeUnits - 1)] + "…";
         var header = active.Header; var outputs = header.Prepared.Artifacts.ToDictionary(output => output.Artifact, output => output.Postimage);
         var preimages = header.Plan.Preconditions.ToDictionary(input => input.Artifact, input => input.Image);
         var metadata = header.Plan.Preconditions.Where(input => !outputs.ContainsKey(input.Artifact)).ToArray();

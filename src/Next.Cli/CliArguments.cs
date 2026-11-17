@@ -2,13 +2,14 @@ using System.Globalization;
 
 namespace Next.Cli;
 
-internal sealed class CliFailure(string code, string? details = null) : Exception(details ?? code)
+internal sealed class CliFailure(string code, string? details = null, object? data = null) : Exception(details ?? code)
 {
     internal string Code { get; } = code;
+    internal object? Result { get; } = data;
 }
 internal sealed record CliArguments(string Command, string? Input, IReadOnlyDictionary<string, string?> Options, string Locale)
 {
-    internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities"];
+    internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore"];
     internal static string Canonical(string name) => name switch { "ls" => "list", "find" => "search", "scan-world" => "scan", "extract-text" => "extract", "--help" or "-h" => "help", "--version" or "-v" => "version", _ => name };
     internal static string[] Allowed(string command) => command switch
     {
@@ -18,6 +19,14 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         "scan" => ["path", "dimension", "region", "types", "limit", "offset", "summary", "show-items", "refresh", "no-cache", "cache-root", "workers", "verbose", "debug", "help"],
         "extract" => ["path", "dimension", "region", "types", "limit", "offset", "all", "unique", "match-pattern", "output", "refresh", "no-cache", "cache-root", "workers", "verbose", "debug", "help"],
         "validate" => ["path", "dimension", "region", "types", "limit", "offset", "quick", "refresh", "no-cache", "cache-root", "workers", "verbose", "debug", "help"],
+        "set" => ["path", "pointer", "segments", "chunk", "dimension", "compression", "value", "value-file", "operation-id", "apply", "world-offline", "state-root", "output", "help"],
+        "batch" => ["world", "apply", "world-offline", "state-root", "output", "help"],
+        "plan" => ["request", "state-root", "output", "help"],
+        "apply" => ["plan", "world-offline", "state-root", "output", "help"],
+        "recover" => ["plan-hash", "world-offline", "rollback", "state-root", "output", "help"],
+        "status" => ["plan-hash", "state-root", "output", "help"],
+        "backup" => ["path", "state-root", "output", "help"],
+        "restore" => ["manifest-hash", "path", "apply", "world-offline", "state-root", "output", "help"],
         "help" or "version" or "capabilities" => ["help"],
         _ => throw new CliFailure("UNKNOWN_COMMAND")
     };
@@ -48,7 +57,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         {
             var arg = args[index];
             if (!positional && arg == "--") { positional = true; continue; }
-            if (!positional && arg.StartsWith('-'))
+            if (!positional && arg != "-" && arg.StartsWith('-'))
             {
                 var separator = arg.IndexOf('='); var name = separator < 0 ? arg : arg[..separator];
                 name = name switch { "--q" or "-q" => "query", "-h" => "help", _ when name.StartsWith("--", StringComparison.Ordinal) => name[2..], _ => throw new CliFailure("UNKNOWN_OPTION", arg) };
@@ -56,7 +65,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
                 if (command == "extract") name = name switch { "no-limit" => "all", "deduplicate" => "unique", _ => name };
                 if (!allowed.Contains(name)) throw new CliFailure("UNKNOWN_OPTION", arg);
                 string? value = null;
-                if (name == "types" && command is "get" or "list" or "search" || name is "help" or "summary" or "show-items" or "refresh" or "no-cache" or "all" or "unique" or "quick" or "verbose" or "debug") { if (separator >= 0) throw new CliFailure("INVALID_ARGUMENTS", "Boolean flags take no value"); }
+                if (name == "types" && command is "get" or "list" or "search" || name is "help" or "summary" or "show-items" or "refresh" or "no-cache" or "all" or "unique" or "quick" or "verbose" or "debug" or "apply" or "world-offline" or "rollback") { if (separator >= 0) throw new CliFailure("INVALID_ARGUMENTS", "Boolean flags take no value"); }
                 else
                 {
                     value = separator >= 0 ? arg[(separator + 1)..] : ++index < args.Length && !args[index].StartsWith("--", StringComparison.Ordinal) ? args[index] : throw new CliFailure("INVALID_ARGUMENTS", "Missing option value");

@@ -1,4 +1,5 @@
 using Next.Domain;
+using Next.Formats;
 
 namespace Next.Application;
 
@@ -77,7 +78,10 @@ public sealed class PreparedWorldPlan : IDisposable
     internal IReadOnlyList<IArtifactCandidate> Candidates { get; }
     internal Hash256 AccessBinding { get; }
     internal PreparedWorldPlan(PatchPlan plan, PreparedManifest manifest, IReadOnlyList<IArtifactCandidate> candidates, Hash256 accessBinding)
-        => (Plan, Manifest, Candidates, AccessBinding) = (plan, manifest, candidates, accessBinding);
+    {
+        ApplyReceiptJson.ValidateStorageBudget(plan, WorldApplyEngine.MaximumReceiptReasonCodeUnits);
+        (Plan, Manifest, Candidates, AccessBinding) = (plan, manifest, candidates, accessBinding);
+    }
     public void Dispose() => Cleanup(Candidates);
     internal static void Cleanup(IEnumerable<IArtifactCandidate> candidates)
     {

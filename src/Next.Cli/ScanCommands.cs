@@ -5,7 +5,7 @@ using Next.Minecraft;
 
 namespace Next.Cli;
 
-internal sealed record CliResult(object Data, string? Code = null, string Outcome = "Success", int Exit = 0);
+internal sealed record CliResult(object Data, string? Code = null, string Outcome = "Success", int Exit = 0, string? Export = null);
 
 internal static class ScanCommands
 {

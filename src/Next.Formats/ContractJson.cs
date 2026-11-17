@@ -36,6 +36,13 @@ internal static class ContractJson
     public static string Write<T>(string family, T data) => JsonSerializer.Serialize(new Envelope<T>(family, 1, data), Options);
     internal static string WriteBounded<T>(string family, T data)
         => SerializeBounded(new Envelope<T>(family, 1, data));
+    internal static string WriteForStorage<T>(string family, T data)
+    {
+        var json = WriteBounded(family, data);
+        try { _ = Read(json, family, _ => true); }
+        catch (JsonException error) { throw new JsonOutputLimitException("Contract output exceeds its decoding budget", error); }
+        return json;
+    }
     internal static string SerializeBounded<T>(T value, JsonSerializerOptions? options = null)
     {
         using var output = new LimitedJsonOutput();

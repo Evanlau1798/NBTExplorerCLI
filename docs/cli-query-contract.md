@@ -3,8 +3,9 @@
 The registered query commands are `get`, `list` (`ls`) and `search` (`find`).
 The product also registers `help`, `version`, `scan`, `extract`, `validate` and
 `capabilities`; see [world text queries](cli-scan-contract.md) for their contracts.
-`help <command>` lists that command's accepted options. Editing and session CLI
-entry points remain planned.
+`help <command>` lists that command's accepted options. Generic editing, durable
+apply/recover and verified backups use the [editing contract](cli-edit-contract.md).
+Translation/session/agent CLI adapters remain planned.
 
 Every invocation emits one `nbtcli.next.cli`, version 1 JSON envelope on stdout.
 `success`, canonical `command`, `outcome`, `data` and `error` have stable meanings.
@@ -98,7 +99,7 @@ World-directory queries verify dimensions against the declared layout.
 All reads retain existing source bytes and create no world files. Physical artifacts
 are limited to 64 MiB, codecs keep their existing decode budgets, and command output
 is bounded to 64 MiB before it is emitted. Cache/scanning, extraction and validation
-are described in the world-query contract. Session operations and edits are separate
-integration work still to be registered.
+are described in the world-query contract. Translation/session/agent commands remain
+separate integration work still to be registered.
 Typed interchange also retains its existing depth/node/token budgets; an output
 limit returns ResourceLimit for the valid source, and a narrower subtree can be queried.

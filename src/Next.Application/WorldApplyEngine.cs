@@ -6,6 +6,7 @@ namespace Next.Application;
 
 public sealed partial class WorldApplyEngine
 {
+    internal const int MaximumReceiptReasonCodeUnits = 256;
     private readonly IWorldInventory inventory;
     private readonly IArtifactStorage storage;
     private readonly IWorldBackupStore objects;
@@ -59,6 +60,7 @@ public sealed partial class WorldApplyEngine
     public ApplyReceipt Recover(Hash256 planHash, bool worldOffline, bool rollback = false, CancellationToken cancellation = default)
     {
         Offline(worldOffline); var active = Load(planHash) ?? throw new FileNotFoundException("No journal for the requested plan");
+        ApplyReceiptJson.ValidateStorageBudget(active.Header.Plan, MaximumReceiptReasonCodeUnits);
         var previous = Receipt(active);
         var direction = rollback || active.Journal.Direction == ApplyDirection.Rollback ? ApplyDirection.Rollback : ApplyDirection.Forward;
         if (previous is not null && (active.Journal.Phase == ApplyJournalPhase.Completed && direction == active.Journal.Direction
@@ -108,6 +110,12 @@ public sealed partial class WorldApplyEngine
             active = new(active.Header, record, previous);
         }
     }
+    public WorldApplyStatus? ReadStatus(Hash256 planHash)
+    {
+        var active = Load(planHash);
+        return active is null ? null : new(active.Header.Plan.PlanHash, active.Journal.Direction, active.Journal.Phase, active.Journal.Sequence,
+            active.Header.BackupManifestHash, Receipt(active));
+    }
     private ApplyReceipt Commit(LoadedJournal active, IReadOnlyList<IArtifactCandidate> candidates, ApplyDirection direction, CancellationToken cancellation)
     {
         if (active.Header.AccessBinding != Access()) throw new ArtifactConflictException("Journal target root differs from the current write authority");
@@ -145,3 +153,6 @@ public sealed partial class WorldApplyEngine
         var bytes = new byte[checked((int)stream.Length)]; stream.ReadExactly(bytes); return bytes;
     }
 }
+
+public sealed record WorldApplyStatus(Hash256 PlanHash, ApplyDirection Direction, ApplyJournalPhase Phase, long Sequence,
+    Hash256 BackupManifestHash, ApplyReceipt? Receipt);

@@ -13,19 +13,23 @@ namespace Next.Verification;
 
 internal static class CliScanTests
 {
-    private sealed record Invocation(int Exit, string Output);
-    private static Invocation Run(string cwd, params string[] args)
+    internal sealed record Invocation(int Exit, string Output);
+    internal static Invocation Run(string cwd, params string[] args) => Invoke(cwd, args, null);
+    internal static Invocation RunInput(string cwd, string input, params string[] args) => Invoke(cwd, args, input);
+    private static Invocation Invoke(string cwd, string[] args, string? input)
     {
         var host = Path.GetFullPath(Path.Combine(RuntimeEnvironment.GetRuntimeDirectory(), "..", "..", "..", "dotnet.exe"));
         var start = new ProcessStartInfo(host) { WorkingDirectory = cwd, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        start.RedirectStandardInput = input is not null;
         start.ArgumentList.Add(typeof(CliApplication).Assembly.Location); foreach (var arg in args) start.ArgumentList.Add(arg);
         using var process = Process.Start(start) ?? throw new IOException("Cannot start product CLI");
         var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
+        if (input is not null) { process.StandardInput.Write(input); process.StandardInput.Close(); }
         if (!process.WaitForExit(20_000)) { process.Kill(true); process.WaitForExit(); throw new TimeoutException("Product CLI did not finish"); }
         var output = stdout.GetAwaiter().GetResult(); var error = stderr.GetAwaiter().GetResult();
         Require(error.Length == 0 || process.ExitCode != 0, "successful machine output needs no diagnostic errors"); return new(process.ExitCode, output);
     }
-    private static JsonDocument Success(Invocation result)
+    internal static JsonDocument Success(Invocation result)
     {
         Require(result.Exit == 0, "expected successful CLI: " + result.Output); var document = JsonDocument.Parse(result.Output);
         Require(document.RootElement.GetProperty("success").GetBoolean(), "success envelope agrees with exit code"); return document;

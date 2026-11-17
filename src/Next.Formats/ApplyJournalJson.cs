@@ -31,7 +31,7 @@ public static class ApplyJournalHeaderJson
         ArgumentNullException.ThrowIfNull(header);
         using var plan = JsonDocument.Parse(PatchPlanJson.Write(header.Plan), new JsonDocumentOptions { MaxDepth = 1024 });
         using var prepared = JsonDocument.Parse(PreparedManifestJson.Write(header.Prepared), new JsonDocumentOptions { MaxDepth = 1024 });
-        return ContractJson.WriteBounded(ApplyJournalHeader.SchemaFamily, new HeaderDto(plan.RootElement, prepared.RootElement, header.BackupManifestHash, header.AccessBinding));
+        return ContractJson.WriteForStorage(ApplyJournalHeader.SchemaFamily, new HeaderDto(plan.RootElement, prepared.RootElement, header.BackupManifestHash, header.AccessBinding));
     }
     public static ApplyJournalHeader Read(string json) => ContractJson.Read<ApplyJournalHeader>(json, ApplyJournalHeader.SchemaFamily, data =>
     {
