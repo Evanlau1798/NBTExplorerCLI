@@ -4,6 +4,14 @@ internal static class CliWorkflowCases
 {
     internal static readonly VerificationCase[] Cases =
     [
+        new("cli-key-plan-generated-field-conflict", "cli-key", _ => CliKeyPlanTests.GeneratedFieldsCannotCompeteWithExplicitTypedEdits()),
+        new("cli-key-plan-bounded-lazy-input", "cli-key", _ => CliKeyPlanTests.LazyKeyInputsAreChargedBeforeTheNextUnboundedAllocation()),
+        new("cli-key-plan-apply-alias-migration", "cli-key", _ => CliKeyPlanTests.LegacyApplyNamesExposeExplicitPreviewMigrationWithoutWriting()),
+        new("cli-key-plan-physical-string-list", "cli-key", _ => CliKeyPlanTests.PhysicalStringListsRequireAnExplicitSupportedShapeChange()),
+        new("cli-key-plan-native-encoded-roots", "cli-key", _ => CliKeyPlanTests.NestedModernComponentsAndEncodedCommandsUseTheirExactRoots()),
+        new("cli-key-plan-pure-mixed-seal", "cli-key", _ => CliKeyPlanTests.PublicKeysPlansGenerateDependenciesAndSealPureAndMixedWorlds()),
+        new("cli-key-plan-existing-pack-merge", "cli-key", _ => CliKeyPlanTests.ExistingPacksMergeOnlyDeclaredKeysAndKeepUnselectedEntries()),
+        new("cli-key-plan-modes-name-authority", "cli-key", _ => CliKeyPlanTests.InvalidModesAndIdentifyingNamesRetainAcceptedReplies()),
         new("cli-legacy-batch-partial-key-ambiguity", "cli-legacy-batch", _ => CliLegacyBatchTests.LegacySeparatorsCannotChooseBetweenTwoDifferentTypedPaths()),
         new("cli-legacy-batch-input-backup-boundaries", "cli-legacy-batch", _ => CliLegacyBatchTests.InputLimitsReportIoAndDisabledConvenienceBackupKeepRecoverySafe()),
         new("cli-legacy-batch-region-windows-ambiguity", "cli-legacy-batch", _ => CliLegacyBatchTests.RegionAndWindowsPathsBindExactChunksAndRejectAmbiguity()),

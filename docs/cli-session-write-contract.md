@@ -18,8 +18,11 @@ acknowledgement, writer lease, staging, backup, readback and nine-state receipts
 This is the explicit replacement for the old `translate apply --direct` workflow.
 The new product separates preview, world commit/recovery and session completion.
 There is no old executable fallback or inferred write from a session reply.
-Key conversion, language output and pack generation remain separate integration
-work; omitting `--direct` does not silently choose a mode.
+[Key planning](cli-key-plan-contract.md) uses explicit `--keys` and declares its
+required language/pack outputs. Canonical `plan` always requires one mode. The
+old `apply`/`apply-keys` names are preview aliases with explicit migration data;
+global `apply` performs the world commit. Standalone resource export and convert
+remain separate integration work.
 
 Plan requires the exact current session revision and every slot to be Translated
 or Unchanged. Pending, conflict or already-applied slots require inspecting or

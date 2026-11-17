@@ -140,7 +140,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         CheckPreimages(inventory, plan);
         return new(plan, sources.ToImmutableDictionary());
     }
-    private byte[] ReadSource(DiscoveredSource source, DecodeLimits limits)
+    internal byte[] ReadSource(DiscoveredSource source, DecodeLimits limits)
     {
         var artifact = source.Location.Artifact;
         var outer = artifact.ContainerEntry is null ? artifact : new ArtifactAddress(artifact.WorldId, artifact.RelativePath, artifact.Kind);

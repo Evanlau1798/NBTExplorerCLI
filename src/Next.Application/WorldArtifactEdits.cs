@@ -35,9 +35,8 @@ internal static class WorldArtifactEdits
     {
         var profile = NbtTextExtractor.Profile(source.Location, document);
         var edits = operations.OfType<TypedPatch>().Select(operation => operation.Edit).ToList();
-        edits.AddRange(operations.OfType<KeyConversionPatch>().Where(operation => operation.Conversion.Address.Artifact == source.Location.Artifact && operation.Conversion.Rule != KeyConversionRule.EncodedTextToTranslate).Select(operation =>
-            TypedEdit.Replace(operation.Conversion.Address.NodePath, operation.Conversion.Expected, WorldKeyEdits.Replacement(operation.Conversion))));
         var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
+        var keyed = WorldKeyEdits.ApplyNative(document, conversions.Where(conversion => conversion.Address.Artifact == source.Location.Artifact && conversion.Rule != KeyConversionRule.EncodedTextToTranslate).ToArray());
         var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation)
             .Concat(WorldReferenceMembers.Literals(operations, source.Location.Artifact, source.Chunk)).ToArray();
         var encodedPaths = conversions.Where(conversion => conversion.Rule == KeyConversionRule.EncodedTextToTranslate && conversion.Address.Syntax is null).Select(conversion => conversion.Address.NodePath)
@@ -60,7 +59,7 @@ internal static class WorldArtifactEdits
             edits.Add(TypedEdit.Replace(path, new NbtString(pending.Command), new NbtString(new UTF8Encoding(false, true).GetString(changed))));
         }
         foreach (var item in literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null)) edits.Add(TypedEdit.Replace(item.Slot.Address.NodePath, new NbtString(item.Slot.SourceText), new NbtString(item.Reply.Text)));
-        var expected = TypedTreeEdits.Apply(document, edits);
+        var expected = TypedTreeEdits.Apply(keyed, edits);
         if (NbtTextExtractor.Profile(source.Location, expected).Id != profile.Id) throw new NotSupportedException("Data version migration requires its explicit profile conversion");
         return expected;
     }

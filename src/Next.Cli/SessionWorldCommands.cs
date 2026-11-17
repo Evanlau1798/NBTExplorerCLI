@@ -9,12 +9,15 @@ namespace Next.Cli;
 
 internal static class SessionWorldCommands
 {
+    internal sealed record PlanPreview(bool Preview, Guid SessionId, long Revision, Guid OperationId, JsonElement Plan, Hash256 PlanHash);
     internal static CliResult Execute(CliArguments request, Guid id, Guid operation)
     {
         if (!long.TryParse(request.Get("revision"), NumberStyles.None, CultureInfo.InvariantCulture, out var revision)) throw new CliFailure("INVALID_ARGUMENTS", "Supply an exact nonnegative --revision");
         var seal = request.Subcommand == "seal";
         if (seal && !request.Flag("operation-id")) throw new CliFailure("INVALID_ARGUMENTS", "Seal requires a retained --operation-id for exact retry");
-        if (!seal && !request.Flag("direct")) throw new CliFailure("INVALID_ARGUMENTS", "Session planning currently requires --direct");
+        if (!seal && request.Flag("direct") == request.Flag("keys")) throw new CliFailure("INVALID_ARGUMENTS", "Choose exactly one planning mode: --direct or --keys");
+        if (!seal && (request.Flag("keys") && request.Flag("synchronize-references") || !request.Flag("keys") && (request.Flag("prefix") || request.Flag("language-output")))) throw new CliFailure("INVALID_ARGUMENTS", "Key output options and reference synchronization belong to separate planning modes");
+        var languagePath = !seal && request.Flag("keys") ? request.Get("language-output") ?? throw new CliFailure("INVALID_ARGUMENTS", "Key planning requires --language-output relative-path[#entry]") : null;
         var hash = seal ? new Hash256(request.Get("plan-hash") ?? throw new CliFailure("INVALID_ARGUMENTS", "Missing --plan-hash")) : null;
         object Repair(string instruction) => new { sessionId = id, revision, operationId = operation, planHash = hash, repair = instruction };
         try
@@ -33,6 +36,17 @@ internal static class SessionWorldCommands
                 CommandOutputJson.ValidateRejectionBudget(operations.Select(item => item.Id).ToArray());
                 var plan = WriteCommands.BeforeCommit(operations.Select(item => item.Id).ToArray(), "PlanRejected", () =>
                 {
+                    if (languagePath is not null)
+                    {
+                        var parts = languagePath.Split('#');
+                        if (parts.Length > 2) throw new ArgumentException("Language output requires one exact artifact and optional entry");
+                        var outer = context.Artifact(parts[0]);
+                        var language = parts.Length == 1 ? outer : new ArtifactAddress(outer.WorldId, outer.RelativePath, ArtifactKind.Archive, parts[1]);
+                        var translated = state.Slots.Where(slot => slot.State == SessionSlotState.Translated).Select(slot => new LiteralTranslation(slot.Slot, slot.Reply!));
+                        var keys = new WorldKeyConversionService(context.Inventory).Create(snapshot, translated, language, request.Get("prefix") ?? "map.");
+                        var converted = keys.Select(key => key.Conversion.Slot.Address).ToHashSet();
+                        operations = operations.Where(item => !converted.Contains(((LiteralPatch)item).Translation.Slot.Address)).Concat(keys).ToArray();
+                    }
                     var names = literals.Where(item => WorldReferenceService.IsIdentifyingName(item.Slot.Role) && item.Reply.Text != item.Slot.SourceText).ToArray();
                     if (request.Flag("synchronize-references") && names.Length != 0)
                     {
@@ -44,7 +58,7 @@ internal static class SessionWorldCommands
                 });
                 var json = PatchPlanJson.Write(plan);
                 using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 1024 });
-                return new(new { preview = true, sessionId = id, revision, operationId = operation, plan = document.RootElement.Clone() }, Export: json);
+                return new(new PlanPreview(true, id, revision, operation, document.RootElement.Clone(), plan.PlanHash), Export: json);
             }
             var engine = context.Engine(); SessionOperationReceipt receipt;
             try { receipt = service.Seal(id, revision, operation, hash!, engine); }

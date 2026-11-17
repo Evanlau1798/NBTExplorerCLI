@@ -5,7 +5,8 @@ durable apply/recovery services as the application API. They never invoke the ol
 product. File-based session/agent management has separate CLI contracts;
 [direct session plans and completion](cli-session-write-contract.md) use these
 same apply/recover commands. Explicit [legacy batch migration](cli-legacy-batch-contract.md)
-maps safely reconstructed old requests to these operations. Key conversion remains integration work.
+maps safely reconstructed old requests to these operations. [Session key plans](cli-key-plan-contract.md)
+generate exact conversion operations and their necessary language/pack outputs.
 This document covers the new versioned operations input.
 
 | Command | Input and options |

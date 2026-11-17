@@ -7,6 +7,21 @@ namespace Next.Application;
 
 internal static class WorldKeyEdits
 {
+    internal static NbtDocument ApplyNative(NbtDocument source, IReadOnlyList<TranslationKeyConversion> conversions)
+    {
+        foreach (var conversion in conversions)
+            if (NbtLocator.Resolve(source.Root, conversion.Address.NodePath).Value != conversion.Expected)
+                throw new EditRejectedException(EditFailure.Precondition, "Native key component differs from its original preimage");
+        var current = source;
+        foreach (var conversion in conversions.OrderByDescending(item => item.Address.NodePath.Segments.Length).ThenBy(item => item.Slot.Id.Digest.Hex, StringComparer.Ordinal))
+        {
+            var value = NbtLocator.Resolve(current.Root, conversion.Address.NodePath).Value ?? throw new ArtifactConflictException("Native key component disappeared");
+            // Preserve already verified child conversions when a containing component also becomes a key.
+            var composed = new TranslationKeyConversion(conversion.Address, value, conversion.Rule, conversion.Profile, conversion.ProfileVersion, conversion.Slot, conversion.Reply, conversion.Dependency);
+            current = TypedTreeEdits.Apply(current, [TypedEdit.Replace(conversion.Address.NodePath, value, Replacement(composed))]);
+        }
+        return current;
+    }
     internal static string RewriteJson(string source, IReadOnlyList<TranslationKeyConversion> conversions, DecodeLimits limits, IReadOnlyList<LiteralTranslation>? translations = null)
     {
         translations ??= [];

@@ -4,8 +4,15 @@ These are pure Domain contracts. They perform no filesystem operations and do no
 establish offline-world, atomic replace, journal, actual grammar completeness or disk
 readback guarantees. Storage and scanner services must establish those facts before
 constructing the corresponding claims. Generic edits and the durable write/restore
-pipeline now have [CLI adapters](cli-edit-contract.md); translation/session adapters
-remain separate integration work.
+pipeline have [CLI adapters](cli-edit-contract.md); [session key plans](cli-key-plan-contract.md)
+bind validated replies to live component roots and required language/pack outputs.
+
+For key conversions the public root targets establish profile/source binding.
+Conflict validation derives the literal slot and newly generated translate/percent
+with fields, allowing independent nested components while rejecting competing
+mutations. Native composition first checks every original root preimage, then
+retains child conversions when transforming a containing root. This changes no
+canonical operation payload or existing legal plan hash.
 
 ## Text slots
 

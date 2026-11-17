@@ -9,7 +9,7 @@ namespace Next.Cli;
 
 internal static class SessionCommands
 {
-    internal static readonly string[] Subcommands = ["start", "status", "export", "next", "submit", "get", "jump", "note", "glossary", "reset", "groups", "memory", "plan", "seal", "help"];
+    internal static readonly string[] Subcommands = ["start", "status", "export", "next", "submit", "get", "jump", "note", "glossary", "reset", "groups", "memory", "plan", "apply", "apply-keys", "seal", "help"];
     internal static string[] Allowed(string action)
     {
         if (action == "help") return ["help"];
@@ -19,7 +19,7 @@ internal static class SessionCommands
             "status" => [], "export" => ["page", "operation-id", "no-group"], "next" => ["reply", "no-group"], "submit" => ["reply", "no-group"],
             "get" => ["slot-id"], "jump" => ["request"], "note" or "glossary" => ["request", "limit", "offset"],
             "reset" => ["request", "confirm"], "groups" => ["limit", "offset"], "memory" => ["slot-id", "source-sessions", "glossary-version", "limit", "offset"],
-            "plan" => ["direct", "revision", "operation-id", "synchronize-references"], "seal" => ["revision", "operation-id", "plan-hash"],
+            "plan" or "apply" or "apply-keys" => ["direct", "keys", "prefix", "language-output", "revision", "operation-id", "synchronize-references"], "seal" => ["revision", "operation-id", "plan-hash"],
             _ => throw new CliFailure("UNKNOWN_COMMAND", "Unknown translate subcommand")
         };
         return ["session-id", "state-root", "output", "help", .. options];
@@ -28,6 +28,22 @@ internal static class SessionCommands
     {
         var id = request.Get("session-id") is { } declared ? GuidValue(declared) : request.Subcommand == "start" ? Guid.NewGuid() : throw new CliFailure("INVALID_ARGUMENTS", "Missing --session-id");
         var operationId = request.Get("operation-id") is { } declaredOperation ? GuidValue(declaredOperation) : Guid.NewGuid();
+        if (request.Subcommand is "apply" or "apply-keys")
+        {
+            var choices = new Dictionary<string, string?>(request.Options);
+            if (!request.Flag("direct") || request.Subcommand == "apply-keys") choices.TryAdd("keys", null);
+            var preview = SessionWorldCommands.Execute(request with { Subcommand = "plan", Options = choices }, id, operationId);
+            var plan = (SessionWorldCommands.PlanPreview)preview.Data;
+            string[] aliasStateArguments = request.Get("state-root") is { } root ? ["--state-root", Path.GetFullPath(root)] : [];
+            var world = Path.GetFullPath(request.Input!); var stateTemplate = aliasStateArguments.Length == 0 ? "" : " --state-root <state-root>";
+            string[] commitArguments = ["apply", world, "--plan", request.Get("output") is { } file ? Path.GetFullPath(file) : "<retained-plan>", "--world-offline", .. aliasStateArguments];
+            string[] completeArguments = ["translate", "seal", world, "--session-id", id.ToString(), "--revision", plan.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "--operation-id", operationId.ToString(), "--plan-hash", plan.PlanHash.Hex, .. aliasStateArguments];
+            return preview with { Data = new { preview = true, result = preview.Data, migration = new { alias = request.Subcommand, canonicalCommand = "translate plan", requiresExplicitApply = true,
+                commitCommand = "apply <world> --plan <retained-plan> --world-offline" + stateTemplate,
+                completeCommand = "translate seal <world> --session-id <session-id> --revision <revision> --operation-id <operation-id> --plan-hash <hash>" + stateTemplate,
+                commitArguments, completeArguments } } };
+        }
         if (request.Subcommand is "plan" or "seal") return SessionWorldCommands.Execute(request, id, operationId);
         ScanOptions? options = null; SessionPolicy? policy = null; string? sourceLanguage = null; string? targetLanguage = null;
         if (request.Subcommand == "start")

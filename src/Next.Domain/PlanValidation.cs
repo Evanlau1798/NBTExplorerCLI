@@ -76,7 +76,7 @@ internal static class PlanValidation
             if (dependency.Consumer == dependency.Required || !required.Contains(dependency.Consumer) || !required.Contains(dependency.Required))
                 throw new ArgumentException("Output dependencies must reference distinct declared outputs");
         }
-        ValidateTargets(targets);
+        ValidateTargets(targets, plan.Operations.OfType<KeyConversionPatch>());
     }
 
     private static void ValidateSnapshot(PatchPlan plan)
@@ -93,6 +93,13 @@ internal static class PlanValidation
     }
     private static IEnumerable<SourceAddress> MutationTargets(PatchOperation operation)
     {
+        if (operation is KeyConversionPatch key)
+        {
+            // The profile root proves the conversion; sibling component fields do not share its literal mutation.
+            yield return key.Conversion.Slot.Address;
+            yield return operation.Targets[1];
+            yield break;
+        }
         foreach (var address in operation.Targets) yield return address;
         if (operation is TypedPatch { Edit.Action: TypedEditAction.Rename } typed && typed.Edit.NewName != typed.Address.NodePath.Segments[^1].Key)
         {
@@ -101,13 +108,22 @@ internal static class PlanValidation
             yield return new(address.Artifact, renamed, address.SemanticRole, address.Dimension, address.Chunk);
         }
     }
-    private static void ValidateTargets(IEnumerable<SourceAddress> addresses)
+    private static PathSegment[] LogicalPath(SourceAddress address) => address.NodePath.Segments.Concat(address.Syntax?.NodePath?.Segments ?? []).Concat(address.ComponentPath?.Segments ?? []).ToArray();
+    private static IEnumerable<(ArtifactAddress Artifact, ChunkPosition? Chunk, PathSegment[] Path)> GeneratedKeyTargets(KeyConversionPatch key)
     {
+        var root = LogicalPath(key.Conversion.Address);
+        if (root.SequenceEqual(LogicalPath(key.Conversion.Slot.Address))) yield break;
+        yield return (key.Conversion.Address.Artifact, key.Conversion.Address.Chunk, [.. root, PathSegment.ForKey("translate")]);
+        if (key.Conversion.Reply.Text.Contains('%')) yield return (key.Conversion.Address.Artifact, key.Conversion.Address.Chunk, [.. root, PathSegment.ForKey("with")]);
+    }
+    private static void ValidateTargets(IEnumerable<SourceAddress> addresses, IEnumerable<KeyConversionPatch> keys)
+    {
+        var generated = keys.SelectMany(GeneratedKeyTargets).ToLookup(item => (item.Artifact.WorldId, item.Artifact.RelativePath, item.Artifact.ContainerEntry, item.Chunk));
         foreach (var group in addresses.GroupBy(address => (address.Artifact.WorldId, address.Artifact.RelativePath,
             address.Artifact.ContainerEntry, address.Chunk)))
         {
             ValidateSyntaxBindings(group);
-            var paths = group.Select(address => address.NodePath.Segments.Concat(address.Syntax?.NodePath?.Segments ?? []).Concat(address.ComponentPath?.Segments ?? []).ToArray()).ToArray();
+            var paths = group.Select(LogicalPath).Concat(generated[group.Key].Select(item => item.Path)).ToArray();
             Array.Sort(paths, ComparePaths);
             for (var index = 1; index < paths.Length; index++)
                 if (paths[index - 1].Length <= paths[index].Length && paths[index - 1].SequenceEqual(paths[index].Take(paths[index - 1].Length)))
