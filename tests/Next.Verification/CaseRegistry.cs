@@ -7,6 +7,23 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("cli-read-wrapped-pack-metadata-resource-limit", "cli-read", _ => CliReadOnlyTests.WrappedPackMetadataLimitsRemainResourceFailures()),
+        new("cli-read-pack-metadata-json-locations", "cli-read", _ => CliReadOnlyTests.PackMetadataUsesNativeJsonInEveryQueryLocation()),
+        new("cli-read-world-catalog-resource-limit", "cli-read", _ => CliReadOnlyTests.WorldCatalogResourceLimitsKeepTheirExitClassification()),
+        new("cli-read-invalid-global-locale-command", "cli-read", _ => CliReadOnlyTests.InvalidGlobalLocalesKeepTheActualCommandIdentity()),
+        new("cli-read-lossless-types-display", "cli-read", _ => CliReadOnlyTests.GetTypedAndDisplayPreserveAllPhysicalTypesAndStrings()),
+        new("cli-read-exact-paths", "cli-read", _ => CliReadOnlyTests.ExactPathsAndAmbiguousLegacyPathsHaveDistinctResults()),
+        new("cli-read-list-search-pagination", "cli-read", _ => CliReadOnlyTests.ListAndSearchUseTypedNodesAndRealPagination()),
+        new("cli-read-json-world-targets", "cli-read", _ => CliReadOnlyTests.JsonWorldQueriesRetainNativeValuesAndRejectTraversal()),
+        new("cli-read-world-region-view", "cli-read", _ => CliReadOnlyTests.WorldAndRegionViewsUseActualLayoutAndChunks()),
+        new("cli-read-arguments-locale-help", "cli-read", _ => CliReadOnlyTests.ArgumentErrorsLocalesAndHelpMatchThePublicEntryPoint()),
+        new("cli-read-global-option-command-error", "cli-read", _ => CliReadOnlyTests.GlobalOptionsDoNotReplaceTheFailingCommandIdentity()),
+        new("cli-read-depth-archive-ambiguity", "cli-read", _ => CliReadOnlyTests.DeepTreesArchivesAndDuplicateKeysKeepExactBoundaries()),
+        new("cli-read-resource-coordinate-key-boundaries", "cli-read", _ => CliReadOnlyTests.SizeBoundsInvalidCoordinatesAndLegalNonScalarKeysAreClassified()),
+        new("cli-read-typed-output-budget", "cli-read", _ => CliReadOnlyTests.TypedOutputLimitsDoNotMislabelValidSourceBytes()),
+        new("cli-read-catalog-is-not-payload-coverage", "cli-read", _ => CliReadOnlyTests.WorldCatalogDoesNotClaimDecodedPayloadCoverage()),
+        new("cli-read-virtual-array-address-budget", "cli-read", _ => CliReadOnlyTests.VirtualArrayChildrenRespectTheAddressDepthBudget()),
+        new("cli-read-segment-source-utf16-integrity", "cli-read", _ => CliReadOnlyTests.InvalidUtf16SegmentSourceNeverNormalizesIntoAnotherKey()),
         new("session-apply-pure-mixed-sealing", "session-apply", _ => SessionApplyTests.SuccessfulPureAndMixedAppliesSealOneDurableSession()),
         new("session-apply-recovery-before-sealing", "session-apply", _ => SessionApplyTests.PartialApplyKeepsRepliesUntilRecoveryCompletesEveryOutput()),
         new("session-apply-subset-cannot-seal", "session-apply", _ => SessionApplyTests.ACompleteSubsetReceiptCannotSealUnwrittenTranslations()),

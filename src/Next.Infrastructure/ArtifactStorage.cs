@@ -3,6 +3,8 @@ using Next.Domain;
 
 namespace Next.Infrastructure;
 
+public sealed class ArtifactSizeLimitException() : IOException("Artifact exceeds 64 MiB limit");
+
 public sealed class ArtifactStorage : IArtifactStorage
 {
     public Hash256 AccessBinding => GuardedArtifactPath.AccessBinding(root, world);
@@ -31,7 +33,7 @@ public sealed class ArtifactStorage : IArtifactStorage
     private IArtifactCandidate StageCore(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, bool delete)
     {
         ArgumentNullException.ThrowIfNull(preimage);
-        if (bytes.Length > MaximumBytes) throw new IOException("Artifact exceeds 64 MiB limit");
+        if (bytes.Length > MaximumBytes) throw new ArtifactSizeLimitException();
         var path = GuardedArtifactPath.Acquire(root, world, artifact, allowMissingParents: preimage.ExpectedAbsent);
         try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io, delete); }
         catch { path.Dispose(); throw; }
@@ -39,7 +41,7 @@ public sealed class ArtifactStorage : IArtifactStorage
     internal static byte[] ReadFile(string path)
     {
         using var stream = GuardedArtifactPath.OpenFile(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-        if (stream.Length > MaximumBytes) throw new IOException("Artifact exceeds 64 MiB limit");
+        if (stream.Length > MaximumBytes) throw new ArtifactSizeLimitException();
         var bytes = new byte[checked((int)stream.Length)]; stream.ReadExactly(bytes);
         return bytes;
     }

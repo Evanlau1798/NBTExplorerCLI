@@ -2,9 +2,9 @@
 
 Windows x64 / .NET 10 的獨立新核心，直接開發於本目錄。舊版位於 `.old/`，不參與新版 build 或 runtime。
 
-目前公開 CLI 提供 help/version；新核心已有來源地址、保型 codec、唯讀抽取與 verified cache 服務。Session 交換／持久化 API 見 [session 契約](docs/session-contract.md)，公開世界與翻譯命令由後續整合交付。目前不能作正式版本使用。完整範圍見 [能力帳本](docs/capabilities.md) 及 [章程](docs/rewrite-charter.md)；模型規格見 [Domain 契約](docs/domain-contracts.md)。
+目前公開 CLI 提供 help/version、get、list/ls、search/find，可查閱 NBT、原生 JSON、指定 ZIP entry、region chunk 與世界盤點；參數、精確路徑、格式及退出碼見 [唯讀命令契約](docs/cli-query-contract.md)。新核心已有抽取／verified cache、session、plan／apply／recover API；scan／翻譯及世界寫入的公開入口仍在整合，尚未提供正式發行版本。完整範圍見 [能力帳本](docs/capabilities.md) 及 [章程](docs/rewrite-charter.md)；模型規格見 [Domain 契約](docs/domain-contracts.md)。
 
-操作與交換的純模型規格見 [操作契約](docs/operation-contracts.md)，舊資料唯讀映射設計見 [legacy mapping](docs/legacy-mapping-contract.md)。這些模型不代表 CLI 已開放世界寫入。
+操作與交換規格見 [操作契約](docs/operation-contracts.md)，session 及封存見 [session 契約](docs/session-contract.md)，舊資料唯讀映射見 [legacy mapping](docs/legacy-mapping-contract.md)。目前公開查閱命令只讀取世界。
 
 ## 建置與驗證
 
@@ -20,7 +20,7 @@ dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --help
 dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --version
 ```
 
-建置與測試分開執行。驗證工程為無外部測試套件的 assertion harness，suite 為 session、scan、discovery、storage、region、compression、snbt、codec、contracts、domain、foundation、architecture、corpus；預設執行全部一般案例。使用 `--fixture-root <absolute-path>` 可覆寫預設輸出資源根，結果不依 shell cwd。每個案例在獨立 worker 執行；`--timeout-ms` 預設 30000，接受 100–120000。Stdout 為單一 JSON，stderr 為診斷；失敗、unsupported、timeout、未知／空選擇皆非零。
+建置與測試分開執行。驗證工程為無外部測試套件的 assertion harness，suite 例為 cli-read、session、session-apply、scan、discovery、storage、foundation、architecture；`--suite cli-read` 會啟動實際 CLI 做黑箱查閱，預設執行全部一般案例。使用 `--fixture-root <absolute-path>` 可覆寫預設輸出資源根，結果不依 shell cwd。每個案例在獨立 worker 執行；`--timeout-ms` 預設 30000，接受 100–120000。Stdout 為單一 JSON，stderr 為診斷；失敗、unsupported、timeout、未知／空選擇皆非零。
 
 校準案例不包含於預設 suite：顯式選擇 `runner-calibration-failure`、`runner-calibration-unsupported` 應 exit 1；`--case runner-calibration-timeout --timeout-ms 1000` 應終止 worker 並 exit 1。校準失敗不能計為通過。
 
