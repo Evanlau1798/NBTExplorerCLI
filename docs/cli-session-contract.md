@@ -1,19 +1,23 @@
 # File-based translation sessions
 
 `translate <action> <world>` exposes the durable session service. These commands
-write tool state, never world content. Direct world translation uses
+manage durable tool state. Direct world translation uses
 [session plan, existing apply/recover and seal](cli-session-write-contract.md);
 [key conversion](cli-key-plan-contract.md) and [convert](cli-convert-contract.md)
-use the same verified writer. Standalone language export and pack generation remain
-integration work. Agent preferences use the
+use the same verified writer. [Standalone language export and pack generation](cli-resource-contract.md)
+have separate preview/apply commands and also use the verified writer. Agent preferences use the
 [agent contract](cli-agent-contract.md).
 
-All non-help actions accept `--session-id <guid>`, `--state-root <directory>`, `--output
+Non-help session management actions accept `--session-id <guid>`, `--state-root <directory>`, `--output
 <new-file>`, `--help` and the global `--ui-locale`. Session ID is required except
 for `start`, which can generate one. Retain the returned ID. State and exports
 must be outside the world; existing output files are preserved. The default state
 root is the same world-scoped root as the editing commands, with separate owned
 repositories for sessions and cache. No legacy executable or state is loaded.
+
+Resource actions `export-lang` and `create-pack` instead use `--output DIR` for
+the resources and `--plan-output FILE` for a new canonical plan file. They require
+an exact revision; see their [resource contract](cli-resource-contract.md).
 
 | Action | Additional options and behavior |
 | --- | --- |
@@ -32,6 +36,8 @@ repositories for sessions and cache. No legacy executable or state is loaded.
 | `plan` | Exactly one of `direct`/`keys`, exact `revision`; optional plan `operation-id`. Direct supports explicit `synchronize-references`; keys requires `language-output` and accepts `prefix`. Exports a PatchPlan for global `apply`. |
 | `apply`, `apply-keys` | Preview aliases with explicit migration metadata; default to keys. `apply --direct` selects direct planning. Commit/recovery uses global `apply`/`recover`. |
 | `seal` | Required original `revision`, retained `operation-id`, `plan-hash`. Records completion only from full durable world proof. |
+| `export-lang` | Exact `revision`; original/target locale and key prefix; resource-directory output, canonical plan export and explicit apply. Does not seal the session. |
+| `create-pack` | Same resource contract plus name, output format, pack format and frozen ZIP/directory merge input. |
 
 `start` requires complete selected-source coverage. It uses the shared verified
 query service, preserving exact physical occurrences and explicit component roots.
@@ -98,6 +104,6 @@ glossary/profile compatibility; lookup does not submit or accept a translation.
 Notes/glossary and group presentation never authorize a world rename/write.
 
 Agent setup/submit/status and [legacy import/report](cli-legacy-contract.md) have
-their own contracts. [Key plans](cli-key-plan-contract.md) create required language/pack dependencies; [convert](cli-convert-contract.md) is a separate source-to-key workflow. Standalone language export/pack management remain integration work.
+their own contracts. [Key plans](cli-key-plan-contract.md) create required language/pack dependencies; [convert](cli-convert-contract.md) is a separate source-to-key workflow. [Standalone language/pack commands](cli-resource-contract.md) export frozen session values without applying gameplay changes or sealing the session.
 Those capabilities remain required. Minecraft load, RSS/performance, power loss
 and release acceptance are later gates.

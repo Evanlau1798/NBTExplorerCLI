@@ -31,7 +31,8 @@ public static class CliApplication
             {
                 var result = command == "convert" ? ConvertCommands.Execute(request) : command == "import-legacy" ? LegacyCommands.Execute(request) : command == "agent" ? AgentCommands.Execute(request) : command == "translate" ? SessionCommands.Execute(request) : command is "scan" or "extract" or "validate" or "capabilities" ? ScanCommands.Execute(request) : WriteCommands.Execute(request);
                 var json = CommandOutputJson.Write(command, result.Data, result.Outcome, result.Code, result.Code is null ? null : Message(result.Code, locale));
-                if (request.Get("output") is { } file)
+                var export = request.Command == "translate" && request.Subcommand is "export-lang" or "create-pack" ? request.Get("plan-output") : request.Get("output");
+                if (export is { } file)
                 {
                     try { QueryExportFile.WriteNew(file, result.Export ?? (json + Environment.NewLine)); }
                     catch (ArtifactConflictException error)

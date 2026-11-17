@@ -113,7 +113,7 @@ internal static class ResourceContractTests
         void Refuse(Func<ResourceGeneration> create) { try { _ = create(); throw new InvalidOperationException("unsafe resource recipe was accepted"); } catch (ArgumentException) { } }
         Refuse(() => new(Guid.Empty, ResourceOutputFormat.LanguageFiles, "", [Language()]));
         Refuse(() => new(World, (ResourceOutputFormat)99, "", [Language()]));
-        Refuse(() => new(World, ResourceOutputFormat.LanguageFiles, "level.dat", [Language()]));
+        Refuse(() => new(World, ResourceOutputFormat.LanguageFiles, "../level.dat", [Language()]));
         Refuse(() => new(World, ResourceOutputFormat.ZipPack, "level.dat", [Language()], new(34, 0)));
         Refuse(() => new(World, ResourceOutputFormat.DirectoryPack, "../data", [Language()], new(34, 0)));
         Refuse(() => new(World, ResourceOutputFormat.ZipPack, "resources.zip", [Language()]));

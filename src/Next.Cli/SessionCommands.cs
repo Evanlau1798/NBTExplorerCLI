@@ -9,7 +9,7 @@ namespace Next.Cli;
 
 internal static class SessionCommands
 {
-    internal static readonly string[] Subcommands = ["start", "status", "export", "next", "submit", "get", "jump", "note", "glossary", "reset", "groups", "memory", "plan", "apply", "apply-keys", "seal", "help"];
+    internal static readonly string[] Subcommands = ["start", "status", "export", "next", "submit", "get", "jump", "note", "glossary", "reset", "groups", "memory", "plan", "apply", "apply-keys", "export-lang", "create-pack", "seal", "help"];
     internal static string[] Allowed(string action)
     {
         if (action == "help") return ["help"];
@@ -20,12 +20,15 @@ internal static class SessionCommands
             "get" => ["slot-id"], "jump" => ["request"], "note" or "glossary" => ["request", "limit", "offset"],
             "reset" => ["request", "confirm"], "groups" => ["limit", "offset"], "memory" => ["slot-id", "source-sessions", "glossary-version", "limit", "offset"],
             "plan" or "apply" or "apply-keys" => ["direct", "keys", "prefix", "language-output", "revision", "operation-id", "synchronize-references"], "seal" => ["revision", "operation-id", "plan-hash"],
+            "export-lang" => ["revision", "original-lang", "target-lang", "prefix", "plan-output", "apply", "world-offline"],
+            "create-pack" => ["revision", "original-lang", "target-lang", "prefix", "plan-output", "apply", "world-offline", "name", "format", "merge", "merge-existing", "pack-format"],
             _ => throw new CliFailure("UNKNOWN_COMMAND", "Unknown translate subcommand")
         };
         return ["session-id", "state-root", "output", "help", .. options];
     }
     internal static CliResult Execute(CliArguments request)
     {
+        if (request.Subcommand is "export-lang" or "create-pack") return ResourceCommands.Execute(request);
         var id = request.Get("session-id") is { } declared ? GuidValue(declared) : request.Subcommand == "start" ? Guid.NewGuid() : throw new CliFailure("INVALID_ARGUMENTS", "Missing --session-id");
         var operationId = request.Get("operation-id") is { } declaredOperation ? GuidValue(declaredOperation) : Guid.NewGuid();
         if (request.Subcommand is "apply" or "apply-keys")

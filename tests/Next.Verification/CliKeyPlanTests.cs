@@ -16,7 +16,7 @@ internal static class CliKeyPlanTests
     private static string State(string work) => Path.Combine(work, "state");
     private static Invocation Call(string world, string work, Guid id, string action, params string[] args) => Run(work,
         ["translate", action, world, "--session-id", id.ToString(), "--state-root", State(work), .. args]);
-    private static (Guid Id, long Revision) Session(string world, string work, string? pattern = null)
+    internal static (Guid Id, long Revision) Session(string world, string work, string? pattern = null)
     {
         var id = Guid.NewGuid();
         using var started = Success(Call(world, work, id, "start", ["--source-language", "en_us", "--target-language", "zh_tw", .. (pattern is null ? Array.Empty<string>() : new[] { "--match-pattern", pattern })]));

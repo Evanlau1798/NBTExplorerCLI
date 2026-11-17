@@ -29,13 +29,14 @@ public sealed class ResourceGeneration
         ArgumentNullException.ThrowIfNull(destination); ArgumentNullException.ThrowIfNull(languages);
         if (format == ResourceOutputFormat.LanguageFiles)
         {
-            if (destination != "" || packFormat is not null || merge is not null) throw new ArgumentException("Standalone language files have no pack destination, format or merge");
+            if (destination.Length != 0) Path(destination);
+            if (packFormat is not null || merge is not null) throw new ArgumentException("Standalone language files have no pack format or merge");
         }
         else
         {
             Path(destination);
-            if (destination.Contains('/') || format == ResourceOutputFormat.ZipPack && !destination.EndsWith(".zip", StringComparison.Ordinal)
-                || packFormat is null || packFormat.Major < 1) throw new ArgumentException("Pack generation requires one exact pack name and a positive format");
+            if (format == ResourceOutputFormat.ZipPack && !destination.EndsWith(".zip", StringComparison.Ordinal)
+                || packFormat is null || packFormat.Major < 1) throw new ArgumentException("Pack generation requires one exact relative destination and a positive format");
         }
         long retained = 64 + (long)destination.Length * 2; var entries = 0;
         void Charge(long bytes)
@@ -94,7 +95,7 @@ public sealed class ResourceGeneration
         {
             if (format == ResourceOutputFormat.DirectoryPack) Add(destination + "/pack.mcmeta", ArtifactKind.Json);
             foreach (var language in Languages)
-                Add(format == ResourceOutputFormat.LanguageFiles ? language.Locale + ".json" : destination + "/assets/minecraft/lang/" + language.Locale + ".json", ArtifactKind.Json);
+                Add(format == ResourceOutputFormat.LanguageFiles ? (destination.Length == 0 ? "" : destination + "/") + language.Locale + ".json" : destination + "/assets/minecraft/lang/" + language.Locale + ".json", ArtifactKind.Json);
             foreach (var entry in Merge?.Entries ?? []) Add(destination + "/" + entry.Path,
                 entry.Path == "pack.mcmeta" || entry.Path.EndsWith(".json", StringComparison.Ordinal) ? ArtifactKind.Json : ArtifactKind.Text);
         }

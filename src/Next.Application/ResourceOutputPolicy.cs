@@ -13,15 +13,15 @@ public static class ResourceOutputPolicy
 {
     private static readonly string[] GameplayRoots = ["data", "datapacks", "region", "entities", "poi", "players", "playerdata", "dimensions", "DIM1", "DIM-1", "stats", "advancements", "generated"];
     private static readonly string[] WorldFiles = ["level.dat", "level.dat_old", "level.dat_mcr", "session.lock", "uid.dat"];
-    public static void ValidateWorldAncestor(string relativeRoot, ResourceGeneration generation, byte[] level, byte[]? worldGen)
+    public static void ValidateWorldAncestor(IEnumerable<string> relativeOutputs, byte[] level, byte[]? worldGen)
     {
         var limits = DecodeLimits.Default;
-        var metadata = WorldMetadata.Read(CompressedNbt.ReadDocument(level, NbtCompression.GZip, limits).Document,
+        _ = WorldMetadata.Read(CompressedNbt.ReadDocument(level, NbtCompression.GZip, limits).Document,
             worldGen is null ? null : CompressedNbt.ReadDocument(worldGen, NbtCompression.GZip, limits).Document);
-        var protectedRoots = GameplayRoots.Concat(WorldFiles).Concat(metadata.DimensionDirectories.Keys.Where(path => path.Length != 0));
-        foreach (var output in generation.Outputs)
+        // Known profiles map every non-root dimension below DIM1, DIM-1 or dimensions.
+        var protectedRoots = GameplayRoots.Concat(WorldFiles);
+        foreach (var path in relativeOutputs)
         {
-            var path = relativeRoot == "." ? output.RelativePath : relativeRoot + "/" + output.RelativePath;
             if (protectedRoots.Any(root => path.Equals(root, StringComparison.OrdinalIgnoreCase) || path.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase)))
                 throw new NotSupportedException("Resource generation cannot target world metadata or a gameplay subtree");
         }

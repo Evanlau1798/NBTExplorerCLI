@@ -9,6 +9,7 @@ namespace Next.Infrastructure;
 internal sealed class GuardedArtifactPath : IDisposable
 {
     private readonly List<SafeFileHandle> directories = [];
+    private HashSet<string>? branches;
     private IDisposable? writer;
     public string Target { get; }
     public string StagingDirectory { get; private set; }
@@ -79,13 +80,16 @@ internal sealed class GuardedArtifactPath : IDisposable
     internal void HoldExistingBranch(string ancestor, string relativeDirectory)
     {
         var current = Path.GetFullPath(ancestor);
-        var prefix = Path.EndsInDirectorySeparator(current) ? current : current + Path.DirectorySeparatorChar;
-        if (current != StagingDirectory && !StagingDirectory.StartsWith(prefix, StringComparison.Ordinal))
+        bool InitiallyHeld(string directory) => directory == StagingDirectory
+            || StagingDirectory.StartsWith(Path.EndsInDirectorySeparator(directory) ? directory : directory + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+        if (!InitiallyHeld(current) && branches?.Contains(current) != true)
             throw new ArgumentException("Branch must start at an already held ancestor", nameof(ancestor));
         ArtifactAddress.ValidatePath(relativeDirectory, entry: false);
         foreach (var segment in relativeDirectory.Split('/'))
         {
-            current = Path.Combine(current, segment); HoldDirectory(current);
+            current = Path.Combine(current, segment);
+            if (InitiallyHeld(current) || branches?.Contains(current) == true) continue;
+            HoldDirectory(current); (branches ??= new(StringComparer.Ordinal)).Add(current);
         }
     }
     internal bool HoldParents(bool create)
@@ -159,5 +163,6 @@ internal sealed class GuardedArtifactPath : IDisposable
         writer?.Dispose(); writer = null;
         for (var index = directories.Count - 1; index >= 0; index--) directories[index].Dispose();
         directories.Clear();
+        branches?.Clear();
     }
 }

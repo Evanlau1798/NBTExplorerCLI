@@ -12,7 +12,7 @@ internal sealed class ResourceScopeGuard : IDisposable
         try
         {
             var rootLease = GuardedArtifactPath.AcquireDirectory(root, ""); guard.held.Add(rootLease);
-            for (var ancestor = new DirectoryInfo(root); ancestor is not null; ancestor = ancestor.Parent)
+            void Inspect(DirectoryInfo ancestor, string levelName = "level.dat", bool required = false)
             {
                 byte[]? Read(string relative)
                 {
@@ -27,9 +27,27 @@ internal sealed class ResourceScopeGuard : IDisposable
                     }
                     catch (FileNotFoundException) { return null; }
                 }
-                if (Read("level.dat") is { } level)
-                    ResourceOutputPolicy.ValidateWorldAncestor(Path.GetRelativePath(ancestor.FullName, root).Replace('\\', '/'), generation, level,
-                        Read("data/minecraft/world_gen_settings.dat"));
+                if (Read(levelName) is { } level)
+                    ResourceOutputPolicy.ValidateWorldAncestor(generation.Outputs.Select(output => Path.GetRelativePath(ancestor.FullName,
+                        Path.Combine(root, output.RelativePath)).Replace('\\', '/')).Where(path => path != ".." && !path.StartsWith("../", StringComparison.Ordinal)),
+                        level, Read("data/minecraft/world_gen_settings.dat"));
+                else if (required) throw new ArtifactConflictException("Descendant world metadata disappeared during scope inspection");
+            }
+            for (var ancestor = new DirectoryInfo(root); ancestor is not null; ancestor = ancestor.Parent) Inspect(ancestor);
+            var paths = generation.Outputs.Select(output => output.RelativePath).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (paths.Any(path => path.Contains('/')))
+            {
+                var catalog = new WorldInventory(root, generation.WorldId).Enumerate();
+                if (!catalog.Complete) throw new IOException("Resource descendant scope catalog is incomplete");
+                foreach (var marker in catalog.Entries.Select(entry => entry.RelativePath).Concat(catalog.DirectoryPaths)
+                    .Where(path => path.EndsWith("/level.dat", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var directory = marker[..marker.LastIndexOf('/')]; var prefix = directory + "/";
+                    var index = Array.BinarySearch(paths, prefix, StringComparer.OrdinalIgnoreCase); if (index < 0) index = ~index;
+                    if (index == paths.Length || !paths[index].StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                    rootLease.HoldExistingBranch(root, directory);
+                    Inspect(new DirectoryInfo(Path.Combine(root, directory)), Path.GetFileName(marker), required: true);
+                }
             }
             return guard;
         }

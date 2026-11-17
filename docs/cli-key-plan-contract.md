@@ -59,8 +59,8 @@ Language files and packs are part of the same prepared physical set as their
 components. All candidates must stage and verify before the first world commit.
 Preparation failure keeps every original and accepted reply; partial commits use
 the original durable journal and verified recovery. A language-only export or
-standalone pack command is separate work; this workflow creates dependencies for
-actual component conversions.
+standalone pack command has a [separate contract](cli-resource-contract.md);
+this workflow creates dependencies for actual component conversions.
 
 The old names `translate apply` and `translate apply-keys` are planning aliases in
 this major version. They return `data.preview=true`, the canonical projection

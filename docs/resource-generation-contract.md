@@ -11,13 +11,13 @@ The original five-kind baseline is recorded in
 objects. `ResourceOutputService` builds and prepares this dedicated kind, then
 uses the existing apply/journal/readback/recovery engine. The gameplay snapshot
 preparation path still refuses this kind. Public `translate export-lang` and
-`translate create-pack` remain integration work.
+`translate create-pack` use this service; see [CLI contract](cli-resource-contract.md).
 
 | Format | Destination | Complete physical output set |
 | --- | --- | --- |
-| `languageFiles` | Empty string; caller selects the physical output root. | One `<locale>.json` per declared locale. |
-| `zipPack` | One basename ending in `.zip`. | One archive. |
-| `directoryPack` | One nonempty directory basename. | `pack.mcmeta`, generated `assets/minecraft/lang/<locale>.json`, and declared merge files. |
+| `languageFiles` | Empty string or a safe relative directory. | One `<locale>.json` at the root, or `<destination>/<locale>.json`, per declared locale. |
+| `zipPack` | One safe relative archive path ending in `.zip`. | One archive at that exact path. |
+| `directoryPack` | One nonempty safe relative directory. | `pack.mcmeta`, generated `assets/minecraft/lang/<locale>.json`, and declared merge files below that directory. |
 
 The payload declares one physical scope identity, output format, destination,
 languages, optional major/minor pack format, and optional immutable merge input.
@@ -25,6 +25,12 @@ Pack formats are required for packs and absent for standalone language files.
 The Minecraft adapter must independently validate actual profile support; a
 positive major number alone is not a support claim. The current key dependency
 writer is unchanged, including its caller-selected resource namespace.
+
+Relative placement extends the accepted values of the existing `destination`
+field without adding fields or changing flat destinations' canonical bytes.
+Traversal, Windows names, complete derived-path lengths and retention budgets
+remain checked. This binds plans to an existing physical ancestor, allowing the
+existing candidate lifecycle to create missing output parents only at commit.
 
 Language values are decoded strings, including empty values and exact UTF-16 code
 units. Keys and locales have ordinal identity. Canonical encoding sorts locales,
@@ -68,10 +74,13 @@ One operation counts once even when it promises multiple files. Applied results
 require proofs for every physical output. Preparation stages and verifies the
 whole set and binds its actual output root. Commit and recovery inspect the
 physical scope again; directory pack members and preserved file preconditions
-are checked before each commit. Output roots must already exist on local NTFS.
+are checked before each commit. The physical anchor must already exist on local
+NTFS; the requested output directory may be a missing descendant.
 Every ancestor carrying `level.dat` is validated, including its separate registry
 where required. Every actual output path is checked relative to every world
-ancestor. Metadata and gameplay/dimension subtrees are refused; safe resource
+ancestor, including descendant world markers between the physical anchor and
+the actual output files. A marker that is malformed, a directory or disappears
+during inspection fails closed. Metadata and gameplay/dimension subtrees are refused; safe resource
 locations such as root `resources.zip`, named resource directories,
 `.nbtcli_translate` language files and `resourcepacks/` remain available.
 Malformed or unknown ancestor metadata is refused. Nested world
@@ -79,13 +88,14 @@ markers cannot hide a more distant gameplay ancestor. Existing metadata handles
 remain open during the operation. Scope checks are repeated between commits to
 detect newly appearing markers; this does not claim atomic exclusion of an
 arbitrary external process creating new files between the check and replacement.
-Ancestor directory handles are acquired once; separate metadata branches add only
-their own directory segments. The native handle witness uses live process handle
+Ancestor and shared branch directory handles are acquired once; separate metadata
+branches add only their own directory segments. The native handle witness uses live process handle
 deltas and checks release after disposal; it does not measure peak RSS.
 
 Immutable input capture validates before publishing its reusable resource index.
 Source changes refuse capture; interrupted capture may leave verified raw backup
 objects, without a completed resource input index. Frozen inputs and prepared
 postimages are independent of later source-path changes. Resource output tests
-cover native NTFS writes, injected I/O interruption and recovery; public CLI,
-Minecraft loading, power loss and peak RSS remain separate gates.
+cover native NTFS writes, injected I/O interruption and recovery. Public CLI
+checks cover preview/apply/recovery and input refusals. Minecraft loading,
+power loss and peak RSS remain separate gates.

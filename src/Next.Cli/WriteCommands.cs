@@ -77,6 +77,11 @@ internal static class WriteCommands
                 using var prepared = Prepare(plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage).Prepare(backup, plan, true));
                 return Apply(prepared, engine, context.Root, context.State);
             }
+            if (plan.Operations.Any(operation => operation is ResourcePatch))
+            {
+                using var resource = Prepare(plan.Operations, () => new ResourceOutputService(context.Inventory, context.Storage, context.Objects()).Prepare(plan, true));
+                return Apply(resource, engine, context.Root, context.State);
+            }
             using var candidate = Prepare(plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage).Prepare(context.Query(SourceIdentity.ReadSnapshotScope(plan.SnapshotId)), plan, true));
             return Apply(candidate, engine, context.Root, context.State);
         }

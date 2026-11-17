@@ -39,6 +39,7 @@ public sealed class ResourceOutputService(IWorldInventory inventory, IArtifactSt
         ResourceInputService.RequireByteBudget(catalog.Entries.Where(entry => selected.Contains(entry.RelativePath)
             || generation.Format == ResourceOutputFormat.DirectoryPack && entry.RelativePath.StartsWith(generation.Destination + "/", StringComparison.OrdinalIgnoreCase)).Select(entry => entry.Bytes));
         var inputs = new Dictionary<string, ArtifactPrecondition>(StringComparer.Ordinal); var existing = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        var prefixLength = generation.Destination.Length == 0 ? 0 : generation.Destination.Length + 1;
         long readBytes = 0;
         byte[]? Read(ArtifactAddress artifact)
         {
@@ -72,14 +73,14 @@ public sealed class ResourceOutputService(IWorldInventory inventory, IArtifactSt
                 throw new ArtifactConflictException("Resource output aliases an existing physical path");
             var bytes = Read(artifact); if (bytes is null) continue;
             if (generation.Format == ResourceOutputFormat.ZipPack) { originalZip = bytes; existing = ResourceInputService.ZipFiles(bytes); }
-            else existing.Add(generation.Format == ResourceOutputFormat.LanguageFiles ? artifact.RelativePath : artifact.RelativePath[(generation.Destination.Length + 1)..], bytes);
+            else existing.Add(artifact.RelativePath[prefixLength..], bytes);
         }
         var merge = generation.Merge is null ? null : new ResourceInputService(objects).Load(generation);
         var rendered = ResourceRendering.Render(generation, existing, merge);
         var outputs = generation.Format == ResourceOutputFormat.ZipPack
             ? new Dictionary<string, byte[]> { [generation.Destination] = ResourceRendering.Zip(originalZip, rendered) }
             : generation.Outputs.ToDictionary(artifact => artifact.RelativePath,
-                artifact => rendered[generation.Format == ResourceOutputFormat.LanguageFiles ? artifact.RelativePath : artifact.RelativePath[(generation.Destination.Length + 1)..]], StringComparer.Ordinal);
+                artifact => rendered[artifact.RelativePath[prefixLength..]], StringComparer.Ordinal);
         var snapshot = SourceIdentity.Snapshot(inventory.WorldId, inputs.Values.Where(input => !input.Image.ExpectedAbsent)
             .Select(input => new ManifestSource(input.Artifact, input.Image.Hash, SourceOutcome.Success)), SnapshotScope.All,
             new("resource-input-v1", ResourceGeneration.Profile, "resource-render-v1", ResourceGeneration.Policy));

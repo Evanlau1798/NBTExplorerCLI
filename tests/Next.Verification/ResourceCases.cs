@@ -4,6 +4,17 @@ internal static class ResourceCases
 {
     internal static readonly VerificationCase[] Cases =
     [
+        new("cli-resource-explicit-source-metadata", "cli-resource", _ => CliResourceTests.ExplicitExternalPackOptionsUseFrozenSessionValuesWithoutSourceMetadata()),
+        new("resource-output-scope-allocation", "resource-output", context => ResourceScopeHandleTests.MetadataProtectionDoesNotMultiplyDimensionAndOutputAllocations(context.ArtifactRoot)),
+        new("cli-resource-directory-merge-conflict", "cli-resource", _ => CliResourceTests.DirectoryMergeAliasAndExistingKeyConflictsPreserveBothInputsAndOutputs()),
+        new("resource-output-relative-placement", "resource-output", _ => ResourcePlacementTests.RelativeOutputDirectoriesAreExactPlanPathsAndAppearOnlyAtCommit()),
+        new("resource-output-descendant-world-scope", "resource-output", _ => ResourcePlacementTests.NestedWorldGameplayCannotHideBelowThePhysicalOutputAnchor()),
+        new("resource-output-embedded-world-flat-merge", "resource-output", _ => ResourcePlacementTests.FlatDirectoryPackCannotCreateGameplayFilesInsideAnEmbeddedWorld()),
+        new("resource-output-descendant-malformed-marker", "resource-output", _ => ResourcePlacementTests.DescendantMalformedFileOrDirectoryMarkersFailClosed()),
+        new("cli-resource-direct-safety-session", "cli-resource", _ => CliResourceTests.DirectResourceWritesRequireExplicitSafetyAndKeepSessionStateTruthful()),
+        new("cli-resource-default-missing-parents", "cli-resource", _ => CliResourceTests.DefaultLegacyLanguageAndModernPackParentsAreCreatedOnlyByApply()),
+        new("cli-resource-language-plan-apply-recover", "cli-resource", _ => CliResourceTests.ExportLanguagesPreviewsCanonicalPlansAndUsesThePublicApplyRecoveryPath()),
+        new("cli-resource-pack-frozen-merge-output", "cli-resource", _ => CliResourceTests.PackCommandsFreezeMergeInputsAndKeepOutputNamesAndDirectoriesDistinct()),
         new("resource-output-deep-native-handles", "resource-output", context => ResourceScopeHandleTests.DeepScopeRetainsALinearNumberOfNativeHandles(context.ArtifactRoot)),
         new("resource-output-native-branch-authority", "resource-output", _ => ResourceScopeHandleTests.BranchesRequireHeldAncestorsAndRejectMetadataReparsePoints()),
         new("resource-output-legacy-safe-locations", "resource-output", _ => ResourceOutputTests.LegacyWorldResourceLocationsRemainAvailableWithoutGameplayAuthority()),
