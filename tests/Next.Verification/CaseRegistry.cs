@@ -7,6 +7,16 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("cli-scan-transient-directory-ownership", "cli-scan", _ => CliScanTests.TransientOwnershipFailureNeverDeletesAnExistingDirectory()),
+        new("cli-scan-quick-result-classification", "cli-scan", _ => CliScanTests.QuickValidationSeparatesReadMalformedUnsupportedAndResourceFailures()),
+        new("cli-scan-dimension-region-zip-corrupt-cache", "cli-scan", _ => CliScanTests.DimensionRegionZipAndCorruptCacheKeepTheirExactBindings()),
+        new("cli-scan-locked-source-unknown-role", "cli-scan", _ => CliScanTests.LockedSourcesRemainReadErrorsAndUnknownRolesAreRejected()),
+        new("cli-scan-shared-full-warm-incremental", "cli-scan", _ => CliScanTests.FullWarmAndIncrementalUseTheSharedWorldCache()),
+        new("cli-scan-extract-unique-output", "cli-scan", _ => CliScanTests.UniqueExtractionRetainsExactOccurrencesAndOutputLifecycle()),
+        new("cli-scan-incomplete-partial-results", "cli-scan", _ => CliScanTests.IncompleteSourcesReturnPartialResultsWithNonzeroExit()),
+        new("cli-scan-scope-no-cache-arguments", "cli-scan", _ => CliScanTests.ScopedNoCacheQueriesPreserveTheWorldAndValidateArguments()),
+        new("cli-scan-validation-capabilities", "cli-scan", _ => CliScanTests.ValidationAndCapabilitiesExposeTheirActualScope()),
+        new("cli-scan-cache-export-regex-boundaries", "cli-scan", _ => CliScanTests.CacheAndExportBoundariesRejectWorldWritesAndRegexTimeouts()),
         new("cli-read-wrapped-pack-metadata-resource-limit", "cli-read", _ => CliReadOnlyTests.WrappedPackMetadataLimitsRemainResourceFailures()),
         new("cli-read-pack-metadata-json-locations", "cli-read", _ => CliReadOnlyTests.PackMetadataUsesNativeJsonInEveryQueryLocation()),
         new("cli-read-world-catalog-resource-limit", "cli-read", _ => CliReadOnlyTests.WorldCatalogResourceLimitsKeepTheirExitClassification()),

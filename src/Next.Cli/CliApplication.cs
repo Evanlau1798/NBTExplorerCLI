@@ -26,6 +26,13 @@ public static class CliApplication
                 command = "help";
             }
             else if (command == "version") data = new { product = "nbtcli-next", version = typeof(CliApplication).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0] };
+            else if (command is "scan" or "extract" or "validate" or "capabilities")
+            {
+                var result = ScanCommands.Execute(request);
+                var json = CommandOutputJson.Write(command, result.Data, result.Outcome, result.Code, result.Code is null ? null : Message(result.Code, locale));
+                if (request.Get("output") is { } file) QueryExportFile.WriteNew(file, json + Environment.NewLine);
+                output.WriteLine(json); return result.Exit;
+            }
             else data = ReadCommands.Execute(request);
             output.WriteLine(CommandOutputJson.Write(command, data)); return 0;
         }
@@ -45,7 +52,7 @@ public static class CliApplication
                 ArgumentException => "INVALID_ARGUMENTS",
                 _ => "INTERNAL_ERROR"
             };
-            var exit = code switch { "UNKNOWN_COMMAND" or "UNKNOWN_OPTION" or "INVALID_ARGUMENTS" or "CHUNK_REQUIRED" => 2, "CONFLICT" or "AMBIGUOUS_PATH" => 3, "UNSUPPORTED_SOURCE" or "INCOMPLETE_SOURCE" => 4, "RESOURCE_LIMIT" => 6, "INTERNAL_ERROR" => 1, _ => 5 };
+            var exit = code switch { "UNKNOWN_COMMAND" or "UNKNOWN_OPTION" or "INVALID_ARGUMENTS" or "CHUNK_REQUIRED" => 2, "CONFLICT" or "AMBIGUOUS_PATH" => 3, "UNSUPPORTED_SOURCE" or "INCOMPLETE_SOURCE" => 4, "RESOURCE_LIMIT" or "PATTERN_TIMEOUT" => 6, "INTERNAL_ERROR" => 1, _ => 5 };
             var outcome = exit == 3 ? "Conflict" : exit == 4 ? "Unsupported" : "Failed";
             output.WriteLine(CommandOutputJson.Write(CliArguments.Canonical(command), null, outcome, code, Message(code, locale), error.Message)); return exit;
         }
@@ -65,6 +72,7 @@ public static class CliApplication
             "MALFORMED_SOURCE" => en ? "The source data is malformed." : "來源資料格式損壞。",
             "ACCESS_DENIED" => en ? "Access denied." : "拒絕存取。",
             "RESOURCE_LIMIT" => en ? "The resource limit was exceeded." : "超過資源上限。",
+            "PATTERN_TIMEOUT" => en ? "The match pattern timed out." : "比對模式已逾時。",
             "READ_ERROR" => en ? "The source could not be read." : "無法讀取來源。",
             _ => en ? "The operation failed." : "操作失敗。"
         };

@@ -2,7 +2,7 @@
 
 Windows x64 / .NET 10 的獨立新核心，直接開發於本目錄。舊版位於 `.old/`，不參與新版 build 或 runtime。
 
-目前公開 CLI 提供 help/version、get、list/ls、search/find，可查閱 NBT、原生 JSON、指定 ZIP entry、region chunk 與世界盤點；參數、精確路徑、格式及退出碼見 [唯讀命令契約](docs/cli-query-contract.md)。新核心已有抽取／verified cache、session、plan／apply／recover API；scan／翻譯及世界寫入的公開入口仍在整合，尚未提供正式發行版本。完整範圍見 [能力帳本](docs/capabilities.md) 及 [章程](docs/rewrite-charter.md)；模型規格見 [Domain 契約](docs/domain-contracts.md)。
+目前公開 CLI 提供 help/version、get、list/ls、search/find，以及 scan/scan-world、extract/extract-text、validate、capabilities。可查閱 NBT、原生 JSON、指定 ZIP entry、region chunk、世界盤點，並透過共用 verified cache 掃描／抽取文字；精確路徑與退出碼見 [查閱契約](docs/cli-query-contract.md)，完整性、快取、篩選及匯出見 [世界查詢契約](docs/cli-scan-contract.md)。session、plan／apply／recover API 已有核心驗收，翻譯及世界寫入的公開入口仍在整合，尚未提供正式發行版本。完整範圍見 [能力帳本](docs/capabilities.md) 及 [章程](docs/rewrite-charter.md)；模型規格見 [Domain 契約](docs/domain-contracts.md)。
 
 操作與交換規格見 [操作契約](docs/operation-contracts.md)，session 及封存見 [session 契約](docs/session-contract.md)，舊資料唯讀映射見 [legacy mapping](docs/legacy-mapping-contract.md)。目前公開查閱命令只讀取世界。
 

@@ -22,7 +22,7 @@ internal static class BootstrapTests
         Require(json.RootElement.GetProperty("success").GetBoolean(), "help 必須標示成功");
         var commands = json.RootElement.GetProperty("data").GetProperty("commands").EnumerateArray()
             .Select(item => item.GetString()).ToArray();
-        Require(commands.SequenceEqual(["help", "version", "get", "list", "search"]), "help 只登錄目前已有黑箱驗證的實作入口");
+        Require(commands.SequenceEqual(["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities"]), "help 只登錄目前已有黑箱驗證的實作入口");
     }
 
     public static void Version()
