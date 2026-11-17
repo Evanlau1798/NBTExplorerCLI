@@ -7,7 +7,11 @@
     "extract-text": "extract",
     "ls": "list",
     "find": "search",
-    "translate-session": "translate"
+    "translate-session": "translate",
+    "--help": "help",
+    "-h": "help",
+    "--version": "version",
+    "-v": "version"
   },
   "developmentCommandsRemoved": ["core-test", "test", "debug-scan"],
   "parameterChanges": [
@@ -35,6 +39,41 @@
       "old": "translation resource --output has no canonical plan export",
       "new": "--output DIR selects resources; --plan-output FILE exports the canonical plan",
       "scope": "translate export-lang / create-pack; --apply --world-offline opts into writing"
+    },
+    {
+      "old": "translate apply --force",
+      "new": "remove force; repair the conflict and export/reply/plan with current bindings",
+      "scope": "translate; source, slot, dependency and protected-structure checks cannot be bypassed"
+    },
+    {
+      "old": "set --no-backup",
+      "new": "remove this option; typed editing always retains verified preimage recovery materials",
+      "scope": "set; convert and explicit legacy batch retain their documented convenience-backup policies"
+    },
+    {
+      "old": "translate get --key or a positional legacy key",
+      "new": "translate get --slot-id HASH; use the explicit legacy importer to map old identifiers",
+      "scope": "translate; no partial-key guessing or invented write authority"
+    },
+    {
+      "old": "translate jump --page or a positional page",
+      "new": "translate jump --request FILE|- containing a versioned session-command and expected revision",
+      "scope": "translate; export --page remains available for explicit page projection"
+    },
+    {
+      "old": "translate apply --original-lang / --target-lang",
+      "new": "bind source/target languages when starting the session; plan/apply use its exact retained languages",
+      "scope": "translate; standalone export-lang/create-pack still accept explicit original/target locale options"
+    },
+    {
+      "old": "translate create-pack --dry-run",
+      "new": "omit dry-run for the default preview; --apply --world-offline explicitly requests writing",
+      "scope": "resource commands require exact session revision and reject unknown flags"
+    },
+    {
+      "old": "legacy batch JSON with inferred values and paths",
+      "new": "batch --legacy --world DIR --migration-report FILE explicitly retains raw input and resolves exact typed operations",
+      "scope": "batch; ambiguous paths or unsupported value mappings are rejected without world writes"
     }
   ],
   "exitCodes": {

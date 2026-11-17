@@ -1,0 +1,55 @@
+{
+  "schemaFamily": "nbtcli.next.correctness-control",
+  "schemaVersion": 1,
+  "gateRevision": 2,
+  "runtimeSourceBase": "4180273d1a42c4aea4332086f1374dad880d12ac",
+  "configuration": {
+    "build": "Release",
+    "runtime": "Windows x64 / .NET 10.0.15 / SDK 10.0.404",
+    "scanWorkers": 1,
+    "queueSources": 16,
+    "bufferBytes": 268435456,
+    "verificationTimeoutMs": 120000,
+    "worldWrites": "explicit offline, one ordered apply/recover invocation at a time",
+    "osFileCache": "uncontrolled; full/refresh does not flush the OS file cache"
+  },
+  "scanInput": {
+    "recipe": "corpus.json S, its six declared files plus fixtures/control/level-java121.dat",
+    "baseManifestSha256": "33277bc56c3504cc181df5b24132eb207e5f4f06d65a8efdc8c684a73bad3019",
+    "metadataSha256": "ffc952ecc6974230f94e113065cd864b3541bb95256d8858873f1b21c9f40ad1",
+    "metadataBytes": 118,
+    "metadataMeaning": "GZip NBT DataVersion 3953 with overworld/nether/end dimension registry; synthetic, not playable",
+    "files": 7,
+    "bytes": 34032,
+    "slots": 256,
+    "scope": "LangKey",
+    "command": "scan WORLD --types LangKey --workers 1 --show-items --limit 10000 --cache-root CACHE",
+    "full": "append --refresh",
+    "warm": "same inputs/root and cache, without --refresh"
+  },
+  "scanTruth": {
+    "counts": {"sources":7,"occurrences":256,"matched":256,"translationKeys":256,"commandReferences":0,"unsupported":0,"failed":0},
+    "coverageComplete": true,
+    "slotRule": "pack-000/001 en_us keys fixture.line.000000..000127 have exact value Fixture PPP/en_us/NNNNNN ‖§‖ and language.value context",
+    "sameRootProjection": "data excluding telemetry, cacheBefore and execution; retain all source/snapshot identities",
+    "portableProjection": "also remove data.worldId, data.snapshotId, sources[].location.artifact.worldId and items[].address.artifact.worldId; retain all sources, diagnostics, counts, scope, addresses and text",
+    "portableJson": "PowerShell 7 ConvertTo-Json -Depth 100 -Compress, UTF-8 without BOM or final newline",
+    "portableSha256": "623cf5fde6f9273eaecee1ada49c2d001b43f79754f82b98f0a0b3559ee230f8"
+  },
+  "workflowControls": {
+    "scope": "Public cases indexed by docs/capabilities.md, plus cli-session-write-public-legacy-through-seal and architecture suite",
+    "settings": "Preserve each case's explicit input/worker settings. scanWorkers=1 applies to the separate serial scan control; cases run sequentially in isolated workers.",
+    "canonicalTruth": "Case assertions fix exact typed values, protected bytes, complete slot/operation sets, receipts, recovery identities, raw restores and session completion; random temporary paths are not semantic outputs",
+    "exportImport": "cli-session-file-exchange-replay",
+    "scanSessionImportPlanApplySeal": "cli-session-write-public-legacy-through-seal",
+    "typedBatch": "cli-edit-set-batch-stdin-parity",
+    "pureMixedApply": "cli-session-write-public-pure-mixed-unchanged",
+    "keyDependencies": "cli-key-plan-pure-mixed-seal",
+    "packMerge": "cli-resource-pack-frozen-merge-output",
+    "convert": "cli-convert-preview-dedup-context",
+    "backupRestore": "cli-compat-backup-named-manifest",
+    "recovery": "cli-session-write-partial-recovery-rollback"
+  },
+  "comparisonRule": "Preserve complete workload, diagnostics, bindings and canonical truth before comparing time/allocation/RSS. G07 must add size-specific workflow workloads and freeze inputs/thresholds before optimization.",
+  "statusBoundary": "Correctness only; no speedup, RSS, sustained-operation, Minecraft, power-loss or release acceptance. The immutable original six-file corpus lacks live world metadata and is not itself a valid public world scan."
+}

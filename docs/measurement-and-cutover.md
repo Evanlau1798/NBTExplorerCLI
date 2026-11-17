@@ -12,6 +12,8 @@ S/M/L 的 recipe、來源集合、bytes、slots 與 manifest hash 記於 [corpus
 
 `fixtures/cases/` 保留 F01–F20 的最小正反例；C-G 的 139 檔 raw byte baseline 與 pristine 副本已固定，DataVersion、chunk 與 slot 真值由 G02/G03 獨立裁決後才用於正確性／完整世界量測。其未建立語義真值的狀態不能當成 pass。G06 必須凍結完整必需工作流的正確串行 control；G07 再按相同語義工作量比較，不能只靠 LangKey corpus 關閉整個性能 Gate。
 
+G06 的 [正確性 control](../benchmarks/control.json) 固定已接受的 runtime 來源、串行 scan 設定、公開工作流 assertion 與 canonical 投影。原 S/M/L recipe 沒有 world metadata，不能直接冒充成功的公開世界 scan；S control 在副本加入 [118-byte metadata](../fixtures/control/level-java121.dat)，原 corpus 與 hashes 保持。控制來源為已知 3953 profile，三個明列維度；7 sources／256 slots、完整 diagnostics 及逐 key 原文公式獨立核對。Full／warm 的原 root identity 與 portable 投影分別比較，不刪錯誤或減少工作量。完整流程使用能力帳本中的公開情境，不把 LangKey 控制當成所有格式驗收。
+
 計時分 process cold、warm、verified incremental、少量／大量 apply、session import、pack、backup、recovery。OS file cache 未控制時明記；不宣稱清空。記錄全部 samples、wall／CPU、read／decoded／write bytes、files／chunks／slots、unsupported／error、RSS、buffer peaks、GC 與累積 allocation。語義結果／來源診斷／coverage／完整性先相同，execution telemetry 另核對。初始樣本只報 median、觀測最大值，不報可靠 p95。
 
 256 MiB 是全域 buffer lease 預算，不等於 RSS；每輸入、metadata、session、plan 各有獨立上限。L 的 524,288 slots 不承諾能塞進單一 100,000-slot session，必須使用明示 scope／容量結果，不能靜默丟槽。過大單輸入、取消與慢消費端均須有明確結果；實作及負載驗收留給各 owning Gate。

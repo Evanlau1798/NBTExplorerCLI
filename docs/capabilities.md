@@ -2,6 +2,8 @@
 
 GateRevision: 2；owner：專案維護者。本表定義完整能力與相容要求；實際可用入口見 README 及各 CLI 契約，未接線能力仍屬必需。
 
+全部命令／參數的版本化表見 [command surface](cli-command-surface.json)，共同 JSON／locale／退出碼見 [CLI protocol](cli-protocol-contract.md)，alias 與大版本差異見 [migration](cli-migration.json)。
+
 舊來源為 `.old/Program.cs`、各 Commands dispatcher 與參數處理。完整實際參數及來源見 [CLI 盤點](legacy-cli-inventory.json)。以下包含已接線與後續必需入口，一律經新版服務；新版參數與差異見 [查閱](cli-query-contract.md)、[掃描](cli-scan-contract.md)、[編輯](cli-edit-contract.md)及 [session 管理](cli-session-contract.md)。每個 fixture 在負責 gate 實作，必須保存 hash 與正反例結果才能 VERIFIED。
 
 | CAP | 新版入口／能力 | 決策與相容影響 | Gate | 驗收 fixture |
@@ -72,4 +74,39 @@ Sign、HangingSign、Book、LecternBook、Title、Author、ItemName、ItemLore�
 - no-backup 只關閉便利備份，不能關閉 journal/preimage；force 不能繞過來源、slot、依賴或受保護結構驗證。
 - 無旗標值的 bare words、未知／重複互斥選項不再默默忽略；回非零及可操作錯誤。
 
-其餘已盤點參數採語法映射保留；debug/verbose 只控制 stderr 診斷，不改成功、完整性或寫入範圍。舊未公開 restore helper 不算既有公開能力。G06 提供每項新用法、help 與黑箱驗收，之前不將本表標為 VERIFIED。
+完整旗標以 command surface 為準。舊 `force` 不再接受；先排除衝突、重新 export/reply/plan。`set --no-backup` 改為必要 verified backup，不提供停用選項；convert 與明確 legacy batch 的便利備份政策另見各契約。舊 `translate get --key` 改為 `--slot-id`，jump 的 page 改為帶 revision 的 session-command 請求；apply 的語言綁定移至 start，輸出動作仍可明確選擇原／目標 locale。`dry-run` 由預設 preview 取代，實際寫入須明確 apply/offline。debug/verbose 不改成功、完整性或寫入範圍，也不承諾一定產生診斷。舊未公開 restore helper 不算既有公開能力。
+
+## 公開情境的驗證索引
+
+以下連到 `tests/Next.Verification` 已註冊的實際 case，供重跑及審查追溯；不是另一份 Gate 完成帳本。單列可包含多個正例及失敗分支。命令為 `Next.Verification.dll --case NAME --timeout-ms 120000`；執行收據與接受範圍依 owning Gate，隔離工程及正式發布另驗。
+
+| CAP | 正常情境 case | 關鍵拒絕／復原 case |
+| --- | --- | --- |
+| CAP01 | cli-scan-shared-full-warm-incremental | cli-scan-incomplete-partial-results |
+| CAP02 | cli-scan-dimension-region-zip-corrupt-cache | cli-scan-scope-no-cache-arguments |
+| CAP03 | cli-scan-extract-unique-output | cli-scan-cache-export-regex-boundaries |
+| CAP04 | cli-read-lossless-types-display | cli-read-exact-paths |
+| CAP05 | cli-read-list-search-pagination | cli-read-arguments-locale-help |
+| CAP06 | cli-edit-set-batch-stdin-parity | cli-edit-stale-arguments-preserve-world |
+| CAP07 | cli-legacy-batch-typed-defaults | cli-legacy-batch-refusal-report |
+| CAP08 | cli-agent-questionnaire-replay-defaults | cli-agent-invalid-and-cas |
+| CAP09 | cli-session-start-presentation-replay | cli-session-invalid-start-no-state |
+| CAP10 | cli-session-file-exchange-replay | cli-session-reply-and-source-freshness |
+| CAP11 | cli-session-management-cas-reset | cli-session-selection-help-export |
+| CAP12 | cli-session-management-cas-reset | cli-session-preferences-failure-preserves-work |
+| CAP13 | cli-session-management-cas-reset | cli-session-status-captured-reset |
+| CAP14 | cli-session-write-public-pure-mixed-unchanged | cli-session-write-partial-recovery-rollback |
+| CAP15 | cli-key-plan-pure-mixed-seal | cli-key-plan-modes-name-authority |
+| CAP16 | cli-resource-language-plan-apply-recover | cli-resource-direct-safety-session |
+| CAP17 | cli-resource-pack-frozen-merge-output | cli-resource-directory-merge-conflict |
+| CAP18 | cli-convert-preview-dedup-context | cli-convert-name-option-refusal |
+| CAP19 | cli-compat-backup-named-manifest | cli-compat-backup-name-publication-failure |
+| CAP20 | cli-scan-validation-capabilities | cli-scan-quick-result-classification |
+| CAP21 | cli-protocol-command-help-locale | cli-protocol-nine-state-receipts |
+| CAP22 | cli-read-lossless-types-display | cli-protocol-locale-fallback |
+| CAP23 | help-identifies-implemented-commands | architecture suite：禁止舊來源／DLL／process fallback |
+| CAP24 | cli-edit-set-batch-stdin-parity | cli-edit-precondition-root-hash-boundaries |
+| CAP25 | cli-edit-preview-apply-status-recover | cli-write-postcommit-io-identity |
+| CAP26 | cli-edit-backup-restore-raw | cli-edit-restore-backup-rejection-accounting |
+| CAP27 | cli-legacy-mapped-session-canonical-export | cli-legacy-unresolved-and-conflict |
+| CAP28 | cli-scan-validation-capabilities | cli-scan-locked-source-unknown-role |

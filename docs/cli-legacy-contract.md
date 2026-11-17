@@ -96,5 +96,7 @@ means complete as of its retained snapshot, not fresh world validation. New repo
 or projection queries also expose selected-world coverage/freshness. None of these
 reports replace the planner's current preimage checks. Direct world apply uses
 the separate [session world workflow](cli-session-write-contract.md).
-Key/pack integration, legacy batch operations, performance/RSS, Minecraft and
-release gates remain separate required work.
+[Key plans](cli-key-plan-contract.md), [standalone resources](cli-resource-contract.md)
+and [explicit legacy batch operations](cli-legacy-batch-contract.md) are separate
+public workflows using that same writer. Performance/RSS, Minecraft and release
+remain separate required gates.

@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="../../docs/cli-command-surface.json" Link="CliContract/cli-command-surface.json" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../../src/Next.Cli/Next.Cli.csproj" />
     <ProjectReference Include="../../benchmarks/Next.Benchmarks/Next.Benchmarks.csproj" />
     <None Include="../../Directory.Build.targets" Condition="Exists('../../Directory.Build.targets')"

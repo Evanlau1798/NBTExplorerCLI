@@ -5,8 +5,9 @@ The product also registers `help`, `version`, `scan`, `extract`, `validate` and
 `capabilities`; see [world text queries](cli-scan-contract.md) for their contracts.
 `help <command>` lists that command's accepted options. Generic editing, durable
 apply/recover and verified backups use the [editing contract](cli-edit-contract.md).
-File-based session and agent preferences use their own CLI contracts; world
-translation adapters remain separate integration work.
+File-based session and agent preferences use their own CLI contracts. World
+translation, conversion and standalone resources use the same verified writer;
+the complete registry and output rules are in the [public protocol](cli-protocol-contract.md).
 
 Every invocation emits one `nbtcli.next.cli`, version 1 JSON envelope on stdout.
 `success`, canonical `command`, `outcome`, `data` and `error` have stable meanings.
@@ -102,6 +103,9 @@ are limited to 64 MiB, codecs keep their existing decode budgets, and command ou
 is bounded to 64 MiB before it is emitted. Cache/scanning, extraction and validation
 are described in the world-query contract. File-based translation session management
 is described in the session CLI contract, and agent preferences in the agent CLI
-contract; world translation adapters remain separate integration work.
+contract. [Direct world translation](cli-session-write-contract.md),
+[key planning](cli-key-plan-contract.md), [conversion](cli-convert-contract.md)
+and [standalone resources](cli-resource-contract.md) use their own explicit
+preview/apply workflows through the verified writer.
 Typed interchange also retains its existing depth/node/token budgets; an output
 limit returns ResourceLimit for the valid source, and a narrower subtree can be queried.

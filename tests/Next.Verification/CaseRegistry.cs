@@ -7,6 +7,9 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("cli-protocol-command-help-locale", "cli-protocol", _ => CliProtocolTests.EveryRegisteredSurfaceHasMatchingHelpAndLocaleStableErrors()),
+        new("cli-protocol-nine-state-receipts", "cli-protocol", _ => CliProtocolTests.NineReceiptOutcomesKeepCountsAndExitClassification()),
+        new("cli-protocol-locale-fallback", "cli-protocol", _ => CliProtocolTests.MissingMessageKeysHaveSafeLocalizedFallbacks()),
         .. CliWorkflowCases.Cases,
         new("cli-edit-restore-backup-rejection-accounting", "cli-edit", _ => CliEditTests.RestorePlanBackupRejectionsAccountForEveryValidIntent()),
         new("cli-edit-bounded-error-diagnostics", "cli-edit", _ => DurableReceiptBudgetTests.ErrorDiagnosticsCannotExhaustTheMachineOutputBudget()),

@@ -81,6 +81,7 @@ replace actual local validation.
 World scope is the existing NTFS directory binding, not a portable world UUID.
 Byte-identical other roots cannot adopt a questionnaire as that world's confirmed
 state. No old executable, cache/config folder or writer is called. Direct translation
-uses the [session world workflow](cli-session-write-contract.md). Key/pack
-integration, legacy batch, performance/RSS, Minecraft load
-and release acceptance remain separate required work.
+uses the [session world workflow](cli-session-write-contract.md). [Key plans](cli-key-plan-contract.md),
+[standalone resources](cli-resource-contract.md) and [explicit legacy batch](cli-legacy-batch-contract.md)
+use the same verified writer. Performance/RSS, Minecraft load and release acceptance
+remain separate required gates.
