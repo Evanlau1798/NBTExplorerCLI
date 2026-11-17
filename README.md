@@ -30,6 +30,6 @@ dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --version
 
 `Directory.Build.targets` 檢查 project graph、Compile containment、HintPath 與 Domain 套件邊界；architecture suite 另檢查 compiled assembly／PDB、舊來源 checksum、process／動態 assembly APIs。`--artifact-root <publish-dir>` 可檢查最小 framework-dependent 發布內容與 deps。這些是工程防線，不代表已完成世界流程或 G08 自足發行驗收。語義改寫後的舊演算法仍需獨立 review，checksum 不能判斷所有抄寫。
 
-benchmarks 的 `generate-corpus S|M|L <new-output-root>` 可建立固定容量資料；既有輸出根拒絕覆寫。正確串行 scan 設定、canonical 真值與公開工作流 control 見 [control.json](benchmarks/control.json)。量測入口仍回 `BENCHMARK_NOT_READY`；尚無 G07 時間／RSS 或速度結果。固定來源、limits、差異裁決與切換規則見 [量測與切換契約](docs/measurement-and-cutover.md)。
+benchmarks 的 `generate-corpus S|M|L <new-output-root>` 可建立固定容量資料；既有輸出根拒絕覆寫。正確串行 scan 設定、canonical 真值與公開工作流 control 見 [control.json](benchmarks/control.json)。`measure-scan` 已提供 [掃描量測入口](docs/benchmark-measurement-contract.md)，分開語義 hash、source/cache traffic、allocation 與 process working set；完整 G07 樣本／工作流／RSS 驗收仍待，不宣稱速度結果。固定來源、limits、差異裁決與切換規則見 [量測與切換契約](docs/measurement-and-cutover.md)。
 
 資料根為 `%LOCALAPPDATA%/nbtcli-next`，暫存根為系統 temp 下的 `nbtcli-next`；取得根路徑不建立任何目錄。世界、譯文及 `.old` 使用者檔案不會因 help/version 被讀寫。候選不安裝至 PATH。
