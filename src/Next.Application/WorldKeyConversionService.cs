@@ -25,13 +25,19 @@ public sealed class WorldKeyConversionService(IWorldInventory inventory)
             if (WorldReferenceService.IsIdentifyingName(item.Slot.Role)) throw new EditRejectedException(EditFailure.Precondition, "Identifying key conversion requires independently verified name authority");
             requested.Add(item);
         }
+        if (requested.Count == 0) return [];
         var output = ImmutableArray.CreateBuilder<KeyConversionPatch>();
-        foreach (var group in requested.GroupBy(item => (item.Slot.Address.Artifact, item.Slot.Address.Chunk)))
+        var groups = requested.GroupBy(item => (item.Slot.Address.Artifact, item.Slot.Address.Chunk)).ToArray();
+        var sourceKeys = groups.Select(group => group.Key).ToHashSet();
+        var bySource = snapshot.Discovery.Sources.Where(source => sourceKeys.Contains((source.Location.Artifact, source.Chunk)))
+            .ToDictionary(source => (source.Location.Artifact, source.Chunk));
+        var reader = new WorldPlanBuilder(inventory);
+        foreach (var group in groups)
         {
-            var source = snapshot.Discovery.Sources.SingleOrDefault(source => source.Location.Artifact == group.Key.Artifact && source.Chunk == group.Key.Chunk)
-                ?? throw new EditRejectedException(EditFailure.Missing, "Key source is absent from the snapshot");
+            if (!bySource.TryGetValue(group.Key, out var source))
+                throw new EditRejectedException(EditFailure.Missing, "Key source is absent from the snapshot");
             if (source.Outcome != SourceOutcome.Success || source.ContentHash is null) throw new NotSupportedException("Key source is incomplete or unsupported");
-            var bytes = new WorldPlanBuilder(inventory).ReadSource(source, snapshot.Limits); NbtDocument? document = null; CapabilityProfile? profile;
+            var bytes = reader.ReadSource(source, snapshot.Limits); NbtDocument? document = null; CapabilityProfile? profile;
             var wanted = group.SelectMany(item => Candidates(item.Slot.Address).Select(path => (item.Slot.Role, path))).ToHashSet();
             var roots = new HashSet<SourceAddress>();
             void Root(SourceAddress address) { if (wanted.Contains((address.SemanticRole, Logical(address)))) roots.Add(address); }

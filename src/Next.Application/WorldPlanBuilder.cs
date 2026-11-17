@@ -98,34 +98,50 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
                 _ = TypedTreeEdits.Apply(document, group.Select(operation => operation.Edit));
             }
         }
-        foreach (var operation in requested.OfType<KeyConversionPatch>())
+        foreach (var group in requested.OfType<KeyConversionPatch>()
+            .GroupBy(operation => (operation.Conversion.Address.Artifact, operation.Conversion.Address.Chunk)))
         {
-            var conversion = operation.Conversion; var address = conversion.Address; var source = sources[(address.Artifact, address.Chunk)];
-            if (WorldReferenceService.IsIdentifyingName(conversion.Slot.Role)) throw new EditRejectedException(EditFailure.Precondition, "Identifying name conversion requires verified reference authority");
+            var conversions = group.Select(operation => operation.Conversion).ToArray();
+            if (conversions.Any(conversion => WorldReferenceService.IsIdentifyingName(conversion.Slot.Role)))
+                throw new EditRejectedException(EditFailure.Precondition, "Identifying name conversion requires verified reference authority");
+            var source = sources[group.Key];
             var bytes = ReadSource(source, snapshot.Limits);
-            CapabilityProfile profile; var roots = new List<SourceAddress>();
             if (source.Location.Role == WorldSourceRole.Function && source.Pack is { } functionPack)
             {
-                profile = MinecraftProfiles.ForPackMetadata(functionPack) ?? throw new NotSupportedException("Command key conversion profile is unknown");
-                var command = WorldCommandEdits.BindFunction(address.Artifact, bytes, profile, source.Location.Dimension);
-                _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, roots.Add);
-                _ = WorldCommandEdits.Rewrite(command, [], profile, snapshot.Limits, [conversion]);
+                var profile = MinecraftProfiles.ForPackMetadata(functionPack) ?? throw new NotSupportedException("Command key conversion profile is unknown");
+                var command = WorldCommandEdits.BindFunction(group.Key.Artifact, bytes, profile, source.Location.Dimension);
+                var roots = new HashSet<SourceAddress>();
+                _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, root => roots.Add(root));
+                _ = WorldCommandEdits.Rewrite(command, [], profile, snapshot.Limits, conversions);
+                foreach (var conversion in conversions) ValidateBinding(conversion, profile, roots);
+                continue;
             }
-            else if (source.Location.Role is WorldSourceRole.PackJson or WorldSourceRole.PackMetadata && source.Pack is { } pack)
+            foreach (var conversion in conversions) ValidateNonFunctionKey(conversion, source, bytes);
+        }
+        CheckPreimages(inventory, plan);
+        return new(plan, sources.ToImmutableDictionary());
+
+        void ValidateNonFunctionKey(TranslationKeyConversion conversion, DiscoveredSource source, byte[] bytes)
+        {
+            var address = conversion.Address;
+            CapabilityProfile profile;
+            var roots = new HashSet<SourceAddress>();
+            void Root(SourceAddress root) => roots.Add(root);
+            if (source.Location.Role is WorldSourceRole.PackJson or WorldSourceRole.PackMetadata && source.Pack is { } pack)
             {
                 profile = MinecraftProfiles.ForPackMetadata(pack) ?? throw new NotSupportedException("Key conversion pack profile is unknown");
-                _ = PackTextExtractor.Extract(source.Location, bytes, pack, snapshot.Limits, snapshot.Manifest.Scope, roots.Add);
+                _ = PackTextExtractor.Extract(source.Location, bytes, pack, snapshot.Limits, snapshot.Manifest.Scope, Root);
                 _ = WorldJsonKeyEdits.Convert(bytes, [conversion], snapshot.Limits);
             }
             else
             {
                 var document = address.Chunk is { } chunk ? Next.Formats.RegionFile.Read(bytes).ReadChunk(chunk.LocalZ * 32 + chunk.LocalX, snapshot.Limits).Document : WorldArtifactEdits.ReadNbt(bytes, snapshot.Limits).Document;
                 profile = NbtTextExtractor.Profile(source.Location, document);
-                var extracted = NbtTextExtractor.Extract(source.Location, document, source.Chunk, snapshot.Limits, snapshot.StorageRules.GetValueOrDefault(address.Artifact, []), snapshot.Manifest.Scope, snapshot.Discovery.Metadata?.Profile, roots.Add);
+                var extracted = NbtTextExtractor.Extract(source.Location, document, source.Chunk, snapshot.Limits, snapshot.StorageRules.GetValueOrDefault(address.Artifact, []), snapshot.Manifest.Scope, snapshot.Discovery.Metadata?.Profile, Root);
                 if (address.Syntax is not null)
                 {
                     var command = extracted.PendingCommands.SingleOrDefault(item => item.Address.NodePath.Equals(address.NodePath)) ?? throw new EditRejectedException(EditFailure.Precondition, "Command key target is not a real NBT command field");
-                    _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, roots.Add);
+                    _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, Root);
                     _ = WorldCommandEdits.Rewrite(command, [], profile, snapshot.Limits, [conversion]);
                 }
                 else if (conversion.Rule == KeyConversionRule.EncodedTextToTranslate && address.ComponentPath is not null && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json")
@@ -137,8 +153,12 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
                     _ = TypedTreeEdits.Apply(document, [TypedEdit.Replace(address.NodePath, conversion.Expected, WorldKeyEdits.Replacement(conversion))]);
                 else throw new NotSupportedException("Key conversion encoding profile is not implemented");
             }
+            ValidateBinding(conversion, profile, roots);
+        }
+        void ValidateBinding(TranslationKeyConversion conversion, CapabilityProfile profile, HashSet<SourceAddress> roots)
+        {
             if (profile.Id != conversion.Profile || profile.Version != conversion.ProfileVersion) throw new NotSupportedException("Key conversion requires its exact text profile");
-            if (!roots.Contains(address))
+            if (!roots.Contains(conversion.Address))
                 throw new EditRejectedException(EditFailure.Precondition, "Key conversion target is not a profile-declared text component");
             var language = sources[(conversion.Dependency.LanguageArtifact, null)];
             if (language.Location.Role != WorldSourceRole.Language || language.Pack?.Kind != PackSourceKind.ResourcePack)
@@ -147,8 +167,6 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
             var languagePath = language.Location.Artifact.ContainerEntry ?? language.Location.Artifact.RelativePath;
             if (!languagePath.EndsWith("/" + conversion.Dependency.Locale + ".json", StringComparison.Ordinal)) throw new EditRejectedException(EditFailure.Precondition, "Language dependency locale differs from its path");
         }
-        CheckPreimages(inventory, plan);
-        return new(plan, sources.ToImmutableDictionary());
     }
     internal byte[] ReadSource(DiscoveredSource source, DecodeLimits limits)
     {

@@ -9,6 +9,7 @@ internal static class CaseRegistry
     [
         .. BenchmarkCases.Cases,
         new("prepare-region-batch-bounded-allocation", "preparation", _ => RegionBatchPreparationTests.ManyChunkEditsPreserveExactBytesWithinAllocationBudget()),
+        new("prepare-function-key-planning-read-cost", "preparation", _ => KeyPlanningReadTests.AdditionalKeysInTheSameFunctionsDoNotRereadTheirSources()),
         new("cli-protocol-command-help-locale", "cli-protocol", _ => CliProtocolTests.EveryRegisteredSurfaceHasMatchingHelpAndLocaleStableErrors()),
         new("cli-protocol-nine-state-receipts", "cli-protocol", _ => CliProtocolTests.NineReceiptOutcomesKeepCountsAndExitClassification()),
         new("cli-protocol-locale-fallback", "cli-protocol", _ => CliProtocolTests.MissingMessageKeysHaveSafeLocalizedFallbacks()),
