@@ -4,7 +4,7 @@ Windows x64 / .NET 10 的獨立新核心，直接開發於本目錄。舊版位�
 
 目前公開 CLI 包含查閱、掃描、通用編輯／恢復及檔案式 session／agent 管理。help/version、get、list/ls、search/find、scan/scan-world、extract/extract-text、validate、capabilities 可查閱 NBT、原生 JSON、ZIP entry、region chunk 與世界盤點，並透過共用 verified cache 掃描／抽取文字；精確路徑與退出碼見 [查閱契約](docs/cli-query-contract.md)，完整性、快取、篩選及匯出見 [世界查詢契約](docs/cli-scan-contract.md)。尚未提供正式發行版本；剩餘整合範圍見下段及 [能力帳本](docs/capabilities.md)，重寫邊界見 [章程](docs/rewrite-charter.md)，模型規格見 [Domain 契約](docs/domain-contracts.md)。
 
-通用 set/batch/plan、apply/status/recover 及 verified backup/restore 已接入新版服務，預設預覽與寫入條件見 [編輯命令契約](docs/cli-edit-contract.md)。`translate` 提供檔案式 session 管理，見 [session CLI 契約](docs/cli-session-contract.md)；`agent setup/submit/status/help` 提供版本化問卷與可重送設定，見 [agent 契約](docs/cli-agent-contract.md)。`import-legacy` 保留舊資料、匯出報告並在完整證據下建立 session，見 [legacy CLI 契約](docs/cli-legacy-contract.md)。翻譯寫回、legacy batch、convert/pack/lang 仍在整合。操作與交換規格見 [操作契約](docs/operation-contracts.md)，session 及封存見 [session 契約](docs/session-contract.md)，唯讀映射見 [legacy mapping](docs/legacy-mapping-contract.md)。查閱、session／agent 與 legacy 管理命令不改世界內容。
+通用 set/batch/plan、apply/status/recover 及 verified backup/restore 已接入新版服務，預設預覽與寫入條件見 [編輯命令契約](docs/cli-edit-contract.md)。`translate` 提供 [檔案式 session 管理](docs/cli-session-contract.md)及 [direct plan → apply/recover → seal](docs/cli-session-write-contract.md)；`agent setup/submit/status/help` 提供版本化問卷與可重送設定，見 [agent 契約](docs/cli-agent-contract.md)。`import-legacy` 保留舊資料、匯出報告並在完整證據下建立 session，見 [legacy CLI 契約](docs/cli-legacy-contract.md)。key conversion、legacy batch、convert/pack/lang 仍在整合。操作與交換規格見 [操作契約](docs/operation-contracts.md)，session 及封存見 [session 契約](docs/session-contract.md)，唯讀映射見 [legacy mapping](docs/legacy-mapping-contract.md)。世界寫入須明確套用並確認離線；預覽與管理命令不寫世界。
 
 ## 建置與驗證
 

@@ -94,6 +94,7 @@ old reports and any accepted session operations remain intact.
 Stored report lookup without projection marks `freshness=not-checked`; complete
 means complete as of its retained snapshot, not fresh world validation. New reports
 or projection queries also expose selected-world coverage/freshness. None of these
-reports replace the planner's current preimage checks. Actual world apply/key/pack
-work, legacy batch operations, performance/RSS, Minecraft and release gates remain
-separate required work.
+reports replace the planner's current preimage checks. Direct world apply uses
+the separate [session world workflow](cli-session-write-contract.md).
+Key/pack integration, legacy batch operations, performance/RSS, Minecraft and
+release gates remain separate required work.

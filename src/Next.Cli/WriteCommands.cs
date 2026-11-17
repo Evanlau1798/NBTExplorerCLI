@@ -109,7 +109,7 @@ internal static class WriteCommands
     private static CliResult Preview(PatchPlan plan) => new(new { preview = true, plan = Json(PatchPlanJson.Write(plan)) }, Export: PatchPlanJson.Write(plan));
     private static PreparedWorldPlan Prepare(IReadOnlyList<PatchOperation> operations, Func<PreparedWorldPlan> prepare)
         => BeforeCommit(operations.Select(operation => operation.Id).ToArray(), "PreparationRejected", prepare);
-    private static T BeforeCommit<T>(IReadOnlyList<string> operationIds, string phase, Func<T> execute)
+    internal static T BeforeCommit<T>(IReadOnlyList<string> operationIds, string phase, Func<T> execute)
     {
         try { return execute(); }
         catch (Exception error)
@@ -121,7 +121,7 @@ internal static class WriteCommands
         return new(code, error.Message, CommandOutputJson.RejectedOperations(operationIds, phase));
     }
     private static CliResult Receipt(ApplyReceipt receipt, WorldApplyEngine engine) => Status(engine.ReadStatus(receipt.PlanHash), receipt);
-    private static CliResult Status(WorldApplyStatus? state, ApplyReceipt? fallback = null)
+    internal static CliResult Status(WorldApplyStatus? state, ApplyReceipt? fallback = null)
     {
         var receipt = state?.Receipt ?? fallback;
         if (state is null && receipt is null) throw new FileNotFoundException("No journal for the requested plan");

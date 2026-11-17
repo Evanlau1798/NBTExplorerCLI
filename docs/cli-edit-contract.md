@@ -2,8 +2,9 @@
 
 These entry points use the same new planner, preparation, verified backup and
 durable apply/recovery services as the application API. They never invoke the old
-product. File-based session/agent management has separate CLI contracts; world translation
-and the legacy batch importer remain separate integration work.
+product. File-based session/agent management has separate CLI contracts;
+[direct session plans and completion](cli-session-write-contract.md) use these
+same apply/recover commands. Key conversion and the legacy batch importer remain integration work.
 This document covers the new versioned operations input.
 
 | Command | Input and options |

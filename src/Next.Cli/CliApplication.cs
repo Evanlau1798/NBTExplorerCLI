@@ -98,6 +98,7 @@ public static class CliApplication
             "AGENT_STATE_IO" => en ? "Agent state could not be confirmed; retry the exact questionnaire after resolving the I/O error." : "無法確認 agent 設定狀態；排除 I/O 錯誤後請重送同一份問卷。",
             "IMPORT_SESSION_FAILED" => en ? "The report is retained; inspect or resume session projection using the import identity." : "報告已保留；請使用 import 身分檢查或接續 session 建立。",
             "IMPORT_STATE_IO" => en ? "Import persistence is unconfirmed; retain the input, resolve I/O and retry or look up the report identity." : "無法確認匯入保存狀態；請保留輸入、排除 I/O 錯誤後重試或查詢報告身分。",
+            "SESSION_SEAL_IO" => en ? "Session completion is unconfirmed; keep the apply proof, resolve I/O and retry the exact seal request." : "無法確認 session 封存狀態；請保留套用證明、排除 I/O 錯誤後重送相同 seal 請求。",
             _ => en ? "The operation failed." : "操作失敗。"
         };
     }

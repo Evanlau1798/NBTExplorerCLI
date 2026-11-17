@@ -19,7 +19,7 @@ GateRevision: 2；owner：專案維護者。本表定義完整能力與相容要
 | CAP11 | translate status/jump/get | 保留 page/key 查閱；legacy key 僅明確 mapping | G04/G06 | SESSION-NAV-01 |
 | CAP12 | translate note、notes/glossary | 保留並支援來源可追溯的人工知識匯入／匯出 | G04/G08 | SESSION-KNOWLEDGE-01 |
 | CAP13 | translate reset | 重新設計 archive/reset；先顯示範圍，保留成果與歷史 | G04/G06 | SESSION-RESET-01 |
-| CAP14 | translate apply --direct | LiteralTranslation；不授權更改 event/style/UUID | G05/G06 | SLOT-01、AST-PRESERVE-01 |
+| CAP14 | translate plan --direct → apply/recover → translate seal | LiteralTranslation；明確preview/commit/completion，不授權更改event/style/UUID | G05/G06 | SLOT-01、AST-PRESERVE-01 |
 | CAP15 | translate apply / apply-keys | TranslationKeyConversion；lang/pack 是必要提交依賴 | G05/G06 | APPLY-PACK-01、KEY-CONVERSION-01 |
 | CAP16 | translate export-lang | 保留 original-lang/target-lang/output；既有檔及重複 key 檢查 | G05/G06 | LANG-EXPORT-01 |
 | CAP17 | translate create-pack | 保留 name/output/merge/pack-format；不覆蓋未選 entry | G05/G06 | PACK-MERGE-01 |

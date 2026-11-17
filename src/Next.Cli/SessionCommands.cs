@@ -9,7 +9,7 @@ namespace Next.Cli;
 
 internal static class SessionCommands
 {
-    internal static readonly string[] Subcommands = ["start", "status", "export", "next", "submit", "get", "jump", "note", "glossary", "reset", "groups", "memory", "help"];
+    internal static readonly string[] Subcommands = ["start", "status", "export", "next", "submit", "get", "jump", "note", "glossary", "reset", "groups", "memory", "plan", "seal", "help"];
     internal static string[] Allowed(string action)
     {
         if (action == "help") return ["help"];
@@ -19,6 +19,7 @@ internal static class SessionCommands
             "status" => [], "export" => ["page", "operation-id", "no-group"], "next" => ["reply", "no-group"], "submit" => ["reply", "no-group"],
             "get" => ["slot-id"], "jump" => ["request"], "note" or "glossary" => ["request", "limit", "offset"],
             "reset" => ["request", "confirm"], "groups" => ["limit", "offset"], "memory" => ["slot-id", "source-sessions", "glossary-version", "limit", "offset"],
+            "plan" => ["direct", "revision", "operation-id"], "seal" => ["revision", "operation-id", "plan-hash"],
             _ => throw new CliFailure("UNKNOWN_COMMAND", "Unknown translate subcommand")
         };
         return ["session-id", "state-root", "output", "help", .. options];
@@ -27,6 +28,7 @@ internal static class SessionCommands
     {
         var id = request.Get("session-id") is { } declared ? GuidValue(declared) : request.Subcommand == "start" ? Guid.NewGuid() : throw new CliFailure("INVALID_ARGUMENTS", "Missing --session-id");
         var operationId = request.Get("operation-id") is { } declaredOperation ? GuidValue(declaredOperation) : Guid.NewGuid();
+        if (request.Subcommand is "plan" or "seal") return SessionWorldCommands.Execute(request, id, operationId);
         ScanOptions? options = null; SessionPolicy? policy = null; string? sourceLanguage = null; string? targetLanguage = null;
         if (request.Subcommand == "start")
         {
@@ -58,9 +60,7 @@ internal static class SessionCommands
         switch (request.Subcommand)
         {
             case "status":
-                var current = Query(context, Scope(state)); var fresh = current.Manifest.SnapshotId == state.Source.SnapshotId;
-                return new(new { status = service.Status(id), sourceFresh = fresh, snapshotId = state.Source.SnapshotId, currentSnapshotId = current.Manifest.SnapshotId,
-                    repair = fresh ? null : "start-new-session" }, fresh ? null : "CONFLICT", fresh ? "Success" : "Conflict", fresh ? 0 : 3);
+                return Status(context, state);
             case "get":
                 var item = service.Get(id, new(Required(request, "slot-id"))); var slot = item.Slot;
                 return new(new { slot = new { slotId = slot.Id.Digest, slot.SourceTextHash, slot.SourceText, slot.Context, slot.Role, slot.SourceLocale, slot.TargetLocale,
@@ -107,8 +107,17 @@ internal static class SessionCommands
     private static object[] Groups(TranslationSessionService service, Guid id, CliArguments request, WriteContext context)
         => request.Flag("no-group") || Preferences(context).Read(id) == false ? [] : service.Groups(id).Select(Group).ToArray();
     private static object Group(SessionContextGroup group) => new { group.Kind, groupId = group.GroupId.Digest, memberDigest = group.MemberDigest.Digest, group.Slots };
-    private static SnapshotScope Scope(TranslationSession state) => new(state.Source.Dimensions, state.Source.Regions, state.Source.Types, state.Source.ArtifactPaths);
-    private static WorldQuerySnapshot Query(WriteContext context, SnapshotScope scope)
+    internal static SnapshotScope Scope(TranslationSession state) => new(state.Source.Dimensions, state.Source.Regions, state.Source.Types, state.Source.ArtifactPaths);
+    internal static CliResult Status(WriteContext context, TranslationSession state)
+    {
+        var status = TranslationSessionService.Status(state);
+        if (state.Slots.All(slot => slot.State == SessionSlotState.Applied))
+            return new(new { status, sourceFresh = (bool?)null, snapshotId = state.Source.SnapshotId, freshness = "not-checked", validationScope = "sealed-session-history" });
+        var current = Query(context, Scope(state)); var fresh = current.Manifest.SnapshotId == state.Source.SnapshotId;
+        return new(new { status, sourceFresh = fresh, snapshotId = state.Source.SnapshotId, currentSnapshotId = current.Manifest.SnapshotId,
+            repair = fresh ? null : "start-new-session" }, fresh ? null : "CONFLICT", fresh ? "Success" : "Conflict", fresh ? 0 : 3);
+    }
+    internal static WorldQuerySnapshot Query(WriteContext context, SnapshotScope scope)
     {
         var result = new WorldQueryService(context.Inventory, new FileSystemScanCacheStore(Path.Combine(context.State, "cache")))
             .QueryAsync(new(new(scope), WorldQueryPurpose.Session)).GetAwaiter().GetResult();

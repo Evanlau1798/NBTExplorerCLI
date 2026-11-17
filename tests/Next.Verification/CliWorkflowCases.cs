@@ -4,6 +4,15 @@ internal static class CliWorkflowCases
 {
     internal static readonly VerificationCase[] Cases =
     [
+        new("cli-session-write-unchanged-no-write-contract", "cli-session-write", _ => CliSessionWriteTests.ExplicitUnchangedSlotsKeepTheirAcceptedNoWriteCompletionContract()),
+        new("cli-session-status-captured-reset", "cli-session-write", _ => SessionStatusConsistencyTests.TheStatusBranchUsesItsCapturedSessionDuringAnInterleavedReset()),
+        new("cli-session-write-public-legacy-through-seal", "cli-session-write", _ => CliSessionWriteTests.PublicLegacyImportFlowsThroughPlanApplyAndSealWithoutRebuildingNbt()),
+        new("cli-session-write-arguments-world-export", "cli-session-write", _ => CliSessionWriteTests.ArgumentsForeignWorldsAndExistingExportsNeverConsumeSessionWork()),
+        new("cli-session-write-public-pure-mixed-unchanged", "cli-session-write", _ => CliSessionWriteTests.PureMixedAndUnchangedSessionsUseThePublicPlanApplySealWorkflow()),
+        new("cli-session-write-pending-revision-source", "cli-session-write", _ => CliSessionWriteTests.PendingStaleRevisionAndChangedSourcesCannotProduceWritablePlans()),
+        new("cli-session-write-missing-subset-proof", "cli-session-write", _ => CliSessionWriteTests.MissingAndSubsetWorldProofsKeepTheSessionUnsealed()),
+        new("cli-session-write-native-seal-retry", "cli-session-write", _ => CliSessionWriteTests.ABlockedSessionSealPreservesCompletedWorldsAndOffersExactRetry()),
+        new("cli-session-write-partial-recovery-rollback", "cli-session-write", _ => CliSessionWriteTests.PartialApplyAndRollbackCannotSealUnfinishedSessionWork()),
         new("legacy-projection-untranslated-borrowed-id", "legacy", _ => LegacyImportRecoveryTests.AnUntranslatedPageCannotBorrowAnImportOperationIdentity()),
         new("cli-legacy-list-zero-report-reads", "cli-legacy", _ => LegacyImportRecoveryTests.RecoveryListingNeverReadsReportBodiesBeforeOrAfterPagination()),
         new("legacy-projection-multipage-recovery", "legacy", _ => LegacyImportRecoveryTests.MultiPageProjectionResumesExactRepliesAcrossAnUntranslatedPage()),

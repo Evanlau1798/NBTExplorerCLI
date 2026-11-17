@@ -1,8 +1,9 @@
 # File-based translation sessions
 
 `translate <action> <world>` exposes the durable session service. These commands
-write tool state, never world content. World translation apply, key conversion,
-pack generation are separate integration work. Agent preferences use the
+write tool state, never world content. Direct world translation uses
+[session plan, existing apply/recover and seal](cli-session-write-contract.md);
+key conversion and pack generation remain integration work. Agent preferences use the
 [agent contract](cli-agent-contract.md).
 
 All non-help actions accept `--session-id <guid>`, `--state-root <directory>`, `--output
@@ -16,7 +17,7 @@ repositories for sessions and cache. No legacy executable or state is loaded.
 | --- | --- |
 | `help` | No world required; lists implemented actions. `help translate` also works. |
 | `start` | `source-language`, `target-language` are required unless confirmed agent defaults exist; optional `operation-id`, `page-size`, `page-bytes`, `types`, `path`, `dimension`, `region`, `match-pattern`, `standalone`, `no-group`. |
-| `status` | Returns progress and compares the current scoped world snapshot with the session snapshot. |
+| `status` | Returns progress; unsealed work compares the current scoped world snapshot with the session snapshot. Sealed work reports history with current freshness explicitly not checked. |
 | `export` | Optional zero-based `page`, reply-template `operation-id`, `no-group`. Returns page JSON, reply template, prompt and context-group projection. |
 | `next` | Optional `reply <file-or-dash>`, `no-group`; persists a valid reply before returning the next pending page. |
 | `submit` | Required `reply <file-or-dash>`; same import and next-page result as `next`. Optional `no-group`. |
@@ -26,6 +27,8 @@ repositories for sessions and cache. No legacy executable or state is loaded.
 | `reset` | Required versioned `request`; previews scope and retained history by default. `confirm` executes a command whose own `confirmed` field is true. |
 | `groups` | Read context-group projections with optional `limit`/`offset`. |
 | `memory` | Required `slot-id`, comma-separated `source-sessions`, `glossary-version`; optional `limit`/`offset`. Returns validated local candidates and provenance. |
+| `plan` | Required `direct`, exact `revision`; optional plan `operation-id`. Exports a literal PatchPlan for existing `apply`. |
+| `seal` | Required original `revision`, retained `operation-id`, `plan-hash`. Records completion only from full durable world proof. |
 
 `start` requires complete selected-source coverage. It uses the shared verified
 query service, preserving exact physical occurrences and explicit component roots.
@@ -92,6 +95,6 @@ glossary/profile compatibility; lookup does not submit or accept a translation.
 Notes/glossary and group presentation never authorize a world rename/write.
 
 Agent setup/submit/status and [legacy import/report](cli-legacy-contract.md) have
-their own contracts. World translation apply/sealing, convert, language export and pack management remain integration work.
+their own contracts. Key conversion, convert, language export and pack management remain integration work.
 Those capabilities remain required. Minecraft load, RSS/performance, power loss
 and release acceptance are later gates.

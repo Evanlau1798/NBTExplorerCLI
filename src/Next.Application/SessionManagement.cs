@@ -7,10 +7,11 @@ namespace Next.Application;
 
 public sealed partial class TranslationSessionService
 {
-    public SessionStatus Status(Guid id)
+    public SessionStatus Status(Guid id) => Status(Read(id));
+    public static SessionStatus Status(TranslationSession state)
     {
-        var state = Read(id); var counts = state.Slots.GroupBy(item => item.State).ToDictionary(group => group.Key, group => group.Count());
-        return new(id, state.Revision, state.Workspace?.CurrentPage ?? 0, state.Pages.Length, state.Slots.Length, counts.GetValueOrDefault(SessionSlotState.Pending), counts.GetValueOrDefault(SessionSlotState.Translated), counts.GetValueOrDefault(SessionSlotState.Unchanged), counts.GetValueOrDefault(SessionSlotState.Conflict), counts.GetValueOrDefault(SessionSlotState.Applied));
+        ArgumentNullException.ThrowIfNull(state); var counts = state.Slots.GroupBy(item => item.State).ToDictionary(group => group.Key, group => group.Count());
+        return new(state.SessionId, state.Revision, state.Workspace?.CurrentPage ?? 0, state.Pages.Length, state.Slots.Length, counts.GetValueOrDefault(SessionSlotState.Pending), counts.GetValueOrDefault(SessionSlotState.Translated), counts.GetValueOrDefault(SessionSlotState.Unchanged), counts.GetValueOrDefault(SessionSlotState.Conflict), counts.GetValueOrDefault(SessionSlotState.Applied));
     }
     public SessionSlot Get(Guid id, Hash256 slotId) => Read(id).Slots.SingleOrDefault(slot => slot.Slot.Id.Digest == slotId) ?? throw new KeyNotFoundException("Unknown session slot");
     public SessionPage Next(Guid id)
