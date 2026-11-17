@@ -17,18 +17,19 @@ public static class CliApplication
             var rest = CliArguments.ExtractLocale(args, out locale, out command);
             var request = CliArguments.Parse(rest, locale); command = request.Command;
             object data;
-            if (command == "help" || request.Flag("help"))
+            if (command == "help" || request.Flag("help") || command == "translate" && request.Subcommand == "help")
             {
                 var subject = command == "help" ? request.Input : command;
                 if (subject is not null) subject = CliArguments.Canonical(subject);
                 data = new { usage = "nbtcli-next <command> [options]", commands = CliArguments.Commands,
-                    subject, options = (subject is null ? Array.Empty<string>() : CliArguments.Allowed(subject)).Select(option => "--" + option).Append("--ui-locale").ToArray() };
+                    subject, subcommand = request.Subcommand, subcommands = subject == "translate" ? SessionCommands.Subcommands : Array.Empty<string>(),
+                    options = (subject is null ? Array.Empty<string>() : CliArguments.Allowed(subject, request.Subcommand)).Select(option => "--" + option).Append("--ui-locale").ToArray() };
                 command = "help";
             }
             else if (command == "version") data = new { product = "nbtcli-next", version = typeof(CliApplication).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0] };
-            else if (command is "scan" or "extract" or "validate" or "capabilities" or "set" or "batch" or "plan" or "apply" or "recover" or "status" or "backup" or "restore")
+            else if (command is "scan" or "extract" or "validate" or "capabilities" or "set" or "batch" or "plan" or "apply" or "recover" or "status" or "backup" or "restore" or "translate")
             {
-                var result = command is "scan" or "extract" or "validate" or "capabilities" ? ScanCommands.Execute(request) : WriteCommands.Execute(request);
+                var result = command == "translate" ? SessionCommands.Execute(request) : command is "scan" or "extract" or "validate" or "capabilities" ? ScanCommands.Execute(request) : WriteCommands.Execute(request);
                 var json = CommandOutputJson.Write(command, result.Data, result.Outcome, result.Code, result.Code is null ? null : Message(result.Code, locale));
                 if (request.Get("output") is { } file)
                 {
@@ -62,8 +63,9 @@ public static class CliApplication
         EditRejectedException { Failure: EditFailure.Missing or EditFailure.Ambiguous or EditFailure.Precondition } => "CONFLICT",
         EditRejectedException => "INVALID_ARGUMENTS",
         FileNotFoundException or DirectoryNotFoundException => "FILE_NOT_FOUND",
+        KeyNotFoundException => "NOT_FOUND",
         UnauthorizedAccessException => "ACCESS_DENIED",
-        ArtifactSizeLimitException or JsonOutputLimitException or CodecException { Code: CodecError.LimitExceeded } => "RESOURCE_LIMIT",
+        ArtifactSizeLimitException or JsonOutputLimitException or SessionPageOversizedException or SessionSlotLimitException or CodecException { Code: CodecError.LimitExceeded } => "RESOURCE_LIMIT",
         CodecException { Code: CodecError.UnsupportedProfile } or NotSupportedException => "UNSUPPORTED_SOURCE",
         CodecException or JsonException => "MALFORMED_SOURCE",
         InvalidDataException => "INVALID_DATA",

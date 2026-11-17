@@ -1,8 +1,8 @@
 # 首版能力帳本
 
-GateRevision: 2；owner：專案維護者；目前全部 PLANNED。本表凍結能力而非宣稱實作。
+GateRevision: 2；owner：專案維護者。本表定義完整能力與相容要求；實際可用入口見 README 及各 CLI 契約，未接線能力仍屬必需。
 
-舊來源為 `.old/Program.cs`、各 Commands dispatcher 與參數處理。完整實際參數及來源見 [CLI 盤點](legacy-cli-inventory.json)。新版保留公開命令／alias，以下入口均為待實作契約；一律經新版服務。每個 fixture 在負責 gate 實作，必須保存 hash 與正反例結果才能 VERIFIED。
+舊來源為 `.old/Program.cs`、各 Commands dispatcher 與參數處理。完整實際參數及來源見 [CLI 盤點](legacy-cli-inventory.json)。以下包含已接線與後續必需入口，一律經新版服務；新版參數與差異見 [查閱](cli-query-contract.md)、[掃描](cli-scan-contract.md)、[編輯](cli-edit-contract.md)及 [session 管理](cli-session-contract.md)。每個 fixture 在負責 gate 實作，必須保存 hash 與正反例結果才能 VERIFIED。
 
 | CAP | 新版入口／能力 | 決策與相容影響 | Gate | 驗收 fixture |
 | --- | --- | --- | --- | --- |

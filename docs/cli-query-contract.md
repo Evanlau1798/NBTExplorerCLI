@@ -99,7 +99,8 @@ World-directory queries verify dimensions against the declared layout.
 All reads retain existing source bytes and create no world files. Physical artifacts
 are limited to 64 MiB, codecs keep their existing decode budgets, and command output
 is bounded to 64 MiB before it is emitted. Cache/scanning, extraction and validation
-are described in the world-query contract. Translation/session/agent commands remain
-separate integration work still to be registered.
+are described in the world-query contract. File-based translation session management
+is described in the session CLI contract; world translation and agent adapters remain
+separate integration work.
 Typed interchange also retains its existing depth/node/token budgets; an output
 limit returns ResourceLimit for the valid source, and a narrower subtree can be queried.

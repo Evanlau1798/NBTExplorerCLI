@@ -10,12 +10,16 @@ public sealed partial class TranslationSessionService(ITranslationSessionStore s
 {
     private readonly ITranslationSessionStore store = store ?? throw new ArgumentNullException(nameof(store));
     public SessionOperationReceipt Start(WorldQuerySnapshot snapshot, Guid sessionId, string sourceLocale, string targetLocale, Guid operationId, SessionPolicy? policy = null)
+        => Start(CreateStartRequest(snapshot, sessionId, sourceLocale, targetLocale, policy), operationId);
+    public static SessionStartRequest CreateStartRequest(WorldQuerySnapshot snapshot, Guid sessionId, string sourceLocale, string targetLocale, SessionPolicy? policy = null, Func<TextOccurrence, bool>? select = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot); var manifest = snapshot.Manifest;
         var source = new SessionSourceSnapshot(manifest.WorldId, manifest.SnapshotId, manifest.InputSources, manifest.Scope.Dimensions, manifest.Scope.Regions, manifest.Scope.Types, manifest.Scope.ArtifactPaths, manifest.Versions, manifest.CoverageComplete);
-        var slots = snapshot.ReadSources().SelectMany(item => item.Text?.Occurrences ?? []).Take(100_001).Select(item => item.ToSlot(sourceLocale, targetLocale)).ToImmutableArray();
+        var selected = snapshot.ReadSources().SelectMany(item => item.Text?.Occurrences ?? []).Where(item => select?.Invoke(item) ?? true).Take(100_001).ToArray();
+        if (selected.Length > 100_000) throw new SessionSlotLimitException();
+        var slots = selected.Select(item => item.ToSlot(sourceLocale, targetLocale)).ToImmutableArray();
         source = source with { ContextRoots = SessionStorageRoots.Build(snapshot, slots) };
-        return Start(new(sessionId, source, sourceLocale, targetLocale, policy ?? new(), slots), operationId);
+        return new(sessionId, source, sourceLocale, targetLocale, policy ?? new(), slots);
     }
     public TranslationSession Read(Guid sessionId) => Load(sessionId).State;
     public SessionOperationReceipt Start(SessionStartRequest request, Guid operationId)
@@ -97,3 +101,5 @@ public sealed class SessionReplyRejectedException(ImmutableArray<SessionValidati
 {
     public ImmutableArray<SessionValidationIssue> Issues { get; } = issues;
 }
+
+public sealed class SessionSlotLimitException() : Exception("Selected session exceeds the 100000-slot budget");

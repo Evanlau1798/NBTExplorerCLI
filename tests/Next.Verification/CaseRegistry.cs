@@ -7,6 +7,16 @@ internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
     [
+        new("cli-session-selection-before-slot-budget", "cli-session", _ => SessionSelectionBudgetTests.SelectionPrecedesTheSessionSlotLimit()),
+        new("cli-session-preferences-failure-preserves-work", "cli-session", _ => CliSessionTests.PreferenceFailuresRetainAcceptedWorkAndDoNotConsumeReplies()),
+        new("cli-session-start-presentation-replay", "cli-session", _ => CliSessionTests.StartReplayBindsTheRetainedGroupPresentationPreference()),
+        new("cli-session-invalid-start-no-state", "cli-session", _ => CliSessionTests.InvalidStartArgumentsDoNotCreateToolRepositories()),
+        new("cli-session-limits-and-read-errors", "cli-session", _ => CliSessionTests.LimitsAndUnreadableSourcesKeepTheirActualClassification()),
+        new("cli-session-local-memory", "cli-session", _ => CliSessionTests.MemoryCandidatesUseOnlyValidatedLocalSessionReplies()),
+        new("cli-session-file-exchange-replay", "cli-session", _ => CliSessionTests.FileExchangePersistsRepliesBeforeReturningTheNextPage()),
+        new("cli-session-reply-and-source-freshness", "cli-session", _ => CliSessionTests.InvalidAndStaleRepliesPreserveWorkEvenWhenTheCacheIsFresh()),
+        new("cli-session-management-cas-reset", "cli-session", _ => CliSessionTests.ManagementCommandsUseRevisionCasAndRetainResetHistory()),
+        new("cli-session-selection-help-export", "cli-session", _ => CliSessionTests.SelectionHelpAndRejectedExportsNeverWriteTheWorld()),
         new("cli-edit-restore-backup-rejection-accounting", "cli-edit", _ => CliEditTests.RestorePlanBackupRejectionsAccountForEveryValidIntent()),
         new("cli-edit-bounded-error-diagnostics", "cli-edit", _ => DurableReceiptBudgetTests.ErrorDiagnosticsCannotExhaustTheMachineOutputBudget()),
         new("cli-edit-rejection-output-budget", "cli-edit", _ => CliEditTests.RejectedLargeIdsStillProduceABoundedMachineError()),

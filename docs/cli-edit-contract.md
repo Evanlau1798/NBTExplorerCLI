@@ -2,8 +2,9 @@
 
 These entry points use the same new planner, preparation, verified backup and
 durable apply/recovery services as the application API. They never invoke the old
-product. Translation/session/agent adapters and the legacy batch importer remain
-separate integration work. This document covers the new versioned operations input.
+product. File-based session management has a separate CLI contract; world translation,
+agent adapters and the legacy batch importer remain separate integration work.
+This document covers the new versioned operations input.
 
 | Command | Input and options |
 | --- | --- |
