@@ -492,3 +492,6 @@ Questionnaires are bounded to 16384 UTF-8 bytes and state to 1024 submissions.
 Exact historical resends do not overwrite newer preferences; defaults affect only
 new sessions. Preferences and explanatory instructions grant no world authority.
 Public workflow and compatibility details are in [agent CLI](cli-agent-contract.md).
+
+Standalone resource intent uses the [versioned generation contract](resource-generation-contract.md).
+Its dedicated preparation service and public CLI are separate integration obligations.

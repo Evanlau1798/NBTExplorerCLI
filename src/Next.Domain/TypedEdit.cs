@@ -1,6 +1,6 @@
 namespace Next.Domain;
 
-public enum PatchKind { TypedEdit, LiteralTranslation, TranslationKeyConversion, ReferenceSynchronization, ArtifactRestore }
+public enum PatchKind { TypedEdit, LiteralTranslation, TranslationKeyConversion, ReferenceSynchronization, ArtifactRestore, ResourceGeneration }
 public enum TypedEditAction { Replace, Add, Remove, Rename }
 
 public sealed record TypedEdit

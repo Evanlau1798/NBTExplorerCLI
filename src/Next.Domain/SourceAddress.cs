@@ -27,12 +27,24 @@ public sealed record ArtifactAddress
     public static void ValidatePath(string path, bool entry)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        var parts = path.Split('/');
-        if (path.StartsWith('/') || path.Contains('\\') || path.Contains('\0')
-            || parts.Any(part => part is "" or "." or "..")
-            || (!entry && (path.Any(character => character < 32 || "<>:\"|?*".Contains(character))
-                || parts.Any(part => part.EndsWith('.') || part.EndsWith(' '))))
-            || (entry && path.Length >= 2 && char.IsAsciiLetter(path[0]) && path[1] == ':'))
+        var text = path.AsSpan(); var start = 0;
+        var invalid = entry && text.Length >= 2 && char.IsAsciiLetter(text[0]) && text[1] == ':';
+        for (var index = 0; !invalid && index <= text.Length; index++)
+        {
+            if (index == text.Length || text[index] == '/')
+            {
+                var part = text[start..index];
+                invalid = part.IsEmpty || part.SequenceEqual(".".AsSpan()) || part.SequenceEqual("..".AsSpan())
+                    || !entry && part[^1] is '.' or ' ';
+                start = index + 1;
+            }
+            else
+            {
+                var unit = text[index];
+                invalid = unit is '\\' or '\0' || !entry && (unit < 32 || unit is '<' or '>' or ':' or '"' or '|' or '?' or '*');
+            }
+        }
+        if (invalid)
             throw new ArgumentException("Invalid or ambiguous relative artifact/entry path", nameof(path));
     }
 }

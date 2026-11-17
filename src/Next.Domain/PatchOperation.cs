@@ -83,6 +83,18 @@ public sealed record RestorePatch : PatchOperation
     public override ImmutableArray<ArtifactAddress> RequiredOutputs => Restore.AuthorizedArtifacts.Select(item => item.Artifact).ToImmutableArray();
 }
 
+public sealed record ResourcePatch : PatchOperation
+{
+    public ResourceGeneration Generation { get; }
+    public ResourcePatch(string id, ResourceGeneration generation) : base(id, PatchKind.ResourceGeneration)
+    {
+        ArgumentNullException.ThrowIfNull(generation);
+        Generation = generation;
+    }
+    public override ImmutableArray<SourceAddress> Targets => [];
+    public override ImmutableArray<ArtifactAddress> RequiredOutputs => Generation.Outputs;
+}
+
 internal static class PlanArtifacts
 {
     public static ArtifactAddress Outer(ArtifactAddress artifact) => artifact.ContainerEntry is null ? artifact

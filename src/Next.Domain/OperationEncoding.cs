@@ -65,6 +65,25 @@ internal static class OperationEncoding
                     writer.Image(artifact.Image);
                 }
                 break;
+            case ResourcePatch resource:
+                var generation = resource.Generation;
+                writer.Int(ResourceGeneration.Version); writer.Text(generation.WorldId.ToString("D"));
+                writer.Byte((byte)generation.Format); writer.Text(generation.Destination);
+                writer.Byte(generation.PackFormat is null ? (byte)0 : (byte)1);
+                if (generation.PackFormat is { } format) { writer.Int(format.Major); writer.Int(format.Minor); }
+                writer.Int(generation.Languages.Length);
+                foreach (var language in generation.Languages)
+                {
+                    writer.Text(language.Locale); writer.Int(language.Values.Length);
+                    foreach (var value in language.Values) { writer.Text(value.Key); writer.Text(value.Text); }
+                }
+                writer.Byte(generation.Merge is null ? (byte)0 : (byte)1);
+                if (generation.Merge is { } merge)
+                {
+                    writer.Hash(merge.BlobHash); writer.Int(merge.Entries.Length);
+                    foreach (var entry in merge.Entries) { writer.Text(entry.Path); writer.Hash(entry.Hash); writer.Long(entry.Bytes); }
+                }
+                break;
             default: throw new ArgumentException("Unknown operation kind", nameof(operation));
         }
     }

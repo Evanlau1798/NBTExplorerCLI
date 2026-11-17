@@ -15,6 +15,8 @@ internal sealed class OperationJsonConverter : JsonConverter<PatchOperation>
     private sealed record ReferenceDto(StableIdentity? GroupId, long? GroupRevision, Hash256? MemberDigest,
         ReferenceCompleteness? Completeness, MemberDto?[]? Members);
     private sealed record RestoreDto(Hash256? VerifiedManifestHash, BackupArtifact[]? AuthorizedArtifacts, ArtifactPrecondition[]? CurrentImages);
+    private sealed record ResourceDto(int? Version, Guid? WorldId, ResourceOutputFormat? Format, string? Destination,
+        ResourceLanguage[]? Languages, PackFormatVersion? PackFormat, ResourceMerge? Merge);
 
     public override PatchOperation Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options)
     {
@@ -31,6 +33,7 @@ internal sealed class OperationJsonConverter : JsonConverter<PatchOperation>
             PatchKind.TranslationKeyConversion => ReadKey(id, Decode<KeyDto>(body)),
             PatchKind.ReferenceSynchronization => ReadReferences(id, Decode<ReferenceDto>(body)),
             PatchKind.ArtifactRestore => ReadRestore(id, Decode<RestoreDto>(body)),
+            PatchKind.ResourceGeneration => ReadResource(id, Decode<ResourceDto>(body)),
             _ => throw new JsonException("Unknown operation kind")
         };
     }
@@ -54,6 +57,13 @@ internal sealed class OperationJsonConverter : JsonConverter<PatchOperation>
             return new KeyValuePair<ArtifactAddress, ArtifactImage>(Required(current.Artifact), Required(current.Image));
         })));
 
+    private static ResourcePatch ReadResource(string id, ResourceDto dto)
+    {
+        var version = dto.Version ?? throw new JsonException("Missing resource generation version");
+        if (version != ResourceGeneration.Version) throw new NotSupportedException("Unknown resource generation version");
+        return new(id, new(dto.WorldId ?? throw new JsonException("Missing resource scope"), dto.Format ?? throw new JsonException("Missing resource format"),
+            Required(dto.Destination), Required(dto.Languages), dto.PackFormat, dto.Merge));
+    }
     public override void Write(Utf8JsonWriter writer, PatchOperation operation, JsonSerializerOptions options)
     {
         object payload = operation switch
@@ -69,6 +79,8 @@ internal sealed class OperationJsonConverter : JsonConverter<PatchOperation>
                 restore.Restore.AuthorizedArtifacts.OrderBy(item => item.Artifact.RelativePath, StringComparer.Ordinal).ToArray(),
                 restore.Restore.CurrentImages.OrderBy(item => item.Key.RelativePath, StringComparer.Ordinal)
                     .Select(item => new ArtifactPrecondition(item.Key, item.Value)).ToArray()),
+            ResourcePatch resource => new ResourceDto(ResourceGeneration.Version, resource.Generation.WorldId, resource.Generation.Format,
+                resource.Generation.Destination, resource.Generation.Languages.ToArray(), resource.Generation.PackFormat, resource.Generation.Merge),
             _ => throw new JsonException("Unknown operation kind")
         };
         writer.WriteStartObject();

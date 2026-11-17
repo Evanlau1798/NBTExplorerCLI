@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "655f0fe9cd76de19d31bb5aa49cb410f808804a9",
+  "operations": [
+    {
+      "kind": "TypedEdit",
+      "planHash": "1484b7c07af3ffc3bb1e09e74c097c538854cb484a04c3e8b79cf4d184439160",
+      "wireSha256": "386277ed5f2d17f76e5ff97c5282d8d6a4ab000aabc6895f5747577a55e40912"
+    },
+    {
+      "kind": "LiteralTranslation",
+      "planHash": "1788406d0dacc9c5a35b89b697ffe072a235ac574c6a3b196882af99f81e31e8",
+      "wireSha256": "c66a30f1cceb7cf58a154a058aa0feb676be9d0b357bae38a68687460ca8276a"
+    },
+    {
+      "kind": "TranslationKeyConversion",
+      "planHash": "50ee33e630df85eea4fd1ff5ebdc7791f064879d36f313c3da4449f3a9f82e3b",
+      "wireSha256": "282d714df247eb429fb50f1304256194579c9c5a94ab472be58c04f0274c4d13"
+    },
+    {
+      "kind": "ReferenceSynchronization",
+      "planHash": "4b97bb24e5ec09f58aa1da2e72708afa618edf12891ba8025fbeef7cbf293530",
+      "wireSha256": "822a3169e58237da700ad927cffa36c2503cca0d592f31e7a61dc15378fb552a"
+    },
+    {
+      "kind": "ArtifactRestore",
+      "planHash": "52495f30e97c45b77cd58dc2cfb0642208e1d741e721d0a2e5ca530dee76f824",
+      "wireSha256": "e34f1db0d7d3e96ee2273784b68de8aab052d0e94c1f06550c48ff837cf2c095"
+    }
+  ]
+}

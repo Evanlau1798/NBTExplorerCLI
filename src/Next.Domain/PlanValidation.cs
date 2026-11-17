@@ -5,6 +5,9 @@ internal static class PlanValidation
     public static void Validate(PatchPlan plan)
     {
         ValidateSnapshot(plan);
+        if (plan.Operations.Any(operation => operation is ResourcePatch) && (plan.Operations.Length != 1
+            || plan.PolicyVersion != ResourceGeneration.Policy || plan.ProfileVersion != ResourceGeneration.Profile))
+            throw new ArgumentException("Resource generation requires its dedicated versioned policy and cannot mix gameplay operations");
         if (plan.Operations.Select(operation => operation.Id).Distinct(StringComparer.Ordinal).Count() != plan.Operations.Length)
             throw new ArgumentException("Plan operation IDs must be unique");
         foreach (var input in plan.Preconditions)
