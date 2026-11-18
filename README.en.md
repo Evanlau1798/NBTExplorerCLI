@@ -31,6 +31,8 @@ The report contains the original bytes, their digest, and individual decisions. 
 
 After interruption, replay the same input and options, or use `import-legacy <world> --list` to find the report ID and `--import-id <ID> --create-session` to resume projection. Use verified backup and journal data for rollback. Switching executables leaves existing writes in place.
 
+Preview an old batch with `batch <file> --legacy --world <copy> --migration-report <report> --output <plan>`. Replay the preview to complete a missing plan export if the original batch, world inputs, and report still verify the same plan. Use `status` and `recover` once an apply journal exists.
+
 ## Build and release
 
 Use the SDK selected by `global.json`. Run build and verification separately.

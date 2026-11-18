@@ -31,6 +31,8 @@ Get-FileHash .\nbtcli-next-win-x64.zip -Algorithm SHA256
 
 遷移中斷時，重送相同輸入與選項，或用 `import-legacy <世界> --list` 找回 ID，再用 `--import-id <ID> --create-session` 接續。同一版回退請使用已驗證備份與 journal。切換 executable 不會復原已寫入的資料。
 
+舊 batch 使用 `batch <file> --legacy --world <副本> --migration-report <報告> --output <計畫>` 預覽。可重送相同的預覽來補齊未輸出的計畫，前提是原始 batch、世界來源和報告仍能驗證出同一份計畫。已有 apply journal 時，用 `status` 與 `recover` 接續。
+
 ## 開發與發布
 
 使用 `global.json` 指定的 SDK。建置與驗證分開執行。

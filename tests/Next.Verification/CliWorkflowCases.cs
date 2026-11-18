@@ -33,6 +33,7 @@ internal static class CliWorkflowCases
         new("cli-legacy-batch-region-windows-ambiguity", "cli-legacy-batch", _ => CliLegacyBatchTests.RegionAndWindowsPathsBindExactChunksAndRejectAmbiguity()),
         new("cli-legacy-batch-native-error-classification", "cli-legacy-batch", _ => CliLegacyBatchTests.NativeReadFailuresAndInvalidTypedValuesKeepTheirErrorClassification()),
         new("cli-legacy-batch-preview-raw-provenance", "cli-legacy-batch", _ => CliLegacyBatchTests.ExplicitLegacyPreviewRetainsBytesAndUsesTheNormalWriter()),
+        new("cli-legacy-batch-preview-retry", "cli-legacy-batch", _ => CliLegacyBatchTests.PreviewRetriesOnlyTheSameReportAndPlan()),
         new("cli-legacy-batch-typed-defaults", "cli-legacy-batch", _ => CliLegacyBatchTests.TypedValuesApplyWithSafeDefaultsAndOldIdsRemainProvenance()),
         new("cli-legacy-batch-refusal-report", "cli-legacy-batch", _ => CliLegacyBatchTests.InvalidOrAmbiguousMappingsAndReportFailuresNeverWriteWorlds()),
         new("cli-reference-plan-raw-typed-composition", "cli-reference", _ => CliReferencePlanTests.RawTypedEditsCannotInvalidateASemanticReferenceGroup()),

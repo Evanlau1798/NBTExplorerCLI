@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Next.Domain;
 
 namespace Next.Formats;
@@ -65,11 +66,11 @@ public static class LegacyBatchJson
         => !fields.TryGetValue(name, out var value) || value.ValueKind == JsonValueKind.Null ? null
             : value.ValueKind == JsonValueKind.String ? NativeJsonStrings.Read(value) : throw new JsonException("Legacy text field differs from its declared type");
     private static bool Boolean(JsonElement value) => value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : throw new JsonException("Expected legacy boolean preference");
-    public static string Report(byte[] raw, Guid worldId, LegacyBatchInput input, IReadOnlyList<LegacyBatchMapping> items, string? problem)
-        => ContractJson.WriteForStorage("nbtcli.next.legacy-batch-report", new
-        {
-            inputHash = Hash256.Compute(raw), rawInputBase64 = Convert.ToBase64String(raw), worldId,
-            input.WorldPath, input.CreateBackup, mandatoryValidation = true, mandatoryRecoveryBackup = true,
-            input.Diagnostics, problem, requested = input.Operations.Length, items
-        });
+    private sealed record ReportData(Hash256 InputHash, string RawInputBase64, Guid WorldId, string? WorldPath, bool CreateBackup,
+        bool MandatoryValidation, bool MandatoryRecoveryBackup, ImmutableArray<string> Diagnostics, string? Problem,
+        int Requested, IReadOnlyList<LegacyBatchMapping> Items,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Hash256? PreviewPlanSha256);
+    public static string Report(byte[] raw, Guid worldId, LegacyBatchInput input, IReadOnlyList<LegacyBatchMapping> items, string? problem, Hash256? previewPlanSha256 = null)
+        => ContractJson.WriteForStorage("nbtcli.next.legacy-batch-report", new ReportData(Hash256.Compute(raw), Convert.ToBase64String(raw),
+            worldId, input.WorldPath, input.CreateBackup, true, true, input.Diagnostics, problem, input.Operations.Length, items, previewPlanSha256));
 }

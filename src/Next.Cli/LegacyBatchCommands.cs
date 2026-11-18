@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Runtime.ExceptionServices;
+using System.Text;
 using System.Text.Json;
 using Next.Domain;
 using Next.Formats;
@@ -8,11 +10,16 @@ namespace Next.Cli;
 
 internal static class LegacyBatchCommands
 {
+    private static readonly UTF8Encoding Utf8 = new(false, true);
     internal static CliResult Execute(CliArguments request)
     {
         var root = request.Get("world") ?? throw new CliFailure("INVALID_ARGUMENTS", "Legacy import requires an explicit --world binding");
-        var report = Path.GetFullPath(request.Get("migration-report") ?? throw new CliFailure("INVALID_ARGUMENTS", "Legacy import requires a new --migration-report outside the world"));
-        var context = new WriteContext(root, request); ScanCommands.OutsideWorld(context.Root, report); QueryExportFile.EnsureNew(report);
+        var report = Path.GetFullPath(request.Get("migration-report") ?? throw new CliFailure("INVALID_ARGUMENTS", "Legacy import requires --migration-report outside the world"));
+        var preview = request.LegacyBatchPreview;
+        var retry = preview && File.Exists(report);
+        var context = new WriteContext(root, request, verifyExistingExport: retry);
+        ScanCommands.OutsideWorld(context.Root, report);
+        if (!retry) QueryExportFile.EnsureNew(report);
         if (request.Get("output") is { } output && Path.GetFullPath(output).Equals(report, StringComparison.OrdinalIgnoreCase)) throw new CliFailure("INVALID_ARGUMENTS", "Plan output and migration report require distinct destinations");
         var raw = CliInput.ReadBytes(request.Input!, LegacyBatchJson.MaximumInputBytes); var input = LegacyBatchJson.Read(raw);
         var mappings = new List<LegacyBatchMapping>(); var operations = new List<PatchOperation>(); var problem = input.Problem;
@@ -39,22 +46,32 @@ internal static class LegacyBatchCommands
             }
             mappings.Add(new(item.Index, id, item.Id, item.Path, item.LineIndex, address, decision, reason, item.Diagnostics));
         }
-        var reportJson = LegacyBatchJson.Report(raw, context.Inventory.WorldId, input, mappings, problem);
-        QueryExportFile.WriteNew(report, reportJson);
-        var summary = new { inputHash = Hash256.Compute(raw), reportHash = Hash256.Compute(new System.Text.UTF8Encoding(false, true).GetBytes(reportJson)), requested = input.Operations.Length, mapped = operations.Count };
-        if (problem is not null || mappings.Any(item => item.Decision != "mapped"))
+        var mapped = problem is null && mappings.All(item => item.Decision == "mapped");
+        CliResult? proposal = null; Exception? previewFailure = null;
+        if (preview && mapped)
+        {
+            // Bind report replay to the exact plan and preimages before exporting either file.
+            try { proposal = WriteCommands.ExecuteOperations(context, operations, false); }
+            catch (Exception error) { previewFailure = error; }
+        }
+        var previewHash = proposal?.Export is { } plan ? Hash256.Compute(Utf8.GetBytes(plan)) : null;
+        var reportJson = LegacyBatchJson.Report(raw, context.Inventory.WorldId, input, mappings, problem, previewHash);
+        QueryExportFile.WriteNew(report, reportJson, acceptIdentical: preview);
+        var summary = new { inputHash = Hash256.Compute(raw), reportHash = Hash256.Compute(Utf8.GetBytes(reportJson)), requested = input.Operations.Length, mapped = operations.Count };
+        if (!mapped)
             throw new CliFailure(FailureCode(problem, mappings),
                 "Legacy batch mapping refused; retain the report and resolve each mapping before creating a fresh plan", new { migration = summary, repair = "inspect-migration-report-and-rescan", result = CommandOutputJson.RejectedOperations(mappings.Select(item => item.OperationId).ToArray(), "LegacyMappingRejected") });
         Hash256? convenienceBackupHash = null;
         try
         {
-            if (request.Flag("apply") && input.CreateBackup)
+            if (previewFailure is not null) ExceptionDispatchInfo.Throw(previewFailure);
+            if (!preview && input.CreateBackup)
             {
                 var backup = WriteCommands.Execute(new("backup", context.Root, new Dictionary<string, string?> { ["state-root"] = context.State }, request.Locale));
                 if (backup.Code is not null) throw new CliFailure(backup.Code, "Convenience backup failed before world commit", backup.Data);
-                convenienceBackupHash = Hash256.Compute(new System.Text.UTF8Encoding(false, true).GetBytes(backup.Export!));
+                convenienceBackupHash = Hash256.Compute(Utf8.GetBytes(backup.Export!));
             }
-            var result = WriteCommands.ExecuteOperations(context, operations, request.Flag("apply"));
+            var result = proposal ?? WriteCommands.ExecuteOperations(context, operations, !preview);
             return result with { Data = new { result = result.Data, migration = summary, convenienceBackupHash } };
         }
         catch (CliFailure error)

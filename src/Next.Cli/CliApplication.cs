@@ -34,7 +34,7 @@ public static class CliApplication
                 var export = request.Command == "translate" && request.Subcommand is "export-lang" or "create-pack" ? request.Get("plan-output") : request.Get("output");
                 if (export is { } file)
                 {
-                    try { QueryExportFile.WriteNew(file, result.Export ?? (json + Environment.NewLine)); }
+                    try { QueryExportFile.WriteNew(file, result.Export ?? (json + Environment.NewLine), acceptIdentical: request.LegacyBatchPreview); }
                     catch (ArtifactConflictException error)
                     {
                         output.WriteLine(CommandOutputJson.Write(command, result.Data, "Conflict", "CONFLICT", Message("CONFLICT", locale), error.Message)); return 3;

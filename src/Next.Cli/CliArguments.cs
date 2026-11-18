@@ -9,6 +9,7 @@ internal sealed class CliFailure(string code, string? details = null, object? da
 }
 internal sealed record CliArguments(string Command, string? Input, IReadOnlyDictionary<string, string?> Options, string Locale, string? Subcommand = null)
 {
+    internal bool LegacyBatchPreview => Command == "batch" && Flag("legacy") && !Flag("apply");
     internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "convert", "translate", "agent", "import-legacy"];
     internal static string Canonical(string name) => name switch { "ls" => "list", "find" => "search", "scan-world" => "scan", "extract-text" => "extract", "translate-session" => "translate", "--help" or "-h" => "help", "--version" or "-v" => "version", _ => name };
     internal static string[] Allowed(string command, string? subcommand = null) => command switch

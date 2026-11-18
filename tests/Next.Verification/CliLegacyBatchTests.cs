@@ -47,6 +47,42 @@ internal static class CliLegacyBatchTests
         }
         finally { Directory.Delete(root, true); Directory.Delete(work, true); }
     }
+    public static void PreviewRetriesOnlyTheSameReportAndPlan()
+    {
+        var root = WorldRoot(); var work = ScratchDirectory.CreateChild();
+        try
+        {
+            var artifact = Path.Combine(root, Artifact); var original = File.ReadAllBytes(artifact);
+            var raw = Input(root, [new { Id = "migration-row", Path = Artifact + "#data/message", Value = "After" }]);
+            var input = Path.Combine(work, "legacy.json"); File.WriteAllText(input, raw);
+            var report = Path.Combine(work, "migration.json"); var plan = Path.Combine(work, "plan.json");
+            Invocation RunBatch(params string[] flags) => Run(work, ["batch", input, .. Args(root, work, report, flags)[2..]]);
+            using var initial = Success(RunBatch());
+            var originalReport = File.ReadAllBytes(report);
+            Require(!File.Exists(plan), "the retained report without a plan export models the interrupted migration boundary");
+            using var resumed = Success(RunBatch("--output", plan));
+            var originalPlan = File.ReadAllBytes(plan);
+            using var replayed = Success(RunBatch("--output", plan));
+            Require(originalReport.AsSpan().SequenceEqual(File.ReadAllBytes(report)) && originalPlan.AsSpan().SequenceEqual(File.ReadAllBytes(plan))
+                && original.AsSpan().SequenceEqual(File.ReadAllBytes(artifact)), "retries after either durable boundary preserve report, plan and world bytes");
+            File.WriteAllText(input, raw + " ");
+            Require(RunBatch("--output", plan).Exit == 3 && File.ReadAllText(input) == raw + " ", "changed raw legacy input is refused and retained even when the mapping would be identical");
+            File.WriteAllText(input, raw);
+            Require(RunBatch("--apply", "--world-offline").Exit == 3 && original.AsSpan().SequenceEqual(File.ReadAllBytes(artifact)),
+                "direct apply never resumes from an existing preview report");
+            var output = Path.Combine(work, "unrelated.json"); File.WriteAllText(output, "keep");
+            Require(RunBatch("--output", output).Exit == 3 && File.ReadAllText(output) == "keep", "an unrelated plan destination cannot be reused");
+            var existing = Read(root); var document = (NbtCompound)existing.Root; var data = (NbtCompound)document.Entries.Single(entry => entry.Name == "data").Value;
+            var changed = new NbtCompound(data.Entries.Select(entry => entry.Name == "number" ? new NbtEntry("number", new NbtInt(8)) : entry));
+            var external = BinaryNbt.WriteDocument(new(existing.Name, new NbtCompound(document.Entries.Select(entry => entry.Name == "data" ? new NbtEntry("data", changed) : entry))));
+            File.WriteAllBytes(artifact, external);
+            var newPlan = Path.Combine(work, "wrong-preimage.json");
+            Require(RunBatch("--output", newPlan).Exit == 3 && !File.Exists(newPlan) && external.AsSpan().SequenceEqual(File.ReadAllBytes(artifact))
+                && originalReport.AsSpan().SequenceEqual(File.ReadAllBytes(report)) && originalPlan.AsSpan().SequenceEqual(File.ReadAllBytes(plan)),
+                "changing another node in the same artifact refuses to reuse the original migration receipt or overwrite its old plan");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(work, true); }
+    }
     public static void TypedValuesApplyWithSafeDefaultsAndOldIdsRemainProvenance()
     {
         var root = WorldRoot(); var work = ScratchDirectory.CreateChild();

@@ -10,14 +10,18 @@ internal sealed class WriteContext
     internal string State { get; }
     internal WorldInventory Inventory { get; }
     internal ArtifactStorage Storage { get; }
-    internal WriteContext(string root, CliArguments request)
+    internal WriteContext(string root, CliArguments request, bool verifyExistingExport = false)
     {
         Root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
         if (!Directory.Exists(Root)) throw new DirectoryNotFoundException("World directory not found");
         Inventory = QuerySource.Inventory(Root); Storage = new(Root, Inventory.WorldId);
         State = Path.GetFullPath(request.Get("state-root") ?? Path.Combine(StatePaths.DataRoot, "worlds", Inventory.WorldId.ToString("N")));
         ScanCommands.OutsideWorld(Root, State);
-        if (request.Get("output") is { } output) { ScanCommands.OutsideWorld(Root, Path.GetFullPath(output)); QueryExportFile.EnsureNew(output); }
+        if (request.Get("output") is { } output)
+        {
+            ScanCommands.OutsideWorld(Root, Path.GetFullPath(output));
+            if (!verifyExistingExport) QueryExportFile.EnsureNew(output);
+        }
     }
     internal IWorldBackupStore Objects() => new FileSystemWorldBackupStore(Path.Combine(State, "objects"));
     internal WorldApplyEngine Engine() => new(Inventory, Storage, Objects(), new FileSystemApplyJournalStore(Path.Combine(State, "journals")));
