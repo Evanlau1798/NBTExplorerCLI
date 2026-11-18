@@ -1,7 +1,6 @@
 using Next.Application;
 using Next.Domain;
 using Next.Formats;
-using System.Text;
 
 namespace Next.Infrastructure;
 
@@ -13,7 +12,7 @@ public sealed class FileSystemTranslationSessionStore : ITranslationSessionStore
     public byte[]? Read(Guid sessionId) => repository.Read(Key(sessionId));
     public void Write(Guid sessionId, ReadOnlyMemory<byte> bytes, Hash256? expected)
     {
-        var key = Key(sessionId); var state = TranslationSessionJson.Read(new UTF8Encoding(false, true).GetString(bytes.Span));
+        var key = Key(sessionId); var state = TranslationSessionJson.ReadUtf8(bytes);
         if (state.SessionId != sessionId) throw new ArgumentException("Session record does not match the requested identity", nameof(bytes));
         repository.Write(key, bytes, expected);
     }

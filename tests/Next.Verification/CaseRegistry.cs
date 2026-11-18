@@ -67,6 +67,7 @@ internal static class CaseRegistry
         new("session-apply-subset-cannot-seal", "session-apply", _ => SessionApplyTests.ACompleteSubsetReceiptCannotSealUnwrittenTranslations()),
         new("session-apply-protect-and-reuse-applied", "session-apply", _ => SessionApplyTests.AppliedRepliesNeedResetAndRemainMemoryCandidates()),
         new("session-apply-storage-cas", "session-apply", _ => SessionApplyTests.SealStorageFailuresAndCasKeepTheAcceptedReply()),
+        new("session-apply-exact-cas-replay", "session-apply", _ => SessionApplyTests.ExactSealCasReplayNeedsNoAdditionalStorageRead()),
         new("session-apply-incomplete-rollback", "session-apply", _ => SessionApplyTests.AnOlderSuccessDuringRollbackCannotSealCurrentState()),
         new("session-apply-key-pack-dependency", "session-apply", _ => SessionApplyTests.KeyPackFailureCannotBeHiddenBySuccessfulWorldWrites()),
         new("session-apply-reference-unchanged", "session-apply", _ => SessionApplyTests.LiveReferenceAndUnchangedNamesJoinTheSameSealedSession()),

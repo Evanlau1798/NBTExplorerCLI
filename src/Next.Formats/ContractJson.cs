@@ -7,6 +7,7 @@ namespace Next.Formats;
 
 internal static class ContractJson
 {
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     internal static readonly JsonSerializerOptions Options = CreateOptions();
     private static JsonSerializerOptions CreateOptions()
     {
@@ -34,6 +35,7 @@ internal static class ContractJson
     }
     private sealed record Envelope<T>(string SchemaFamily, int SchemaVersion, T Data);
     public static string Write<T>(string family, T data) => JsonSerializer.Serialize(new Envelope<T>(family, 1, data), Options);
+    internal static byte[] WriteUtf8<T>(string family, T data) => JsonSerializer.SerializeToUtf8Bytes(new Envelope<T>(family, 1, data), Options);
     internal static string WriteBounded<T>(string family, T data)
         => SerializeBounded(new Envelope<T>(family, 1, data));
     internal static string WriteForStorage<T>(string family, T data)
@@ -59,12 +61,21 @@ internal static class ContractJson
     public static T Read<T>(string json, string family, Func<JsonElement, T> decode)
     {
         ArgumentNullException.ThrowIfNull(json);
+        if (json.Length > 67_108_864 || LosslessStringConverter.HasUnpairedSurrogate(json)
+            || Encoding.UTF8.GetByteCount(json) > 67_108_864) throw new JsonException("Invalid or oversized contract JSON");
+        return ReadBytes(Encoding.UTF8.GetBytes(json), family, decode);
+    }
+    internal static T ReadUtf8<T>(ReadOnlyMemory<byte> bytes, string family, Func<JsonElement, T> decode)
+    {
+        if (bytes.Length > 67_108_864) throw new JsonException("Invalid or oversized contract JSON");
+        _ = StrictUtf8.GetCharCount(bytes.Span);
+        return ReadBytes(bytes, family, decode);
+    }
+    private static T ReadBytes<T>(ReadOnlyMemory<byte> bytes, string family, Func<JsonElement, T> decode)
+    {
         try
         {
-            if (json.Length > 67_108_864 || LosslessStringConverter.HasUnpairedSurrogate(json)
-                || Encoding.UTF8.GetByteCount(json) > 67_108_864) throw new JsonException("Invalid or oversized contract JSON");
-            var bytes = Encoding.UTF8.GetBytes(json);
-            var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { MaxDepth = 1024 });
+            var reader = new Utf8JsonReader(bytes.Span, new JsonReaderOptions { MaxDepth = 1024 });
             var objects = new Stack<HashSet<string>>();
             var tokens = 0;
             while (reader.Read())

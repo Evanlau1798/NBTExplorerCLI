@@ -132,11 +132,37 @@ internal static class SessionApplyTests
     private sealed class InterceptStore(ITranslationSessionStore inner) : ITranslationSessionStore
     {
         internal Action? BeforeWrite { get; set; }
-        public byte[]? Read(Guid id) => inner.Read(id);
+        internal Action? BeforeRead { get; set; }
+        public byte[]? Read(Guid id) { BeforeRead?.Invoke(); return inner.Read(id); }
         public void Write(Guid id, ReadOnlyMemory<byte> bytes, Hash256? expected)
         {
             var callback = BeforeWrite; BeforeWrite = null; callback?.Invoke(); inner.Write(id, bytes, expected);
         }
+    }
+    public static void ExactSealCasReplayNeedsNoAdditionalStorageRead()
+    {
+        var root = WorldQueryTests.CreateWorld(); var state = ScratchDirectory.CreateChild();
+        try
+        {
+            var snapshot = LegacyImportMappingTests.Query(root, Path.Combine(state, "cache")); var inventory = new WorldInventory(root, World);
+            var (service, id, store) = Session(state, snapshot); var translated = service.Read(id);
+            var plan = new WorldPlanBuilder(inventory).Build(snapshot, Operations(translated, false));
+            using var prepared = new WorldPlanPreparation(inventory, new ArtifactStorage(root, World)).Prepare(snapshot, plan, true);
+            var engine = WorldApplyTests.Engine(root, state);
+            Require(engine.Apply(prepared, true).Success, "exact-CAS replay starts with a complete forward journal");
+            var operation = Guid.NewGuid(); var intercepted = new InterceptStore(store); var reads = 0;
+            SessionOperationReceipt? winner = null;
+            intercepted.BeforeRead = () =>
+            {
+                if (++reads > 2) throw new IOException("Unexpected read after the exact CAS replay was confirmed");
+            };
+            intercepted.BeforeWrite = () => winner = service.Seal(id, translated.Revision, operation, plan.PlanHash, engine);
+            var actual = new TranslationSessionService(intercepted).Seal(id, translated.Revision, operation, plan.PlanHash, engine);
+            Require(reads == 2 && winner is not null && actual.OperationId == winner.OperationId && actual.InputHash == winner.InputHash
+                && actual.Revision == winner.Revision && service.Read(id).Slots.All(slot => slot.State == SessionSlotState.Applied),
+                "an exact competing seal returns its durable receipt from the captured CAS fallback state");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(state, true); }
     }
     public static void SealStorageFailuresAndCasKeepTheAcceptedReply()
     {

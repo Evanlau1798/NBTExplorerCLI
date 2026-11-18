@@ -50,6 +50,9 @@ internal static class TranslationSessionTests
             var store = new FileSystemTranslationSessionStore(root); var service = new TranslationSessionService(store); service.Start(StartRequest(), Guid.NewGuid());
             var original = store.Read(SessionId)!; var state = TranslationSessionJson.Read(Encoding.UTF8.GetString(original));
             Require(TranslationSessionJson.Write(state) == Encoding.UTF8.GetString(original) && state.Source.SnapshotId == StartRequest().Source.SnapshotId, "session schema roundtrips exact bound source and slot identities");
+            Require(TranslationSessionJson.WriteUtf8(state).SequenceEqual(original), "persistent UTF-8 and the public string codec emit identical canonical bytes");
+            Reject<DecoderFallbackException>(() => store.Write(SessionId, new byte[] { 0xc0, 0xaf }, Hash256.Compute(original)));
+            Reject<System.Text.Json.JsonException>(() => store.Write(SessionId, original.Append((byte)' ').ToArray(), Hash256.Compute(original)));
             store.Write(SessionId, original, Hash256.Compute(original));
             Reject<ArtifactConflictException>(() => store.Write(SessionId, original, null));
             Reject<ArtifactConflictException>(() => store.Write(SessionId, original, Hash256.Compute([99])));

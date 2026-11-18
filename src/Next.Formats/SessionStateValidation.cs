@@ -106,7 +106,7 @@ internal static class SessionStateValidation
                     }
                     else
                     {
-                        var completion = SessionApplyCompletionJson.Read(new UTF8Encoding(false, true).GetString(bytes));
+                        var completion = SessionApplyCompletionJson.ReadUtf8(bytes);
                         if (completion.OperationId != operation.OperationId || !operation.Slots.ToHashSet().SetEquals(slots.Keys)) Invalid();
                         changed = SessionApplyCompletions.Apply(replayState, completion);
                     }

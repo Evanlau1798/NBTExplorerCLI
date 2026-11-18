@@ -82,7 +82,7 @@ public sealed partial class TranslationSessionService(ITranslationSessionStore s
         var bytes = store.Read(id) ?? throw new KeyNotFoundException("Session does not exist"); var state = Decode(bytes);
         if (state.SessionId != id) throw new InvalidDataException("Session store identity differs"); return (state, Hash256.Compute(bytes));
     }
-    private static TranslationSession Decode(byte[] bytes) => TranslationSessionJson.Read(new UTF8Encoding(false, true).GetString(bytes));
+    private static TranslationSession Decode(byte[] bytes) => TranslationSessionJson.ReadUtf8(bytes);
     private static SessionOperationReceipt? Replay(TranslationSession state, Guid operation, Hash256 input, string kind)
     {
         var receipt = state.Operations.SingleOrDefault(item => item.OperationId == operation);
@@ -90,10 +90,17 @@ public sealed partial class TranslationSessionService(ITranslationSessionStore s
         return receipt;
     }
     private SessionOperationReceipt Save(TranslationSession state, SessionOperationReceipt receipt, Hash256? expected)
+        => Save(state, receipt, expected, out _);
+    private SessionOperationReceipt Save(TranslationSession state, SessionOperationReceipt receipt, Hash256? expected, out TranslationSession persisted)
     {
-        var bytes = Encoding.UTF8.GetBytes(TranslationSessionJson.Write(state));
+        var bytes = TranslationSessionJson.WriteUtf8(state);
         try { store.Write(state.SessionId, bytes, expected); }
-        catch (ArtifactConflictException) { return Replay(Read(state.SessionId), receipt.OperationId, receipt.InputHash, receipt.Kind) ?? throw new ArtifactConflictException("Session revision changed"); }
+        catch (ArtifactConflictException)
+        {
+            persisted = Read(state.SessionId);
+            return Replay(persisted, receipt.OperationId, receipt.InputHash, receipt.Kind) ?? throw new ArtifactConflictException("Session revision changed");
+        }
+        persisted = state;
         return receipt;
     }
 }

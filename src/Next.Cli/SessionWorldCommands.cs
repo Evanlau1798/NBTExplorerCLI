@@ -23,10 +23,11 @@ internal static class SessionWorldCommands
         try
         {
             var context = new WriteContext(request.Input!, request);
-            var service = new TranslationSessionService(new FileSystemTranslationSessionStore(Path.Combine(context.State, "sessions"))); var state = service.Read(id);
-            if (state.Source.WorldId != context.Inventory.WorldId) throw new ArtifactConflictException("Session belongs to a different world root");
+            var service = new TranslationSessionService(new FileSystemTranslationSessionStore(Path.Combine(context.State, "sessions")));
             if (!seal)
             {
+                var state = service.Read(id);
+                if (state.Source.WorldId != context.Inventory.WorldId) throw new ArtifactConflictException("Session belongs to a different world root");
                 if (state.Revision != revision || state.Slots.Any(slot => slot.State is not (SessionSlotState.Translated or SessionSlotState.Unchanged)))
                     throw new CliFailure("CONFLICT", "Retain this session; inspect its revision and complete all pending replies before planning", Repair("inspect-session-status-and-complete-replies"));
                 var snapshot = SessionCommands.Query(context, SessionCommands.Scope(state));
@@ -57,15 +58,18 @@ internal static class SessionWorldCommands
                 using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 1024 });
                 return new(new PlanPreview(true, id, revision, operation, document.RootElement.Clone(), plan.PlanHash), Export: json);
             }
-            var engine = context.Engine(); SessionOperationReceipt receipt;
-            try { receipt = service.Seal(id, revision, operation, hash!, engine); }
+            WorldApplyEngine? engine = null;
+            WorldApplyEngine OpenEngine() => engine ??= context.Engine();
+            (SessionOperationReceipt Receipt, SessionStatus Status) completed;
+            try { completed = service.SealWithStatus(id, revision, operation, hash!, context.Inventory.WorldId, OpenEngine); }
             catch (InvalidOperationException)
             {
-                var result = WriteCommands.Status(engine.ReadStatus(hash!));
+                var result = WriteCommands.Status(OpenEngine().ReadStatus(hash!));
                 return result with { Data = new { apply = result.Data, sessionId = id, revision, operationId = operation, repair = "inspect-apply-status-and-retry-seal" } };
             }
+            var receipt = completed.Receipt;
             return new(new { completion = new { receipt.OperationId, receipt.InputHash, receipt.FromRevision, receipt.Revision, receipt.Kind, slotCount = receipt.Slots.Length },
-                status = service.Status(id), planHash = hash, validationScope = "durable-session-completion" });
+                status = completed.Status, planHash = hash, validationScope = "durable-session-completion" });
         }
         catch (FileNotFoundException error) when (seal)
         { throw new CliFailure("FILE_NOT_FOUND", error.Message, Repair("inspect-apply-status-and-retry-seal")); }
