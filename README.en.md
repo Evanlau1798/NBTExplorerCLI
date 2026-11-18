@@ -6,7 +6,7 @@ NBTExplorerCLI is a Windows x64 command-line tool for Minecraft Java Edition wor
 
 ## Install and inspect
 
-Download the Windows x64 ZIP from GitHub Releases. Compare its SHA-256 with `SHA256SUMS.txt` from the same release, then extract the whole archive to a new folder. Keep the DLLs beside the executable. The package includes the .NET runtime.
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) or the matching [Actions candidate](https://github.com/Evanlau1798/NBTExplorerCLI/actions). Verify the ZIP against the accompanying `SHA256SUMS.txt`, then extract the whole archive to a new folder. Keep the DLLs beside the executable. The package includes the .NET runtime.
 
 ```powershell
 Get-FileHash .\nbtcli-next-win-x64.zip -Algorithm SHA256
@@ -16,22 +16,6 @@ Get-FileHash .\nbtcli-next-win-x64.zip -Algorithm SHA256
 ```
 
 Run `help <command>` for its options. The CLI emits one JSON response and supports `--ui-locale zh-TW` and `en-US`. Preview writes and check the plan and source before applying. Give `--world-offline` only after closing all writers. If a commit is interrupted, use the same state root and plan hash with `status`, then select the appropriate `recover` operation.
-
-## Migrate legacy data
-
-Keep the original world, backups, translations, glossary, questionnaire, and settings. The questionnaire, settings, and notes under `.nbtcli_cache` are user data. Select an explicit legacy profile and a world copy. Store the new state and report outside the world directory.
-
-```powershell
-.\nbtcli-next.exe import-legacy 'D:\WorldCopy' --input 'D:\Legacy\session.json' `
-  --profile command-session --source-language en_us --target-language zh_tw `
-  --state-root 'D:\NextState' --output 'D:\Migration\session-report.json'
-```
-
-The report contains the original bytes, their digest, and individual decisions. Protect it the same way as the source. Reconfirm questionnaires and preferences through `agent setup` and `agent submit`. After verifying the world copy and its source, use `--acknowledge-world-rebind --create-session` to project an eligible import. Review ambiguous, changed, or unresolved sources manually. Importing alone leaves world data intact.
-
-After interruption, replay the same input and options, or use `import-legacy <world> --list` to find the report ID and `--import-id <ID> --create-session` to resume projection. Use verified backup and journal data for rollback. Switching executables leaves existing writes in place.
-
-Preview an old batch with `batch <file> --legacy --world <copy> --migration-report <report> --output <plan>`. Replay the preview to complete a missing plan export if the original batch, world inputs, and report still verify the same plan. Use `status` and `recover` once an apply journal exists.
 
 ## Build and release
 
