@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <AssemblyName>nbtcli-next</AssemblyName>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../Next.Infrastructure/Next.Infrastructure.csproj" />
-  </ItemGroup>
-</Project>

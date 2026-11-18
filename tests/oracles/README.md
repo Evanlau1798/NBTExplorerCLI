@@ -42,9 +42,9 @@ URL 中的 object hash 即 SHA1，下載至 ignored `tmp/codec-oracle/` 後已�
 
 ## SNBT grammar oracle
 
-`MinecraftSnbtOracle.java` 各以官方 1.21.4／1.21.5 TagParser 執行相同 44 個合成字面值，輸出接受／拒絕、consumed bytes 及官方 named NBT bytes。Legacy 使用 uo.readValue 後明確檢查 EOF；modern 使用 vb 的 NBT_OPS_PARSER.parseAsArgument 後同樣檢查 EOF。無啟動遊戲／伺服器。duplicate key 的原語法順序保留是本專案額外鑑識契約，不能拿官方 Map 的最後值覆蓋來抵充。
+`MinecraftSnbtOracle.java` 各以官方 1.21.4／1.21.5 TagParser 執行相同 44 個合成字面值，輸出接受／拒絕、consumed bytes 及官方 named NBT bytes。1.21.4 使用 uo.readValue 後明確檢查 EOF；modern 使用 vb 的 NBT_OPS_PARSER.parseAsArgument 後同樣檢查 EOF。無啟動遊戲／伺服器。duplicate key 的原語法順序保留是本專案額外鑑識契約，不能拿官方 Map 的最後值覆蓋來抵充。
 
-1.21.4 client SHA1 `a7e5a6024bfd3cd614625aa05629adf760020304`，mappings SHA1 `0cf2a0b7f056da1a5a5dd99fc6dc752f33987150`，URL 同為官方 `https://piston-data.mojang.com/v1/objects/<sha1>/client.jar`／`client.txt`。存於 `tmp/codec-oracle/legacy/`；勿將兩版 client 放同一 classpath。額外 Java dependencies 也從 1.21.5 官方 metadata URL 下載且已核對 SHA1：
+1.21.4 client SHA1 `a7e5a6024bfd3cd614625aa05629adf760020304`，mappings SHA1 `0cf2a0b7f056da1a5a5dd99fc6dc752f33987150`，URL 同為官方 `https://piston-data.mojang.com/v1/objects/<sha1>/client.jar`／`client.txt`。存於 `tmp/codec-oracle/java-1.21.4/`；勿將兩版 client 放同一 classpath。額外 Java dependencies 也從 1.21.5 官方 metadata URL 下載且已核對 SHA1：
 
 | dependency | SHA1 |
 | --- | --- |
@@ -59,12 +59,12 @@ URL 中的 object hash 即 SHA1，下載至 ignored `tmp/codec-oracle/` 後已�
 
 ```powershell
 $snbtLibraries = @(Get-ChildItem tmp/codec-oracle -Filter '*.jar' | Where-Object Name -notlike 'client*' | ForEach-Object FullName)
-# 1.21.4 的 client 改用 tmp/codec-oracle/legacy/client-1.21.4.jar，最後參數改 1.21.4。
+# 1.21.4 的 client 改用 tmp/codec-oracle/java-1.21.4/client-1.21.4.jar，最後參數改 1.21.4。
 $snbtClasspath = (Join-Path $PWD 'tmp/codec-oracle/client-1.21.5.jar') + ';' + ($snbtLibraries -join ';')
 java -cp $snbtClasspath tests/oracles/MinecraftSnbtOracle.java 1.21.5
 ```
 
-Legacy oracle 接受 24／拒絕 20，modern 接受 29／拒絕 15。fixtures 均 UTF-8、LF 結尾；只保存 stdout，不能把 SLF4J stderr 寫進 JSON。
+1.21.4 oracle 接受 24／拒絕 20，modern 接受 29／拒絕 15。fixtures 均 UTF-8、LF 結尾；只保存 stdout，不能把 SLF4J stderr 寫進 JSON。
 
 新增的 `MinecraftSnbtOracle.java 1.21.5 edges` 產生 63 個邊界到 `snbt-1.21.5-edges-oracle.json`，原兩份 44 例 fixture 不變。涵蓋 suffix／內部 whitespace、0b 歧義、範圍、array context、Unicode names、Java UUID 短群組等；須以新的候選明確審查差異，不能用產品 reader 改寫 expected。
 
@@ -76,7 +76,7 @@ Legacy oracle 接受 24／拒絕 20，modern 接受 29／拒絕 15。fixtures �
 & 'C:/Program Files/Java/jdk-21/bin/java.exe' tests/oracles/JavaUnicodeNames.java
 ```
 
-輸出存至 `src/Next.Formats/Unicode/java21-names.json`，UTF-8／LF。使用 Java 21.0.8 runtime `21.0.8+12-LTS-250`、Unicode15.0，共 288,767 個 getName／codePointOf 可逆的 entries。gzip 內文為 `hex-codepoint<TAB>name<LF>`；SHA256 `7820d9a7ab31fa78e4241d89d48e1a41df8fa906456062b250cef6d82466822d`。整份 JSON 2,143,040 bytes，SHA256 `660194030d42081ab3b1e22468630d8b848c59c160494f7da9f4585b6bc3f173`。不要把大型 Base64 印入診斷或 review；只核對 metadata、digest 與再生結果。
+輸出存至 `src/NBTExplorerCLI.Formats/Unicode/java21-names.json`，UTF-8／LF。使用 Java 21.0.8 runtime `21.0.8+12-LTS-250`、Unicode15.0，共 288,767 個 getName／codePointOf 可逆的 entries。gzip 內文為 `hex-codepoint<TAB>name<LF>`；SHA256 `7820d9a7ab31fa78e4241d89d48e1a41df8fa906456062b250cef6d82466822d`。整份 JSON 2,143,040 bytes，SHA256 `660194030d42081ab3b1e22468630d8b848c59c160494f7da9f4585b6bc3f173`。不要把大型 Base64 印入診斷或 review；只核對 metadata、digest 與再生結果。
 
 產品內嵌資料、按需載入，不呼叫 JDK。Unicode 授權完整保留在 `licenses/Unicode.md`（原 JDK21 legal/java.base/unicode.md，僅統一 LF），並複製到產品輸出。JDK／Mojang 程式及 jars 均未納入 source 或產品依賴；只有本專案生成器與合成 oracle 資料。
 

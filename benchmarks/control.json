@@ -1,5 +1,5 @@
 {
-  "schemaFamily": "nbtcli.next.correctness-control",
+  "schemaFamily": "nbtcli.correctness-control",
   "schemaVersion": 1,
   "gateRevision": 2,
   "runtimeSourceBase": "4180273d1a42c4aea4332086f1374dad880d12ac",
@@ -15,7 +15,7 @@
   },
   "scanInput": {
     "recipe": "corpus.json S, its six declared files plus fixtures/control/level-java121.dat",
-    "baseManifestSha256": "33277bc56c3504cc181df5b24132eb207e5f4f06d65a8efdc8c684a73bad3019",
+    "baseManifestSha256": "1b3873386f606deff81d96eee23803957902134ad5cb57fd550a27d3a8e02029",
     "metadataSha256": "ffc952ecc6974230f94e113065cd864b3541bb95256d8858873f1b21c9f40ad1",
     "metadataBytes": 118,
     "metadataMeaning": "GZip NBT DataVersion 3953 with overworld/nether/end dimension registry; synthetic, not playable",
@@ -34,20 +34,19 @@
     "sameRootProjection": "data excluding telemetry, cacheBefore and execution; retain all source/snapshot identities",
     "portableProjection": "also remove data.worldId, data.snapshotId, sources[].location.artifact.worldId and items[].address.artifact.worldId; retain all sources, diagnostics, counts, scope, addresses and text",
     "portableJson": "PowerShell 7 ConvertTo-Json -Depth 100 -Compress, UTF-8 without BOM or final newline",
-    "portableSha256": "623cf5fde6f9273eaecee1ada49c2d001b43f79754f82b98f0a0b3559ee230f8"
+    "portableSha256": "012a5729903e93c86ce869da6ca2cea8aec9e019205be628ebab2a4290c9dc4f"
   },
   "workflowControls": {
-    "scope": "Public cases listed below, cli-session-write-public-legacy-through-seal, and the architecture suite",
+    "scope": "Public cases listed below and the architecture suite",
     "settings": "Preserve each case's explicit input/worker settings. scanWorkers=1 applies to the separate serial scan control; cases run sequentially in isolated workers.",
     "canonicalTruth": "Case assertions fix exact typed values, protected bytes, complete slot/operation sets, receipts, recovery identities, raw restores and session completion; random temporary paths are not semantic outputs",
     "exportImport": "cli-session-file-exchange-replay",
-    "scanSessionImportPlanApplySeal": "cli-session-write-public-legacy-through-seal",
     "typedBatch": "cli-edit-set-batch-stdin-parity",
     "pureMixedApply": "cli-session-write-public-pure-mixed-unchanged",
     "keyDependencies": "cli-key-plan-pure-mixed-seal",
     "packMerge": "cli-resource-pack-frozen-merge-output",
     "convert": "cli-convert-preview-dedup-context",
-    "backupRestore": "cli-compat-backup-named-manifest",
+    "backupRestore": "cli-backup-named-manifest",
     "recovery": "cli-session-write-partial-recovery-rollback"
   },
   "comparisonRule": "Preserve complete workload, diagnostics, bindings and canonical truth before comparing time/allocation/RSS. G07 must add size-specific workflow workloads and freeze inputs/thresholds before optimization.",

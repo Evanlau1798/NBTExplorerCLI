@@ -1,6 +1,6 @@
 {
   "corpusVersion": 1,
-  "source": "Project-authored counterexamples and exact invariants, not legacy golden output",
+  "source": "Project-authored counterexamples and exact invariants",
   "license": "Project-authored fixture data",
   "cases": [
     {"id":"SLOT-01","findings":["F09"],"gate":"G04/G05","profile":"json-text","input":{"text":"Hello","extra":[{"text":"Tail"}],"clickEvent":{"action":"run_command","value":"{{T0}}"}},"replyTexts":["literal {{T1}} | ‖§‖","tail"],"expected":{"text":"literal {{T1}} | ‖§‖","extra":[{"text":"tail"}],"clickEvent":{"action":"run_command","value":"{{T0}}"}},"invariants":["No template replacement","Missing or duplicate slot rejects whole page"]},

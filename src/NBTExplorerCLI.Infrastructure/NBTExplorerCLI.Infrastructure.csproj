@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="NBTExplorerCLI.Verification" />
+    <ProjectReference Include="../NBTExplorerCLI.Application/NBTExplorerCLI.Application.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,5 +1,5 @@
 {
-  "legacy": [
+  "directoryLayout": [
     "level.dat|||Level|",
     "region/r.-1.0.mca|||Terrain|minecraft:overworld",
     "region/r.-1.0.mca||-32,0|Terrain|minecraft:overworld",

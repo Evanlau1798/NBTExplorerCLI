@@ -1,1 +1,1 @@
-{"schemaFamily":"nbtcli.next.typed-edit","schemaVersion":99,"data":{"action":"replace","path":[],"expected":{"tag":"int","value":1},"replacement":{"tag":"int","value":2},"child":null,"newName":null}}
+{"schemaFamily":"nbtcli.typed-edit","schemaVersion":99,"data":{"action":"replace","path":[],"expected":{"tag":"int","value":1},"replacement":{"tag":"int","value":2},"child":null,"newName":null}}

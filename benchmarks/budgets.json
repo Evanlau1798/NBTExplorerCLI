@@ -21,9 +21,6 @@
     "replyDecodedTextBytes": 67108864,
     "declaredPlaceholderTokens": 256,
     "placeholderOccurrences": 100000,
-    "legacyInputBytes": 16777216,
-    "legacyMappingOccurrences": 100000,
-    "legacyReportCandidateAddresses": 4096,
     "planOperations": 100000,
     "planJsonBytes": 67108864,
     "receiptJsonBytes": 134217728

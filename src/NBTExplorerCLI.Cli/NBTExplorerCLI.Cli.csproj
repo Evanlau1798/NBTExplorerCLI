@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>nbtcli</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../NBTExplorerCLI.Infrastructure/NBTExplorerCLI.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

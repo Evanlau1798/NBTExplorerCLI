@@ -63,7 +63,7 @@ jobs:
       - name: Run verification harness
         shell: pwsh
         run: |
-          dotnet tests/Next.Verification/bin/Release/net10.0/Next.Verification.dll --suite all --timeout-ms 120000 |
+          dotnet tests/NBTExplorerCLI.Verification/bin/Release/net10.0/NBTExplorerCLI.Verification.dll --suite all --timeout-ms 120000 |
             Tee-Object "$env:RUNNER_TEMP/nbt-verification.json"
           exit $LASTEXITCODE
       - name: Build self-contained Windows candidate
@@ -71,7 +71,7 @@ jobs:
         env:
           REVISION: ${{ steps.source.outputs.revision }}
         run: |
-          $project = 'src/Next.Cli/Next.Cli.csproj'
+          $project = 'src/NBTExplorerCLI.Cli/NBTExplorerCLI.Cli.csproj'
           $release = @('--runtime','win-x64','-p:SelfContained=true','-p:RuntimeFrameworkVersion=10.0.15',
             '-p:NuGetLockFilePath=packages.win-x64.lock.json','-p:DisableTransitiveFrameworkReferenceDownloads=true')
           dotnet restore $project @release --configfile NuGet.Config --locked-mode --packages "$env:RUNNER_TEMP/nbt-rid-packages"
@@ -86,7 +86,7 @@ jobs:
           $root = "$env:RUNNER_TEMP/nbt-artifact"
           New-Item -ItemType Directory -Path $root | Out-Null
           $pack = "$env:RUNNER_TEMP/nbt-rid-packages/microsoft.netcore.app.runtime.win-x64/10.0.15/microsoft.netcore.app.runtime.win-x64.10.0.15.nupkg"
-          $receipt = ./New-WindowsCandidate.ps1 -PublishDirectory "$env:RUNNER_TEMP/nbt-publish" -RuntimePackage $pack -Revision $env:REVISION -OutputZip "$root/nbtcli-next-win-x64.zip"
+          $receipt = ./New-WindowsCandidate.ps1 -PublishDirectory "$env:RUNNER_TEMP/nbt-publish" -RuntimePackage $pack -Revision $env:REVISION -OutputZip "$root/nbtcli-win-x64.zip"
           $receipt | Set-Content -Encoding utf8NoBOM "$root/package.json"
           $manifest = $receipt | ConvertFrom-Json
           "$($manifest.sha256)  $($manifest.file)" | Set-Content -Encoding ascii "$root/SHA256SUMS.txt"
@@ -100,7 +100,6 @@ jobs:
           New-Item -ItemType Directory -Path $smokeRoot | Out-Null
           Copy-Item "$env:RUNNER_TEMP/nbt-artifact/*" -Destination $smokeRoot
           Copy-Item .github/scripts/Test-WindowsCandidate.ps1,fixtures/control/level-java121.dat -Destination $smokeRoot
-          Copy-Item -LiteralPath fixtures/legacy-user-data -Destination "$smokeRoot/legacy" -Recurse
           $image = 'mcr.microsoft.com/windows/servercore:ltsc2025'
           docker pull $image
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -114,7 +113,7 @@ jobs:
           exit $LASTEXITCODE
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: nbtcli-next-windows-x64
+          name: nbtcli-windows-x64
           path: ${{ runner.temp }}/nbt-artifact/
           if-no-files-found: error
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -140,7 +139,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: nbtcli-next-windows-x64
+          name: nbtcli-windows-x64
           path: ${{ runner.temp }}/nbt-verified
       - name: Publish the verified candidate and checksum
         shell: pwsh
@@ -157,12 +156,12 @@ jobs:
           git merge-base --is-ancestor $head refs/remotes/origin/main
           if ($LASTEXITCODE -ne 0) { throw 'Release revision must be in main' }
           $root = "$env:RUNNER_TEMP/nbt-verified"
-          $zip = "$root/nbtcli-next-win-x64.zip"
+          $zip = "$root/nbtcli-win-x64.zip"
           if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne $env:SHA256 -or
-              (Get-Content -LiteralPath "$root/SHA256SUMS.txt" -Raw).Trim() -cne "$env:SHA256  nbtcli-next-win-x64.zip") { throw 'Verified artifact digest differs' }
+              (Get-Content -LiteralPath "$root/SHA256SUMS.txt" -Raw).Trim() -cne "$env:SHA256  nbtcli-win-x64.zip") { throw 'Verified artifact digest differs' }
           $receipt = Get-Content -LiteralPath "$root/package.json" -Raw | ConvertFrom-Json
           if ($receipt.sha256 -cne $env:SHA256 -or $receipt.revision -cne $head -or
-              $receipt.version -cne $env:VERSION -or $receipt.file -cne 'nbtcli-next-win-x64.zip') { throw 'Verified receipt differs' }
+              $receipt.version -cne $env:VERSION -or $receipt.file -cne 'nbtcli-win-x64.zip') { throw 'Verified receipt differs' }
           $tagObject = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object' | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'Cannot verify remote tag' }
           if ($tagObject.type -eq 'tag') {

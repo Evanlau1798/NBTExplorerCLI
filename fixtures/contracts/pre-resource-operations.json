@@ -1,30 +1,31 @@
 {
-  "sourceCommit": "655f0fe9cd76de19d31bb5aa49cb410f808804a9",
+  "operationExamplesCommit": "655f0fe9cd76de19d31bb5aa49cb410f808804a9",
+  "wireSchemaFamily": "nbtcli.patch-plan",
   "operations": [
     {
       "kind": "TypedEdit",
-      "planHash": "1484b7c07af3ffc3bb1e09e74c097c538854cb484a04c3e8b79cf4d184439160",
-      "wireSha256": "386277ed5f2d17f76e5ff97c5282d8d6a4ab000aabc6895f5747577a55e40912"
+      "planHash": "a585d8215d3065142535c16cc4253d8c0c1fab55542b623192685b197f9a40f7",
+      "wireSha256": "6fb7996273f4dadd3c2666335ae51242e5832c5b6529e1ad0433caefa76670f0"
     },
     {
       "kind": "LiteralTranslation",
-      "planHash": "1788406d0dacc9c5a35b89b697ffe072a235ac574c6a3b196882af99f81e31e8",
-      "wireSha256": "c66a30f1cceb7cf58a154a058aa0feb676be9d0b357bae38a68687460ca8276a"
+      "planHash": "4c1e8989347caf008b0109c11e371f178c524216f54c80f0c44fc46a8d6f24c2",
+      "wireSha256": "b65c7283f8663f8b8d9e4975830c45658fc661fa26fd5934d35d5d259ded26aa"
     },
     {
       "kind": "TranslationKeyConversion",
-      "planHash": "50ee33e630df85eea4fd1ff5ebdc7791f064879d36f313c3da4449f3a9f82e3b",
-      "wireSha256": "282d714df247eb429fb50f1304256194579c9c5a94ab472be58c04f0274c4d13"
+      "planHash": "ac2d20fc12294339eadfd6df66abca742423faf9ec3ed9318174ed2a5ef11255",
+      "wireSha256": "7d4386325c6a5eeced39db22093f4f29ace55dfca821ff365d525b64395ce5a2"
     },
     {
       "kind": "ReferenceSynchronization",
-      "planHash": "4b97bb24e5ec09f58aa1da2e72708afa618edf12891ba8025fbeef7cbf293530",
-      "wireSha256": "822a3169e58237da700ad927cffa36c2503cca0d592f31e7a61dc15378fb552a"
+      "planHash": "f8b5ab65f6918e027b8d3de6c38448abe6936ea4f241d3f79ac22a5e1e06d5d0",
+      "wireSha256": "a32536ff086b3086df75be6b6390d9b1f811c533f810556a53497959b3bb2ace"
     },
     {
       "kind": "ArtifactRestore",
-      "planHash": "52495f30e97c45b77cd58dc2cfb0642208e1d741e721d0a2e5ca530dee76f824",
-      "wireSha256": "e34f1db0d7d3e96ee2273784b68de8aab052d0e94c1f06550c48ff837cf2c095"
+      "planHash": "2505550aceae886814864e1836a1fdcc95f3bc3126718476d1f284ece5612765",
+      "wireSha256": "f93fc3fd254510b4cfea15849d6c7a146d928ef9825732fc4928f2509944a86d"
     }
   ]
 }

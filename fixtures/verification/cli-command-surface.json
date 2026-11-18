@@ -1,19 +1,10 @@
 {
-  "schemaFamily": "nbtcli.next.command-surface",
+  "schemaFamily": "nbtcli.command-surface",
   "schemaVersion": 1,
   "globalOptions": ["--ui-locale"],
-  "rootAliases": {"scan-world":"scan","extract-text":"extract","ls":"list","find":"search","translate-session":"translate","--help":"help","-h":"help","--version":"version","-v":"version"},
+  "rootAliases": {"--help":"help","-h":"help","--version":"version","-v":"version"},
   "optionAliases": [
-    {"alias":"-h","option":"help","commands":["*"],"subcommands":null,"kind":"flag"},
-    {"alias":"--q","option":"query","commands":["search"],"subcommands":null,"kind":"value"},
-    {"alias":"-q","option":"query","commands":["search"],"subcommands":null,"kind":"value"},
-    {"alias":"-k","option":"keepdup","commands":["convert"],"subcommands":null,"kind":"flag"},
-    {"alias":"-v","option":"verbose","commands":["convert"],"subcommands":null,"kind":"flag"},
-    {"alias":"--summary-only","option":"summary","commands":["scan"],"subcommands":null,"kind":"flag"},
-    {"alias":"--items","option":"show-items","commands":["scan"],"subcommands":null,"kind":"flag"},
-    {"alias":"--no-limit","option":"all","commands":["extract"],"subcommands":null,"kind":"flag"},
-    {"alias":"--deduplicate","option":"unique","commands":["extract"],"subcommands":null,"kind":"flag"},
-    {"alias":"--merge-existing","option":"merge-existing","equivalentTo":"merge","commands":["translate"],"subcommands":["create-pack"],"kind":"value"}
+    {"alias":"-h","option":"help","commands":["*"],"subcommands":null,"kind":"flag"}
   ],
   "entries": [
     {"command":"help","subcommand":null,"options":["--help","--ui-locale"],"contract":"cli-protocol-contract.md"},
@@ -26,7 +17,7 @@
     {"command":"validate","subcommand":null,"options":["--path","--dimension","--region","--types","--limit","--offset","--quick","--refresh","--no-cache","--cache-root","--workers","--verbose","--debug","--help","--ui-locale"],"contract":"cli-scan-contract.md"},
     {"command":"capabilities","subcommand":null,"options":["--help","--ui-locale"],"contract":"cli-scan-contract.md"},
     {"command":"set","subcommand":null,"options":["--path","--pointer","--segments","--chunk","--dimension","--compression","--value","--value-file","--operation-id","--apply","--world-offline","--state-root","--output","--help","--ui-locale"],"contract":"cli-edit-contract.md"},
-    {"command":"batch","subcommand":null,"options":["--world","--legacy","--migration-report","--apply","--world-offline","--state-root","--output","--help","--ui-locale"],"contract":"cli-edit-contract.md"},
+    {"command":"batch","subcommand":null,"options":["--world","--apply","--world-offline","--state-root","--output","--help","--ui-locale"],"contract":"cli-edit-contract.md"},
     {"command":"plan","subcommand":null,"options":["--request","--state-root","--output","--help","--ui-locale"],"contract":"cli-edit-contract.md"},
     {"command":"apply","subcommand":null,"options":["--plan","--world-offline","--state-root","--output","--help","--ui-locale"],"contract":"cli-edit-contract.md"},
     {"command":"recover","subcommand":null,"options":["--plan-hash","--world-offline","--rollback","--state-root","--output","--help","--ui-locale"],"contract":"cli-edit-contract.md"},
@@ -38,7 +29,7 @@
     {"command":"translate","subcommand":"start","options":["--session-id","--state-root","--output","--help","--source-language","--target-language","--operation-id","--page-size","--page-bytes","--match-pattern","--types","--path","--dimension","--region","--standalone","--no-group","--ui-locale"],"contract":"cli-session-contract.md"},
     {"command":"translate","subcommand":"status","options":["--session-id","--state-root","--output","--help","--ui-locale"],"contract":"cli-session-contract.md"},
     {"command":"translate","subcommand":"export","options":["--session-id","--state-root","--output","--help","--page","--operation-id","--no-group","--ui-locale"],"contract":"cli-session-contract.md"},
-    {"command":"translate","subcommand":"next","options":["--session-id","--state-root","--output","--help","--reply","--no-group","--ui-locale"],"contract":"cli-session-contract.md"},
+    {"command":"translate","subcommand":"advance","options":["--session-id","--state-root","--output","--help","--reply","--no-group","--ui-locale"],"contract":"cli-session-contract.md"},
     {"command":"translate","subcommand":"submit","options":["--session-id","--state-root","--output","--help","--reply","--no-group","--ui-locale"],"contract":"cli-session-contract.md"},
     {"command":"translate","subcommand":"get","options":["--session-id","--state-root","--output","--help","--slot-id","--ui-locale"],"contract":"cli-session-contract.md"},
     {"command":"translate","subcommand":"jump","options":["--session-id","--state-root","--output","--help","--request","--ui-locale"],"contract":"cli-session-contract.md"},
@@ -48,17 +39,14 @@
     {"command":"translate","subcommand":"groups","options":["--session-id","--state-root","--output","--help","--limit","--offset","--ui-locale"],"contract":"cli-session-contract.md"},
     {"command":"translate","subcommand":"memory","options":["--session-id","--state-root","--output","--help","--slot-id","--source-sessions","--glossary-version","--limit","--offset","--ui-locale"],"contract":"cli-session-contract.md"},
     {"command":"translate","subcommand":"plan","options":["--session-id","--state-root","--output","--help","--direct","--keys","--prefix","--language-output","--revision","--operation-id","--synchronize-references","--ui-locale"],"contract":"cli-session-write-contract.md"},
-    {"command":"translate","subcommand":"apply","options":["--session-id","--state-root","--output","--help","--direct","--keys","--prefix","--language-output","--revision","--operation-id","--synchronize-references","--ui-locale"],"contract":"cli-session-write-contract.md"},
-    {"command":"translate","subcommand":"apply-keys","options":["--session-id","--state-root","--output","--help","--direct","--keys","--prefix","--language-output","--revision","--operation-id","--synchronize-references","--ui-locale"],"contract":"cli-session-write-contract.md"},
     {"command":"translate","subcommand":"export-lang","options":["--session-id","--state-root","--output","--help","--revision","--original-lang","--target-lang","--prefix","--plan-output","--apply","--world-offline","--ui-locale"],"contract":"cli-resource-contract.md"},
-    {"command":"translate","subcommand":"create-pack","options":["--session-id","--state-root","--output","--help","--revision","--original-lang","--target-lang","--prefix","--plan-output","--apply","--world-offline","--name","--format","--merge","--merge-existing","--pack-format","--ui-locale"],"contract":"cli-resource-contract.md"},
+    {"command":"translate","subcommand":"create-pack","options":["--session-id","--state-root","--output","--help","--revision","--original-lang","--target-lang","--prefix","--plan-output","--apply","--world-offline","--name","--format","--merge","--pack-format","--ui-locale"],"contract":"cli-resource-contract.md"},
     {"command":"translate","subcommand":"seal","options":["--session-id","--state-root","--output","--help","--revision","--operation-id","--plan-hash","--ui-locale"],"contract":"cli-session-write-contract.md"},
     {"command":"translate","subcommand":"help","options":["--help","--ui-locale"],"contract":"cli-session-contract.md"},
     {"command":"agent","subcommand":null,"options":["--help","--ui-locale"],"contract":"cli-agent-contract.md"},
     {"command":"agent","subcommand":"setup","options":["--state-root","--output","--help","--source-language","--target-language","--operation-id","--ui-locale"],"contract":"cli-agent-contract.md"},
     {"command":"agent","subcommand":"submit","options":["--state-root","--output","--help","--request","--ui-locale"],"contract":"cli-agent-contract.md"},
     {"command":"agent","subcommand":"status","options":["--state-root","--output","--help","--ui-locale"],"contract":"cli-agent-contract.md"},
-    {"command":"agent","subcommand":"help","options":["--help","--ui-locale"],"contract":"cli-agent-contract.md"},
-    {"command":"import-legacy","subcommand":null,"options":["--input","--profile","--import-id","--list","--source-language","--target-language","--acknowledge-world-rebind","--create-session","--state-root","--output","--limit","--offset","--help","--ui-locale"],"contract":"cli-legacy-contract.md"}
+    {"command":"agent","subcommand":"help","options":["--help","--ui-locale"],"contract":"cli-agent-contract.md"}
   ]
 }

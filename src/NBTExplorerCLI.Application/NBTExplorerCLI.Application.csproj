@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../NBTExplorerCLI.Domain/NBTExplorerCLI.Domain.csproj" />
+    <ProjectReference Include="../NBTExplorerCLI.Formats/NBTExplorerCLI.Formats.csproj" />
+    <ProjectReference Include="../NBTExplorerCLI.Minecraft/NBTExplorerCLI.Minecraft.csproj" />
+  </ItemGroup>
+</Project>

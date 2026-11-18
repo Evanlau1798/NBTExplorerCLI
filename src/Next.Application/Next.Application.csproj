@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../Next.Domain/Next.Domain.csproj" />
-    <ProjectReference Include="../Next.Formats/Next.Formats.csproj" />
-    <ProjectReference Include="../Next.Minecraft/Next.Minecraft.csproj" />
-  </ItemGroup>
-</Project>

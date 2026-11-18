@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../NBTExplorerCLI.Domain/NBTExplorerCLI.Domain.csproj" />
+    <ProjectReference Include="../NBTExplorerCLI.Formats/NBTExplorerCLI.Formats.csproj" />
+  </ItemGroup>
+</Project>

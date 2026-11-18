@@ -17,7 +17,7 @@ $target = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPat
 if (Test-Path -LiteralPath $target) { throw 'The candidate ZIP already exists.' }
 if ([IO.Path]::GetExtension($target) -ine '.zip') { throw 'The output must be a ZIP path.' }
 $version = ([xml][IO.File]::ReadAllText("$PSScriptRoot/Directory.Build.props")).Project.PropertyGroup.Version
-$product = @('nbtcli-next', 'Next.Application', 'Next.Domain', 'Next.Formats', 'Next.Infrastructure', 'Next.Minecraft')
+$product = @('nbtcli', 'NBTExplorerCLI.Application', 'NBTExplorerCLI.Domain', 'NBTExplorerCLI.Formats', 'NBTExplorerCLI.Infrastructure', 'NBTExplorerCLI.Minecraft')
 $paths = [Collections.Generic.SortedDictionary[string,string]]::new([StringComparer]::Ordinal)
 $hashes = [ordered]@{}
 
@@ -37,17 +37,17 @@ foreach ($name in $product) {
     }
     Add-CandidateFile "$name.dll" $file
 }
-foreach ($name in 'nbtcli-next.exe', 'nbtcli-next.deps.json', 'nbtcli-next.runtimeconfig.json') {
+foreach ($name in 'nbtcli.exe', 'nbtcli.deps.json', 'nbtcli.runtimeconfig.json') {
     Add-CandidateFile $name "$publish/$name"
 }
 Add-CandidateFile 'ICSharpCode.SharpZipLib.dll' "$publish/ICSharpCode.SharpZipLib.dll" $sharpDigest
 
-$config = (Get-Content -LiteralPath "$publish/nbtcli-next.runtimeconfig.json" -Raw | ConvertFrom-Json).runtimeOptions
+$config = (Get-Content -LiteralPath "$publish/nbtcli.runtimeconfig.json" -Raw | ConvertFrom-Json).runtimeOptions
 if ($config.framework -or $config.frameworks -or @($config.includedFrameworks).Count -ne 1 -or
     $config.includedFrameworks[0].name -cne 'Microsoft.NETCore.App' -or $config.includedFrameworks[0].version -cne $runtimeVersion) {
     throw 'The app does not include the pinned .NET runtime.'
 }
-$deps = Get-Content -LiteralPath "$publish/nbtcli-next.deps.json" -Raw | ConvertFrom-Json -AsHashtable
+$deps = Get-Content -LiteralPath "$publish/nbtcli.deps.json" -Raw | ConvertFrom-Json -AsHashtable
 $expectedLibraries = @($product | ForEach-Object { "$_/$version" }) + @("runtimepack.$runtimeId/$runtimeVersion", 'SharpZipLib/1.4.2')
 if ($deps.runtimeTarget.name -cne '.NETCoreApp,Version=v10.0/win-x64' -or
     (Compare-Object $expectedLibraries @($deps.libraries.Keys) -CaseSensitive)) {
@@ -92,7 +92,7 @@ try {
             finally { $stream.Dispose() }
         }
         $manifest = [ordered]@{
-            product = 'nbtcli-next'; version = $version; revision = $Revision; rid = 'win-x64'; configuration = 'Release'; sdk = '10.0.404'
+            product = 'nbtcli'; version = $version; revision = $Revision; rid = 'win-x64'; configuration = 'Release'; sdk = '10.0.404'
             dependencies = @(
                 @{ name = $runtimeId; version = $runtimeVersion; license = 'MIT and bundled third-party notices'; packageSha256 = $runtimeDigest },
                 @{ name = 'SharpZipLib'; version = '1.4.2'; license = 'MIT' },

@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <PackageReference Include="SharpZipLib" Version="[1.4.2]" />
-    <ProjectReference Include="../Next.Domain/Next.Domain.csproj" />
-    <EmbeddedResource Include="Unicode/java21-names.json" />
-    <None Include="../../licenses/Unicode.md" Link="licenses/Unicode.md" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../licenses/SharpZipLib.md" Link="licenses/SharpZipLib.md" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-</Project>

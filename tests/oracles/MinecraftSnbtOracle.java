@@ -13,8 +13,8 @@ public final class MinecraftSnbtOracle {
     static String encoded(byte[] bytes) { return Base64.getEncoder().encodeToString(bytes); }
     static Object parse(StringReader reader) throws Exception {
         if (modern) return parserClass.getMethod("b", StringReader.class).invoke(parser, reader);
-        var legacy = parserClass.getConstructor(StringReader.class).newInstance(reader);
-        return parserClass.getMethod("d").invoke(legacy);
+        var java1214Parser = parserClass.getConstructor(StringReader.class).newInstance(reader);
+        return parserClass.getMethod("d").invoke(java1214Parser);
     }
     static String fixture(String text) throws Exception {
         var prefix = "{\"sourceBase64\":\"" + encoded(text.getBytes(StandardCharsets.UTF_8)) + "\",";

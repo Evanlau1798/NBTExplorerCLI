@@ -5,20 +5,20 @@
       <_OwnSourceRootUpper>$([System.String]::Copy('$([MSBuild]::EnsureTrailingSlash($(MSBuildProjectDirectory)))').ToUpperInvariant())</_OwnSourceRootUpper>
     </PropertyGroup>
     <ItemGroup>
-      <_AllowedProject Include="$(_RewriteRoot)src/Next.Domain/Next.Domain.csproj"
-        Condition="'$(MSBuildProjectName)' == 'Next.Formats' Or '$(MSBuildProjectName)' == 'Next.Minecraft' Or '$(MSBuildProjectName)' == 'Next.Application' Or '$(MSBuildProjectName)' == 'Next.Infrastructure' Or '$(MSBuildProjectName)' == 'Next.Cli' Or '$(MSBuildProjectName)' == 'Next.Verification' Or '$(MSBuildProjectName)' == 'Next.Benchmarks'" />
-      <_AllowedProject Include="$(_RewriteRoot)src/Next.Formats/Next.Formats.csproj"
-        Condition="'$(MSBuildProjectName)' == 'Next.Minecraft' Or '$(MSBuildProjectName)' == 'Next.Application' Or '$(MSBuildProjectName)' == 'Next.Infrastructure' Or '$(MSBuildProjectName)' == 'Next.Cli' Or '$(MSBuildProjectName)' == 'Next.Verification' Or '$(MSBuildProjectName)' == 'Next.Benchmarks'" />
-      <_AllowedProject Include="$(_RewriteRoot)src/Next.Minecraft/Next.Minecraft.csproj"
-        Condition="'$(MSBuildProjectName)' == 'Next.Application' Or '$(MSBuildProjectName)' == 'Next.Infrastructure' Or '$(MSBuildProjectName)' == 'Next.Cli' Or '$(MSBuildProjectName)' == 'Next.Verification' Or '$(MSBuildProjectName)' == 'Next.Benchmarks'" />
-      <_AllowedProject Include="$(_RewriteRoot)src/Next.Application/Next.Application.csproj"
-        Condition="'$(MSBuildProjectName)' == 'Next.Infrastructure' Or '$(MSBuildProjectName)' == 'Next.Cli' Or '$(MSBuildProjectName)' == 'Next.Verification' Or '$(MSBuildProjectName)' == 'Next.Benchmarks'" />
-      <_AllowedProject Include="$(_RewriteRoot)src/Next.Infrastructure/Next.Infrastructure.csproj"
-        Condition="'$(MSBuildProjectName)' == 'Next.Cli' Or '$(MSBuildProjectName)' == 'Next.Verification' Or '$(MSBuildProjectName)' == 'Next.Benchmarks'" />
-      <_AllowedProject Include="$(_RewriteRoot)src/Next.Cli/Next.Cli.csproj"
-        Condition="'$(MSBuildProjectName)' == 'Next.Verification'" />
-      <_AllowedProject Include="$(_RewriteRoot)benchmarks/Next.Benchmarks/Next.Benchmarks.csproj"
-        Condition="'$(MSBuildProjectName)' == 'Next.Verification'" />
+      <_AllowedProject Include="$(_RewriteRoot)src/NBTExplorerCLI.Domain/NBTExplorerCLI.Domain.csproj"
+        Condition="'$(MSBuildProjectName)' == 'NBTExplorerCLI.Formats' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Minecraft' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Application' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Infrastructure' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Cli' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Verification' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Benchmarks'" />
+      <_AllowedProject Include="$(_RewriteRoot)src/NBTExplorerCLI.Formats/NBTExplorerCLI.Formats.csproj"
+        Condition="'$(MSBuildProjectName)' == 'NBTExplorerCLI.Minecraft' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Application' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Infrastructure' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Cli' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Verification' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Benchmarks'" />
+      <_AllowedProject Include="$(_RewriteRoot)src/NBTExplorerCLI.Minecraft/NBTExplorerCLI.Minecraft.csproj"
+        Condition="'$(MSBuildProjectName)' == 'NBTExplorerCLI.Application' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Infrastructure' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Cli' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Verification' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Benchmarks'" />
+      <_AllowedProject Include="$(_RewriteRoot)src/NBTExplorerCLI.Application/NBTExplorerCLI.Application.csproj"
+        Condition="'$(MSBuildProjectName)' == 'NBTExplorerCLI.Infrastructure' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Cli' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Verification' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Benchmarks'" />
+      <_AllowedProject Include="$(_RewriteRoot)src/NBTExplorerCLI.Infrastructure/NBTExplorerCLI.Infrastructure.csproj"
+        Condition="'$(MSBuildProjectName)' == 'NBTExplorerCLI.Cli' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Verification' Or '$(MSBuildProjectName)' == 'NBTExplorerCLI.Benchmarks'" />
+      <_AllowedProject Include="$(_RewriteRoot)src/NBTExplorerCLI.Cli/NBTExplorerCLI.Cli.csproj"
+        Condition="'$(MSBuildProjectName)' == 'NBTExplorerCLI.Verification'" />
+      <_AllowedProject Include="$(_RewriteRoot)benchmarks/NBTExplorerCLI.Benchmarks/NBTExplorerCLI.Benchmarks.csproj"
+        Condition="'$(MSBuildProjectName)' == 'NBTExplorerCLI.Verification'" />
       <_ReferencedProject Include="@(ProjectReference->'%(FullPath)')" />
       <_ForbiddenProject Include="@(_ReferencedProject)" Exclude="@(_AllowedProject)" />
       <_ForbiddenCompile Include="@(Compile)"
@@ -26,12 +26,12 @@
       <_ManualAssembly Include="@(Reference)" />
     </ItemGroup>
     <Error Code="NBTARCH001" Condition="'@(_ForbiddenProject)' != ''"
-      Text="Project reference violates the vNext dependency graph: @(_ForbiddenProject)" />
+      Text="Project reference violates the NBTExplorerCLI dependency graph: @(_ForbiddenProject)" />
     <Error Code="NBTARCH002" Condition="'@(_ForbiddenCompile)' != ''"
       Text="Compile input must stay inside its owning project: @(_ForbiddenCompile)" />
     <Error Code="NBTARCH003" Condition="'@(_ManualAssembly)' != ''"
       Text="Direct assembly references are forbidden; use the allowed project graph: @(_ManualAssembly)" />
-    <Error Code="NBTARCH004" Condition="'$(MSBuildProjectName)' == 'Next.Domain' And '@(PackageReference)' != ''"
+    <Error Code="NBTARCH004" Condition="'$(MSBuildProjectName)' == 'NBTExplorerCLI.Domain' And '@(PackageReference)' != ''"
       Text="Domain must use only framework references." />
   </Target>
   <Target Name="CheckFinalCompileInputs" AfterTargets="CoreCompile">
