@@ -74,9 +74,9 @@ and cache traffic, incremental reparsing, malformed payloads, root catalog failu
 precancellation, invalid configuration and the actual executable's stdout/exit
 contract. It is tool validation, not a performance sample matrix.
 
-G07 still requires its frozen environment/scenario manifests and complete raw
-samples, size-specific thresholds, decoded/staging/readback/comparison metrics,
-full workflow timing, cancellation convergence and sustained fault/resource runs.
-This entry alone does not accept G07-C01–C06 or prove a speedup, a supported peak
-RSS capacity, orphan cleanup, Minecraft behavior, power-loss durability or release
-readiness. The G06 correctness reference remains [control.json](../benchmarks/control.json).
+The [measured results and operating limits](performance-results.md) describe the
+frozen environment, complete scenario comparisons, workflow timing, capacity,
+cancellation and sustained-operation observations. Interpret measurements within
+their stated intervals and workload sizes. Minecraft behavior, power-loss
+durability and release installation have separate acceptance requirements.
+The G06 correctness reference remains [control.json](../benchmarks/control.json).

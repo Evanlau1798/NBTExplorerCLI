@@ -219,6 +219,7 @@ internal static class CaseRegistry
         new("cache-review-catalog-outcome-binding", "scan", _ => ScanCacheReviewTests.CatalogOutcomesCannotBeOverridden()),
         new("cache-review-commands-only-dimension", "scan", _ => ScanCacheReviewTests.CommandsOnlyDimensionBinding()),
         new("scan-review-total-queue-bound", "scan", _ => ScanCacheReviewTests.TotalQueueCapacityIsBounded()),
+        new("scan-paused-consumer-buffer-reservation", "scan", _ => ScanBackpressureTests.PausedConsumerRetainsReservationUntilRelease()),
         new("query-review-writer-marker-accounting", "scan", _ => ScanCacheReviewTests.WriterMarkerAccountingUsesOneCatalog()),
         new("query-cache-serialization-limit", "scan", _ => WorldQueryParityTests.CacheSerializationLimitIsSourceFailure()),
         new("query-mixed-codecs-workers-cache-modes", "scan", _ => WorldQueryParityTests.MixedCodecsWorkersAndCacheModes()),
