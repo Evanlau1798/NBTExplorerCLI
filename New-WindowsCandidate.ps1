@@ -79,7 +79,7 @@ try {
                 ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Unexpected publish artifact: $($entry.Name)" }
         }
         Add-CandidateFile 'README.md' "$PSScriptRoot/README.md"
-        Add-CandidateFile 'README.en.md' "$PSScriptRoot/README.en.md"
+        Add-CandidateFile 'README.zh-TW.md' "$PSScriptRoot/README.zh-TW.md"
         foreach ($name in 'SharpZipLib.md', 'Unicode.md') {
             Add-CandidateFile "licenses/$name" "$PSScriptRoot/licenses/$name"
         }

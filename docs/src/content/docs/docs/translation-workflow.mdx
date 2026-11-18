@@ -1,0 +1,192 @@
+---
+title: Translation Workflow
+description: Translate Minecraft adventure maps page by page using durable sessions, glossaries, verified plans, and session sealing.
+---
+
+import SafetyBanner from '../../../components/SafetyBanner.astro';
+import WorkflowPipeline from '../../../components/WorkflowPipeline.astro';
+
+<SafetyBanner tier="preview" lang="en" />
+
+Translating an adventure map or custom world often involves hundreds or thousands of text occurrences across signs, books, items, entities, scoreboards, bossbars, and datapacks. **NBTExplorerCLI** manages this through a durable, file-based **Translation Session** workflow (`nbtcli translate`).
+
+All session work happens in an external state directory outside your world. Your Minecraft world is only modified at the final step when you explicitly run `apply --world-offline` on a generated translation plan.
+
+<WorkflowPipeline kind="translate" lang="en" />
+
+## 1. Optional: Configure External Assistant Preferences (`agent`)
+
+If you use an external translation tool or AI assistant to translate exported pages, you can store default source/target languages and page-size preferences per world using `agent`:
+
+```powershell
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+# Export the versioned questionnaire template
+.\nbtcli.exe agent setup 'D:\WorldCopy' `
+  --source-language en_us `
+  --target-language zh_tw `
+  --output 'D:\Translate\agent-questionnaire.json'
+
+# After filling in agentName and preferences in the JSON file, submit it
+.\nbtcli.exe agent submit 'D:\WorldCopy' `
+  --request 'D:\Translate\agent-questionnaire.json'
+
+# Check saved preferences at any time
+.\nbtcli.exe agent status 'D:\WorldCopy'
+```
+
+> [!NOTE]
+> `agent` commands only store preferences in your local state folder. They never connect to external web services or grant automatic permission to modify your world.
+
+## 2. Start a Translation Session (`translate start`)
+
+Run `translate start` on your world copy, specifying `--source-language` and `--target-language` (unless already configured via `agent`):
+
+```powershell
+.\nbtcli.exe translate start 'D:\WorldCopy' `
+  --source-language en_us `
+  --target-language zh_tw `
+  --page-size 30
+```
+
+You can also narrow a session to specific parts of a world using `--dimension`, `--region`, `--types`, `--path`, or `--match-pattern`.
+
+Record the `sessionId` and `revision` (starts at `0`) from the JSON response:
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "translate",
+  "outcome": "Success",
+  "data": {
+    "status": {
+      "sessionId": "6f9619ff-8b86-d011-b42d-00cf4fc964ff",
+      "revision": 0,
+      "total": 60,
+      "pending": 60
+    }
+  },
+  "error": null
+}
+```
+
+### How Text Slots Work
+
+- **Every occurrence has its own `slotId`**: Even if two signs contain the same English sentence, each physical occurrence gets its own slot so you can translate them differently if their in-game context differs.
+- **Formatting and events Stay Protected**: Slots expose only the decoded text string. Underlying JSON Text Component colors, click/hover events, scores, and selectors remain protected inside the local session state so a typo in a translation cannot break command syntax or component trees.
+
+## 3. Export a Page and Submit Replies (`export`, `submit`, `advance`)
+
+Export the first page (`--page 0`) to a UTF-8 file outside the world:
+
+```powershell
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+$export = .\nbtcli.exe translate export 'D:\WorldCopy' `
+  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --page 0 `
+  --output 'D:\Translate\page-0-prompt.txt' | ConvertFrom-Json
+```
+
+The exported file contains:
+1. A read-only `nbtcli.session-page` JSON block showing each slot's source text, role, and context groups.
+2. A `nbtcli.session-reply` JSON template ready to be filled in.
+
+### Fill in the Exported Reply Template
+
+Save the actual `data.replyTemplate` to its own file. Keep the identifiers unchanged, including `operationId`, `targetLocale`, and every slot's `sourceTextHash`. Keep the complete list of slots. For a translated slot, use `"state": "translated"` with the translation in `text`. To intentionally keep the original, use `"state": "unchanged"` with `"text": null`.
+
+```powershell
+if (-not $export.success) { throw $export.error.message }
+$export.data.replyTemplate | ConvertTo-Json -Depth 50 |
+  Set-Content -Encoding utf8 'D:\Translate\reply-0.json'
+```
+
+Edit the saved file before submitting it. The template initially marks each slot as unchanged.
+
+### Submit the Reply and Move to the Next Page
+
+Use `translate submit` (or `translate advance`, which also works without `--reply` to fetch the next pending page):
+
+```powershell
+.\nbtcli.exe translate submit 'D:\WorldCopy' `
+  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --reply 'D:\Translate\reply-0.json'
+```
+
+Each accepted submission increments the session's `revision` (for example, from `0` to `1`) and returns `data.pendingPage`. Resending the exact same reply file with the same `operationId` is idempotent and returns the existing receipt without duplicating work.
+
+> [!IMPORTANT]
+> When you submit a new reply, NBTExplorerCLI checks that the world files still match the session's starting snapshot. If the world was modified externally while the session was open, `submit` returns exit code `3` (`Conflict`) with `"repair": "start-new-session"` while preserving all your existing replies for reference.
+
+## 4. Managing Glossaries, Notes, Memory, and Resets
+
+During a session, you can inspect or update supporting metadata:
+
+- **Check Progress**: `nbtcli translate status 'D:\WorldCopy' --session-id <guid>`
+- **Inspect One Slot**: `nbtcli translate get 'D:\WorldCopy' --session-id <guid> --slot-id <slot-id>`
+- **View Context Groups**: `nbtcli translate groups 'D:\WorldCopy' --session-id <guid> --limit 50`
+- **Read Notes or Glossary**:
+  ```powershell
+  .\nbtcli.exe translate glossary 'D:\WorldCopy' --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+  .\nbtcli.exe translate note 'D:\WorldCopy' --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+  ```
+- **Query Translation Memory from Previous Sessions**:
+  ```powershell
+  $previousSessionId = Read-Host 'Previous session ID'
+  $slotId = Read-Host 'Full slot ID from the current session'
+  $glossaryVersion = Read-Host 'Glossary version'
+  .\nbtcli.exe translate memory 'D:\WorldCopy' `
+    --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+    --slot-id $slotId `
+    --source-sessions $previousSessionId `
+    --glossary-version $glossaryVersion
+  ```
+- **Jump Page or Reset Selected Slots**: Pass a versioned `nbtcli.session-command` JSON file via `--request` to `translate jump`, `translate note`, `translate glossary`, or `translate reset` (add `--confirm` to execute a confirmed reset).
+
+## 5. Plan, Apply Offline, and Seal the Session
+
+Once `pending` reaches `0` (every slot is either `Translated` or `Unchanged`), verify your current `revision` via `translate status`, then complete the three-step finish:
+
+### Step A: Generate the Translation Plan (`translate plan`)
+
+Choose either `--direct` (replaces literal text directly in the world) or `--keys` (converts text to translation keys and writes a language file; see [Resource Packs and References](../resources-and-packs/)):
+
+```powershell
+.\nbtcli.exe translate plan 'D:\WorldCopy' `
+  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --revision 2 `
+  --direct `
+  --operation-id 88888888-4444-4444-4444-121212121212 `
+  --output 'D:\Translate\world-translate-plan.json'
+```
+
+Note the `planHash` returned in the JSON output.
+
+### Step B: Apply the Plan to the Offline World (`apply`)
+
+<SafetyBanner tier="write" lang="en" />
+
+Close Minecraft and apply the generated plan:
+
+```powershell
+.\nbtcli.exe apply 'D:\WorldCopy' `
+  --plan 'D:\Translate\world-translate-plan.json' `
+  --world-offline `
+  --output 'D:\Translate\world-translate-receipt.json'
+```
+
+### Step C: Seal the Session (`translate seal`)
+
+After `apply` succeeds with exit code `0`, record completion in the session using the same `--revision`, `--operation-id`, and `--plan-hash`:
+
+```powershell
+$planHash = (Get-Content -Raw 'D:\Translate\world-translate-plan.json' | ConvertFrom-Json).data.planHash
+.\nbtcli.exe translate seal 'D:\WorldCopy' `
+  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --revision 2 `
+  --operation-id 88888888-4444-4444-4444-121212121212 `
+  --plan-hash $planHash
+```
+
+`translate seal` verifies the durable apply journal on disk before marking the session sealed. If `apply` was interrupted or only partially completed, `seal` refuses to close the session and directs you to check `status` and `recover` first.

@@ -1,0 +1,120 @@
+---
+import type { LocaleKey } from '../data/cli-surface';
+
+interface Step {
+  step: string;
+  title: string;
+  cmd: string;
+  tier: 'safe' | 'preview' | 'write';
+}
+
+interface Props {
+  kind: 'edit' | 'translate';
+  lang?: LocaleKey;
+}
+
+const { kind, lang = 'en' } = Astro.props;
+
+const pipelines: Record<'edit' | 'translate', Record<LocaleKey, Step[]>> = {
+  edit: {
+    en: [
+      { step: '01', title: 'Inspect Node', cmd: 'get --types', tier: 'safe' },
+      { step: '02', title: 'Preview Plan', cmd: 'set / plan / batch', tier: 'preview' },
+      { step: '03', title: 'Apply Offline', cmd: 'apply --world-offline', tier: 'write' },
+      { step: '04', title: 'Verify or Recover', cmd: 'status / recover', tier: 'safe' },
+    ],
+    'zh-tw': [
+      { step: '01', title: '讀取節點型別', cmd: 'get --types', tier: 'safe' },
+      { step: '02', title: '產生預覽計畫', cmd: 'set / plan / batch', tier: 'preview' },
+      { step: '03', title: '離線套用變更', cmd: 'apply --world-offline', tier: 'write' },
+      { step: '04', title: '驗證或中斷復原', cmd: 'status / recover', tier: 'safe' },
+    ],
+  },
+  translate: {
+    en: [
+      { step: '01', title: 'Start Session', cmd: 'translate start', tier: 'preview' },
+      { step: '02', title: 'Export & Submit', cmd: 'export / submit', tier: 'preview' },
+      { step: '03', title: 'Build Plan', cmd: 'translate plan', tier: 'preview' },
+      { step: '04', title: 'Apply & Seal', cmd: 'apply -> translate seal', tier: 'write' },
+    ],
+    'zh-tw': [
+      { step: '01', title: '建立工作階段', cmd: 'translate start', tier: 'preview' },
+      { step: '02', title: '匯出與提交譯文', cmd: 'export / submit', tier: 'preview' },
+      { step: '03', title: '產生修補計畫', cmd: 'translate plan', tier: 'preview' },
+      { step: '04', title: '離線寫入並封存', cmd: 'apply -> translate seal', tier: 'write' },
+    ],
+  },
+};
+
+const steps = pipelines[kind][lang] ?? pipelines[kind].en;
+---
+
+<div class="nbt-pipeline not-content">
+  {
+    steps.map((s) => (
+      <div class="nbt-pipeline-step" data-tier={s.tier}>
+        <div class="nbt-pipeline-num">STEP {s.step}</div>
+        <div class="nbt-pipeline-title">{s.title}</div>
+        <code class="nbt-pipeline-cmd">{s.cmd}</code>
+      </div>
+    ))
+  }
+</div>
+
+<style>
+  .nbt-pipeline {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.75rem;
+    margin: 1.25rem 0 1.75rem;
+  }
+
+  .nbt-pipeline-step {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-top-width: 3px;
+    border-radius: 4px;
+    background: rgba(17, 23, 34, 0.55);
+  }
+
+  :root[data-theme='light'] .nbt-pipeline-step {
+    background: #ffffff;
+  }
+
+  .nbt-pipeline-step[data-tier='safe'] {
+    border-top-color: #10b981;
+  }
+
+  .nbt-pipeline-step[data-tier='preview'] {
+    border-top-color: #f59e0b;
+  }
+
+  .nbt-pipeline-step[data-tier='write'] {
+    border-top-color: #ef4444;
+  }
+
+  .nbt-pipeline-num {
+    font-family: var(--sl-font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--sl-color-gray-3);
+    letter-spacing: 0.05em;
+  }
+
+  .nbt-pipeline-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--sl-color-white);
+    margin: 0.2rem 0 0.45rem;
+  }
+
+  .nbt-pipeline-cmd {
+    font-family: var(--sl-font-mono);
+    font-size: 0.78rem;
+    color: var(--sl-color-accent-high);
+    background: var(--sl-color-gray-6);
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    display: inline-block;
+  }
+</style>

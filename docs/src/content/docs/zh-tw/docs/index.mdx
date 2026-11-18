@@ -1,0 +1,75 @@
+---
+title: 文檔總覽與核心概念
+description: 了解如何使用 NBTExplorerCLI 在 Windows x64 環境下安全查閱、翻譯與編輯 Minecraft Java 版世界存檔。
+---
+
+import SafetyBanner from '../../../../components/SafetyBanner.astro';
+
+**NBTExplorerCLI**（執行檔 `nbtcli.exe`，版本 `1.0.0`）是專為 **Minecraft Java Edition** 設計的 Windows x64 獨立封裝命令列工具。無論您是一般玩家、冒險地圖創作者、翻譯團隊或自動化工具開發者，都能透過它查閱 NBT 資料結構、掃描並分頁翻譯世界文字、產生資源包，以及在具備寫前備份與中斷復原保護的機制下安全編輯世界。
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+## 認識三種操作風險分級
+
+為了讓所有使用者都能直觀判斷每個指令是否會影響存檔，本站所有教學與命令參考皆標示以下三種清楚的風險標籤：
+
+| 風險標籤 | 對 Minecraft 世界存檔的影響說明 |
+| --- | --- |
+| **安全查閱：不改存檔** | 僅讀取檔案或查閱外部日誌。您的 Minecraft 世界資料夾完全不會被修改。 |
+| **預覽模式：僅產出計畫** | 在世界資料夾「外部」建立變更計畫檔（`nbtcli.patch-plan`）或儲存翻譯工作階段進度，世界存檔本身維持原狀。 |
+| **修改存檔：請先關遊戲並備份** | 會實際將變更寫入指定的世界資料夾。請務必先建立世界副本、關閉 Minecraft 與其他編輯器，並加上 `--world-offline` 執行。 |
+
+## 六大核心工作流程
+
+建議依序閱讀以下指南，完成從首次查閱、安全編輯到地圖翻譯與資源包輸出的完整流程：
+
+1. **[安裝驗證與安全查閱](./getting-started/)**
+   核對發行包 ZIP 的 SHA-256 雜湊值、完整解壓縮、執行 `--version` 與 `--help`，並在世界副本上執行第一次唯讀 `get`、`list`、`search` 與 `scan`。
+2. **[安全編輯與中斷復原](./safe-editing/)**
+   學習如何用 JSON Pointer 或結構化區段（Segments）指定節點、用 `set` / `batch` / `plan` 預覽、用 `apply --world-offline` 離線寫入，以及在程序中斷後用 `status` 與 `recover` 查詢及復原。
+3. **[地圖翻譯工作流](./translation-workflow/)**
+   建立分頁式翻譯工作階段（`translate start`）、匯出待譯分頁（`export`）、提交經驗證的譯文回覆（`submit` / `advance`）、管理術語表與備註，最後透過 `plan`、`apply` 與 `seal` 完成翻譯封存。
+4. **[資源包、語言檔與引用](./resources-and-packs/)**
+   區分「直接替換世界文字（`--direct`）」、「轉換為翻譯鍵並附加語言檔（`--keys` 與 `convert`）」以及「不更動世界 NBT 的獨立語言檔／資源包輸出（`export-lang`、`create-pack`）」，並了解實體名稱引用同步（`--synchronize-references`）的限制。
+5. **[備份與狀態檔管理](./backups-and-state/)**
+   建立與驗證世界備份（`backup` 與 `restore`），並了解外部狀態目錄（`--state-root`）中的掃描快取、工作階段、內容定址備份庫（`objects`）與復原日誌（`journals`）如何運作。
+6. **[支援範圍與疑難排解](./support-and-troubleshooting/)**
+   查閱支援的 Minecraft Java 版 `DataVersion`、退出碼（`0` 至 `8` 及 `130`）對照表、區分「CLI 解析驗證」與「尚待實機驗證」的邊界，以及常見錯誤的排解步驟。
+
+若想直接查閱特定指令與旗標，請前往 **[CLI 命令完整參考](./command-reference/)**。
+
+## 統一的單行 JSON 輸出格式
+
+每次執行 `nbtcli.exe`，標準輸出（`stdout`）都會固定回傳單行 UTF-8 JSON 信封結構：
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "version",
+  "outcome": "Success",
+  "data": {
+    "product": "nbtcli",
+    "version": "1.0.0"
+  },
+  "error": null
+}
+```
+
+### 介面語言與地圖翻譯語言的區別
+
+NBTExplorerCLI 嚴格區分「工具本身的提示訊息語言」與「地圖內容的翻譯語言」：
+
+- **工具介面語言（`--ui-locale`）**：可於任何指令前後加上 `--ui-locale zh-TW`（預設）或 `en-US`，僅改變錯誤訊息與說明文字的顯示語言，不會影響 JSON 欄位名稱、錯誤代碼或世界資料。
+- **地圖與資源包語言**：包含 `--source-language`、`--target-language`、`--lang`、`--original-lang` 與 `--target-lang`，專門用於指定 Minecraft 內容的來源與目標語言代碼（如 `en_us`、`zh_tw`）。
+
+## 授權與第三方聲明
+
+本專案採用 **MIT 授權條款**（詳見倉庫與發行包根目錄之 `LICENSE`）。隨附之第三方元件保留其各自之授權條款與聲明：
+
+- **SharpZipLib**（`licenses/SharpZipLib.md`）
+- **Unicode 字元資料庫**（`licenses/Unicode.md`）
+- **.NET Runtime 授權與第三方聲明**（Windows x64 發行包內之 `licenses/dotnet-LICENSE.txt` 與 `licenses/dotnet-THIRD-PARTY-NOTICES.txt`）
+
+Minecraft 遊戲資產與使用者建立之世界存檔，均依其各自所有權人之授權條款處理。

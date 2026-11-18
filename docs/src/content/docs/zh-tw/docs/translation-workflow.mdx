@@ -1,0 +1,192 @@
+---
+title: 地圖翻譯工作流
+description: 使用分頁式翻譯工作階段、術語表與安全驗證計畫，逐步完成 Minecraft 冒險地圖翻譯與封存。
+---
+
+import SafetyBanner from '../../../../components/SafetyBanner.astro';
+import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
+
+<SafetyBanner tier="preview" lang="zh-tw" />
+
+一張完整的 Minecraft 冒險地圖或自訂世界，往往包含數百至數千筆分散在告示牌、書本、物品、實體、計分板、Boss 血條與資料包中的文字。**NBTExplorerCLI** 提供檔案式的**翻譯工作階段（Translation Session）**機制（`nbtcli translate`），讓譯者或外部翻譯工具能分頁匯出、驗證譯文並安全套用。
+
+在整個翻譯過程中，所有進度都儲存在世界資料夾「外部」的狀態目錄；直到最後一步您明確對產出的計畫執行 `apply --world-offline` 時，才會實際修改世界存檔。
+
+<WorkflowPipeline kind="translate" lang="zh-tw" />
+
+## 1. 選用步驟：設定外部翻譯助手偏好（`agent`）
+
+若您搭配外部翻譯腳本或 AI 助手處理匯出的分頁，可以先透過 `agent` 指令為該世界設定預設的來源／目標語言與每頁筆數偏好：
+
+```powershell
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+# 匯出版本化的問卷設定範本
+.\nbtcli.exe agent setup 'D:\WorldCopy' `
+  --source-language en_us `
+  --target-language zh_tw `
+  --output 'D:\Translate\agent-questionnaire.json'
+
+# 在 JSON 檔案中填妥 agentName 與偏好設定後提交
+.\nbtcli.exe agent submit 'D:\WorldCopy' `
+  --request 'D:\Translate\agent-questionnaire.json'
+
+# 隨時查詢目前已儲存的偏好設定
+.\nbtcli.exe agent status 'D:\WorldCopy'
+```
+
+> [!NOTE]
+> `agent` 指令僅將偏好設定儲存在本機外部狀態目錄中，絕不會主動連線至外部網路服務，也不會自動修改世界存檔。
+
+## 2. 建立翻譯工作階段（`translate start`）
+
+對世界副本執行 `translate start`，指定來源語言（`--source-language`）與目標語言（`--target-language`）：
+
+```powershell
+.\nbtcli.exe translate start 'D:\WorldCopy' `
+  --source-language en_us `
+  --target-language zh_tw `
+  --page-size 30
+```
+
+您也可以搭配 `--dimension`、`--region`、`--types`、`--path` 或 `--match-pattern` 篩選特定的翻譯範圍。
+
+執行後請記下回傳 JSON 中的 `sessionId` 與初始 `revision`（從 `0` 開始）：
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "translate",
+  "outcome": "Success",
+  "data": {
+    "status": {
+      "sessionId": "6f9619ff-8b86-d011-b42d-00cf4fc964ff",
+      "revision": 0,
+      "total": 60,
+      "pending": 60
+    }
+  },
+  "error": null
+}
+```
+
+### 翻譯槽位（Slots）的安全設計
+
+- **每個出現位置都有獨立的 `slotId`**：即使兩塊告示牌上的英文原文完全相同，它們各自仍擁有獨立的 `slotId`，讓您能根據不同場景給予最合適的翻譯。
+- **自動保護顏色、格式與點擊事件**：匯出的槽位僅包含解碼後的純文字。底層 JSON 文字組件的顏色、粗體、點擊／懸停事件（Click/Hover Events）與選擇器都會保留在本機狀態中，避免翻譯時不小心改壞語法結構。
+
+## 3. 匯出分頁並提交譯文（`export`、`submit`、`advance`）
+
+將第一頁（`--page 0`）匯出至世界資料夾外的 UTF-8 檔案：
+
+```powershell
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+$export = .\nbtcli.exe translate export 'D:\WorldCopy' `
+  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --page 0 `
+  --output 'D:\Translate\page-0-prompt.txt' | ConvertFrom-Json
+```
+
+匯出的檔案內含兩個區塊：
+1. 唯讀的 `nbtcli.session-page` JSON，列出該頁每個槽位的原文、類型與語境群組。
+2. 供填寫譯文的 `nbtcli.session-reply` JSON 範本。
+
+### 填寫實際匯出的回覆範本
+
+將 `data.replyTemplate` 另存為回覆檔，保留包括 `operationId`、`targetLocale` 及每個槽位的 `sourceTextHash` 在內的所有識別欄位，也要保留完整槽位清單。送出譯文時，使用 `"state": "translated"` 並填寫 `text`。決定保留原文時，使用 `"state": "unchanged"` 與 `"text": null`。
+
+```powershell
+if (-not $export.success) { throw $export.error.message }
+$export.data.replyTemplate | ConvertTo-Json -Depth 50 |
+  Set-Content -Encoding utf8 'D:\Translate\reply-0.json'
+```
+
+提交之前請編輯保存的回覆檔。原始範本將每個槽位標示為保留原文。
+
+### 提交回覆並取得下一頁
+
+使用 `translate submit`（或 `translate advance`）送回回覆檔：
+
+```powershell
+.\nbtcli.exe translate submit 'D:\WorldCopy' `
+  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --reply 'D:\Translate\reply-0.json'
+```
+
+每次成功提交後，工作階段的 `revision` 會自動加 1（例如由 `0` 變為 `1`），並在 `data.pendingPage` 回傳下一個待處理的分頁。若因腳本重試而重複送出完全相同的回覆檔與 `operationId`，工具會直接回傳先前的成功回執，不會重複累加版本號。
+
+> [!IMPORTANT]
+> 每次提交新回覆時，NBTExplorerCLI 都會核對世界檔案是否仍與建立工作階段時的快照一致。若世界在翻譯期間曾被外部修改，會回傳退出碼 `3`（`Conflict`）與 `"repair": "start-new-session"`，同時完整保留您已提交的所有譯文。
+
+## 4. 查詢進度、術語表、備註與歷史記憶
+
+在翻譯過程中，您可以隨時使用以下輔助子命令：
+
+- **查看翻譯進度**：`nbtcli translate status 'D:\WorldCopy' --session-id <guid>`
+- **查詢單一槽位**：`nbtcli translate get 'D:\WorldCopy' --session-id <guid> --slot-id <slot-id>`
+- **檢視語境群組**：`nbtcli translate groups 'D:\WorldCopy' --session-id <guid> --limit 50`
+- **查閱術語表與譯者備註**：
+  ```powershell
+  .\nbtcli.exe translate glossary 'D:\WorldCopy' --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+  .\nbtcli.exe translate note 'D:\WorldCopy' --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+  ```
+- **從先前的翻譯工作階段查詢翻譯記憶（Memory）**：
+  ```powershell
+  $previousSessionId = Read-Host '先前工作階段的識別碼'
+  $slotId = Read-Host '目前工作階段的完整槽位 ID'
+  $glossaryVersion = Read-Host '術語表版本'
+  .\nbtcli.exe translate memory 'D:\WorldCopy' `
+    --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+    --slot-id $slotId `
+    --source-sessions $previousSessionId `
+    --glossary-version $glossaryVersion
+  ```
+- **跳頁或重置特定槽位**：可透過 `--request` 傳入 `nbtcli.session-command` JSON 檔案給 `translate jump`、`translate note`、`translate glossary` 或 `translate reset`（執行重置需加上 `--confirm`）。
+
+## 5. 產生翻譯計畫、離線套用與封存（`plan` -> `apply` -> `seal`）
+
+當所有槽位皆已完成（`pending` 為 `0`，所有項目皆為 `Translated` 或 `Unchanged`），請先透過 `translate status` 確認目前的 `revision`，接著依序完成最後三個步驟：
+
+### 步驟 A：產生翻譯修補計畫（`translate plan`）
+
+可選擇 `--direct`（直接替換世界內的文字）或 `--keys`（將文字轉換為翻譯鍵並一併輸出語言檔，詳見 [資源包、語言檔與引用](../resources-and-packs/)）：
+
+```powershell
+.\nbtcli.exe translate plan 'D:\WorldCopy' `
+  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --revision 2 `
+  --direct `
+  --operation-id 88888888-4444-4444-4444-121212121212 `
+  --output 'D:\Translate\world-translate-plan.json'
+```
+
+請記下回傳 JSON 中的 `planHash`。
+
+### 步驟 B：離線套用計畫至世界存檔（`apply`）
+
+<SafetyBanner tier="write" lang="zh-tw" />
+
+確認 Minecraft 已關閉後，執行 `apply`：
+
+```powershell
+.\nbtcli.exe apply 'D:\WorldCopy' `
+  --plan 'D:\Translate\world-translate-plan.json' `
+  --world-offline `
+  --output 'D:\Translate\world-translate-receipt.json'
+```
+
+### 步驟 C：封存翻譯工作階段（`translate seal`）
+
+確認 `apply` 成功完成（退出碼 `0`）後，帶入相同的 `--revision`、`--operation-id` 與 `--plan-hash` 執行 `seal`：
+
+```powershell
+$planHash = (Get-Content -Raw 'D:\Translate\world-translate-plan.json' | ConvertFrom-Json).data.planHash
+.\nbtcli.exe translate seal 'D:\WorldCopy' `
+  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --revision 2 `
+  --operation-id 88888888-4444-4444-4444-121212121212 `
+  --plan-hash $planHash
+```
+
+`translate seal` 會驗證硬碟上的寫入日誌確實已全部完成，才會將工作階段標記為已封存完成。若寫入曾中斷或尚未完成，`seal` 會拒絕封存並提示您先檢查 `status` 與 `recover`。

@@ -1,0 +1,246 @@
+:root {
+  --sl-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif;
+  --sl-font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  --nbt-radius: 4px;
+}
+
+:root,
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #062c21;
+  --sl-color-accent: #10b981;
+  --sl-color-accent-high: #6ee7b7;
+  --sl-color-white: #f1f5f9;
+  --sl-color-gray-1: #e2e8f0;
+  --sl-color-gray-2: #94a3b8;
+  --sl-color-gray-3: #64748b;
+  --sl-color-gray-4: #334155;
+  --sl-color-gray-5: #1e293b;
+  --sl-color-gray-6: #111722;
+  --sl-color-black: #0a0e14;
+  --sl-color-bg-nav: #0c1118;
+  --sl-color-bg-sidebar: #0d121a;
+  --sl-color-hairline-shade: #1e293b;
+  --sl-color-hairline-light: #1e293b;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d1fae5;
+  --sl-color-accent: #059669;
+  --sl-color-accent-high: #064e3b;
+  --sl-color-white: #0f172a;
+  --sl-color-gray-1: #1e293b;
+  --sl-color-gray-2: #334155;
+  --sl-color-gray-3: #475569;
+  --sl-color-gray-4: #94a3b8;
+  --sl-color-gray-5: #cbd5e1;
+  --sl-color-gray-6: #f1f5f9;
+  --sl-color-black: #f8fafc;
+}
+
+/* Sharp craft-engineering geometry */
+.sl-markdown-content pre,
+.sl-markdown-content table,
+.starlight-aside {
+  border-radius: var(--nbt-radius);
+}
+
+.sl-markdown-content code:not(:where(.not-content *)) {
+  border-radius: 3px;
+  font-weight: 500;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* Friendly Safety Level Banner & Badges */
+.nbt-safety-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 1.1rem;
+  margin: 1rem 0 1.5rem;
+  border-radius: var(--nbt-radius);
+  border: 1px solid var(--sl-color-gray-5);
+  border-left-width: 4px;
+  background: rgba(17, 23, 34, 0.65);
+}
+
+:root[data-theme='light'] .nbt-safety-banner {
+  background: #f8fafc;
+}
+
+.nbt-safety-banner[data-tier='safe'] {
+  border-left-color: #10b981;
+}
+
+.nbt-safety-banner[data-tier='preview'] {
+  border-left-color: #f59e0b;
+}
+
+.nbt-safety-banner[data-tier='write'] {
+  border-left-color: #ef4444;
+}
+
+.nbt-safety-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+}
+
+.nbt-safety-dot {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  border-radius: 1px;
+}
+
+.nbt-safety-banner[data-tier='safe'] .nbt-safety-dot,
+.nbt-pill[data-tier='safe'] .nbt-safety-dot {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.nbt-safety-banner[data-tier='preview'] .nbt-safety-dot,
+.nbt-pill[data-tier='preview'] .nbt-safety-dot {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+}
+
+.nbt-safety-banner[data-tier='write'] .nbt-safety-dot,
+.nbt-pill[data-tier='write'] .nbt-safety-dot {
+  background-color: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.nbt-safety-desc {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--sl-color-gray-2);
+}
+
+/* Inline safety pill for tables and command cards */
+.nbt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-family: var(--sl-font-mono);
+  border-radius: 3px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.nbt-pill[data-tier='safe'] {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.nbt-pill[data-tier='preview'] {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.nbt-pill[data-tier='write'] {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+:root[data-theme='light'] .nbt-pill[data-tier='safe'] {
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+:root[data-theme='light'] .nbt-pill[data-tier='preview'] {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+:root[data-theme='light'] .nbt-pill[data-tier='write'] {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* Command card grid in Command Reference */
+.nbt-cmd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  margin: 1.25rem 0;
+}
+
+.nbt-cmd-card {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: var(--nbt-radius);
+  padding: 1.1rem 1.25rem;
+  background: rgba(17, 23, 34, 0.55);
+}
+
+:root[data-theme='light'] .nbt-cmd-card {
+  background: #ffffff;
+}
+
+.nbt-cmd-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.nbt-cmd-syntax {
+  font-family: var(--sl-font-mono);
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--sl-color-white);
+}
+
+.nbt-cmd-summary {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.92rem;
+  color: var(--sl-color-gray-2);
+}
+
+.nbt-cmd-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.65rem;
+  font-size: 0.84rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--sl-color-gray-5);
+}
+
+.nbt-cmd-meta-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sl-color-gray-3);
+  margin-bottom: 0.2rem;
+}
+
+.nbt-flag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.nbt-flag-chip {
+  font-family: var(--sl-font-mono);
+  font-size: 0.76rem;
+  padding: 0.1rem 0.4rem;
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 3px;
+  color: var(--sl-color-gray-1);
+}

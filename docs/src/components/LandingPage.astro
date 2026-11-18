@@ -1,0 +1,198 @@
+---
+import '../styles/landing.css';
+import { LANDING_COPY } from '../data/landing-i18n';
+import { PRODUCT_META, type LocaleKey } from '../data/cli-surface';
+
+interface Props {
+  lang: LocaleKey;
+}
+
+const { lang } = Astro.props;
+const copy = LANDING_COPY[lang] ?? LANDING_COPY.en;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const pageHref = (path: string) => base + path;
+---
+
+<!doctype html>
+<html lang={copy.langAttr} data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{PRODUCT_META.name} — {copy.heroTitleHighlight}</title>
+    <meta name="description" content={copy.heroSubtitle} />
+    <link rel="icon" type="image/svg+xml" href={pageHref('/favicon.svg')} />
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="container navbar-inner">
+        <a href={pageHref(lang === 'zh-tw' ? '/zh-tw/' : '/')} class="brand">
+          <img src={pageHref('/favicon.svg')} alt="NBTExplorerCLI icon" />
+          <span>{PRODUCT_META.name}</span>
+        </a>
+        <nav class="nav-links" aria-label="Primary Navigation">
+          <a href={pageHref(copy.docsHomeHref)}>{copy.navDocs}</a>
+          <a href={pageHref(copy.commandsHref)}>{copy.navCommands}</a>
+          <a href={PRODUCT_META.releasesUrl}>{copy.navReleases}</a>
+          <a href={PRODUCT_META.repoUrl}>{copy.navGithub}</a>
+          <a href={pageHref(copy.switchLangHref)} class="lang-switch">{copy.switchLangLabel}</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero">
+        <div class="hero-badge">
+          <span class="hero-badge-dot" aria-hidden="true"></span>
+          <span>{copy.badgeText}</span>
+        </div>
+        <h1>
+          {copy.heroTitleLine1}
+          <span>{copy.heroTitleHighlight}</span>
+        </h1>
+        <p class="hero-sub">{copy.heroSubtitle}</p>
+        <div class="hero-actions">
+          <a href={pageHref(copy.docsHomeHref)} class="btn btn-primary">{copy.ctaDocs}</a>
+          <a href={PRODUCT_META.releasesUrl} class="btn btn-secondary">{copy.ctaDownload}</a>
+        </div>
+      </section>
+
+      <section class="terminal-section" aria-label={copy.terminalTitle}>
+        <div class="terminal-window">
+          <div class="terminal-topbar">
+            <span class="terminal-title">{copy.terminalTitle}</span>
+            <div class="terminal-tabs" role="tablist" aria-label={copy.terminalTitle}>
+              {
+                copy.terminalTabs.map((tab, index) => (
+                  <button
+                    type="button"
+                    role="tab"
+                    class="tab-btn"
+                    id={`terminal-tab-${tab.id}`}
+                    aria-selected={index === 0 ? 'true' : 'false'}
+                    aria-controls={`terminal-panel-${tab.id}`}
+                    tabindex={index === 0 ? 0 : -1}
+                  >
+                    {tab.label}
+                  </button>
+                ))
+              }
+            </div>
+          </div>
+          {
+            copy.terminalTabs.map((tab, index) => (
+              <div
+                class="terminal-panel"
+                id={`terminal-panel-${tab.id}`}
+                role="tabpanel"
+                aria-labelledby={`terminal-tab-${tab.id}`}
+                tabindex="0"
+                hidden={index !== 0}
+              >
+                <div class="terminal-cmd-row">
+                  <div class="terminal-cmd-text">
+                    <span class="terminal-cmd-prefix">PS&gt;</span>
+                    <code>{tab.command}</code>
+                  </div>
+                  <span class="tier-tag" data-tier={tab.tier}>
+                    {tab.tierLabel}
+                  </span>
+                </div>
+                <pre class="terminal-json"><code>{tab.output}</code></pre>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>{copy.safetyTitle}</h2>
+          <p>{copy.safetySubtitle}</p>
+        </div>
+        <div class="safety-grid">
+          {
+            copy.safetyCards.map((card) => (
+              <div class="safety-card" data-tier={card.tier}>
+                <span class="tier-tag" data-tier={card.tier}>
+                  {card.tag}
+                </span>
+                <h3>{card.title}</h3>
+                <p>{card.body}</p>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>{copy.bentoTitle}</h2>
+          <p>{copy.bentoSubtitle}</p>
+        </div>
+        <div class="bento-grid">
+          {
+            copy.bentoItems.map((item) => (
+              <div class="bento-card">
+                <div>
+                  <div class="bento-kicker">{item.kicker}</div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </div>
+                <a href={pageHref(item.linkHref)} class="bento-link">
+                  {item.linkText} -&gt;
+                </a>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>{copy.quickInstallTitle}</h2>
+          <p>{copy.quickInstallSubtitle}</p>
+        </div>
+        <pre class="install-box"><code>Get-FileHash .\{PRODUCT_META.zipName} -Algorithm SHA256
+Expand-Archive .\{PRODUCT_META.zipName} -DestinationPath .\nbtcli
+.\nbtcli\{PRODUCT_META.binary} --version
+.\nbtcli\{PRODUCT_META.binary} --help
+.\nbtcli\{PRODUCT_META.binary} get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion</code></pre>
+      </section>
+    </main>
+
+    <footer class="container footer">
+      <span>{copy.footerNote}</span>
+      <span>
+        <a href={pageHref(copy.docsHomeHref)}>{copy.navDocs}</a> · <a href={PRODUCT_META.repoUrl}>GitHub</a>
+      </span>
+    </footer>
+
+    <script is:inline>
+      const buttons = [...document.querySelectorAll('.terminal-tabs [role="tab"]')];
+      function selectTab(selected) {
+        buttons.forEach((button) => {
+          const active = button === selected;
+          button.setAttribute('aria-selected', String(active));
+          button.tabIndex = active ? 0 : -1;
+          document.getElementById(button.getAttribute('aria-controls')).hidden = !active;
+        });
+      }
+      buttons.forEach((button, index) => {
+        button.addEventListener('click', () => selectTab(button));
+        button.addEventListener('keydown', (event) => {
+          let position;
+          switch (event.key) {
+            case 'ArrowRight': position = (index + 1) % buttons.length; break;
+            case 'ArrowLeft': position = (index + buttons.length - 1) % buttons.length; break;
+            case 'Home': position = 0; break;
+            case 'End': position = buttons.length - 1; break;
+            default: return;
+          }
+          event.preventDefault();
+          selectTab(buttons[position]);
+          buttons[position].focus();
+        });
+      });
+    </script>
+  </body>
+</html>
