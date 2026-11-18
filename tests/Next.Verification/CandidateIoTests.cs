@@ -7,6 +7,41 @@ namespace Next.Verification;
 internal static class CandidateIoTests
 {
     private static ArtifactAddress Artifact(string path = "level.dat") => new(World, path, ArtifactKind.Nbt);
+    public static void CandidateLifecycleStreamsExactImages(string? artifactRoot)
+    {
+        var root = ScratchDirectory.CreateChild();
+        try
+        {
+            var path = Path.Combine(root, "level.dat");
+            var replacement = new byte[16 * 1024 * 1024]; replacement[0] = 17; replacement[^1] = 31;
+            File.WriteAllBytes(path, new byte[replacement.Length]);
+            var storage = new Infrastructure.ArtifactStorage(root, World);
+            var preimage = ArtifactImage.Present(Hash256.Compute(File.ReadAllBytes(path)));
+            var postimage = ArtifactImage.Present(Hash256.Compute(replacement));
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            using (var candidate = storage.Stage(Artifact(), preimage, replacement))
+            {
+                candidate.Flush();
+                candidate.Verify(stream =>
+                {
+                    Require(stream.Length == replacement.Length && stream.ReadByte() == 17, "persisted candidate stream begins at the exact first byte");
+                    Require(stream.Seek(-1, SeekOrigin.End) == replacement.Length - 1 && stream.ReadByte() == 31, "candidate verifier can seek to the last persisted byte");
+                });
+                candidate.Commit();
+                Require(candidate.Postimage == postimage, "staged identity and committed image remain bound");
+            }
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Require(Hash256.Compute(storage.Read(Artifact())) == postimage.Hash, "committed artifact is the exact authorized image");
+            if (artifactRoot is not null)
+            {
+                Directory.CreateDirectory(artifactRoot);
+                File.WriteAllText(Path.Combine(artifactRoot, "candidate-hash-allocation.json"),
+                    System.Text.Json.JsonSerializer.Serialize(new { allocatedBytes = allocated, artifactBytes = replacement.Length }));
+            }
+            Require(allocated < 8L * 1024 * 1024, $"Candidate stage, flush, verify and commit allocated {allocated:N0} bytes");
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
     public static void ExplicitLifecycle()
     {
         var root = ScratchDirectory.CreateChild();

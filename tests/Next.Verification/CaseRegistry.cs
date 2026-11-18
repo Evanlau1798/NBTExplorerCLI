@@ -336,6 +336,7 @@ internal static class CaseRegistry
         new("dat-rejects-stale-scope-and-corrupt", "storage", _ => DatSliceTests.RejectsStaleScopeAndCorrupt()),
         new("candidate-real-junction-and-path-boundaries", "storage", _ => CandidatePathTests.ActualJunctionAndPathBoundaries()),
         new("candidate-staging-faults-preserve-source", "storage", _ => CandidateFaultTests.StagingFailuresPreserveSource()),
+        new("candidate-hash-allocation", "storage", context => CandidateIoTests.CandidateLifecycleStreamsExactImages(context.ArtifactRoot)),
         new("candidate-single-writer-and-read-only", "storage", _ => CandidateIoTests.SingleWriterAndReadOnly()),
         new("candidate-explicit-lifecycle", "storage", _ => CandidateIoTests.ExplicitLifecycle()),
         new("candidate-stale-corrupt-and-locked", "storage", _ => CandidateIoTests.StaleCorruptAndLocked()),

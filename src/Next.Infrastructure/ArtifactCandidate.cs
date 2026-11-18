@@ -38,9 +38,9 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
     {
         RequireActive(); ArgumentNullException.ThrowIfNull(verify); verified = false;
         if (!flushed) throw new InvalidOperationException("Candidate must be flushed before verification");
-        var bytes = ArtifactStorage.ReadFile(CandidatePath);
-        if (ArtifactImage.Present(Hash256.Compute(bytes)) != stagedImage) throw new ArtifactConflictException("Candidate differs from staged image");
-        using var input = new MemoryStream(bytes, writable: false); verify(input);
+        using var input = GuardedArtifactPath.OpenFile(CandidatePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        if (ArtifactStorage.Image(input) != stagedImage) throw new ArtifactConflictException("Candidate differs from staged image");
+        input.Position = 0; verify(input);
         verified = true;
     }
     public void Commit()

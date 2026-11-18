@@ -39,8 +39,7 @@ public sealed class ArtifactStorage : IArtifactStorage
         try
         {
             using var path = GuardedArtifactPath.Acquire(root, world, artifact);
-            using var stream = GuardedArtifactPath.OpenFile(path.Target, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-            return Image(stream);
+            return Image(path.Target);
         }
         catch (FileNotFoundException) { return ArtifactImage.Absent; }
     }
@@ -56,11 +55,6 @@ public sealed class ArtifactStorage : IArtifactStorage
         try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io, delete); }
         catch { path.Dispose(); throw; }
     }
-    internal static byte[] ReadFile(string path)
-    {
-        using var stream = GuardedArtifactPath.OpenFile(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-        return ReadStream(stream, MaximumBytes);
-    }
     private static byte[] ReadStream(Stream stream, int maximumBytes)
     {
         if (stream.Length > maximumBytes) throw new ArtifactSizeLimitException(maximumBytes);
@@ -69,12 +63,16 @@ public sealed class ArtifactStorage : IArtifactStorage
     }
     internal static ArtifactImage Image(string path)
     {
-        try { return ArtifactImage.Present(Hash256.Compute(ReadFile(path))); }
+        try
+        {
+            using var stream = GuardedArtifactPath.OpenFile(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            return Image(stream);
+        }
         catch (FileNotFoundException) { return ArtifactImage.Absent; }
     }
     internal static ArtifactImage Image(Stream stream)
     {
-        if (stream.Length > MaximumBytes) throw new IOException("Artifact exceeds 64 MiB limit");
+        if (stream.Length > MaximumBytes) throw new ArtifactSizeLimitException();
         return ArtifactImage.Present(new Hash256(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))));
     }
 }
