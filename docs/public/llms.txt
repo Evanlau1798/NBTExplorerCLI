@@ -1,0 +1,78 @@
+# NBTExplorerCLI (nbtcli.exe) — LLM & Automation Reference Index
+
+> Self-contained Windows x64 command-line tool (`nbtcli.exe`, version `1.0.0`) for inspecting NBT structures, scanning 21 Minecraft world text roles, managing paginated map translation sessions, generating resource packs, and applying crash-recoverable offline edits to Minecraft Java Edition worlds.
+
+## Canonical Documentation URLs
+
+- Product Landing Page (English): https://nbtcli.evanlau1798.com/
+- Product Landing Page (Traditional Chinese): https://nbtcli.evanlau1798.com/zh-tw/
+- Documentation Overview (English): https://nbtcli.evanlau1798.com/docs/
+- Documentation Overview (Traditional Chinese): https://nbtcli.evanlau1798.com/zh-tw/docs/
+- Install and Inspect: https://nbtcli.evanlau1798.com/docs/getting-started/
+- Safe Editing and Recovery: https://nbtcli.evanlau1798.com/docs/safe-editing/
+- Translation Workflow: https://nbtcli.evanlau1798.com/docs/translation-workflow/
+- Resource Packs and References: https://nbtcli.evanlau1798.com/docs/resources-and-packs/
+- Backups and State Files: https://nbtcli.evanlau1798.com/docs/backups-and-state/
+- Command Reference: https://nbtcli.evanlau1798.com/docs/command-reference/
+- Support Scope and Troubleshooting: https://nbtcli.evanlau1798.com/docs/support-and-troubleshooting/
+
+## Core Protocol Invariants
+
+1. **Single-Line JSON Response**: Every invocation of `nbtcli.exe` writes exactly one newline-delimited UTF-8 JSON object (`schemaFamily: "nbtcli.cli"`, `schemaVersion: 1`) to `stdout`.
+2. **Global UI Locale (`--ui-locale`)**: Accepts `zh-TW` (default) or `en-US` before or after any command. Controls human-readable `error.message` and help text without altering JSON keys, machine error codes, or world translation locales.
+3. **World Safety & External State**:
+   - Never write `--output`, `--plan-output`, `--state-root`, or `--cache-root` inside the target Minecraft world folder, and ensure parent directories for `--output` / `--plan-output` already exist before running export commands.
+   - Default standalone scan cache (`scan`, `extract`, regular `validate`): `%LOCALAPPDATA%\nbtcli\scan\<world-id>`.
+   - Default external state root (translation, backup, and write workflows): `%LOCALAPPDATA%\nbtcli\worlds\<world-id>` (`cache/`, `sessions/`, `agent/`, `objects/`, `journals/`).
+   - World-modifying commands (`set --apply`, `batch --apply`, `apply`, `convert --apply`, `recover`, `restore --apply`) require `--world-offline` after closing Minecraft and other editors.
+   - `translate export-lang` and `translate create-pack` preview by default. With `--apply --world-offline` and no `--output`, they write into `<world>\.nbtcli.language` for `export-lang`, or the world root or `<world>\resourcepacks` for `create-pack`, depending on profile. Pass an explicit external `--output` to keep generated files outside the world.
+
+## Exit Codes
+
+- `0` (`Success`): Command completed normally (`outcome: "Success"`).
+- `1` (`Internal Failure`): An unexpected internal error occurred.
+- `2` (`Invalid Arguments`): Unknown command/flag, missing value, or incompatible selector.
+- `3` (`Conflict or Stale State`): World or session changed since plan/page creation, or operation ID reused with different input.
+- `4` (`Unsupported Format or Incomplete Scope`): Unsupported `DataVersion`/profile feature or incomplete source discovery.
+- `5` (`File, Access, or Validation Error`): Missing/locked file, malformed NBT/JSON input, or pre-commit preparation failure.
+- `6` (`Resource or Timeout Limit`): Exceeded 64 MiB output ceiling, 100,000-slot limit, 256-segment depth limit, or 100 ms regex timeout.
+- `7` (`Recovery Required`): Interrupted write detected; inspect with `status` and run `recover`.
+- `8` (`Rolled Back`): `recover --rollback` restored the world to its verified pre-edit bytes.
+- `130` (`Cancelled`): Operation recorded as cancelled.
+
+## Registered Command Surface
+
+### Read-Only Inspection & Scanning (Safe to Inspect)
+- `nbtcli version` (or `--version`, `-v`)
+- `nbtcli help [command]` (or `--help`, `-h`; for subcommands use `nbtcli <command> <subcommand> --help`)
+- `nbtcli capabilities`
+- `nbtcli get <world-or-file> [--path <rel>] [--entry <zip-entry>] [--chunk <x,z>] [--dimension <ns:id>] [--pointer <json-pointer> | --segments <json-array>] [--compression <type>] [--types]`
+- `nbtcli list <world-or-file> [--path <rel>] [--entry <zip-entry>] [--chunk <x,z>] [--dimension <ns:id>] [--pointer <json-pointer> | --segments <json-array>] [--compression <type>] [--types] [--limit <n>] [--offset <n>]`
+- `nbtcli search <world-or-file> [--path <rel>] [--entry <zip-entry>] [--chunk <x,z>] [--dimension <ns:id>] [--pointer <json-pointer> | --segments <json-array>] [--compression <type>] [--query <text>] [--name <tag-name>] [--type <nbt-type>] [--types] [--limit <n>] [--offset <n>]`
+- `nbtcli scan <world> [--dimension <ns:id>] [--region <r.x.z.mca>] [--types <roles>] [--path <rel>] [--summary] [--show-items] [--limit <n>] [--offset <n>] [--cache-root <dir>] [--refresh] [--no-cache] [--workers <n>] [--verbose] [--debug]`
+- `nbtcli extract <world> [--dimension <ns:id>] [--region <r.x.z.mca>] [--types <roles>] [--path <rel>] [--all | --unique] [--match-pattern <regex>] [--limit <n>] [--offset <n>] [--cache-root <dir>] [--refresh] [--no-cache] [--workers <n>] [--verbose] [--debug] [--output <file>]`
+- `nbtcli validate <world> [--quick] [--dimension <ns:id>] [--region <r.x.z.mca>] [--types <roles>] [--path <rel>] [--limit <n>] [--offset <n>] [--cache-root <dir>] [--refresh] [--no-cache] [--workers <n>] [--verbose] [--debug]`
+- `nbtcli status <world> --plan-hash <sha256> [--state-root <dir>] [--output <file>]`
+- `nbtcli backup <world> [--path <rel>] [--suffix <name>] [--state-root <dir>] [--output <file>]`
+
+### Preview & Session Commands (Preview Only unless `--apply` is passed)
+- `nbtcli set <world> --path <rel> (--pointer <ptr> | --segments <json>) (--value <json> | --value-file <file|->) [--chunk <x,z>] [--dimension <ns:id>] [--operation-id <guid>] [--output <plan.json>] [--apply --world-offline] [--state-root <dir>]`
+- `nbtcli plan <world> --request <ops.json|-> [--output <plan.json>] [--state-root <dir>]`
+- `nbtcli batch <ops.json|-> --world <world> [--output <plan.json>] [--apply --world-offline] [--state-root <dir>]`
+- `nbtcli restore <world> --manifest-hash <sha256> [--path <rel>] [--output <plan.json>] [--apply --world-offline] [--state-root <dir>]`
+- `nbtcli convert <world> --lang <locale> [--prefix <key-prefix>] [--keepdup] [--no-backup] [--language-output <target>] [--path <rel>] [--dimension <ns:id>] [--region <r.x.z.mca>] [--types <roles>] [--match-pattern <regex>] [--output <plan.json>] [--apply --world-offline] [--state-root <dir>]`
+- `nbtcli translate <start|status|export|advance|submit|get|jump|note|glossary|reset|groups|memory|plan|export-lang|create-pack|seal|help> <world> [options]`
+- `nbtcli agent <setup|submit|status|help> <world> [options]`
+
+### Offline Commit & Recovery Commands (Modifies World Save)
+- `nbtcli apply <world> --plan <plan.json|-> --world-offline [--output <receipt.json>] [--state-root <dir>]`
+- `nbtcli recover <world> --plan-hash <sha256> [--rollback] --world-offline [--output <receipt.json>] [--state-root <dir>]`
+
+## Input JSON Schema Families (`schemaVersion: 1`)
+
+1. `nbtcli.typed-nbt`: `data: { name, root: { tag, value } }` extracted from `get --types` (`data.value`); used by `set --value` / `set --value-file`.
+2. `nbtcli.operations`: Used by `plan --request` and `batch`.
+3. `nbtcli.patch-plan`: Produced by `set`, `plan`, `batch`, `restore`, `convert`, `translate plan`; consumed by `apply --plan`.
+4. `nbtcli.session-reply`: Used by `translate submit --reply` and `translate advance --reply`.
+5. `nbtcli.session-command`: Used by `translate jump`, `note`, `glossary`, and `reset` (`--request`).
+6. `nbtcli.agent-questionnaire`: Used by `agent submit --request`.

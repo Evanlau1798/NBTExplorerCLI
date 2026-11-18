@@ -40,8 +40,19 @@
 /* Sharp craft-engineering geometry */
 .sl-markdown-content pre,
 .sl-markdown-content table,
-.starlight-aside {
+.starlight-aside,
+.sl-markdown-content .card,
+.sl-markdown-content sl-file-tree {
   border-radius: var(--nbt-radius);
+}
+
+.sl-markdown-content .card {
+  border-color: var(--sl-color-gray-5);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.sl-markdown-content .card:hover {
+  border-color: var(--sl-color-accent);
 }
 
 .sl-markdown-content code:not(:where(.not-content *)) {

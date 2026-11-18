@@ -7,8 +7,8 @@ export const COMMAND_SURFACE: CommandEntry[] = [
     syntax: 'nbtcli help [command]',
     tier: 'safe',
     requiredArgs: {
-      en: 'None (optional command or subcommand name)',
-      'zh-tw': '無（可選填命令或子命令名稱）',
+      en: 'None (optional root command name; for subcommands run <command> <subcommand> --help)',
+      'zh-tw': '無（可選填根命令名稱；若要查詢子命令請執行 <命令> <子命令> --help）',
     },
     summary: {
       en: 'Displays available commands, subcommands, and exact accepted options in JSON.',
@@ -249,8 +249,8 @@ export const COMMAND_SURFACE: CommandEntry[] = [
       'zh-tw': '查詢特定計畫的執行日誌與回執狀態，判斷寫入是否已完成、需要復原，或已回滾。',
     },
     resultAndNext: {
-      en: 'Read-only check; use its output to decide whether to run recover or recover --rollback.',
-      'zh-tw': '純唯讀檢查；根據回傳狀態決定要執行 recover 繼續完成，或加上 --rollback 退回原狀。',
+      en: 'Read-only check; use its output together with exit code and repair guidance to confirm the original journal before running recover.',
+      'zh-tw': '純唯讀檢查；請搭配退出碼與 repair 指引確認原日誌與計畫身分後，再決定執行 recover 或 --rollback。',
     },
   },
   {
@@ -303,8 +303,8 @@ export const COMMAND_SURFACE: CommandEntry[] = [
       'zh-tw': '從已驗證的備份清單預覽或還原世界檔案，即使目前世界內的目標檔案已損壞或遺失也能修復。',
     },
     resultAndNext: {
-      en: 'Previews by default; add --apply --world-offline to write the restored files.',
-      'zh-tw': '預設為預覽模式；確認無誤後加上 --apply --world-offline 即可實際還原檔案。',
+      en: 'Previews by default; save the reviewed plan with --output and run apply --plan --world-offline.',
+      'zh-tw': '預設為預覽模式；建議先用 --output 保存並審閱計畫，再執行 apply --plan --world-offline。',
     },
   },
   {
@@ -339,8 +339,8 @@ export const COMMAND_SURFACE: CommandEntry[] = [
       'zh-tw': '管理分頁式地圖翻譯工作階段、術語表、翻譯計畫生成、獨立資源包匯出與完成封存（seal）。',
     },
     resultAndNext: {
-      en: 'Stores session progress outside the world; world edits only happen when you apply a generated plan.',
-      'zh-tw': '所有翻譯進度皆儲存在世界資料夾外；唯有將產出的計畫交由 apply 執行時才會修改世界。',
+      en: 'Stores session progress outside the world; run translate <subcommand> --help for subcommand flags.',
+      'zh-tw': '所有翻譯進度皆儲存在世界資料夾外；可執行 translate <子命令> --help 查詢各子命令旗標。',
     },
   },
   {
@@ -357,8 +357,8 @@ export const COMMAND_SURFACE: CommandEntry[] = [
       'zh-tw': '建立與管理外部翻譯工具或 AI 助手的預設來源／目標語言及每頁筆數偏好設定。',
     },
     resultAndNext: {
-      en: 'Saves preferences in the external state root; never calls external networks or modifies the world.',
-      'zh-tw': '偏好設定儲存於外部狀態目錄，不會主動連網，也不會修改任何世界檔案。',
+      en: 'Saves preferences in the external state root; run agent <subcommand> --help for subcommand flags.',
+      'zh-tw': '偏好設定儲存於外部狀態目錄；可執行 agent <子命令> --help 查詢各子命令旗標。',
     },
   },
 ];

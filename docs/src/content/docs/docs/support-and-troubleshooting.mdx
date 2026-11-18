@@ -3,6 +3,7 @@ title: Support Scope and Troubleshooting
 description: Supported Minecraft Java Edition DataVersion profiles, exit codes, verification boundaries, and solutions for common errors.
 ---
 
+import { Steps } from '@astrojs/starlight/components';
 import ExitCodeTable from '../../../components/ExitCodeTable.astro';
 import ProfileTable from '../../../components/ProfileTable.astro';
 import SafetyBanner from '../../../components/SafetyBanner.astro';
@@ -15,7 +16,7 @@ This page summarizes the supported **Minecraft Java Edition** profiles, explains
 
 Run `nbtcli capabilities` at any time to inspect the registered command list and the declared support matrix for each pinned Minecraft `DataVersion` profile:
 
-```powershell
+```powershell title="PowerShell"
 .\nbtcli.exe capabilities
 ```
 
@@ -30,6 +31,8 @@ For each profile, `capabilities` reports five operations (`read`, `extract`, `pl
   - `validate`, `scan`, `plan`, and `apply` verify binary NBT/region framing, JSON syntax, SHA-256 preimages/postimages, and schema rules at the CLI level.
   - Passing CLI validation is **not** a substitute for loading the world inside the Minecraft Java Edition client. In-game visual rendering, custom font spacing, and live command execution behavior that have not yet been tested in the running game remain **pending live in-game verification** (`尚待實機驗證`) — always verify your translated or edited world copy inside Minecraft before distributing a map.
 
+---
+
 ## 2. Supported World Text Roles (21 Roles)
 
 When running `scan`, `extract`, `validate`, `convert`, or `translate start`, the `--types` option can filter by any combination of the 21 supported text roles:
@@ -40,35 +43,49 @@ When running `scan`, `extract`, `validate`, `convert`, or `translate start`, the
 - **World & UI State**: `BossBar`, `ScoreboardTeam`, `ScoreboardObjective`
 - **Datapacks & Resources**: `McFunction`, `Advancement`, `CommandStorage`, `LangKey`, `TranslationKey`
 
+---
+
 ## 3. Exit Codes Reference
 
 Every invocation returns a deterministic exit code alongside the JSON response on `stdout`. When an exit code is non-zero (`success: false`), inspect `error.code`, `error.message`, and `error.details` for the exact reason.
 
 <ExitCodeTable lang="en" />
 
+---
+
 ## 4. Common Troubleshooting Scenarios
 
 ### Scenario A: World File Is Locked or Access Is Denied (Exit Code `5`)
 
 **Symptom**: `scan`, `backup`, or `apply` fails with exit code `5` (`IO_ERROR` or `ACCESS_DENIED`).
-**How to Resolve**:
+
+<Steps>
+
 1. Close the Minecraft Java Edition client, integrated server, or dedicated server completely.
 2. Close any other tools inspecting the same world folder (such as NBT viewers, map renderers, or archive managers).
 3. Re-run the command on your world copy.
 
+</Steps>
+
 ### Scenario B: Write Interrupted — `RECOVERY_REQUIRED` (Exit Code `7`)
 
 **Symptom**: `apply` or `recover` returns exit code `7` (`RECOVERY_REQUIRED`).
-**How to Resolve**:
+
+<Steps>
+
 1. **Do not open the world in Minecraft.**
 2. Copy the `planHash` and `stateRoot` from the JSON output.
 3. Run `nbtcli status <world> --plan-hash <hash> --state-root <stateRoot>` to inspect the journal state.
 4. Run `nbtcli recover <world> --plan-hash <hash> --state-root <stateRoot> --world-offline` to finish the planned write, or add `--rollback` to restore the original pre-edit files (returns exit code `8`).
 
+</Steps>
+
 ### Scenario C: World Modified Externally After Creating a Plan or Session (Exit Code `3`)
 
 **Symptom**: `apply` or `translate submit` fails with exit code `3` (`CONFLICT`).
+
 **Why It Happens**: One or more world files changed on disk after your `patch-plan` or translation session snapshot was created. NBTExplorerCLI refuses to overwrite changed files with stale plans.
+
 **How to Resolve**:
 - If an edit plan is stale: Re-run `get --types` and `set` / `plan` on the current world files to generate a fresh plan.
 - If a translation session snapshot is stale (`repair: "start-new-session"`): Start a new session on the updated world copy; follow the [translation memory example](../translation-workflow/) with the new session ID, its full slot hash, the previous session ID, and the glossary version.
@@ -76,15 +93,21 @@ Every invocation returns a deterministic exit code alongside the JSON response o
 ### Scenario D: Corrupted Region/NBT File or Unsupported Format (Exit Code `4` or `5`)
 
 **Symptom**: `scan` or `validate` reports `coverageComplete: false` with exit code `4` (unsupported profile/feature) or exit code `5` (malformed/corrupt file, such as a zero-byte region file or invalid JSON in a datapack).
-**How to Resolve**:
+
+<Steps>
+
 1. Run `nbtcli validate <world>` and inspect the per-source diagnostics in the JSON output to see which exact relative file path failed.
 2. If a single file is damaged and you have a verified backup, restore that specific file using `nbtcli restore <world> --manifest-hash <hash> --path <relative-path> --apply --world-offline`.
 3. If you only need to translate or edit healthy dimensions or specific files, scope your command using `--dimension`, `--region`, `--path`, or `--types` to exclude the damaged or unsupported file.
 
+</Steps>
+
 ### Scenario E: Resource Budget or Regex Timeout Exceeded (Exit Code `6`)
 
 **Symptom**: Command exits with code `6` (`RESOURCE_LIMIT` or `PATTERN_TIMEOUT`).
+
 **Why It Happens**: To prevent out-of-memory crashes or runaway regular expressions, NBTExplorerCLI enforces a 64 MiB artifact/output ceiling, a 100,000-slot session limit, a 256-segment node depth limit, and a 100 ms regex timeout.
+
 **How to Resolve**:
 - Narrow the target scope with `--dimension`, `--region`, `--path`, or `--types`.
 - When starting or exporting a translation session, lower `--page-size` or `--page-bytes`.

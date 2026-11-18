@@ -3,6 +3,7 @@ title: Backups and State Files
 description: Create and verify content-addressed world backups, restore damaged files, and understand how NBTExplorerCLI organizes external state files.
 ---
 
+import { FileTree, Steps } from '@astrojs/starlight/components';
 import SafetyBanner from '../../../components/SafetyBanner.astro';
 
 <SafetyBanner tier="safe" lang="en" />
@@ -13,19 +14,27 @@ import SafetyBanner from '../../../components/SafetyBanner.astro';
 
 By default, world-scoped state is stored under your local Windows application data folder:
 
-```text
-%LOCALAPPDATA%\nbtcli\worlds\<world-id>\
-```
+<FileTree>
+- %LOCALAPPDATA%\nbtcli\
+  - worlds\
+    - 4a8b9c1d2e3f... (world-id without hyphens)
+      - cache\ (rebuildable scan cache for translation & write workflows)
+      - sessions\ (paginated translation sessions, slot replies, glossaries)
+      - agent\ (external assistant default preferences)
+      - objects\ (content-addressed SHA-256 preimage backups & snapshot blobs)
+      - journals\ (crash recovery journals and terminal apply receipts)
+      - backup_before-translation_20261118T070000Z_a1b2c3.json
+  - scan\
+    - 4a8b9c1d2e3f...\ (default standalone cache for scan, extract, validate)
+</FileTree>
 
 You can also specify a dedicated folder outside the world with `--state-root 'D:\NbtState\MyWorld'`. Make sure to pass the **same** `--state-root` across related `plan`, `apply`, `status`, `recover`, `backup`, `restore`, `translate`, and `agent` commands.
-
-The standalone `scan`, `extract`, and regular `validate` commands default to `%LOCALAPPDATA%\nbtcli\scan\<world-id>` and accept an external `--cache-root`. Translation and writing workflows have a separate cache under the state root.
 
 ### Directory Layout Inside a State Root
 
 | Subfolder / File | Purpose | Can It Be Deleted or Rebuilt? |
 | --- | --- | --- |
-| `cache/` | Stores the local cache used by translation and writing workflows. | **Rebuildable**: Manage it separately from the standalone scan cache. |
+| `cache/` | Stores the local cache used by translation and writing workflows. | **Rebuildable**: Manage separately from the standalone scan cache (`%LOCALAPPDATA%\nbtcli\scan\<world-id>`, refreshed with `scan --refresh`). |
 | `sessions/` | Stores translation sessions (`translate start`, `submit`, `note`, `glossary`, `seal`). | **Keep while translating**: Contains your translation progress, slot replies, and glossary history. |
 | `agent/` | Stores external assistant questionnaire settings (`agent setup` / `submit`). | **User configuration**: Keep to retain default language and page-size preferences for that world. |
 | `objects/` | Content-addressed store (by SHA-256) holding verified preimage files and backup blobs. | **Critical for restore & rollback**: Required by `restore` and `recover` to reconstruct original world files. |
@@ -36,20 +45,20 @@ The standalone `scan`, `extract`, and regular `validate` commands default to `%L
 
 `<world-id>` is the tool's world identifier without hyphens. Assign an explicit, separate state root to each world copy. If you recreate or copy a world folder, scan the selected folder and generate a fresh plan for it. Use the same world path and state root when resuming an existing journal.
 
+---
+
 ## 2. Creating a Verified World Backup (`backup`)
 
 Run `backup` before major edits to capture a verified, content-addressed snapshot of the entire world (or pass `--path <relative-path>` to back up a single file):
 
-```powershell
+```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
 .\nbtcli.exe backup 'D:\WorldCopy' `
   --suffix before-translation `
   --output 'D:\Backups\before-translation-manifest.json'
 ```
 
-Example response:
-
-```json
+```json title="stdout (backup)"
 {
   "schemaFamily": "nbtcli.cli",
   "schemaVersion": 1,
@@ -69,30 +78,36 @@ Example response:
 > [!IMPORTANT]
 > A backup manifest JSON file (`before-translation-manifest.json`) is an **index** of file paths and SHA-256 hashes; the actual file contents live inside the `objects/` subfolder of `stateRoot`. Keep both the `manifestHash` and the `stateRoot` directory intact so you can restore later.
 
+---
+
 ## 3. Restoring from a Backup (`restore`)
 
 <SafetyBanner tier="write" lang="en" />
 
 `restore` uses the verified backup manifest and the `objects/` store to restore your world (or a single `--path`). Even if a target file in the world is currently corrupted or missing on disk, `restore` can replace it cleanly.
 
-### Step 1: Preview the Restoration
+<Steps>
 
-Run `restore` without `--apply` first to inspect the restoration plan:
+1. **Preview the Restoration**
 
-```powershell
-.\nbtcli.exe restore 'D:\WorldCopy' `
-  --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
-  --output 'D:\Backups\restore-plan.json'
-```
+   Run `restore` without `--apply` first to inspect the restoration plan:
 
-### Step 2: Apply the Reviewed Plan Offline
+   ```powershell title="PowerShell"
+   .\nbtcli.exe restore 'D:\WorldCopy' `
+     --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
+     --output 'D:\Backups\restore-plan.json'
+   ```
 
-Close Minecraft and apply the saved plan using the same world and state root as the preview. Apply checks the recorded preimage and refuses to overwrite changes made after preview.
+2. **Apply the Reviewed Plan Offline**
 
-```powershell
-.\nbtcli.exe apply 'D:\WorldCopy' `
-  --plan 'D:\Backups\restore-plan.json' `
-  --world-offline
-```
+   Close Minecraft and apply the saved plan using the same world and state root as the preview. `apply` checks the recorded preimage and refuses to overwrite changes made after preview:
 
-If you used `--state-root` for the preview, pass that same option here. To restore a single file, add `--path level.dat` to the preview command, review the output plan, and then apply that file.
+   ```powershell title="PowerShell"
+   .\nbtcli.exe apply 'D:\WorldCopy' `
+     --plan 'D:\Backups\restore-plan.json' `
+     --world-offline
+   ```
+
+   If you used `--state-root` for the preview, pass that same option here. To restore a single file, add `--path level.dat` to the preview command, review the output plan, and then apply that file.
+
+</Steps>

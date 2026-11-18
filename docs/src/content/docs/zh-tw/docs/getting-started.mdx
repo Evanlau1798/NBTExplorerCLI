@@ -1,86 +1,100 @@
 ---
 title: 安裝驗證與安全查閱
-description: 驗證 Windows x64 發行包 SHA-256 雜湊、確認執行檔狀態，並在世界副本上執行第一次唯讀 NBT 查閱與文字掃描。
+description: 驗證 Windows x64 發行壓縮包雜湊、檢查執行檔狀態，並在世界副本上執行唯讀 NBT 查詢與世界文字掃描。
 ---
 
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 <SafetyBanner tier="safe" lang="zh-tw" />
 
-本指南將帶您下載 **NBTExplorerCLI**、核對壓縮包 SHA-256 雜湊值、完整解壓縮獨立執行環境，並在 Minecraft Java 版世界副本上完成第一次安全查閱（`get`、`list`、`search`、`scan` 與 `extract`）。
+本指南將帶您完成 **NBTExplorerCLI** 的下載、SHA-256 雜湊與溯源清單驗證、解壓縮獨立封裝執行環境，並在 Minecraft Java Edition 世界副本上執行第一次唯讀查閱命令（`get`、`list`、`search`、`scan` 與 `extract`）。
 
-## 1. 下載並驗證 Windows x64 發行包
+## 安裝與驗證四步驟
 
-您可以從以下兩個官方管道取得 Windows x64 壓縮包（`nbtcli-win-x64.zip`）：
+<Steps>
 
-- **[GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**：通過完整驗證並綁定版本標籤（如 `v1.0.0`）的正式發行版。
-- **[GitHub Actions 候選建置](https://github.com/Evanlau1798/NBTExplorerCLI/actions)**：針對特定提交版本自動建置、並在無安裝 SDK 的乾淨 Windows Server Core 容器中完成煙霧測試的候選產物（`nbtcli-windows-x64`）。
+1. **下載並驗證 Windows x64 壓縮包**
 
-在解壓縮之前，請先使用 PowerShell 計算壓縮包的 SHA-256 雜湊值，並確認與隨附的 `SHA256SUMS.txt` 完全一致：
+   您可以從以下兩個官方管道取得 Windows x64 發行包（`nbtcli-win-x64.zip`）與 `SHA256SUMS.txt`：
 
-```powershell
-Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256
-Get-Content .\SHA256SUMS.txt
-```
+   - **[GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**：通過完整發布驗證流程的正式標籤版本（`v1.0.0`）。
+   - **[GitHub Actions 候選建置](https://github.com/Evanlau1798/NBTExplorerCLI/actions)**：針對特定 Commit 產出、並於無 SDK 的乾淨 Windows Server Core 容器內完成冒煙測試的建置產物（`nbtcli-windows-x64`）。
 
-核對無誤後，請將整個壓縮包完整解壓縮至新資料夾。本套件已**內建獨立 .NET 執行環境（10.0.15）**與所需函式庫（`ICSharpCode.SharpZipLib.dll`），請務必讓 `nbtcli.exe` 與隨附的所有 `.dll` 及 `.json` 檔案保持在同一個資料夾內：
+   解壓縮前，請先確認 ZIP 檔案的 SHA-256 雜湊值與隨附的 `SHA256SUMS.txt` 一致：
 
-```powershell
-Expand-Archive -Path .\nbtcli-win-x64.zip -DestinationPath .\nbtcli
-Set-Location .\nbtcli
-```
+   ```powershell title="PowerShell"
+   $zipHash = (Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+   $expected = (Get-Content .\SHA256SUMS.txt | Select-Object -First 1).Split(' ')[0].Trim().ToLowerInvariant()
+   if ($zipHash -ne $expected) { throw "SHA-256 雜湊不符！" } else { "驗證成功: $zipHash" }
+   ```
 
-> [!TIP]
-> 發行包內的 `candidate.json` 記錄了該版本的完整建置資訊，包含版本號（`1.0.0`）、Git 來源修訂號（Revision）、SDK 版本（`10.0.404`）、第三方相依元件，以及壓縮包內每一個檔案的 SHA-256 雜湊清單。
+2. **解壓縮獨立封裝執行環境**
 
-## 2. 檢查版本與指令說明
+   請將壓縮包完整解壓縮至獨立資料夾。本套件為**獨立封裝（Self-Contained）**，已內建固定版本的 .NET Runtime（`10.0.15`）與必要函式庫（`ICSharpCode.SharpZipLib.dll`）。請務必讓 `nbtcli.exe` 與同目錄下的 `.dll` 及 `.json` 檔案保持在一起：
 
-執行 `--version` 與 `--help`，確認工具可正常啟動並輸出單行 JSON：
+   ```powershell title="PowerShell"
+   Expand-Archive -Path .\nbtcli-win-x64.zip -DestinationPath .\nbtcli
+   Set-Location .\nbtcli
+   ```
 
-```powershell
-.\nbtcli.exe --version
-.\nbtcli.exe --help
-```
+   > [!TIP]
+   > 每個發行包內皆附有 `candidate.json`，完整記錄建置版本（`1.0.0`）、Git Commit 雜湊、固定 SDK 版本（`10.0.404`）、相依套件版本，以及壓縮包內每個檔案各自的 SHA-256 雜湊值。
 
-`--version` 的輸出範例：
+3. **檢查版本與命令說明**
 
-```json
-{
-  "schemaFamily": "nbtcli.cli",
-  "schemaVersion": 1,
-  "success": true,
-  "command": "version",
-  "outcome": "Success",
-  "data": {
-    "product": "nbtcli",
-    "version": "1.0.0"
-  },
-  "error": null
-}
-```
+   執行 `--version` 與 `--help` 確認執行檔可正常啟動：
 
-若想查詢特定指令或子命令支援的所有旗標，可隨時執行 `help <命令>`：
+   ```powershell title="PowerShell"
+   .\nbtcli.exe --version
+   .\nbtcli.exe --help
+   ```
 
-```powershell
-.\nbtcli.exe help get
-.\nbtcli.exe help translate
-```
+   ```json title="stdout (nbtcli --version)"
+   {
+     "schemaFamily": "nbtcli.cli",
+     "schemaVersion": 1,
+     "success": true,
+     "command": "version",
+     "outcome": "Success",
+     "data": {
+       "product": "nbtcli",
+       "version": "1.0.0"
+     },
+     "error": null
+   }
+   ```
 
-## 3. 準備世界存檔副本
+   若要查詢根命令支援的參數清單，請執行 `help <命令>`；查詢子命令（例如 `translate start`）則需將 `--help` 接在最後：
 
-雖然查閱指令完全不會修改檔案，但我們強烈建議先在關閉 Minecraft 的狀態下，將您的世界存檔複製一份到獨立路徑（例如 `D:\WorldCopy`），後續所有的查閱、掃描與編輯預覽都針對這份副本操作。
+   ```powershell title="PowerShell"
+   .\nbtcli.exe help get --ui-locale zh-TW
+   .\nbtcli.exe help translate --ui-locale zh-TW
+   .\nbtcli.exe translate start --help --ui-locale zh-TW
+   ```
 
-## 4. 使用 `get` 查閱單一 NBT 節點或 JSON 屬性
+4. **準備一份世界副本**
 
-`get` 可直接讀取世界內的 NBT 檔案、區塊（Chunk）或資料包 JSON 節點。
+   雖然唯讀查閱命令絕不會修改世界檔案，但在測試查詢、掃描或編輯流程前，強烈建議先複製一份獨立的 Minecraft 世界存檔（例如 `D:\WorldCopy`）。複製存檔資料夾前請先關閉 Minecraft，確保所有區塊與世界資料皆已完整寫入磁碟。
 
-### 讀取 `level.dat` 的 `DataVersion`
+</Steps>
 
-```powershell
+---
+
+## 使用 `get` 讀取單一節點
+
+`get` 可用於讀取特定的 NBT 標籤、區塊檔（`.mca`）、資料包 JSON 屬性或 ZIP 壓縮包內項目。
+
+<Tabs syncKey="get-mode">
+  <TabItem label="易讀顯示模式 (預設)">
+
+預設情況下，`get` 會回傳簡潔易讀的 `display-json`：
+
+```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 ```
 
-```json
+```json title="stdout (display-json)"
 {
   "schemaFamily": "nbtcli.cli",
   "schemaVersion": 1,
@@ -89,69 +103,123 @@ Set-Location .\nbtcli
   "outcome": "Success",
   "data": {
     "representation": "display-json",
-    "pointer": "/Data/DataVersion",
+    "tagType": "Int",
     "value": 3953
   },
   "error": null
 }
 ```
 
-### 顯示格式（`display-json`）與可還原型別格式（`--types`）
+  </TabItem>
+  <TabItem label="可逆型別模式 (--types)">
 
-預設情況下，`get` 會回傳方便閱讀的 `display-json`。如果您打算將讀取到的值修改後交給 `set` 或 `batch` 寫回世界，請加上 `--types` 以取得 `nbtcli.typed-nbt` 格式——它會完整保留 NBT 數值寬度（如 `Byte`、`Short`、`Int`、`Long`、`Float` 位元值與型別陣列）以及精確的來源位址：
+若您後續打算將輸出中的 `data.value` 修改後交給 `set` 或 `batch` 寫回世界，請加上 `--types` 以取得 `nbtcli.typed-nbt` 結構，完整保留 NBT 精確型別（如 `byte`、`short`、`int`、`long`、`float` 原始位元與型別陣列）：
 
-```powershell
+```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
 ```
 
-### 其他常見的 `get` 查閱範例
+```json title="stdout (typed-nbt)"
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "get",
+  "outcome": "Success",
+  "data": {
+    "representation": "typed-nbt",
+    "tagType": "String",
+    "value": {
+      "schemaFamily": "nbtcli.typed-nbt",
+      "schemaVersion": 1,
+      "data": {
+        "name": "",
+        "root": {
+          "tag": "string",
+          "value": "Original Map Name"
+        }
+      }
+    }
+  },
+  "error": null
+}
+```
 
-```powershell
-# 查閱世界內資料包（Datapack）的 JSON 欄位
-.\nbtcli.exe get 'D:\WorldCopy' --path 'datapacks/custom/data/quest/advancement/root.json' --pointer /display/title
+  </TabItem>
+</Tabs>
 
-# 查閱區塊檔（.mca）中特定全域區塊座標的 NBT 內容
+### 查詢不同類型的世界目標
+
+<Tabs syncKey="target-kind">
+  <TabItem label="level.dat">
+
+```powershell title="PowerShell"
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName
+```
+
+  </TabItem>
+  <TabItem label="地形或實體區塊 (.mca)">
+
+```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' --path 'region/r.0.0.mca' --chunk 0,0 --dimension minecraft:overworld --pointer /Status
+```
 
-# 查閱 ZIP 資源包或資料包內的指定檔案項目
+  </TabItem>
+  <TabItem label="資料包 JSON">
+
+```powershell title="PowerShell"
+.\nbtcli.exe get 'D:\WorldCopy' --path 'datapacks/custom/data/quest/advancement/root.json' --pointer /display/title
+```
+
+  </TabItem>
+  <TabItem label="ZIP 壓縮包項目">
+
+```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy\resources.zip' --entry 'assets/custom/lang/en_us.json' --pointer /item.custom.sword
 ```
 
-## 5. 使用 `list` 與 `search` 探索世界結構
+  </TabItem>
+</Tabs>
 
-對世界資料夾執行 `list`，可盤點該世界的名稱、已宣告維度，以及各維度的地形區塊檔與實體區塊檔數量：
+---
 
-```powershell
+## 使用 `list` 與 `search` 探索世界結構
+
+對世界目錄執行 `list`，可列出該世界宣告的所有維度、地形區塊檔數量與實體區塊檔數量：
+
+```powershell title="PowerShell"
 .\nbtcli.exe list 'D:\WorldCopy'
 ```
 
-對 `.mca` 區塊檔執行 `list`（不加 `--chunk`）可列出所有已生成的區塊座標；執行 `search` 則可依內容文字（`--query`）、欄位名稱（`--name`）或標籤型別（`--type`）搜尋節點：
+對 `.mca` 區塊檔執行 `list`（不加 `--chunk`）可列出所有已生成的區塊座標；執行 `search` 則可依文字內容（`--query`）、標籤名稱（`--name`）或 NBT 型別（`--type`）搜尋節點：
 
-```powershell
+```powershell title="PowerShell"
 .\nbtcli.exe list 'D:\WorldCopy' --path 'region/r.0.0.mca' --limit 20
 .\nbtcli.exe search 'D:\WorldCopy' --path level.dat --name Spawn --limit 10
 ```
 
-## 6. 使用 `scan` 與 `extract` 掃描世界文字
+---
 
-使用 `scan` 可以掃描世界中的告示牌、懸掛式告示牌、書本、講台書本、物品名稱與說明（Lore）、實體名稱、容器名稱、指令方塊、函數（`.mcfunction`）、計分板、Boss 血條、進度（Advancements）與語言檔：
+## 使用 `scan` 與 `extract` 掃描及抽取世界文字
 
-```powershell
-# 快速檢視全世界的文字來源統計摘要
+`scan` 會索引世界內 21 種可翻譯或可檢視的文字來源（包含告示牌、懸掛式告示牌、書本、物品、實體、容器、指令方塊、函數、計分板、Boss 血條、進度與語言檔）：
+
+```powershell title="PowerShell"
+# 快速輸出全世界的文字來源統計摘要
 .\nbtcli.exe scan 'D:\WorldCopy' --summary
 
-# 僅掃描主世界（Overworld）並列出前 25 筆解碼後的文字項目
+# 指定單一維度掃描，並在輸出中包含解碼後的文字項目
 .\nbtcli.exe scan 'D:\WorldCopy' --dimension minecraft:overworld --show-items --limit 25
 ```
 
 > [!NOTE]
-> `scan` 會在世界資料夾「外部」建立可隨時重建的掃描快取（預設位於 `%LOCALAPPDATA%\nbtcli\scan\<world-id>`，亦可透過 `--cache-root` 指定其他外部路徑）。若需強制重新解析所有檔案可加上 `--refresh`，若不想讀寫持久快取則可加上 `--no-cache`。
+> 獨立的 `scan`、`extract` 與一般 `validate` 預設會在世界資料夾外建立可隨時重建的高速掃描快取（預設位於 `%LOCALAPPDATA%\nbtcli\scan\<world-id>`，亦可使用 `--cache-root` 指定世界外的其他目錄）；翻譯與寫入工作流程則使用 state root 下的獨立快取。加上 `--refresh` 可強制重新剖析，加上 `--no-cache` 則不儲存快取。
 
-若要將世界內的文字連同精確來源位址匯出至外部檔案，請使用 `extract`（可搭配 `--unique` 將相同字串歸納檢視）：
+若要將解碼後的文字與精確來源位置匯出至世界資料夾外的既有目錄，請先建立父目錄後執行 `extract`：
 
-```powershell
+```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 .\nbtcli.exe extract 'D:\WorldCopy' --unique --output 'D:\Exports\world-text-unique.json'
 ```
 
-完成基本查閱與掃描後，請接著閱讀 **[安全編輯與中斷復原](../safe-editing/)**，了解如何安全預覽並套用世界修改。
+熟悉唯讀查閱與掃描後，請接著閱讀 **[安全編輯與中斷復原](../safe-editing/)**，了解如何先預覽變更計畫再安全寫入世界。

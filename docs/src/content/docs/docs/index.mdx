@@ -3,11 +3,27 @@ title: Documentation Overview
 description: Learn how NBTExplorerCLI inspects, translates, and safely edits Minecraft Java Edition worlds on Windows x64.
 ---
 
+import { Card, CardGrid } from '@astrojs/starlight/components';
 import SafetyBanner from '../../../components/SafetyBanner.astro';
 
-**NBTExplorerCLI** (`nbtcli.exe`, version `1.0.0`) is a self-contained Windows x64 command-line tool built for **Minecraft Java Edition** worlds. It enables players, adventure map creators, localization teams, and tool developers to inspect NBT data, scan and translate in-world text, generate resource packs, and apply verified offline edits.
+**NBTExplorerCLI** (`nbtcli.exe`, version `1.0.0`) is a self-contained Windows x64 command-line tool built for **Minecraft Java Edition** worlds (`1.12.2` through `1.21.11`, `DataVersion` `1343` to `4671`). It enables players, adventure map creators, localization teams, and tool developers to inspect NBT data, scan and translate in-world text, generate resource packs, and apply verified offline edits.
 
 <SafetyBanner tier="safe" lang="en" />
+
+## When to Use NBTExplorerCLI
+
+<CardGrid>
+  <Card title="Built For">
+    - **Adventure Map Localization Teams**: Scanning thousands of signs, books, items, command blocks, and datapack entries into structured pages and glossaries.
+    - **Technical Creators & Server Admins**: Inspecting or batch-modifying `level.dat`, `.mca` region chunks, entities, and datapacks offline with SHA-256 precondition checks and pre-write backups.
+    - **Automation Scripts & AI Agents**: Driving world inspection and translation via deterministic single-line JSON responses and machine-readable exit codes (`0` through `8` and `130`).
+  </Card>
+  <Card title="Not Designed For">
+    - **Live In-Game Editing**: World-modifying commands require Minecraft and other editors to be closed (`--world-offline`) so region files and metadata are never corrupted by concurrent writes.
+    - **3D Viewport Terrain Rendering**: NBTExplorerCLI is a deterministic command-line engine rather than a 3D visual block editor.
+    - **Minecraft Bedrock Edition Saves**: The storage and NBT codecs target **Minecraft Java Edition** saves only.
+  </Card>
+</CardGrid>
 
 ## Understanding Operation Safety Levels
 
@@ -21,28 +37,48 @@ Every guide and command in this documentation displays one of three plain-langua
 
 ## Six Core Workflows
 
-Use the following guides in order to learn the complete workflow from first inspection to crash-safe editing and map localization:
+Follow these guides in order to master the complete workflow from first read-only inspection to crash-safe offline editing and map localization:
 
-1. **[Install and Inspect](./getting-started/)**
-   Verify the release ZIP SHA-256 checksum, extract the self-contained package, run `--version` and `--help`, and execute your first read-only `get`, `list`, `search`, and `scan` commands on a world copy.
-2. **[Safe Editing and Recovery](./safe-editing/)**
-   Select exact NBT nodes with JSON Pointers or typed segments, preview changes with `set`, `batch`, or `plan`, apply plans offline with `apply --world-offline`, and recover or roll back interrupted writes using `status` and `recover`.
-3. **[Translation Workflow](./translation-workflow/)**
-   Create paginated translation sessions (`translate start`), export pages (`export`), submit validated replies (`submit` / `advance`), manage notes and glossaries, and complete world translation with `plan`, `apply`, and `seal`.
-4. **[Resource Packs and References](./resources-and-packs/)**
-   Understand the difference between direct in-world text replacement (`--direct`), translation key conversion (`--keys` and `convert`), standalone language/resource pack exports (`export-lang`, `create-pack`), and reference synchronization (`--synchronize-references`).
-5. **[Backups and State Files](./backups-and-state/)**
-   Create and verify content-addressed world backups (`backup` and `restore`), and understand how external scan caches, sessions, object stores, and recovery journals are organized outside your world directory.
-6. **[Support Scope and Troubleshooting](./support-and-troubleshooting/)**
-   Check supported Minecraft Java Edition `DataVersion` profiles, inspect exit codes (`0` through `8` and `130`), understand parser verification versus live in-game verification boundaries, and resolve common errors.
+<CardGrid>
+  <Card title="1. Install and Inspect">
+    Verify the release ZIP SHA-256 checksum, inspect `candidate.json`, extract the self-contained package, and run your first read-only `get`, `list`, `search`, and `scan` commands on a world copy.
 
-Need to look up a specific command or option quickly? Go straight to the **[Command Reference](./command-reference/)**.
+    [Read Install and Inspect ->](./getting-started/)
+  </Card>
+  <Card title="2. Safe Editing and Recovery">
+    Select exact NBT nodes with JSON Pointers or typed segments, preview changes with `set`, `batch`, or `plan`, apply plans offline with `apply --world-offline`, and recover or roll back interrupted writes.
+
+    [Read Safe Editing and Recovery ->](./safe-editing/)
+  </Card>
+  <Card title="3. Translation Workflow">
+    Create paginated translation sessions (`translate start`), export pages (`export`), submit validated replies (`submit` / `advance`), manage notes and glossaries, and complete world translation with `plan`, `apply`, and `seal`.
+
+    [Read Translation Workflow ->](./translation-workflow/)
+  </Card>
+  <Card title="4. Resource Packs and References">
+    Compare direct in-world text replacement (`--direct`), translation key conversion (`--keys` and `convert`), standalone language/resource pack exports (`export-lang`, `create-pack`), and reference synchronization.
+
+    [Read Resource Packs and References ->](./resources-and-packs/)
+  </Card>
+  <Card title="5. Backups and State Files">
+    Create and verify content-addressed world backups (`backup` and `restore`), and inspect the external file tree (`cache/`, `sessions/`, `objects/`, `journals/`, `backups/`) stored outside your world directory.
+
+    [Read Backups and State Files ->](./backups-and-state/)
+  </Card>
+  <Card title="6. Support Scope and Troubleshooting">
+    Check supported Minecraft Java Edition `DataVersion` profiles, inspect exit codes (`0` through `8` and `130`), understand parser verification versus live in-game verification boundaries, and resolve common errors.
+
+    [Read Support Scope and Troubleshooting ->](./support-and-troubleshooting/)
+  </Card>
+</CardGrid>
+
+Need to look up a specific command, flag, or input JSON format quickly? Go straight to the **[Command Reference](./command-reference/)**. For automation, see the **[`llms.txt`](../llms.txt)** reference index.
 
 ## One Predictable JSON Response Format
 
 Every invocation of `nbtcli.exe` writes exactly one newline-delimited UTF-8 JSON object to standard output (`stdout`):
 
-```json
+```json title="stdout (nbtcli.cli)"
 {
   "schemaFamily": "nbtcli.cli",
   "schemaVersion": 1,

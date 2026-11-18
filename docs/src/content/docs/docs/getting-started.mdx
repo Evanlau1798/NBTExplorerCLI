@@ -3,84 +3,98 @@ title: Install and Inspect
 description: Verify the Windows x64 release archive, check CLI health, and run read-only NBT queries and world scans on a world copy.
 ---
 
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import SafetyBanner from '../../../components/SafetyBanner.astro';
 
 <SafetyBanner tier="safe" lang="en" />
 
-This guide walks you through downloading **NBTExplorerCLI**, verifying the archive checksum, extracting the self-contained runtime, and running your first read-only inspection commands (`get`, `list`, `search`, `scan`, and `extract`) on a copy of a Minecraft Java Edition world.
+This guide walks you through downloading **NBTExplorerCLI**, verifying the archive checksum and provenance manifest, extracting the self-contained runtime, and running your first read-only inspection commands (`get`, `list`, `search`, `scan`, and `extract`) on a copy of a Minecraft Java Edition world.
 
-## 1. Download and Verify the Windows x64 Package
+## Setup and Verification Walkthrough
 
-You can obtain the Windows x64 archive (`nbtcli-win-x64.zip`) from two official sources:
+<Steps>
 
-- **[GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**: Official tagged releases (`v1.0.0`) that have passed the release publication workflow.
-- **[GitHub Actions Candidates](https://github.com/Evanlau1798/NBTExplorerCLI/actions)**: Automated build artifacts (`nbtcli-windows-x64`) produced and smoke-tested in an SDK-free Windows Server Core container for a specific commit before a release tag is published.
+1. **Download and Verify the Windows x64 Archive**
 
-Before extracting, verify that the ZIP file's SHA-256 hash matches the value in the accompanying `SHA256SUMS.txt` file:
+   Obtain `nbtcli-win-x64.zip` and `SHA256SUMS.txt` from one of the two official channels:
 
-```powershell
-Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256
-Get-Content .\SHA256SUMS.txt
-```
+   - **[GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**: Official tagged releases (`v1.0.0`) published through the release pipeline.
+   - **[GitHub Actions Candidates](https://github.com/Evanlau1798/NBTExplorerCLI/actions)**: Automated build artifacts (`nbtcli-windows-x64`) verified in an SDK-free Windows Server Core container for a specific commit.
 
-Extract the entire archive into a new, dedicated directory. The package is **self-contained** and bundles the pinned .NET runtime (`10.0.15`) and required libraries (`ICSharpCode.SharpZipLib.dll`). Always keep `nbtcli.exe` in the same folder as its accompanying `.dll` and `.json` files:
+   Before extracting, confirm that the ZIP file's SHA-256 digest matches `SHA256SUMS.txt`:
 
-```powershell
-Expand-Archive -Path .\nbtcli-win-x64.zip -DestinationPath .\nbtcli
-Set-Location .\nbtcli
-```
+   ```powershell title="PowerShell"
+   $zipHash = (Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+   $expected = (Get-Content .\SHA256SUMS.txt | Select-Object -First 1).Split(' ')[0].Trim().ToLowerInvariant()
+   if ($zipHash -ne $expected) { throw "SHA-256 mismatch!" } else { "Verified OK: $zipHash" }
+   ```
 
-> [!TIP]
-> Each release package also includes `candidate.json`, which records the exact build version (`1.0.0`), Git commit revision, pinned SDK (`10.0.404`), dependency versions, and the individual SHA-256 digest of every bundled file.
+2. **Extract the Self-Contained Runtime**
 
-## 2. Check Version and Command Help
+   Extract the entire archive into a dedicated folder. The package bundles the pinned .NET runtime (`10.0.15`) and required libraries (`ICSharpCode.SharpZipLib.dll`). Always keep `nbtcli.exe` in the same folder as its accompanying `.dll` and `.json` files:
 
-Run `--version` and `--help` to confirm the binary launches cleanly:
+   ```powershell title="PowerShell"
+   Expand-Archive -Path .\nbtcli-win-x64.zip -DestinationPath .\nbtcli
+   Set-Location .\nbtcli
+   ```
 
-```powershell
-.\nbtcli.exe --version
-.\nbtcli.exe --help
-```
+   > [!TIP]
+   > Each release package includes `candidate.json`, which records the exact build version (`1.0.0`), Git commit revision, pinned SDK (`10.0.404`), dependency versions, and the SHA-256 digest of every bundled file.
 
-Example JSON response from `--version`:
+3. **Check Binary Version and Command Help**
 
-```json
-{
-  "schemaFamily": "nbtcli.cli",
-  "schemaVersion": 1,
-  "success": true,
-  "command": "version",
-  "outcome": "Success",
-  "data": {
-    "product": "nbtcli",
-    "version": "1.0.0"
-  },
-  "error": null
-}
-```
+   Run `--version` and `--help` to confirm the binary launches cleanly:
 
-To inspect the accepted options for any specific command or subcommand, run `help <command>`:
+   ```powershell title="PowerShell"
+   .\nbtcli.exe --version
+   .\nbtcli.exe --help
+   ```
 
-```powershell
-.\nbtcli.exe help get --ui-locale en-US
-.\nbtcli.exe help translate --ui-locale en-US
-```
+   ```json title="stdout (nbtcli --version)"
+   {
+     "schemaFamily": "nbtcli.cli",
+     "schemaVersion": 1,
+     "success": true,
+     "command": "version",
+     "outcome": "Success",
+     "data": {
+       "product": "nbtcli",
+       "version": "1.0.0"
+     },
+     "error": null
+   }
+   ```
 
-## 3. Prepare a World Copy
+   To inspect accepted options for any root command, run `help <command>` (for subcommands such as `translate start`, pass `--help` at the end):
 
-Even though inspection commands never modify world files, it is best practice to make a dedicated copy of your Minecraft world (for example, `D:\WorldCopy`) before testing queries, scans, or edits. Make sure Minecraft is closed while copying the save folder so all region and level files are flushed to disk.
+   ```powershell title="PowerShell"
+   .\nbtcli.exe help get --ui-locale en-US
+   .\nbtcli.exe help translate --ui-locale en-US
+   .\nbtcli.exe translate start --help --ui-locale en-US
+   ```
 
-## 4. Inspect a Single Value with `get`
+4. **Prepare a Disposable World Copy**
 
-Use `get` to read a specific NBT tag, region chunk, or datapack JSON property.
+   Even though inspection commands never modify world files, always make a dedicated copy of your Minecraft world (for example, `D:\WorldCopy`) before testing queries, scans, or edits. Make sure Minecraft is closed while copying the save folder so all region and level files are flushed to disk.
 
-### Read `DataVersion` from `level.dat`
+</Steps>
 
-```powershell
+---
+
+## Inspecting Single Values with `get`
+
+Use `get` to read a specific NBT tag, region chunk, datapack JSON property, or ZIP entry.
+
+<Tabs syncKey="get-mode">
+  <TabItem label="Display JSON (Default)">
+
+By default, `get` returns concise, human-readable `display-json`:
+
+```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 ```
 
-```json
+```json title="stdout (display-json)"
 {
   "schemaFamily": "nbtcli.cli",
   "schemaVersion": 1,
@@ -89,54 +103,108 @@ Use `get` to read a specific NBT tag, region chunk, or datapack JSON property.
   "outcome": "Success",
   "data": {
     "representation": "display-json",
-    "pointer": "/Data/DataVersion",
+    "tagType": "Int",
     "value": 3953
   },
   "error": null
 }
 ```
 
-### Display JSON vs. Reversible Typed NBT (`--types`)
+  </TabItem>
+  <TabItem label="Reversible Typed NBT (--types)">
 
-By default, `get` returns human-friendly `display-json`. If you plan to use the output as input to `set` or `batch` later, add `--types` to obtain a reversible `nbtcli.typed-nbt` envelope that preserves exact NBT tag types (such as `Byte`, `Short`, `Int`, `Long`, `Float` bits, and typed arrays) along with the exact source address:
+If you plan to feed the result into `set` or `batch` later, add `--types` to obtain a reversible `nbtcli.typed-nbt` envelope inside `data.value` that preserves exact NBT tag types (`byte`, `short`, `int`, `long`, `float` raw bits, and typed arrays):
 
-```powershell
+```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
 ```
 
-### Other Ways to Select Targets with `get`
+```json title="stdout (typed-nbt)"
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "get",
+  "outcome": "Success",
+  "data": {
+    "representation": "typed-nbt",
+    "tagType": "String",
+    "value": {
+      "schemaFamily": "nbtcli.typed-nbt",
+      "schemaVersion": 1,
+      "data": {
+        "name": "",
+        "root": {
+          "tag": "string",
+          "value": "Original Map Name"
+        }
+      }
+    }
+  },
+  "error": null
+}
+```
 
-```powershell
-# Inspect a datapack JSON property inside the world
-.\nbtcli.exe get 'D:\WorldCopy' --path 'datapacks/custom/data/quest/advancement/root.json' --pointer /display/title
+  </TabItem>
+</Tabs>
 
-# Inspect a specific chunk inside a region file
+### Querying Different World Targets
+
+<Tabs syncKey="target-kind">
+  <TabItem label="level.dat">
+
+```powershell title="PowerShell"
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName
+```
+
+  </TabItem>
+  <TabItem label="Region Chunk (.mca)">
+
+```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' --path 'region/r.0.0.mca' --chunk 0,0 --dimension minecraft:overworld --pointer /Status
+```
 
-# Inspect an entry inside a ZIP resource pack or datapack
+  </TabItem>
+  <TabItem label="Datapack JSON">
+
+```powershell title="PowerShell"
+.\nbtcli.exe get 'D:\WorldCopy' --path 'datapacks/custom/data/quest/advancement/root.json' --pointer /display/title
+```
+
+  </TabItem>
+  <TabItem label="ZIP Archive Entry">
+
+```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy\resources.zip' --entry 'assets/custom/lang/en_us.json' --pointer /item.custom.sword
 ```
 
-## 5. Explore World Structure with `list` and `search`
+  </TabItem>
+</Tabs>
+
+---
+
+## Exploring Structure with `list` and `search`
 
 Run `list` on a world directory to discover its declared dimensions, terrain region counts, and entity region counts:
 
-```powershell
+```powershell title="PowerShell"
 .\nbtcli.exe list 'D:\WorldCopy'
 ```
 
-Run `list` on an `.mca` region file without `--chunk` to list all populated chunk coordinates, or run `search` to find nodes by text value (`--query`), tag name (`--name`), or NBT tag type (`--type`):
+Run `list` on an `.mca` region file without `--chunk` to list populated chunk coordinates, or run `search` to find nodes by text value (`--query`), tag name (`--name`), or NBT tag type (`--type`):
 
-```powershell
+```powershell title="PowerShell"
 .\nbtcli.exe list 'D:\WorldCopy' --path 'region/r.0.0.mca' --limit 20
 .\nbtcli.exe search 'D:\WorldCopy' --path level.dat --name Spawn --limit 10
 ```
 
-## 6. Scan and Extract World Text with `scan` and `extract`
+---
 
-Use `scan` to index translatable and inspectable text across signs, hanging signs, books, items, entities, containers, command blocks, functions, scoreboards, bossbars, advancements, and language files:
+## Scanning and Extracting World Text (`scan` & `extract`)
 
-```powershell
+Use `scan` to index translatable and inspectable text across all 21 supported Minecraft text roles (signs, hanging signs, books, items, entities, containers, command blocks, functions, scoreboards, bossbars, advancements, and language files):
+
+```powershell title="PowerShell"
 # Quick summary of text sources across the world
 .\nbtcli.exe scan 'D:\WorldCopy' --summary
 
@@ -145,11 +213,11 @@ Use `scan` to index translatable and inspectable text across signs, hanging sign
 ```
 
 > [!NOTE]
-> `scan` stores a fast, rebuildable cache outside your world folder (under `%LOCALAPPDATA%\nbtcli\scan\<world-id>` by default, or in a custom `--cache-root` outside the world). Pass `--refresh` to force re-parsing, or `--no-cache` to run without saving a persistent cache.
+> Standalone `scan`, `extract`, and regular `validate` store their rebuildable cache outside your world folder under `%LOCALAPPDATA%\nbtcli\scan\<world-id>` by default (or a custom external `--cache-root`); translation and writing workflows use a separate cache under the state root. Pass `--refresh` to force re-parsing, or `--no-cache` to run without saving a persistent cache.
 
-To export decoded text entries along with their exact source locations to a file outside the world, use `extract`:
+To export decoded text entries along with their exact source locations to an existing external folder, create the parent directory if needed and run `extract`:
 
-```powershell
+```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 .\nbtcli.exe extract 'D:\WorldCopy' --unique --output 'D:\Exports\world-text-unique.json'
 ```

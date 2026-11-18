@@ -1,58 +1,193 @@
 ---
 title: CLI 命令完整參考
-description: NBTExplorerCLI 所有根命令、子命令、接受旗標、輸入 JSON 結構與操作安全分級完整參考表。
+description: NBTExplorerCLI 所有命令、子命令、支援旗標、輸入 JSON Schema 範本與操作安全等級的完整參考手冊。
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
 import CommandReferenceList from '../../../../components/CommandReferenceList.astro';
 
-本頁完整列出 **NBTExplorerCLI**（`nbtcli.exe`）註冊的所有命令與子命令，內容與自動化測試驗證的機器命令表（`nbtcli.command-surface` 版本 `1`）完全同步。
+本頁完整列出 **NBTExplorerCLI**（`nbtcli.exe`）所有已註冊的命令與子命令，並與驗證套件鎖定的命令介面契約（`nbtcli.command-surface`，版本 `1`）保持完全一致。
 
-## 全域協定與旗標規則
+## 全域 CLI 規則
 
-- **單行 JSON 標準輸出**：所有指令皆會在標準輸出（`stdout`）回傳單一 UTF-8 JSON 信封物件（`schemaFamily: "nbtcli.cli"`，`schemaVersion: 1`）。
-- **介面顯示語言（`--ui-locale`）**：可於指令前後加上 `--ui-locale zh-TW`（預設）或 `--ui-locale en-US`，僅改變說明與錯誤訊息文字，不影響地圖翻譯與資源包的語言設定（`--source-language`、`--target-language`、`--lang`、`--original-lang`、`--target-lang`）。
-- **參數語法**：帶值參數支援 `--option value` 或 `--option=value` 兩種寫法；布林旗標不帶值。若檔案路徑以連字號開頭，可使用 `--` 結束旗標解析。
-- **支援的簡寫別名（Aliases）**：
-  - 根命令 `--help` 與 `-h` 等同於 `help`。
-  - 根命令 `--version` 與 `-v` 等同於 `version`。
-  - 所有命令皆支援以 `-h` 查詢該命令的 `--help` 說明。
+若要查詢個別子命令（例如 `translate start` 或 `agent setup`）的說明，請將 `--help` 接在子命令之後，例如 `nbtcli translate start --help`（執行 `nbtcli help translate start` 會回傳結束代碼 `2`）。
 
-## 結構化檔案與標準輸入（`-`）格式對照
-
-當指令透過檔案路徑或標準輸入（`-`）讀取 JSON 時，皆會先驗證對應的 `schemaFamily` 與 `schemaVersion`：
-
-| 輸入 JSON Schema Family | 使用該格式的指令與參數 |
-| --- | --- |
-| `nbtcli.typed-nbt` | `set --value <json>` 或 `set --value-file <檔案\|->` |
-| `nbtcli.operations` | `batch <檔案\|-> --world <世界目錄>` 或 `plan <世界目錄> --request <檔案\|->` |
-| `nbtcli.patch-plan` | `apply <世界目錄> --plan <檔案\|->` |
-| `nbtcli.session-reply` | `translate submit --reply <檔案\|->` 或 `translate advance --reply <檔案\|->` |
-| `nbtcli.session-command` | `translate jump`、`note`、`glossary` 或 `reset` 搭配 `--request <檔案\|->` |
-| `nbtcli.agent-questionnaire` | `agent submit <世界目錄> --request <檔案\|->` |
+- **單一 JSON 輸出格式**：每個命令皆只會向標準輸出（`stdout`）寫入單行 UTF-8 JSON 封套（`schemaFamily: "nbtcli.cli"`，`schemaVersion: 1`）。
+- **全域介面訊息語言（`--ui-locale`）**：可在任何命令前後加上 `--ui-locale zh-TW`（預設）或 `--ui-locale en-US`，切換錯誤訊息與說明文字的語言；此選項不會影響翻譯來源與目標語言參數（`--source-language`、`--target-language`、`--lang`、`--original-lang`、`--target-lang`）。
+- **選項語法規則**：帶值選項支援 `--option value` 或 `--option=value` 兩種寫法；布林旗標不帶值。若目標路徑本身以連字號（`-`）開頭，請先加上 `--` 結束選項剖析。
+- **根命令與說明別名**：
+  - 根層級的 `--help` 與 `-h` 等同於執行 `help`。
+  - 根層級的 `--version` 與 `-v` 等同於執行 `version`。
+  - 任何命令皆可使用 `-h` 作為 `--help` 的簡寫。
 
 ---
 
-## 查閱與搜尋命令（Inspection & Query）
+## 檔案與標準輸入（`-`）JSON Schema 對照表
 
-用於檢查版本、查詢參數說明、讀取 NBT 節點、檢視區塊與搜尋資料包 JSON 的唯讀命令。
+凡是會從檔案或標準輸入（`-`）讀取結構化 JSON 的命令，執行前皆會嚴格驗證 `schemaFamily` 與 `schemaVersion`：
+
+| 輸入 Schema Family | 接收此格式的命令與參數 |
+| --- | --- |
+| `nbtcli.typed-nbt` | `set --value <json>` 或 `set --value-file <檔案\|->` |
+| `nbtcli.operations` | `batch <檔案\|-> --world <目錄>` 或 `plan <目錄> --request <檔案\|->` |
+| `nbtcli.patch-plan` | `apply <目錄> --plan <檔案\|->` |
+| `nbtcli.session-reply` | `translate submit --reply <檔案\|->` 或 `translate advance --reply <檔案\|->` |
+| `nbtcli.session-command` | `translate jump`、`note`、`glossary` 或 `reset`（透過 `--request <檔案\|->`） |
+| `nbtcli.agent-questionnaire` | `agent submit <目錄> --request <檔案\|->` |
+
+### 可直接複製的 JSON Schema 輸入範本
+
+<Tabs syncKey="input-schema">
+  <TabItem label="nbtcli.typed-nbt">
+
+供 `set --value` 或 `set --value-file` 使用。小技巧：請先執行 `nbtcli get <世界> --path <相對路徑> --pointer <指標> --types`，取出 `data.value` 後僅修改 `data.root.value`。
+
+```json title="value-typed-nbt.json"
+{
+  "schemaFamily": "nbtcli.typed-nbt",
+  "schemaVersion": 1,
+  "data": {
+    "name": "",
+    "root": {
+      "tag": "string",
+      "value": "Updated Map Title"
+    }
+  }
+}
+```
+
+  </TabItem>
+  <TabItem label="nbtcli.operations">
+
+供 `nbtcli plan <世界> --request <檔案|->` 與 `nbtcli batch <檔案|-> --world <世界>` 使用。單一請求可包含 1 至 100,000 筆具有唯一 `id` 的操作。
+
+可用[安全編輯指南](../safe-editing/)的字串編輯預覽產生請求。批次使用時，請保留同一世界的來源位址，並為每筆操作指定不同的 ID。
+
+```powershell title="Build an operation set from a preview"
+$preview = Get-Content -Raw 'D:\Plans\level-name-plan.json' | ConvertFrom-Json
+@{
+  schemaFamily = 'nbtcli.operations'
+  schemaVersion = 1
+  data = @{ operations = @($preview.data.operations) }
+} | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 'D:\Plans\ops.json'
+```
+
+  </TabItem>
+  <TabItem label="nbtcli.session-reply">
+
+供 `translate submit --reply` 與 `translate advance --reply` 使用。請務必從 `translate export` 產出的 `data.replyTemplate` 開始修改，確保 `operationId`、`snapshotId`、`pageId`、`slotId` 與 `sourceTextHash` 與目前分頁一致。
+
+```json title="reply-page-0.json"
+{
+  "schemaFamily": "nbtcli.session-reply",
+  "schemaVersion": 1,
+  "data": {
+    "operationId": "3b9910e1-52f8-4f63-91aa-887766554433",
+    "sessionId": "6f9619ff-8b86-d011-b42d-00cf4fc964ff",
+    "revision": 0,
+    "snapshotId": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "page": 0,
+    "pageId": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "targetLocale": "zh_tw",
+    "slots": [
+      {
+        "slotId": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+        "sourceTextHash": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+        "state": "translated",
+        "text": "歡迎來到冒險大廳"
+      }
+    ]
+  }
+}
+```
+
+  </TabItem>
+  <TabItem label="nbtcli.session-command">
+
+供 `translate jump`、`translate note`、`translate glossary` 與 `translate reset` 透過 `--request <檔案|->` 傳入。
+
+```json title="session-command.json"
+{
+  "schemaFamily": "nbtcli.session-command",
+  "schemaVersion": 1,
+  "data": {
+    "operationId": "550e8400-e29b-41d4-a716-446655440000",
+    "sessionId": "6f9619ff-8b86-d011-b42d-00cf4fc964ff",
+    "revision": 1,
+    "kind": "glossary",
+    "page": null,
+    "slotId": null,
+    "text": "聖殿騎士",
+    "source": "Templar Knight",
+    "origin": "translator",
+    "confirmed": false,
+    "resetSlots": []
+  }
+}
+```
+
+  </TabItem>
+  <TabItem label="nbtcli.agent-questionnaire">
+
+由 `nbtcli agent setup <世界> --output <檔案>` 匯出，填寫完成後透過 `nbtcli agent submit <世界> --request <檔案|->` 提交。
+
+請為實際使用的世界產生問卷。填寫 `configuration.agentName` 並核對來源與目標語言，保留世界 ID、revision 及 operation ID 後再提交。
+
+```powershell title="Export the questionnaire"
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+.\nbtcli.exe agent setup 'D:\WorldCopy' --source-language en_us --target-language zh_tw `
+  --output 'D:\Translate\agent-questionnaire.json'
+```
+
+  </TabItem>
+</Tabs>
+
+---
+
+## PowerShell 自動化腳本與結束代碼解析範本
+
+在 PowerShell 腳本或 CI 流程中呼叫 `nbtcli.exe` 時，可直接將單行輸出交由 `ConvertFrom-Json` 解析，並同時檢查 `$LASTEXITCODE` 與 `$response.success`：
+
+```powershell title="PowerShell"
+$raw = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion --ui-locale zh-TW
+$exitCode = $LASTEXITCODE
+$response = $raw | ConvertFrom-Json
+
+if ($exitCode -eq 7 -or $response.outcome -eq 'RecoveryRequired') {
+  Write-Error "偵測到未完成的寫入（planHash: $($response.data.planHash)），請先執行 'nbtcli status' 與 'nbtcli recover'。"
+  exit 7
+}
+
+if ($exitCode -ne 0 -or -not $response.success) {
+  throw "nbtcli 執行失敗（結束代碼 $exitCode，錯誤碼 $($response.error.code)）：$($response.error.message)"
+}
+
+Write-Output "讀取到的 DataVersion：$($response.data.value)"
+```
+
+---
+
+## 唯讀查閱與搜尋命令（Inspection & Query）
+
+用於檢查版本、查詢命令說明、讀取 NBT 節點、探索 `.mca` 區塊檔與搜尋資料包 JSON 的唯讀指令。
 
 <CommandReferenceList lang="zh-tw" group="inspect" />
 
-## 世界文字掃描與驗證命令（Scanning & Validation）
+## 世界文字掃描與驗證命令（Scan & Validation）
 
-用於掃描世界文字、抽取字串、驗證檔案完整性與查詢支援版本的唯讀命令。
+用於索引世界內各類文字來源、抽取字串、驗證檔案完整性，以及查詢支援的 Minecraft 版本組合。
 
 <CommandReferenceList lang="zh-tw" group="scan" />
 
-## 安全編輯、備份與復原命令（Editing, Backup & Recovery）
+## 安全編輯、備份與中斷復原命令（Edit, Backup & Recovery）
 
-用於預覽修改計畫、離線套用變更、建立備份與從中斷狀態復原世界的命令。
+用於預覽變更計畫、在離線狀態下套用修改、建立與還原完整備份，以及處理中斷復原。
 
 <CommandReferenceList lang="zh-tw" group="edit" />
 
-## 地圖翻譯、轉換與外部助手設定命令（Translation & Agent）
+## 地圖翻譯、翻譯鍵轉換與輔助設定命令（Translate, Convert & Agent）
 
-用於單次翻譯鍵轉換、分頁式翻譯工作階段以及外部翻譯助手偏好設定的根命令。
+用於單次全文轉翻譯鍵、分頁式翻譯工作階段管理，以及設定外部翻譯工具偏好。
 
 <CommandReferenceList lang="zh-tw" group="translate" />
 
@@ -62,12 +197,12 @@ import CommandReferenceList from '../../../../components/CommandReferenceList.as
 
 ## `translate` 子命令完整參考
 
-除 `translate help` 外，所有 `translate` 子命令皆需指定目標 `<world>` 路徑，並支援 `--state-root`、`--output`、`--help` 與 `--ui-locale`。
+除 `translate help` 外，所有 `translate` 子命令皆需帶入目標 `<world>` 路徑，並支援 `--state-root`、`--output`、`--help` 與 `--ui-locale`。
 
 <CommandReferenceList lang="zh-tw" group="translate-sub" />
 
-如需個別子命令的說明，請在該子命令後加上 `--help`，例如 `nbtcli translate start --help`。
+## `agent` 子命令完整參考
 
-## `agent` 子命令參考
+除 `agent help` 外，所有 `agent` 子命令皆需帶入目標 `<world>` 路徑，並將偏好設定儲存在世界資料夾外的外部狀態目錄中。
 
 <CommandReferenceList lang="zh-tw" group="agent-sub" />
