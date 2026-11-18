@@ -17,12 +17,16 @@ internal static class WorldLanguageEdits
     }
     internal static PreparedArtifactBytes AddValues(byte[] current, IEnumerable<(string Key, string Text)> values, DecodeLimits limits)
     {
+        using var observation = WorkDiagnostics.Start("language.add");
         using var parsed = BoundedJson.ReadDecoded(current, limits);
         if (parsed.RootElement.ValueKind != JsonValueKind.Object) throw new EditRejectedException(EditFailure.Precondition, "Language output must be a JSON object");
         var expected = parsed.RootElement.EnumerateObject().ToDictionary(NativeJsonStrings.PropertyName, item => NativeJsonStrings.Read(item.Value), StringComparer.Ordinal);
         var additions = new List<byte[]>(); long retained = current.Length; var hasProperties = expected.Count != 0;
+        long comparisons = 0;
         foreach (var (name, text) in values)
         {
+            comparisons++;
+            observation?.SetTag("comparisons", comparisons);
             if (expected.TryGetValue(name, out var old))
             {
                 if (old != text) throw new EditRejectedException(EditFailure.Precondition, "Language key already has different content");
@@ -52,7 +56,9 @@ internal static class WorldLanguageEdits
             var values = actual.RootElement.EnumerateObject().ToDictionary(NativeJsonStrings.PropertyName, item => NativeJsonStrings.Read(item.Value), StringComparer.Ordinal);
             if (values.Count != expected.Count || expected.Any(item => !values.TryGetValue(item.Key, out var value) || value != item.Value)) throw new InvalidDataException("Language candidate differs from its declared values");
         }
-        using (var stream = new MemoryStream(output, writable: false)) Verify(stream);
+        using (WorkDiagnostics.Start("language.projection", phase: "projection"))
+            using (var stream = new MemoryStream(output, writable: false)) Verify(stream);
+        observation?.SetTag("bytes", output.LongLength);
         return new(output, Verify);
     }
 }

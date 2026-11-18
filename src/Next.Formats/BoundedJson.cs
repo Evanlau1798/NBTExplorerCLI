@@ -8,6 +8,7 @@ public static class BoundedJson
 {
     public static JsonDocument ReadDecoded(byte[] source, DecodeLimits? limits = null)
     {
+        using var observation = WorkDiagnostics.Start("json.parse");
         ArgumentNullException.ThrowIfNull(source);
         limits ??= DecodeLimits.Default; limits.Validate();
         void Check(long value, long maximum, long offset)
@@ -44,6 +45,8 @@ public static class BoundedJson
             if (type == JsonTokenType.StartObject) containers.Push(new(StringComparer.Ordinal));
             else if (type == JsonTokenType.StartArray) containers.Push(null);
         }
-        return JsonDocument.Parse(source.AsMemory(start), new JsonDocumentOptions { MaxDepth = 257 });
+        var result = JsonDocument.Parse(source.AsMemory(start), new JsonDocumentOptions { MaxDepth = 257 });
+        observation?.SetTag("bytes", source.LongLength);
+        return result;
     }
 }

@@ -1,5 +1,6 @@
 using Next.Application;
 using Next.Domain;
+using Next.Formats;
 
 namespace Next.Infrastructure;
 
@@ -31,11 +32,15 @@ public sealed class ArtifactStorage : IArtifactStorage
     {
         if (maximumBytes is < 1 or > MaximumBytes) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
         using var path = GuardedArtifactPath.Acquire(root, world, artifact);
+        using var observation = WorkDiagnostics.Start("storage.read", artifact.RelativePath, worldId: artifact.WorldId);
         using var stream = GuardedArtifactPath.OpenFile(path.Target, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-        return ReadStream(stream, maximumBytes);
+        var bytes = ReadStream(stream, maximumBytes);
+        observation?.SetTag("bytes", bytes.LongLength);
+        return bytes;
     }
     internal ArtifactImage ReadImage(ArtifactAddress artifact)
     {
+        using var observation = WorkDiagnostics.Start("storage.image", artifact.RelativePath, worldId: artifact.WorldId);
         try
         {
             using var path = GuardedArtifactPath.Acquire(root, world, artifact);
@@ -56,7 +61,7 @@ public sealed class ArtifactStorage : IArtifactStorage
         ArgumentNullException.ThrowIfNull(preimage);
         if (bytes.Length > MaximumBytes) throw new ArtifactSizeLimitException();
         var path = GuardedArtifactPath.Acquire(root, world, artifact, allowMissingParents: preimage.ExpectedAbsent);
-        try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io, delete, track); }
+        try { path.HoldWriter(writer); return new ArtifactCandidate(path, artifact, preimage, bytes, io, delete, track); }
         catch { path.Dispose(); throw; }
     }
     private static byte[] ReadStream(Stream stream, int maximumBytes)
@@ -77,6 +82,10 @@ public sealed class ArtifactStorage : IArtifactStorage
     internal static ArtifactImage Image(Stream stream)
     {
         if (stream.Length > MaximumBytes) throw new ArtifactSizeLimitException();
-        return ArtifactImage.Present(new Hash256(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))));
+        using var observation = WorkDiagnostics.Start("image.hash");
+        var before = stream.Position;
+        var image = ArtifactImage.Present(new Hash256(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))));
+        observation?.SetTag("bytes", stream.Position - before);
+        return image;
     }
 }

@@ -54,9 +54,15 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
             foreach (var output in plan.Outputs)
             {
                 var input = plan.Preconditions.Single(item => item.Artifact == output.Artifact);
-                var transformed = create(output, input);
+                PreparedArtifactBytes transformed;
+                using (WorkDiagnostics.Start("artifact.stage", output.Artifact.RelativePath, "staging", output.Artifact.WorldId)) transformed = create(output, input);
                 var candidate = storage.StageTracked(output.Artifact, input.Image, transformed.Bytes, output.Intent == OutputIntent.Delete);
-                candidates.Add(candidate); candidate.Flush(); candidate.Verify(transformed.Verify);
+                candidates.Add(candidate); candidate.Flush();
+                candidate.Verify(stream =>
+                {
+                    using var observation = WorkDiagnostics.Start("artifact.verify", output.Artifact.RelativePath, "readback", output.Artifact.WorldId);
+                    transformed.Verify(stream);
+                });
                 artifacts.Add(new(output.Artifact, candidate.Postimage.ExpectedAbsent ? null : candidate.CandidatePath, candidate.Postimage, output.RequiredChecks.Select(name => new ValidationCheck(name, true, name == "preimage" ? input.Image.Hash ?? plan.PlanHash : candidate.Postimage.Hash ?? plan.PlanHash))));
             }
             // Parsed projections remain valid only while every staged postimage still matches.

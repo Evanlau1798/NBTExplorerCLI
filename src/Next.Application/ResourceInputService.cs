@@ -104,10 +104,11 @@ public sealed class ResourceInputService(IWorldBackupStore objects)
         if (MinecraftProfiles.ForPackMetadata(new(PackSourceKind.ResourcePack, format.Major < 65 ? format.Major : null, format, format)) is null)
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Unknown resource generation pack format");
     }
-    internal static void ValidateFiles(Dictionary<string, byte[]> files, PackFormatVersion required)
+    internal static void ValidateFiles(Dictionary<string, byte[]> files, PackFormatVersion required, ResourceGeneration? output = null)
     {
         if (!files.TryGetValue("pack.mcmeta", out var metadata)) throw new InvalidDataException("Resource input is missing pack metadata");
-        var pack = PackMetadata.Read(metadata, PackSourceKind.ResourcePack, Limits);
+        PackMetadata pack;
+        using (ResourceRendering.ObserveMember(output, "pack.mcmeta", "resource.validate")) pack = PackMetadata.Read(metadata, PackSourceKind.ResourcePack, Limits);
         if (MinecraftProfiles.ForPackMetadata(pack) is null || !pack.DeclaresSupport(required)) throw new CodecException(CodecError.UnsupportedProfile, 0, "Resource input format does not support the requested output");
         foreach (var file in files)
         {
@@ -127,6 +128,7 @@ public sealed class ResourceInputService(IWorldBackupStore objects)
             if (!path.StartsWith("lang/", StringComparison.Ordinal)) continue;
             path = path[5..];
             if (path.Contains('/') || !path.EndsWith(".json", StringComparison.Ordinal)) continue;
+            using var observation = ResourceRendering.ObserveMember(output, file.Key, "resource.validate");
             using var json = BoundedJson.ReadDecoded(file.Value, Limits);
             if (json.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException("Resource language must be a string object");
             var keys = new HashSet<string>(StringComparer.Ordinal);

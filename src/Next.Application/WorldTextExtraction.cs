@@ -41,6 +41,7 @@ public sealed partial class WorldTextExtraction
     {
         foreach (var group in selected.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
         {
+            using var observation = WorkDiagnostics.Start("artifact.extract", group.Key, worldId: inventory.WorldId);
             var sources = group.ToArray();
             if (sources.All(source => source.Outcome != SourceOutcome.Success))
             { foreach (var source in sources) yield return Forward(source); continue; }

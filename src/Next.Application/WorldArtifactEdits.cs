@@ -82,12 +82,16 @@ internal static class WorldArtifactEdits
         return new(output, stream =>
         {
             var candidate = RegionFile.Read(Read(stream));
+            using var observation = WorkDiagnostics.Start("region.compare");
             for (var index = 0; index < 1024; index++)
+            {
+                observation?.SetTag("comparisons", (long)index + 1);
                 if (expected.TryGetValue(index, out var verified))
                 {
                     if (candidate.Chunks[index] != verified.Descriptor || Hash256.Compute(candidate.CompressedPayload(index)) != verified.Payload) throw new InvalidDataException("Region candidate differs from its verified chunk image");
                 }
                 else if (candidate.Chunks[index] != original.Chunks[index] || original.Chunks[index].Present && !candidate.CompressedPayload(index).SequenceEqual(original.CompressedPayload(index))) throw new InvalidDataException("Region changed an unselected chunk");
+            }
         });
     }
     internal static byte[] Read(Stream stream)

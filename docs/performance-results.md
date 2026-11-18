@@ -120,9 +120,10 @@ For 128 function files with 2,048 command slots, batching source validation redu
 Bind inventory reads from 2,822 to 902. Eight file/slot/translation-cardinality
 diagnostic cases preserve their complete canonical plans.
 
-Inventory diagnostics record enumeration, scope, read calls and returned payload
-bytes. These runs leave per-artifact staging parse, chunk-load, candidate-comparison
-and decoded read/write counts unobserved.
+Those earlier inventory diagnostics record enumeration, scope, read calls and
+returned payload bytes. They leave per-artifact staging parse, chunk-load,
+candidate-comparison and decoded read/write counts unobserved. The additional
+internal observations below use a separately identified candidate and interval.
 
 With a 4 MiB retained resource dependency and nine outputs, streamed image
 validation reduces cumulative managed allocation from 86,545,248 to 40,095,128
@@ -137,6 +138,137 @@ the 1.10 latency ratio in four groups. A separately frozen, same-root AB/BA chec
 retains those adverse samples and adds 56 executions for the four groups. Its
 candidate/control median ratios are 0.966, 0.986, 0.942 and 0.971. The variation
 limits attribution of the original timing difference to the implementation.
+
+## Internal preparation work
+
+Optional `nbtcli.next.work` activities separate discovery, binding, construction,
+in-memory projection and persisted verification. Observer-on/off calibration keeps
+canonical plan bytes, every candidate hash and source preimages equal. A typed-only
+three-chunk/two-target witness originally loads five chunks during Bind; validating
+fresh source descriptors directly reduces this to the two selected chunks, retaining
+typed/profile checks and final preimage checks. Literal/key/reference binding keeps
+its semantic extraction. This is a bounded removal of unrelated text work.
+
+Six frozen raw-codec region cases independently vary artifact size and target
+count. Each has one discovery index parse, one Bind index parse and one staging
+index parse. Bind and staging each load exactly the selected chunk count. Each
+candidate readback reparses the index and checks all 1,024 descriptors:
+
+| Input chunks | Selected chunks | Staging decoded NBT read bytes | Staging serialized NBT bytes | Persisted payload comparison bytes | Physical candidate bytes written |
+| --- | --- | --- | --- | --- | --- |
+| 64 | 1 | 36 | 36 | 4,572 | 274,432 |
+| 64 | 16 | 576 | 576 | 4,032 | 335,872 |
+| 64 | 64 | 2,304 | 2,304 | 2,304 | 532,480 |
+| 512 | 1 | 36 | 36 | 36,828 | 2,109,440 |
+| 512 | 16 | 576 | 576 | 36,288 | 2,170,880 |
+| 512 | 64 | 2,304 | 2,304 | 34,560 | 2,367,488 |
+
+Payload comparison reads both original and candidate unselected payloads; selected
+payloads compare against the verified image. This explains the different scaling
+of necessary readback and selected document decoding. All original sector bytes
+remain intact, and every selected `Counter` has its independently expected value.
+Physical candidate size still includes the retained region and appended sectors.
+These byte counts describe codec/port work, not device traffic or RSS.
+
+Eight function cases independently vary physical files (16/128), slots per file
+(1/16) and distinct translated values (1/16). The following counts hold separately
+for both translation cardinalities. Indexed Bind lookups and exact JSON target
+checks follow slot count, while full staging command parses follow file count:
+
+| Function files | Slots | Bind occurrence checks | Staging command parses | Staging JSON target checks | Projection / persisted command parses | Persisted candidate image checks |
+| --- | --- | --- | --- | --- | --- | --- |
+| 16 | 16 | 16 | 16 | 16 | 32 / 32 | 32 |
+| 16 | 256 | 256 | 16 | 256 | 32 / 32 | 32 |
+| 128 | 128 | 128 | 128 | 128 | 256 / 256 | 256 |
+| 128 | 2,048 | 2,048 | 128 | 2,048 | 256 / 256 | 256 |
+
+Nested JSON validation/span passes are recorded separately; a command-parse count
+is not a claim that every JSON fragment is parsed only once. Projection and
+persisted checks remain intact. These are complete observer-on diagnostics with a
+100,000-key aggregation cap, and do not enter observer-disabled timing denominators.
+
+For these fourteen cases, observer-disabled before/after capsules use identical
+runner code, input roots, query/plan semantics and candidate oracles. Each side has
+two warmup and five formal fresh-process samples, in serial AB/BA order. The
+interval is synchronous `Prepare`, including Bind, staging and persisted readback;
+query, the initial plan Build, process startup and the external oracle are outside
+it. OS file-cache state is uncontrolled. Formal median time ratios span
+0.9041–1.0418 and same-thread cumulative allocation ratios span 0.8207–1.0004,
+within the predeclared 1.10 thresholds. These compare the typed-Bind improvement
+and disabled observation together; they do not isolate a universal tracing cost,
+claim a full-workflow speedup or establish peak RSS.
+
+The labels below encode region chunks/targets or function files/slots-per-file/
+translation kinds. Times are the five formal samples' median / observed maximum,
+in milliseconds. Allocation ratios compare formal medians, not live memory:
+
+| Case | Before Prepare ms | After Prepare ms | Allocation ratio |
+| --- | --- | --- | --- |
+| region-64-1 | 70.335 / 72.530 | 69.910 / 71.687 | 0.8384 |
+| region-64-16 | 75.136 / 77.543 | 71.867 / 73.538 | 0.8431 |
+| region-64-64 | 79.103 / 84.876 | 77.365 / 80.143 | 0.9002 |
+| region-512-1 | 97.085 / 108.113 | 90.393 / 91.383 | 0.8207 |
+| region-512-16 | 96.178 / 101.401 | 88.505 / 93.473 | 0.8268 |
+| region-512-64 | 102.157 / 105.740 | 92.356 / 92.786 | 0.8381 |
+| function-16-1-1 | 218.567 / 225.826 | 215.375 / 222.310 | 1.0003 |
+| function-16-1-16 | 224.904 / 288.643 | 209.612 / 222.212 | 0.9968 |
+| function-16-16-1 | 321.188 / 336.190 | 326.062 / 360.366 | 1.0004 |
+| function-16-16-16 | 329.127 / 340.132 | 342.867 / 352.037 | 1.0000 |
+| function-128-1-1 | 1,273.373 / 1,277.672 | 1,260.603 / 1,276.263 | 1.0003 |
+| function-128-1-16 | 1,260.678 / 1,348.201 | 1,251.603 / 1,397.472 | 1.0003 |
+| function-128-16-1 | 1,774.732 / 11,239.317 | 1,689.411 / 1,866.690 | 0.9996 |
+| function-128-16-16 | 1,727.003 / 1,761.920 | 1,700.668 / 1,753.490 | 0.9994 |
+
+The 11,239.317 ms before sample is retained. No percentile or general speedup is
+inferred from these five-sample distributions.
+
+Eight resource diagnostics reuse the frozen language/ZIP/directory scenarios.
+An outer harness interval separates Build, Prepare and Apply while retaining each
+activity's own phase. The following rows cover Prepare only and the output world's
+GUID, excluding internal backup/journal namespace writes. All original/merge
+members, including metadata, and every generated value are checked; rollback
+restores the complete original file set. Each declared physical candidate has one
+write and two persisted image comparisons during Prepare:
+
+| Case | Physical outputs | Language-key checks | Candidate bytes written | Persisted image comparisons | Existing-output inventory payload bytes |
+| --- | --- | --- | --- | --- | --- |
+| lang-small | 1 | 1 | 26 | 2 | 0 |
+| lang-many | 64 | 64 | 1,664 | 128 | 0 |
+| zip-merge | 1 | 8 | 26,099 | 2 | 0 |
+| directory-base | 9 | 8 | 267 | 18 | 6,321 |
+| directory-outputs | 65 | 64 | 1,723 | 130 | 6,321 |
+| directory-retained | 9 | 8 | 267 | 18 | 49,329 |
+| directory-bytes | 9 | 8 | 267 | 18 | 12,583,089 |
+| directory-merge | 73 | 8 | 16,651 | 146 | 6,321 |
+
+Both merge cases load 16,443 frozen member bytes during rendering, counted
+separately from inventory traffic and serialized ZIP bytes. A zero inventory
+payload count still includes absence checks and says nothing about immutable
+object-store traffic or device I/O. This diagnostic retains the original inventory
+wrapper's array-based image fallback identically on both sides. Its allocation
+comparisons do not measure the native inventory's streamed-image allocation gains.
+
+Their observer-disabled paired samples use the same two-warmup/five-formal AB/BA
+policy, full output/member hashes and exact rollback. Only the Prepare phase enters
+this additional cost comparison. Its time median ratios span 0.9789–1.0412 and
+allocation median ratios span 1.0003–1.0304, within the frozen 1.10 limits:
+
+| Case | Before Prepare median / maximum ms | After Prepare median / maximum ms | Allocation ratio |
+| --- | --- | --- | --- |
+| lang-small | 62.574 / 66.779 | 63.343 / 64.845 | 1.0277 |
+| lang-many | 409.776 / 413.934 | 406.297 / 439.523 | 1.0078 |
+| zip-merge | 95.762 / 97.727 | 97.297 / 100.926 | 1.0170 |
+| directory-base | 125.866 / 146.412 | 131.043 / 134.153 | 1.0303 |
+| directory-outputs | 461.428 / 528.229 | 454.820 / 473.499 | 1.0016 |
+| directory-retained | 203.285 / 209.754 | 207.740 / 220.142 | 1.0003 |
+| directory-bytes | 222.517 / 286.991 | 217.812 / 223.451 | 1.0024 |
+| directory-merge | 519.907 / 577.568 | 519.508 / 529.172 | 1.0010 |
+
+A final trace-context fix tags validation of an existing output ZIP during Bind.
+These eight scenarios have no existing output ZIP, so that branch is outside this
+matrix; its observer-on/off candidate equality and physical identity have a separate
+focused verification. That functional witness establishes no formal latency result
+for existing-ZIP input.
 
 ## Capacity and recovery boundaries
 

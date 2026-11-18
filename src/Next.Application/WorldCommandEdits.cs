@@ -93,7 +93,9 @@ internal static class WorldCommandEdits
         var script = encoding.GetString(output.AsSpan(bom ? 3 : 0)); var root = source.Address; var syntax = root.Syntax;
         var address = new SourceAddress(root.Artifact, root.NodePath, root.SemanticRole, root.Dimension, root.Chunk,
             syntax: syntax is null ? null : new(syntax.GrammarProfile, syntax.GrammarVersion, bom ? 3 : 0, output.Length - (bom ? 3 : 0), Hash256.Compute(output).Hex, syntax.Encoding, SyntaxLocator.DetectNewline(script), syntax.NodePath));
-        Verify(source, new(address, script), translations, profile, limits, conversions); return output;
+        using (WorkDiagnostics.Start("command.projection", phase: "projection"))
+            Verify(source, new(address, script), translations, profile, limits, conversions);
+        return output;
     }
     private static (long Start, long Length, TypedPath? Path) SpanKey(SourceAddress address)
         => (address.Syntax!.StartByte, address.Syntax.LengthBytes, address.Syntax.NodePath);

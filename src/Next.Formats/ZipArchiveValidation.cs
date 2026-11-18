@@ -21,6 +21,7 @@ public static partial class ZipArchiveValidation
 
     public static void Validate(byte[] source, DecodeLimits? limits = null)
     {
+        using var observation = WorkDiagnostics.Start("zip.validate");
         ArgumentNullException.ThrowIfNull(source); limits ??= DecodeLimits.Default; limits.Validate();
         if (source.LongLength > limits.MaxCompressedBytes) throw Limit(0);
         var members = CentralMembers(source, limits);
@@ -46,6 +47,7 @@ public static partial class ZipArchiveValidation
             }
             if (readTotal != entry.Length || (uint)crc.Value != entry.Crc32) throw Invalid();
         }
+        observation?.SetTag("bytes", total);
     }
 
     private static List<Member> CentralMembers(byte[] source, DecodeLimits limits)
@@ -110,6 +112,7 @@ public static partial class ZipArchiveValidation
     }
     private static void ValidateDeflate(byte[] source, Member member, Inflater inflater, byte[] buffer, Crc32 crc)
     {
+        using var observation = WorkDiagnostics.Start("zip.deflate.validate");
         inflater.Reset(); crc.Reset(); inflater.SetInput(source, member.DataOffset, member.CompressedBytes);
         long total = 0;
         while (!inflater.IsFinished)
@@ -121,6 +124,7 @@ public static partial class ZipArchiveValidation
             total += read; crc.Update(new ArraySegment<byte>(buffer, 0, read));
         }
         if (inflater.RemainingInput != 0 || total != member.DecodedBytes || (uint)crc.Value != member.Crc) throw Invalid();
+        observation?.SetTag("bytes", total);
     }
     private sealed record Member(string Name, int Method, int DataOffset, int CompressedBytes, long DecodedBytes, uint Crc);
     private static uint U32(byte[] source, int offset) => BinaryPrimitives.ReadUInt32LittleEndian(source.AsSpan(offset));

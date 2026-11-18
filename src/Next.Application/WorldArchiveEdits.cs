@@ -14,6 +14,8 @@ internal static class WorldArchiveEdits
             .Select(address => address.Artifact.ContainerEntry ?? throw new EditRejectedException(EditFailure.Precondition, "ZIP operation requires an exact entry")).Distinct(StringComparer.Ordinal);
         foreach (var name in targets)
         {
+            using var entryTrace = WorkDiagnostics.Start("zip.entry.read");
+            entryTrace?.SetTag("entry", name);
             var target = new ArtifactAddress(sources[0].Location.Artifact.WorldId, sources[0].Location.Artifact.RelativePath, ArtifactKind.Archive, name);
             var group = operations.Where(operation => operation.Targets.Any(address => address.Artifact == target)).ToArray();
             var source = sources.Single(item => item.Location.Artifact.ContainerEntry == name);
@@ -22,6 +24,7 @@ internal static class WorldArchiveEdits
             if (missing && source.Location.Role != WorldSourceRole.Language) throw new NotSupportedException("New ZIP entries require declared language dependencies");
             var original = entry is null ? "{}"u8.ToArray() : new byte[checked((int)entry.Length)];
             if (entry is not null) { using var stream = entry.Open(); stream.ReadExactly(original); }
+            entryTrace?.SetTag("bytes", entry is null ? 0L : original.LongLength);
             PreparedArtifactBytes transformed;
             if (source.Location.Role == WorldSourceRole.Function) transformed = WorldCommandEdits.Create(source.Location.Artifact, original, group.ToArray(), source, limits);
             else if (source.Location.Role == WorldSourceRole.Structure)
@@ -35,7 +38,8 @@ internal static class WorldArchiveEdits
             else throw new NotSupportedException("Unknown ZIP entry preparation profile");
             retainedBytes = checked(retainedBytes + transformed.Bytes.Length);
             if (retainedBytes > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "ZIP transformed entry buffers exceed aggregate budget");
-            using (var verify = new MemoryStream(transformed.Bytes, writable: false)) transformed.Verify(verify);
+            using (WorkDiagnostics.Start("zip.entry.projection", phase: "projection"))
+                using (var verify = new MemoryStream(transformed.Bytes, writable: false)) transformed.Verify(verify);
             if (missing) additions.Add((name, transformed.Bytes)); else replacements.Add((name, source.ContentHash!, transformed.Bytes));
         }
         var candidate = ZipArchiveValidation.ReplaceEntries(bytes, replacements, limits);

@@ -41,6 +41,7 @@ public static class WorldDiscovery
         {
             cancellationToken.ThrowIfCancellationRequested();
             activeMetadata = path;
+            using var observation = WorkDiagnostics.Start("metadata.discover", path, "discovery", inventory.WorldId);
             var bytes = inventory.Read(new(inventory.WorldId, path, ArtifactKind.Nbt)); metadataHashes[path] = Hash256.Compute(bytes);
             return CompressedNbt.ReadDocument(bytes, NbtCompression.GZip, limits).Document;
         }
@@ -104,6 +105,7 @@ public static class WorldDiscovery
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!request.Scope.ArtifactPaths.IsEmpty && !request.Scope.ArtifactPaths.Contains(entry.RelativePath, StringComparer.Ordinal)) continue;
+            using var observation = WorkDiagnostics.Start("artifact.discover", entry.RelativePath, "discovery", inventory.WorldId);
             WorldSourceLocation location;
             try { location = WorldLayoutLocator.Locate(inventory.WorldId, entry.RelativePath, metadata.Profile, metadata.DimensionDirectories, packs); }
             catch (Exception error) when (DiscoveryFailure.IsExpected(error))

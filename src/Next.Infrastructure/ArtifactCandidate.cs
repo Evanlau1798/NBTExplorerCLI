@@ -1,5 +1,6 @@
 using Next.Application;
 using Next.Domain;
+using Next.Formats;
 
 namespace Next.Infrastructure;
 
@@ -8,13 +9,16 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
     private readonly GuardedArtifactPath path;
     private readonly ArtifactFileIo io;
     private readonly ArtifactImage stagedImage;
+    private readonly ArtifactAddress artifact;
     private bool flushed, verified, committed, disposed, attempted;
     public string CandidatePath { get; }
     public ArtifactImage Preimage { get; }
     public ArtifactImage Postimage { get; }
     public CandidateCleanupProof? CleanupProof { get; }
-    public ArtifactCandidate(GuardedArtifactPath path, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, ArtifactFileIo io, bool delete = false, bool track = false)
+    public ArtifactCandidate(GuardedArtifactPath path, ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, ArtifactFileIo io, bool delete = false, bool track = false)
     {
+        this.artifact = artifact;
+        using var observation = WorkDiagnostics.Start("candidate.write", artifact.RelativePath, "staging", artifact.WorldId);
         this.path = path; this.io = io; Preimage = preimage; stagedImage = ArtifactImage.Present(Hash256.Compute(bytes.Span));
         Postimage = delete ? ArtifactImage.Absent : stagedImage;
         var current = path.HoldParents(create: false) ? ArtifactStorage.Image(path.Target) : ArtifactImage.Absent;
@@ -26,6 +30,7 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
             using var output = GuardedArtifactPath.OpenFile(CandidatePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
             created = true;
             io.Write(output, bytes);
+            observation?.SetTag("bytes", (long)bytes.Length);
             if (track) CleanupProof = new(CandidatePath, GuardedArtifactPath.FileIdentity(output), stagedImage.Hash!);
         }
         catch { if (created) File.Delete(CandidatePath); throw; }
@@ -38,15 +43,20 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
     }
     public void Verify(Action<Stream> verify)
     {
+        using var observation = WorkDiagnostics.Start("candidate.verify", artifact.RelativePath, "readback", artifact.WorldId);
         RequireActive(); ArgumentNullException.ThrowIfNull(verify); verified = false;
         if (!flushed) throw new InvalidOperationException("Candidate must be flushed before verification");
         using var input = GuardedArtifactPath.OpenFile(CandidatePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-        if (ArtifactStorage.Image(input) != stagedImage) throw new ArtifactConflictException("Candidate differs from staged image");
+        var actual = ArtifactStorage.Image(input);
+        observation?.SetTag("bytes", input.Length);
+        observation?.SetTag("comparisons", 1L);
+        if (actual != stagedImage) throw new ArtifactConflictException("Candidate differs from staged image");
         input.Position = 0; verify(input);
         verified = true;
     }
     public void Commit()
     {
+        using var observation = WorkDiagnostics.Start("candidate.commit", artifact.RelativePath, "commit", artifact.WorldId);
         RequireActive();
         if (!verified) throw new InvalidOperationException("Commit requires a verified candidate");
         if (ArtifactStorage.Image(CandidatePath) != stagedImage) throw new ArtifactConflictException("Candidate changed after verification");

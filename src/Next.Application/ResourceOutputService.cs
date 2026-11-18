@@ -31,6 +31,7 @@ public sealed class ResourceOutputService(IWorldInventory inventory, IArtifactSt
     {
         ArgumentNullException.ThrowIfNull(generation);
         if (generation.WorldId != inventory.WorldId) throw new ArgumentException("Resource recipe belongs to another output scope");
+        using var observation = WorkDiagnostics.Start("resource.bind", phase: "bind", worldId: generation.WorldId);
         using var scope = ResourceOutputPolicy.Guard(inventory, generation);
         var access = inventory.AccessBinding;
         if (access is null || access != storage.AccessBinding) throw new ArgumentException("Resource inventory and storage must bind the same physical root");
@@ -72,13 +73,17 @@ public sealed class ResourceOutputService(IWorldInventory inventory, IArtifactSt
             if (catalog.Entries.Any(entry => entry.RelativePath.Equals(artifact.RelativePath, StringComparison.OrdinalIgnoreCase) && entry.RelativePath != artifact.RelativePath))
                 throw new ArtifactConflictException("Resource output aliases an existing physical path");
             var bytes = Read(artifact); if (bytes is null) continue;
-            if (generation.Format == ResourceOutputFormat.ZipPack) { originalZip = bytes; existing = ResourceInputService.ZipFiles(bytes); }
+            if (generation.Format == ResourceOutputFormat.ZipPack)
+            {
+                using var sourceTrace = WorkDiagnostics.Start("resource.source", artifact.RelativePath, worldId: artifact.WorldId);
+                originalZip = bytes; existing = ResourceInputService.ZipFiles(bytes);
+            }
             else existing.Add(artifact.RelativePath[prefixLength..], bytes);
         }
         var merge = generation.Merge is null ? null : new ResourceInputService(objects).Load(generation);
         var rendered = ResourceRendering.Render(generation, existing, merge);
         var outputs = generation.Format == ResourceOutputFormat.ZipPack
-            ? new Dictionary<string, byte[]> { [generation.Destination] = ResourceRendering.Zip(originalZip, rendered) }
+            ? new Dictionary<string, byte[]> { [generation.Destination] = ResourceRendering.Zip(generation, originalZip, rendered) }
             : generation.Outputs.ToDictionary(artifact => artifact.RelativePath,
                 artifact => rendered[artifact.RelativePath[prefixLength..]], StringComparer.Ordinal);
         var snapshot = SourceIdentity.Snapshot(inventory.WorldId, inputs.Values.Where(input => !input.Image.ExpectedAbsent)

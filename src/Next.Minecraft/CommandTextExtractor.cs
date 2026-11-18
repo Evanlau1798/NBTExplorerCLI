@@ -1,4 +1,5 @@
 using Next.Domain;
+using Next.Formats;
 
 namespace Next.Minecraft;
 
@@ -7,6 +8,7 @@ public static class CommandTextExtractor
     public static CommandExtractionResult Extract(CommandCandidate source, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null, Action<SourceAddress>? componentRoot = null, Action<CommandSelectorReference>? selectorReference = null)
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(profile);
+        using var observation = WorkDiagnostics.Start("command.parse", source.Address.Artifact.RelativePath, worldId: source.Address.Artifact.WorldId);
         limits ??= DecodeLimits.Default; limits.Validate();
         var expected = MinecraftProfiles.ForDataVersion(profile.Id switch { "java-1.20.4" => 3700, "java-1.21" => 3953, "java-1.21.5" => 4325, "java-26.1-snapshot-6" => 4774, _ => 0 });
         if (expected is null || profile.Features[ProfileFacet.CommandGrammar] != expected.Features[ProfileFacet.CommandGrammar])

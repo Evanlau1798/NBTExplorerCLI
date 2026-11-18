@@ -12,9 +12,12 @@ public static class BinaryNbt
     }
     public static NbtReadResult ReadDocument(Stream input, BinaryNbtProfile profile = BinaryNbtProfile.JavaNamed, DecodeLimits? limits = null)
     {
+        using var observation = WorkDiagnostics.Start("nbt.read");
         ArgumentNullException.ThrowIfNull(input);
         if (!input.CanRead) throw new ArgumentException("Input must be readable", nameof(input));
-        return new BinaryNbtReader(input, Checked(profile, limits)).Read();
+        var result = new BinaryNbtReader(input, Checked(profile, limits)).Read();
+        observation?.SetTag("bytes", result.ConsumedBytes);
+        return result;
     }
     public static CodecMetrics Validate(byte[] input, BinaryNbtProfile profile = BinaryNbtProfile.JavaNamed, DecodeLimits? limits = null)
         => ReadDocument(input, profile, limits).Metrics;
@@ -25,21 +28,26 @@ public static class BinaryNbt
     }
     public static byte[] WriteDocument(NbtDocument document, DecodeLimits? limits = null, BinaryNbtProfile profile = BinaryNbtProfile.JavaNamed)
     {
+        using var observation = WorkDiagnostics.Start("nbt.write");
         ArgumentNullException.ThrowIfNull(document);
         var policy = Checked(profile, limits);
         var measured = new BinaryNbtWriter(null, policy).Write(document);
         using var output = new MemoryStream(checked((int)measured.Bytes));
-        _ = new BinaryNbtWriter(output, policy).Write(document);
+        var written = new BinaryNbtWriter(output, policy).Write(document);
+        observation?.SetTag("bytes", written.Bytes);
         return output.ToArray();
     }
     public static CodecMetrics WriteDocument(NbtDocument document, Stream output, DecodeLimits? limits = null, BinaryNbtProfile profile = BinaryNbtProfile.JavaNamed)
     {
+        using var observation = WorkDiagnostics.Start("nbt.write");
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(output);
         if (!output.CanWrite) throw new ArgumentException("Output must be writable", nameof(output));
         var policy = Checked(profile, limits);
         _ = new BinaryNbtWriter(null, policy).Write(document);
-        return new BinaryNbtWriter(output, policy).Write(document);
+        var written = new BinaryNbtWriter(output, policy).Write(document);
+        observation?.SetTag("bytes", written.Bytes);
+        return written;
     }
     private static DecodeLimits Checked(BinaryNbtProfile profile, DecodeLimits? limits)
     {

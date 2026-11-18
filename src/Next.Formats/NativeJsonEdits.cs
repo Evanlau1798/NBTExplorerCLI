@@ -9,6 +9,7 @@ public static class NativeJsonEdits
 {
     public static byte[] ReplaceStrings(byte[] source, IEnumerable<(TypedPath Path, string Expected, string Replacement)> changes, DecodeLimits? limits = null)
     {
+        using var observation = WorkDiagnostics.Start("json.rewrite");
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(changes);
         limits ??= DecodeLimits.Default; limits.Validate();
         if (source.Length > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "JSON source exceeds decode budget");
@@ -27,7 +28,8 @@ public static class NativeJsonEdits
             edits.Add((span, bytes));
         }
         if (length > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "JSON candidate exceeds decode budget");
-        if (edits.Count == 0) return snapshot;
+        observation?.SetTag("comparisons", (long)requested.Length);
+        if (edits.Count == 0) { observation?.SetTag("bytes", snapshot.LongLength); return snapshot; }
         var output = new byte[checked((int)length)]; var from = 0; var to = 0;
         foreach (var edit in edits.OrderBy(edit => edit.Span.StartByte))
         {
@@ -36,6 +38,7 @@ public static class NativeJsonEdits
         }
         snapshot.AsSpan(from).CopyTo(output.AsSpan(to));
         using var verified = BoundedJson.ReadDecoded(output, limits);
+        observation?.SetTag("bytes", output.LongLength);
         return output;
     }
     private static byte[] Encode(string text, long budget)

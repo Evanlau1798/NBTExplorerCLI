@@ -19,7 +19,7 @@ public static class QueryExportFile
         if (bytes.Length > ArtifactStorage.MaximumBytes) throw new ArtifactSizeLimitException();
         var artifact = new ArtifactAddress(Namespace, Path.GetFileName(full), ArtifactKind.Json);
         using var path = GuardedArtifactPath.Acquire(root, Namespace, artifact);
-        using var candidate = new ArtifactCandidate(path, ArtifactImage.Absent, bytes, new ArtifactFileIo());
+        using var candidate = new ArtifactCandidate(path, artifact, ArtifactImage.Absent, bytes, new ArtifactFileIo());
         candidate.Flush(); candidate.Verify(_ => { }); candidate.Commit();
     }
 }

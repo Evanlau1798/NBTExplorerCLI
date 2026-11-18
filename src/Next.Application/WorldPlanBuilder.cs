@@ -27,6 +27,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     internal BoundWorldPlan Bind(WorldQuerySnapshot snapshot, IEnumerable<PatchOperation> operations)
     {
         ArgumentNullException.ThrowIfNull(snapshot); ArgumentNullException.ThrowIfNull(operations);
+        using var bindingTrace = Next.Formats.WorkDiagnostics.Start("plan.bind", phase: "bind", worldId: inventory.WorldId);
         if (snapshot.Manifest.WorldId != inventory.WorldId) throw new ArgumentException("Snapshot belongs to another world", nameof(snapshot));
         var requested = operations.Take(100_001).ToArray();
         if (requested.Length > 100_000 || requested.Any(operation => operation is null)) throw new ArgumentException("Invalid or oversized operation set", nameof(operations));
@@ -67,17 +68,33 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         var literal = requested.OfType<LiteralPatch>().Select(operation => operation.Translation)
             .Concat(requested.OfType<KeyConversionPatch>().Select(operation => new LiteralTranslation(operation.Conversion.Slot, operation.Conversion.Reply)))
             .ToDictionary(translation => translation.Slot.Address); var found = new HashSet<SourceAddress>();
-        foreach (var row in extraction.ReadSources())
+        bool CheckSource(DiscoveredSource source)
         {
-            if (!sources.TryGetValue((row.Source.Location.Artifact, row.Source.Chunk), out var expected)) continue;
-            if (row.Source.Location != expected.Location || row.Source.ContentHash != expected.ContentHash || row.Source.PackMetadataHash != expected.PackMetadataHash) throw new ArtifactConflictException("Source interpretation changed after scanning");
-            foreach (var occurrence in row.Text?.Occurrences ?? [])
-                if (literal.TryGetValue(occurrence.Address, out var translation))
-                {
-                    var slot = translation.Slot;
-                    if (!found.Add(occurrence.Address) || slot.SourceText != occurrence.Text || slot.Context != occurrence.Context || slot.AllowedEmpty != occurrence.AllowedEmpty) throw new EditRejectedException(EditFailure.Precondition, "Literal operation differs from its actual source slot");
-                    ValidateLiteral(translation, snapshot.Manifest.SnapshotId.Digest);
-                }
+            if (!sources.TryGetValue((source.Location.Artifact, source.Chunk), out var expected)) return false;
+            using var sourceTrace = Next.Formats.WorkDiagnostics.Start("source.bind", source.Location.Artifact.RelativePath, worldId: source.Location.Artifact.WorldId);
+            if (source.Location != expected.Location || source.ContentHash != expected.ContentHash || source.PackMetadataHash != expected.PackMetadataHash) throw new ArtifactConflictException("Source interpretation changed after scanning");
+            sourceTrace?.SetTag("comparisons", 1L);
+            return true;
+        }
+        if (requested.All(operation => operation is TypedPatch))
+        {
+            foreach (var source in extraction.Discovery.Sources) _ = CheckSource(source);
+        }
+        else
+        {
+            foreach (var row in extraction.ReadSources())
+            {
+                if (!CheckSource(row.Source)) continue;
+                using var comparisonTrace = Next.Formats.WorkDiagnostics.Start("candidate.lookup", row.Source.Location.Artifact.RelativePath);
+                foreach (var occurrence in row.Text?.Occurrences ?? [])
+                    if (literal.TryGetValue(occurrence.Address, out var translation))
+                    {
+                        var slot = translation.Slot;
+                        if (!found.Add(occurrence.Address) || slot.SourceText != occurrence.Text || slot.Context != occurrence.Context || slot.AllowedEmpty != occurrence.AllowedEmpty) throw new EditRejectedException(EditFailure.Precondition, "Literal operation differs from its actual source slot");
+                        ValidateLiteral(translation, snapshot.Manifest.SnapshotId.Digest);
+                    }
+                comparisonTrace?.SetTag("comparisons", (long)(row.Text?.Occurrences.Length ?? 0));
+            }
         }
         if (found.Count != literal.Count) throw new EditRejectedException(EditFailure.Precondition, "Literal target is not an extracted text slot");
         foreach (var operation in requested.OfType<TypedPatch>())
@@ -85,6 +102,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         foreach (var artifactGroup in requested.OfType<TypedPatch>().GroupBy(operation => operation.Address.Artifact))
         {
             var artifact = artifactGroup.Key;
+            using var artifactTrace = Next.Formats.WorkDiagnostics.Start("artifact.bind", artifact.RelativePath);
             var bytes = inventory.Read(artifact);
             if (Hash256.Compute(bytes) != sources[(artifact, null)].ContentHash)
                 throw new ArtifactConflictException("Typed source payload changed during plan validation");
@@ -95,7 +113,9 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
                     ? region!.ReadChunk(chunk.LocalZ * 32 + chunk.LocalX, snapshot.Limits).Document
                     : WorldArtifactEdits.ReadNbt(bytes, snapshot.Limits).Document;
                 _ = NbtTextExtractor.Profile(sources[(artifact, group.Key)].Location, document);
+                using var typedTrace = Next.Formats.WorkDiagnostics.Start("typed.check", artifact.RelativePath);
                 _ = TypedTreeEdits.Apply(document, group.Select(operation => operation.Edit));
+                typedTrace?.SetTag("comparisons", (long)group.Count());
             }
         }
         foreach (var group in requested.OfType<KeyConversionPatch>()

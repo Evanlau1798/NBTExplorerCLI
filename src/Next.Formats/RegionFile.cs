@@ -18,6 +18,7 @@ public sealed class RegionFile
 
     public static RegionFile Read(byte[] source)
     {
+        using var observation = WorkDiagnostics.Start("region.parse");
         ArgumentNullException.ThrowIfNull(source);
         if (source.Length > MaximumArtifactBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Region artifact limit exceeded");
         if (source.Length < 8192 || source.Length % 4096 != 0) throw Invalid(0);
@@ -43,17 +44,21 @@ public sealed class RegionFile
             if (chunk.SectorOffset < end) throw Invalid(chunk.Index * 4);
             end = checked((long)chunk.SectorOffset + chunk.SectorCount);
         }
+        observation?.SetTag("bytes", source.LongLength);
         return new(source.ToArray(), chunks);
     }
 
     public byte[] CompressedPayload(int index)
     {
+        using var observation = WorkDiagnostics.Start("region.payload.read");
         var chunk = Existing(index);
+        observation?.SetTag("bytes", (long)chunk.PayloadLength);
         return snapshot.AsSpan(checked(chunk.SectorOffset * 4096 + 5), chunk.PayloadLength).ToArray();
     }
 
     public NbtReadResult ReadChunk(int index, DecodeLimits? limits = null)
     {
+        using var observation = WorkDiagnostics.Start("region.chunk.load");
         var chunk = Existing(index); RequireSupported(chunk);
         limits ??= DecodeLimits.Default; limits.Validate();
         if (chunk.PayloadLength > limits.MaxCompressedBytes)
@@ -100,8 +105,9 @@ public sealed class RegionFile
             var codec = (NbtCompression)chunk.CodecId;
             var append = EncodeAppend(index, after, codec, chunk.Timestamp, length, limits);
             // Verify the exact bytes that will be copied into the new sector.
-            if (CompressedNbt.ReadDocument(append.Payload, codec, limits).Document != after)
-                throw new InvalidDataException("Region candidate differs from its authorized tree");
+            using (WorkDiagnostics.Start("region.projection", phase: "projection"))
+                if (CompressedNbt.ReadDocument(append.Payload, codec, limits).Document != after)
+                    throw new InvalidDataException("Region candidate differs from its authorized tree");
             var descriptor = new RegionChunk(index, append.Offset / 4096, (byte)append.Sectors, append.Payload.Length,
                 chunk.CodecId, false, chunk.Timestamp);
             expected.Add(index, (descriptor, Hash256.Compute(append.Payload)));

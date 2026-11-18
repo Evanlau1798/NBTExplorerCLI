@@ -48,7 +48,7 @@ internal static class RegionBatchPreparationTests
         finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
     }
 
-    private static void WriteChunk(byte[] region, int index, int sector, int counter)
+    internal static void WriteChunk(byte[] region, int index, int sector, int counter)
     {
         BinaryPrimitives.WriteUInt32BigEndian(region.AsSpan(index * 4), (uint)((sector << 8) | 1));
         BinaryPrimitives.WriteUInt32BigEndian(region.AsSpan(4096 + index * 4), (uint)(1000000 + index));

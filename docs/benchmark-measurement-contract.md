@@ -80,3 +80,68 @@ cancellation and sustained-operation observations. Interpret measurements within
 their stated intervals and workload sizes. Minecraft behavior, power-loss
 durability and release installation have separate acceptance requirements.
 The G06 correctness reference remains [control.json](../benchmarks/control.json).
+
+## Optional preparation work observations
+
+`Next.Formats.WorkDiagnostics.SourceName` exposes the BCL `ActivitySource`
+`nbtcli.next.work`. It adds no CLI switch, default log, exporter or dependency.
+Register a trusted `ActivityListener` with `AllData` sampling before the measured
+operation and dispose it afterward. No listener means no activities or world-ID
+formatting. Observers own their sampling, retention and callback failures; keep
+callbacks bounded and nonthrowing. Source paths and ZIP member names can identify
+private files even though text values and payload bytes are not emitted.
+
+Tags `world`, `artifact`, `phase` and `entry` are strings. `world` is the exact
+artifact world GUID; `artifact` is its physical relative path, including the output
+directory prefix. ZIP member names use `entry`, while `artifact` stays the outer
+archive. A child can inherit context from its nearest tagged `Activity.Parent`.
+Read each tag independently: codec activities usually inherit their artifact and
+phase. Standalone codec calls can have no world, artifact or phase. Resource input
+capture without an output recipe can also lack an output identity; do not invent
+one. Trace-parent context is observational and grants no write authority.
+
+Phases distinguish fresh `discovery`, exact-source `bind`, candidate construction
+`staging`, in-memory `projection`, persisted `readback`, resource `render` and
+physical `commit`. Scope activities describe their children, rather than extra
+parses. `Prepare` includes binding and final source checks, so not every event in
+that interval has the `staging` phase. A harness may supply an outer phase for
+otherwise untagged input or apply work and must record that convention.
+
+Metrics `bytes` and `comparisons` are boxed `Int64` values. Their units depend on
+the operation:
+
+| Operation | Metric and boundary |
+| --- | --- |
+| `nbt.read`, `nbt.write` | Successfully consumed decoded NBT bytes / serialized NBT bytes. Writer validation/measurement passes are retained; this is serialized volume, not their total CPU work. |
+| `json.parse`, `json.spans` | Complete supplied UTF-8 source bytes for successful validation/parse or span indexing. Repeated calls remain separate. |
+| `json.rewrite` | Output JSON bytes and requested exact-path checks. This includes checks of unchanged values; it is not a scan of all translations. |
+| `region.parse` | Supplied physical region bytes for successful index parsing, not decoded chunk bytes. |
+| `region.chunk.load` | One selected document-load call; nested NBT and payload events carry byte counts. |
+| `region.payload.read` | Copied compressed chunk payload bytes. Raw-codec payloads happen to be decoded bytes too. |
+| `region.compare` | Descriptor comparisons reached in persisted candidate verification, including unselected chunks. Successful full verification checks 1,024. Payload comparisons remain part of that verification. |
+| `candidate.lookup`, `source.bind`, `typed.check` | Actual indexed occurrence checks, fresh source-description checks, or typed edits checked. They are separate work and cannot be added into a unique-target count. |
+| `command.parse` | One command-extraction call. An artifact can require additional projection/readback parses; this is not a command-line or slot count. |
+| `language.add` | Requested indexed language-key checks and complete resulting UTF-8 language bytes. |
+| `zip.entry.read` | Actual decoded target-entry bytes read; a missing declared language entry reads zero. Its scope also encloses that entry's transformation. |
+| `zip.validate` | Decoded bytes of the successful whole-archive CRC read pass. |
+| `zip.deflate.validate` | Decoded bytes from a separate strict inflater/CRC pass for a deflated member. This is additional validation work. |
+| `resource.render`, `resource.merge` | Complete generated member bytes / frozen merge-member bytes loaded. ZIP members share their outer physical artifact and retain distinct `entry` tags. |
+| `resource.archive` | Complete serialized output ZIP bytes, separate from member rendering. |
+| `storage.read`, `image.hash` | Successfully returned raw source payload bytes / stream bytes actually consumed by SHA-256. Neither measures device I/O. |
+| `candidate.write`, `candidate.verify` | Bytes submitted to candidate writing / persisted candidate length compared against its staged image. A verify event records one image comparison; its nested `image.hash` measures that same pass. |
+
+Other events (`plan.bind`, `artifact.stage`, `artifact.verify`, `artifact.extract`,
+metadata/discovery, resource (including existing-ZIP `resource.source`) and projection scopes, `storage.image`,
+`candidate.commit`) supply call/context boundaries. They do not promise byte or
+comparison tags. A missing metric is unavailable, rather than a measured zero.
+Some failure paths publish partial counters and others publish no metric. Activity
+completion alone is not success: use the operation's actual outcome or exception.
+
+Keep operation, world, physical artifact, phase and optional entry as distinct
+aggregation dimensions. An aggregate count requires complete sampling; retain
+clipping and failed operations explicitly. Do not add nested durations, JSON/NBT
+passes, member rendering and serialized archives, or `candidate.verify` and its
+nested `image.hash` into a unique byte/I/O total. Counters explain repeated work;
+they do not replace full semantic, preimage, candidate, readback or receipt checks.
+Report observer-on diagnostics separately from observer-disabled latency and
+allocation comparisons. Neither establishes RSS or physical device traffic.

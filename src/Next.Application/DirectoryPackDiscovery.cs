@@ -1,5 +1,6 @@
 using Next.Domain;
 using Next.Minecraft;
+using Next.Formats;
 
 namespace Next.Application;
 
@@ -37,6 +38,7 @@ internal static class DirectoryPackDiscovery
     }
     internal static State Read(IWorldInventory inventory, string root, PackSourceKind kind, DecodeLimits limits)
     {
+        using var observation = WorkDiagnostics.Start("metadata.discover", root + "/pack.mcmeta", "discovery", inventory.WorldId);
         Hash256? hash = null;
         try
         {
