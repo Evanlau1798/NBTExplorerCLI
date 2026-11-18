@@ -1,34 +1,76 @@
 # NBTExplorerCLI
 
-[English](README.en.md)
+[繁體中文](README.zh-TW.md) | [Product Site](https://nbtcli.evanlau1798.com/) | [Documentation](https://nbtcli.evanlau1798.com/docs/) | [Contributing](CONTRIBUTING.md)
 
-NBTExplorerCLI 是 Windows x64 的 Minecraft Java 版世界資料 CLI。它能查閱 NBT、掃描文字、管理翻譯、輸出資源包，以及預覽和驗證世界編輯。請在世界副本上確認工作流程，並在遊戲及其他寫入工具關閉時修改世界。
+**NBTExplorerCLI** (`nbtcli.exe`) is a self-contained Windows x64 command-line tool for **Minecraft Java Edition** worlds. It provides a deterministic, single-JSON-response interface to inspect NBT structures, scan and extract in-world text, manage paginated translation sessions, generate resource packs, and apply verified offline world edits with automatic pre-write backups and crash recovery.
 
-## 安裝與查閱
+## Key Capabilities
 
-Windows x64 ZIP 可從 [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) 或對應的 [Actions 候選](https://github.com/Evanlau1798/NBTExplorerCLI/actions) 取得。用隨附的 `SHA256SUMS.txt` 核對 ZIP，完整解壓到新目錄並保留隨附的 DLL。封裝內含 .NET runtime。
+- **Safe Read-Only Inspection (`get`, `list`, `search`)**: Query `level.dat`, `.mca` region chunks, entity regions, and datapack JSON files using JSON Pointers (`--pointer`) or explicit segment arrays (`--segments`), in either human-readable display mode or reversible `typed-nbt` mode (`--types`).
+- **World Text Scanning and Validation (`scan`, `extract`, `validate`, `capabilities`)**: Index text across 21 Minecraft text roles (signs, books, items, entities, containers, command blocks, functions, scoreboards, bossbars, advancements, and language files) with an external rebuildable scan cache.
+- **Paginated Map Localization (`translate`, `agent`)**: Organize large adventure map translations into verifiable pages and slots, maintain terminology glossaries and translator notes, and seal completed sessions only after durable world verification.
+- **Resource Packs and Key Conversion (`convert`, `translate plan --keys`, `export-lang`, `create-pack`)**: Convert literal world text into translation keys, export standalone language JSON files, or build and merge client resource packs while protecting existing assets.
+- **Crash-Safe Offline Editing (`set`, `batch`, `plan`, `apply`, `status`, `recover`, `backup`, `restore`)**: Preview every modification as an immutable `nbtcli.patch-plan` before writing. Offline commits automatically stage candidates, store content-addressed preimages, record journals, and support deterministic recovery or rollback.
+
+## Quick Start (Windows x64)
+
+Download `nbtcli-win-x64.zip` and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) or a verified [GitHub Actions candidate](https://github.com/Evanlau1798/NBTExplorerCLI/actions). The archive bundles the required .NET runtime (`10.0.15`) and libraries—keep all extracted files together in the same directory.
 
 ```powershell
-Get-FileHash .\nbtcli-next-win-x64.zip -Algorithm SHA256
-.\nbtcli-next.exe --version
-.\nbtcli-next.exe --help
-.\nbtcli-next.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+# 1. Verify the archive SHA-256 digest against SHA256SUMS.txt
+Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256
+Get-Content .\SHA256SUMS.txt
+
+# 2. Extract the archive and check the executable
+Expand-Archive -Path .\nbtcli-win-x64.zip -DestinationPath .\nbtcli
+.\nbtcli\nbtcli.exe --version
+.\nbtcli\nbtcli.exe --help
+
+# 3. Inspect a disposable copy of a Minecraft world (read-only)
+.\nbtcli\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 ```
 
-`help <命令>` 顯示實際選項。CLI 輸出單一 JSON，使用 `--ui-locale zh-TW` 或 `en-US` 選擇介面語言。寫入前請先預覽，核對計畫及來源，並只在世界離線時提供 `--world-offline`。若提交中斷，使用同一個 state root 和計畫 hash 查詢 `status`，再依結果決定如何 `recover`。
+Run `.\nbtcli.exe help <command>` to inspect accepted flags. Pass `--ui-locale zh-TW` or `--ui-locale en-US` to select the CLI diagnostic language independently of world translation locales. Always test workflows on a world copy, preview plans before writing, and pass `--world-offline` only after closing Minecraft and any other editors. If a write is interrupted, run `status` with the same `--state-root` and `--plan-hash`, then run `recover`.
 
-## 開發與發布
+## Documentation
 
-使用 `global.json` 指定的 SDK。建置與驗證分開執行。
+Full guides, safety explanations, and command schemas are available on the documentation site:
+
+- **English Documentation**: [https://nbtcli.evanlau1798.com/docs/](https://nbtcli.evanlau1798.com/docs/)
+  - [Install and Inspect](https://nbtcli.evanlau1798.com/docs/getting-started/)
+  - [Safe Editing and Recovery](https://nbtcli.evanlau1798.com/docs/safe-editing/)
+  - [Translation Workflow](https://nbtcli.evanlau1798.com/docs/translation-workflow/)
+  - [Resource Packs and References](https://nbtcli.evanlau1798.com/docs/resources-and-packs/)
+  - [Backups and State Files](https://nbtcli.evanlau1798.com/docs/backups-and-state/)
+  - [Command Reference](https://nbtcli.evanlau1798.com/docs/command-reference/)
+  - [Support Scope and Troubleshooting](https://nbtcli.evanlau1798.com/docs/support-and-troubleshooting/)
+- **繁體中文文檔**: [https://nbtcli.evanlau1798.com/zh-tw/docs/](https://nbtcli.evanlau1798.com/zh-tw/docs/)
+
+## Build and Verification
+
+Use the .NET SDK specified in `global.json` (`10.0.404`). Run restore, build, and the verification harness as separate steps:
 
 ```powershell
 dotnet restore NBTExplorerCLI.slnx --configfile NuGet.Config --locked-mode
 dotnet build NBTExplorerCLI.slnx -c Release --no-restore
-dotnet tests/Next.Verification/bin/Release/net10.0/Next.Verification.dll --suite all --timeout-ms 120000
+dotnet tests/NBTExplorerCLI.Verification/bin/Release/net10.0/NBTExplorerCLI.Verification.dll --suite all --timeout-ms 120000
 ```
 
-GitHub Actions 建置並驗證 Windows x64 候選，發布則由通過驗證的 tag 工作流程執行。
+To preview or build the Astro Starlight documentation site locally under `docs/`:
 
-## 授權
+```powershell
+Set-Location .\docs
+npm ci
+npm run build
+npm run preview
+```
 
-本專案採用 [MIT](LICENSE)。隨附的第三方元件依各自的授權與聲明散布。見 [SharpZipLib](licenses/SharpZipLib.md) 與 [Unicode](licenses/Unicode.md)。Windows 發行包也附有 .NET 授權及第三方聲明。
+## Contributing
+
+NBTExplorerCLI is created and maintained by [@Evanlau1798](https://github.com/Evanlau1798). Focused external contributions—such as isolated bug fixes, deterministic regression tests, documentation improvements, and additional documentation translations—are welcome.
+
+Before opening an issue or pull request, please read [CONTRIBUTING.md](CONTRIBUTING.md) for scope invariants, world-safety requirements, and required verification steps.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE). Bundled third-party components retain their own terms and notices; see [SharpZipLib](licenses/SharpZipLib.md) and [Unicode](licenses/Unicode.md). The Windows x64 distribution package also includes the .NET runtime license and third-party notices.

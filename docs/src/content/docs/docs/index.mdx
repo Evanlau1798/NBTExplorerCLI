@@ -1,0 +1,75 @@
+---
+title: Documentation Overview
+description: Learn how NBTExplorerCLI inspects, translates, and safely edits Minecraft Java Edition worlds on Windows x64.
+---
+
+import SafetyBanner from '../../../components/SafetyBanner.astro';
+
+**NBTExplorerCLI** (`nbtcli.exe`, version `1.0.0`) is a self-contained Windows x64 command-line tool built for **Minecraft Java Edition** worlds. It enables players, adventure map creators, localization teams, and tool developers to inspect NBT data, scan and translate in-world text, generate resource packs, and apply verified offline edits.
+
+<SafetyBanner tier="safe" lang="en" />
+
+## Understanding Operation Safety Levels
+
+Every guide and command in this documentation displays one of three plain-language safety labels so you always know whether an action can affect your Minecraft save files:
+
+| Safety Badge | What It Means for Your World Save |
+| --- | --- |
+| **Safe to Inspect** | Reads files or checks external status logs only. Your Minecraft world folder is never modified. |
+| **Preview Only** | Creates a change plan (`nbtcli.patch-plan`) or saves translation progress in an external directory outside your world. Your world files remain untouched. |
+| **Modifies World Save** | Writes changes to your world folder. Always work on a world copy, close Minecraft and other editors first, and pass `--world-offline`. |
+
+## Six Core Workflows
+
+Use the following guides in order to learn the complete workflow from first inspection to crash-safe editing and map localization:
+
+1. **[Install and Inspect](/docs/getting-started/)**
+   Verify the release ZIP SHA-256 checksum, extract the self-contained package, run `--version` and `--help`, and execute your first read-only `get`, `list`, `search`, and `scan` commands on a world copy.
+2. **[Safe Editing and Recovery](/docs/safe-editing/)**
+   Select exact NBT nodes with JSON Pointers or typed segments, preview changes with `set`, `batch`, or `plan`, apply plans offline with `apply --world-offline`, and recover or roll back interrupted writes using `status` and `recover`.
+3. **[Translation Workflow](/docs/translation-workflow/)**
+   Create paginated translation sessions (`translate start`), export pages (`export`), submit validated replies (`submit` / `advance`), manage notes and glossaries, and complete world translation with `plan`, `apply`, and `seal`.
+4. **[Resource Packs and References](/docs/resources-and-packs/)**
+   Understand the difference between direct in-world text replacement (`--direct`), translation key conversion (`--keys` and `convert`), standalone language/resource pack exports (`export-lang`, `create-pack`), and reference synchronization (`--synchronize-references`).
+5. **[Backups and State Files](/docs/backups-and-state/)**
+   Create and verify content-addressed world backups (`backup` and `restore`), and understand how external scan caches, sessions, object stores, and recovery journals are organized outside your world directory.
+6. **[Support Scope and Troubleshooting](/docs/support-and-troubleshooting/)**
+   Check supported Minecraft Java Edition `DataVersion` profiles, inspect exit codes (`0` through `8` and `130`), understand parser verification versus live in-game verification boundaries, and resolve common errors.
+
+Need to look up a specific command or option quickly? Go straight to the **[Command Reference](/docs/command-reference/)**.
+
+## One Predictable JSON Response Format
+
+Every invocation of `nbtcli.exe` writes exactly one newline-delimited UTF-8 JSON object to standard output (`stdout`):
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "version",
+  "outcome": "Success",
+  "data": {
+    "product": "nbtcli",
+    "version": "1.0.0"
+  },
+  "error": null
+}
+```
+
+### Interface Language vs. Translation Languages
+
+NBTExplorerCLI strictly separates the language of CLI messages from the languages of your Minecraft world text:
+
+- **CLI Interface Language (`--ui-locale`)**: Accepts `zh-TW` (default) or `en-US` before or after any command. It controls human-readable `error.message` and instruction text without changing JSON keys, machine error codes, or world data.
+- **World & Resource Languages**: Flags such as `--source-language`, `--target-language`, `--lang`, `--original-lang`, and `--target-lang` control how Minecraft text and resource pack language files (such as `en_us` and `zh_tw`) are processed.
+
+## License and Third-Party Notices
+
+NBTExplorerCLI is licensed under the **MIT License** (`LICENSE` in the repository and release archive). Bundled third-party components retain their respective terms and notices:
+
+- **SharpZipLib** (`licenses/SharpZipLib.md`)
+- **Unicode Character Database** (`licenses/Unicode.md`)
+- **.NET Runtime Licenses and Third-Party Notices** (`licenses/dotnet-LICENSE.txt` and `licenses/dotnet-THIRD-PARTY-NOTICES.txt` in the Windows x64 release package)
+
+Minecraft game assets and user-created worlds remain subject to their respective owners' terms and licenses.

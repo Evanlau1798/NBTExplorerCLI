@@ -1,0 +1,636 @@
+---
+import { LANDING_COPY } from '../data/landing-i18n';
+import { PRODUCT_META, type LocaleKey } from '../data/cli-surface';
+
+interface Props {
+  lang: LocaleKey;
+}
+
+const { lang } = Astro.props;
+const copy = LANDING_COPY[lang] ?? LANDING_COPY.en;
+---
+
+<!doctype html>
+<html lang={copy.langAttr} data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{PRODUCT_META.name} — {copy.heroTitleHighlight}</title>
+    <meta name="description" content={copy.heroSubtitle} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root {
+        --bg-obsidian: #080b10;
+        --bg-panel: #0e141d;
+        --bg-panel-hover: #131b27;
+        --border-slate: #1e293b;
+        --border-emerald: rgba(16, 185, 129, 0.45);
+        --emerald: #10b981;
+        --emerald-bright: #34d399;
+        --amber: #f59e0b;
+        --crimson: #ef4444;
+        --text-main: #f1f5f9;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif;
+        --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-sans);
+        background-color: var(--bg-obsidian);
+        color: var(--text-main);
+        line-height: 1.6;
+        background-image:
+          radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.12), transparent 55%),
+          linear-gradient(to right, rgba(30, 41, 59, 0.22) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(30, 41, 59, 0.22) 1px, transparent 1px);
+        background-size: 100% 100%, 40px 40px, 40px 40px;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .container {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+      }
+
+      /* Top Navigation */
+      .navbar {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        backdrop-filter: blur(12px);
+        background: rgba(8, 11, 16, 0.85);
+        border-bottom: 1px solid var(--border-slate);
+      }
+
+      .navbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
+        gap: 1rem;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-weight: 700;
+        font-size: 1.05rem;
+        letter-spacing: -0.01em;
+      }
+
+      .brand img {
+        width: 28px;
+        height: 28px;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+      }
+
+      .nav-links a:hover {
+        color: var(--text-main);
+      }
+
+      .lang-switch {
+        padding: 0.3rem 0.65rem;
+        border: 1px solid var(--border-slate);
+        border-radius: 4px;
+        background: var(--bg-panel);
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-main);
+      }
+
+      .lang-switch:hover {
+        border-color: var(--emerald);
+      }
+
+      /* Hero */
+      .hero {
+        padding: 5rem 0 3.5rem;
+        text-align: center;
+      }
+
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0.85rem;
+        border: 1px solid var(--border-emerald);
+        background: rgba(16, 185, 129, 0.08);
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--emerald-bright);
+        margin-bottom: 1.5rem;
+      }
+
+      .hero-badge-dot {
+        width: 7px;
+        height: 7px;
+        background: var(--emerald);
+        display: inline-block;
+      }
+
+      .hero h1 {
+        font-size: clamp(2.1rem, 4.5vw, 3.5rem);
+        line-height: 1.15;
+        margin: 0 auto 1.25rem;
+        max-width: 860px;
+        letter-spacing: -0.025em;
+      }
+
+      .hero h1 span {
+        color: var(--emerald-bright);
+        display: block;
+      }
+
+      .hero-sub {
+        max-width: 720px;
+        margin: 0 auto 2.25rem;
+        font-size: 1.1rem;
+        color: var(--text-muted);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.9rem;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.78rem 1.45rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+        border-radius: 4px;
+        border: 1px solid transparent;
+        transition: all 0.15s ease;
+      }
+
+      .btn-primary {
+        background: var(--emerald);
+        color: #04130d;
+      }
+
+      .btn-primary:hover {
+        background: var(--emerald-bright);
+      }
+
+      .btn-secondary {
+        background: var(--bg-panel);
+        border-color: var(--border-slate);
+        color: var(--text-main);
+      }
+
+      .btn-secondary:hover {
+        border-color: var(--emerald);
+        background: var(--bg-panel-hover);
+      }
+
+      /* Terminal Showcase */
+      .terminal-section {
+        padding: 1.5rem 0 4rem;
+      }
+
+      .terminal-window {
+        border: 1px solid var(--border-slate);
+        border-radius: 4px;
+        background: #090d14;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
+        overflow: hidden;
+      }
+
+      .terminal-topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.65rem 1rem;
+        background: #0f1622;
+        border-bottom: 1px solid var(--border-slate);
+        gap: 0.75rem;
+      }
+
+      .terminal-title {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .terminal-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+
+      .tab-btn {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        padding: 0.35rem 0.75rem;
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border-slate);
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .tab-btn[aria-selected='true'] {
+        background: rgba(16, 185, 129, 0.14);
+        color: var(--emerald-bright);
+        border-color: var(--border-emerald);
+      }
+
+      .terminal-panel {
+        display: none;
+        padding: 1.35rem;
+      }
+
+      .terminal-panel.active {
+        display: block;
+      }
+
+      .terminal-cmd-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        background: #0d131d;
+        border: 1px solid var(--border-slate);
+        border-radius: 3px;
+        margin-bottom: 1rem;
+      }
+
+      .terminal-cmd-text {
+        font-family: var(--font-mono);
+        font-size: 0.88rem;
+        color: #f8fafc;
+        overflow-x: auto;
+      }
+
+      .terminal-cmd-prefix {
+        color: var(--emerald);
+        margin-right: 0.5rem;
+        user-select: none;
+      }
+
+      .tier-tag {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.15rem 0.55rem;
+        border-radius: 3px;
+        border: 1px solid transparent;
+      }
+
+      .tier-tag[data-tier='safe'] {
+        color: var(--emerald-bright);
+        background: rgba(16, 185, 129, 0.12);
+        border-color: rgba(16, 185, 129, 0.35);
+      }
+
+      .tier-tag[data-tier='preview'] {
+        color: #fbbf24;
+        background: rgba(245, 158, 11, 0.12);
+        border-color: rgba(245, 158, 11, 0.35);
+      }
+
+      .tier-tag[data-tier='write'] {
+        color: #f87171;
+        background: rgba(239, 68, 68, 0.12);
+        border-color: rgba(239, 68, 68, 0.35);
+      }
+
+      .terminal-json {
+        margin: 0;
+        padding: 1rem;
+        background: #06090e;
+        border: 1px solid #162030;
+        border-radius: 3px;
+        font-family: var(--font-mono);
+        font-size: 0.83rem;
+        color: #cbd5e1;
+        overflow-x: auto;
+      }
+
+      /* Section Headings */
+      .section {
+        padding: 3.5rem 0;
+        border-top: 1px solid rgba(30, 41, 59, 0.6);
+      }
+
+      .section-header {
+        margin-bottom: 2.25rem;
+      }
+
+      .section-header h2 {
+        font-size: 1.75rem;
+        margin: 0 0 0.5rem;
+        letter-spacing: -0.015em;
+      }
+
+      .section-header p {
+        margin: 0;
+        color: var(--text-muted);
+        max-width: 720px;
+      }
+
+      /* Safety Tier Grid */
+      .safety-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+        gap: 1.15rem;
+      }
+
+      .safety-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border-slate);
+        border-top-width: 3px;
+        border-radius: 4px;
+        padding: 1.35rem;
+      }
+
+      .safety-card[data-tier='safe'] {
+        border-top-color: var(--emerald);
+      }
+
+      .safety-card[data-tier='preview'] {
+        border-top-color: var(--amber);
+      }
+
+      .safety-card[data-tier='write'] {
+        border-top-color: var(--crimson);
+      }
+
+      .safety-card h3 {
+        margin: 0.65rem 0 0.45rem;
+        font-size: 1.1rem;
+      }
+
+      .safety-card p {
+        margin: 0;
+        font-size: 0.92rem;
+        color: var(--text-muted);
+      }
+
+      /* Bento Grid */
+      .bento-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+        gap: 1.25rem;
+      }
+
+      @media (max-width: 640px) {
+        .bento-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .bento-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: var(--bg-panel);
+        border: 1px solid var(--border-slate);
+        border-radius: 4px;
+        padding: 1.5rem;
+        transition: border-color 0.15s ease;
+      }
+
+      .bento-card:hover {
+        border-color: var(--border-emerald);
+      }
+
+      .bento-kicker {
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        letter-spacing: 0.06em;
+        color: var(--emerald-bright);
+        margin-bottom: 0.45rem;
+      }
+
+      .bento-card h3 {
+        margin: 0 0 0.6rem;
+        font-size: 1.2rem;
+      }
+
+      .bento-card p {
+        margin: 0 0 1.25rem;
+        color: var(--text-muted);
+        font-size: 0.94rem;
+      }
+
+      .bento-link {
+        font-family: var(--font-mono);
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: var(--emerald-bright);
+      }
+
+      .bento-link:hover {
+        text-decoration: underline;
+      }
+
+      /* Quick Install Block */
+      .install-box {
+        background: #070a0f;
+        border: 1px solid var(--border-slate);
+        border-radius: 4px;
+        padding: 1.25rem 1.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.86rem;
+        color: #e2e8f0;
+        overflow-x: auto;
+      }
+
+      .footer {
+        padding: 2.5rem 0;
+        border-top: 1px solid var(--border-slate);
+        font-size: 0.86rem;
+        color: var(--text-dim);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="container navbar-inner">
+        <a href={lang === 'zh-tw' ? '/zh-tw/' : '/'} class="brand">
+          <img src="/favicon.svg" alt="NBTExplorerCLI icon" />
+          <span>{PRODUCT_META.name}</span>
+        </a>
+        <nav class="nav-links" aria-label="Primary Navigation">
+          <a href={copy.docsHomeHref}>{copy.navDocs}</a>
+          <a href={copy.commandsHref}>{copy.navCommands}</a>
+          <a href={PRODUCT_META.releasesUrl}>{copy.navReleases}</a>
+          <a href={PRODUCT_META.repoUrl}>{copy.navGithub}</a>
+          <a href={copy.switchLangHref} class="lang-switch">{copy.switchLangLabel}</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero">
+        <div class="hero-badge">
+          <span class="hero-badge-dot" aria-hidden="true"></span>
+          <span>{copy.badgeText}</span>
+        </div>
+        <h1>
+          {copy.heroTitleLine1}
+          <span>{copy.heroTitleHighlight}</span>
+        </h1>
+        <p class="hero-sub">{copy.heroSubtitle}</p>
+        <div class="hero-actions">
+          <a href={copy.docsHomeHref} class="btn btn-primary">{copy.ctaDocs}</a>
+          <a href={PRODUCT_META.releasesUrl} class="btn btn-secondary">{copy.ctaDownload}</a>
+        </div>
+      </section>
+
+      <section class="terminal-section" aria-label={copy.terminalTitle}>
+        <div class="terminal-window">
+          <div class="terminal-topbar">
+            <span class="terminal-title">{copy.terminalTitle}</span>
+            <div class="terminal-tabs" role="tablist">
+              {
+                copy.terminalTabs.map((tab, index) => (
+                  <button
+                    type="button"
+                    role="tab"
+                    class="tab-btn"
+                    aria-selected={index === 0 ? 'true' : 'false'}
+                    data-tab-target={tab.id}
+                  >
+                    {tab.label}
+                  </button>
+                ))
+              }
+            </div>
+          </div>
+          {
+            copy.terminalTabs.map((tab, index) => (
+              <div
+                class={`terminal-panel ${index === 0 ? 'active' : ''}`}
+                data-tab-panel={tab.id}
+                role="tabpanel"
+              >
+                <div class="terminal-cmd-row">
+                  <div class="terminal-cmd-text">
+                    <span class="terminal-cmd-prefix">PS&gt;</span>
+                    <code>{tab.command}</code>
+                  </div>
+                  <span class="tier-tag" data-tier={tab.tier}>
+                    {tab.tierLabel}
+                  </span>
+                </div>
+                <pre class="terminal-json"><code>{tab.output}</code></pre>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>{copy.safetyTitle}</h2>
+          <p>{copy.safetySubtitle}</p>
+        </div>
+        <div class="safety-grid">
+          {
+            copy.safetyCards.map((card) => (
+              <div class="safety-card" data-tier={card.tier}>
+                <span class="tier-tag" data-tier={card.tier}>
+                  {card.tag}
+                </span>
+                <h3>{card.title}</h3>
+                <p>{card.body}</p>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>{copy.bentoTitle}</h2>
+          <p>{copy.bentoSubtitle}</p>
+        </div>
+        <div class="bento-grid">
+          {
+            copy.bentoItems.map((item) => (
+              <div class="bento-card">
+                <div>
+                  <div class="bento-kicker">{item.kicker}</div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </div>
+                <a href={item.linkHref} class="bento-link">
+                  {item.linkText} -&gt;
+                </a>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>{copy.quickInstallTitle}</h2>
+          <p>{copy.quickInstallSubtitle}</p>
+        </div>
+        <pre class="install-box"><code>Get-FileHash .\{PRODUCT_META.zipName} -Algorithm SHA256
+Expand-Archive .\{PRODUCT_META.zipName} -DestinationPath .\nbtcli
+.\nbtcli\{PRODUCT_META.binary} --version
+.\nbtcli\{PRODUCT_META.binary} --help
+.\nbtcli\{PRODUCT_META.binary} get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion</code></pre>
+      </section>
+    </main>
+
+    <footer class="container footer">
+      <span>{copy.footerNote}</span>
+      <span>
+        <a href={copy.docsHomeHref}>{copy.navDocs}</a> · <a href={PRODUCT_META.repoUrl}>GitHub</a>
+      </span>
+    </footer>
+
+    <script is:inline>
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const target = btn.getAttribute('data-tab-target');
+          document.querySelectorAll('.tab-btn').forEach((b) => {
+            b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+          });
+          document.querySelectorAll('.terminal-panel').forEach((panel) => {
+            panel.classList.toggle('active', panel.getAttribute('data-tab-panel') === target);
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

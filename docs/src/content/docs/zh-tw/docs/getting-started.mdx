@@ -1,0 +1,156 @@
+---
+title: 安裝驗證與安全查閱
+description: 驗證 Windows x64 發行包 SHA-256 雜湊、確認執行檔狀態，並在世界副本上執行第一次唯讀 NBT 查閱與文字掃描。
+---
+
+import SafetyBanner from '../../../../components/SafetyBanner.astro';
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+本指南將帶您下載 **NBTExplorerCLI**、核對壓縮包 SHA-256 雜湊值、完整解壓縮獨立執行環境，並在 Minecraft Java 版世界副本上完成第一次安全查閱（`get`、`list`、`search`、`scan` 與 `extract`）。
+
+## 1. 下載並驗證 Windows x64 發行包
+
+您可以從以下兩個官方管道取得 Windows x64 壓縮包（`nbtcli-win-x64.zip`）：
+
+- **[GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**：通過完整驗證並綁定版本標籤（如 `v1.0.0`）的正式發行版。
+- **[GitHub Actions 候選建置](https://github.com/Evanlau1798/NBTExplorerCLI/actions)**：針對特定提交版本自動建置、並在無安裝 SDK 的乾淨 Windows Server Core 容器中完成煙霧測試的候選產物（`nbtcli-windows-x64`）。
+
+在解壓縮之前，請先使用 PowerShell 計算壓縮包的 SHA-256 雜湊值，並確認與隨附的 `SHA256SUMS.txt` 完全一致：
+
+```powershell
+Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256
+Get-Content .\SHA256SUMS.txt
+```
+
+核對無誤後，請將整個壓縮包完整解壓縮至新資料夾。本套件已**內建獨立 .NET 執行環境（10.0.15）**與所需函式庫（`ICSharpCode.SharpZipLib.dll`），請務必讓 `nbtcli.exe` 與隨附的所有 `.dll` 及 `.json` 檔案保持在同一個資料夾內：
+
+```powershell
+Expand-Archive -Path .\nbtcli-win-x64.zip -DestinationPath .\nbtcli
+Set-Location .\nbtcli
+```
+
+> [!TIP]
+> 發行包內的 `candidate.json` 記錄了該版本的完整建置資訊，包含版本號（`1.0.0`）、Git 來源修訂號（Revision）、SDK 版本（`10.0.404`）、第三方相依元件，以及壓縮包內每一個檔案的 SHA-256 雜湊清單。
+
+## 2. 檢查版本與指令說明
+
+執行 `--version` 與 `--help`，確認工具可正常啟動並輸出單行 JSON：
+
+```powershell
+.\nbtcli.exe --version
+.\nbtcli.exe --help
+```
+
+`--version` 的輸出範例：
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "version",
+  "outcome": "Success",
+  "data": {
+    "product": "nbtcli",
+    "version": "1.0.0"
+  },
+  "error": null
+}
+```
+
+若想查詢特定指令或子命令支援的所有旗標，可隨時執行 `help <命令>`：
+
+```powershell
+.\nbtcli.exe help get
+.\nbtcli.exe help translate
+```
+
+## 3. 準備世界存檔副本
+
+雖然查閱指令完全不會修改檔案，但我們強烈建議先在關閉 Minecraft 的狀態下，將您的世界存檔複製一份到獨立路徑（例如 `D:\WorldCopy`），後續所有的查閱、掃描與編輯預覽都針對這份副本操作。
+
+## 4. 使用 `get` 查閱單一 NBT 節點或 JSON 屬性
+
+`get` 可直接讀取世界內的 NBT 檔案、區塊（Chunk）或資料包 JSON 節點。
+
+### 讀取 `level.dat` 的 `DataVersion`
+
+```powershell
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+```
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "get",
+  "outcome": "Success",
+  "data": {
+    "format": "display-json",
+    "pointer": "/Data/DataVersion",
+    "value": 3953
+  },
+  "error": null
+}
+```
+
+### 顯示格式（`display-json`）與可還原型別格式（`--types`）
+
+預設情況下，`get` 會回傳方便閱讀的 `display-json`。如果您打算將讀取到的值修改後交給 `set` 或 `batch` 寫回世界，請加上 `--types` 以取得 `nbtcli.typed-nbt` 格式——它會完整保留 NBT 數值寬度（如 `Byte`、`Short`、`Int`、`Long`、`Float` 位元值與型別陣列）以及精確的來源位址：
+
+```powershell
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
+```
+
+### 其他常見的 `get` 查閱範例
+
+```powershell
+# 查閱世界內資料包（Datapack）的 JSON 欄位
+.\nbtcli.exe get 'D:\WorldCopy' --path 'datapacks/custom/data/quest/advancement/root.json' --pointer /display/title
+
+# 查閱區塊檔（.mca）中特定全域區塊座標的 NBT 內容
+.\nbtcli.exe get 'D:\WorldCopy' --path 'region/r.0.0.mca' --chunk 0,0 --dimension minecraft:overworld --pointer /Status
+
+# 查閱 ZIP 資源包或資料包內的指定檔案項目
+.\nbtcli.exe get 'D:\WorldCopy\resources.zip' --entry 'assets/custom/lang/en_us.json' --pointer /item.custom.sword
+```
+
+## 5. 使用 `list` 與 `search` 探索世界結構
+
+對世界資料夾執行 `list`，可盤點該世界的名稱、已宣告維度，以及各維度的地形區塊檔與實體區塊檔數量：
+
+```powershell
+.\nbtcli.exe list 'D:\WorldCopy'
+```
+
+對 `.mca` 區塊檔執行 `list`（不加 `--chunk`）可列出所有已生成的區塊座標；執行 `search` 則可依內容文字（`--query`）、欄位名稱（`--name`）或標籤型別（`--type`）搜尋節點：
+
+```powershell
+.\nbtcli.exe list 'D:\WorldCopy' --path 'region/r.0.0.mca' --limit 20
+.\nbtcli.exe search 'D:\WorldCopy' --path level.dat --name Spawn --limit 10
+```
+
+## 6. 使用 `scan` 與 `extract` 掃描世界文字
+
+使用 `scan` 可以掃描世界中的告示牌、懸掛式告示牌、書本、講台書本、物品名稱與說明（Lore）、實體名稱、容器名稱、指令方塊、函數（`.mcfunction`）、計分板、Boss 血條、進度（Advancements）與語言檔：
+
+```powershell
+# 快速檢視全世界的文字來源統計摘要
+.\nbtcli.exe scan 'D:\WorldCopy' --summary
+
+# 僅掃描主世界（Overworld）並列出前 25 筆解碼後的文字項目
+.\nbtcli.exe scan 'D:\WorldCopy' --dimension minecraft:overworld --show-items --limit 25
+```
+
+> [!NOTE]
+> `scan` 會在世界資料夾「外部」建立可隨時重建的掃描快取（預設位於 `%LOCALAPPDATA%\nbtcli\worlds\<scope-id>\cache`，亦可透過 `--cache-root` 指定其他外部路徑）。若需強制重新解析所有檔案可加上 `--refresh`，若不想讀寫持久快取則可加上 `--no-cache`。
+
+若要將世界內的文字連同精確來源位址匯出至外部檔案，請使用 `extract`（可搭配 `--unique` 將相同字串歸納檢視）：
+
+```powershell
+.\nbtcli.exe extract 'D:\WorldCopy' --unique --output 'D:\Exports\world-text-unique.json'
+```
+
+完成基本查閱與掃描後，請接著閱讀 **[安全編輯與中斷復原](/zh-tw/docs/safe-editing/)**，了解如何安全預覽並套用世界修改。

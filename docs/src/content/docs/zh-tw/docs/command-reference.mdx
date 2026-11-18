@@ -1,0 +1,67 @@
+---
+title: CLI 命令完整參考
+description: NBTExplorerCLI 所有根命令、子命令、接受旗標、輸入 JSON 結構與操作安全分級完整參考表。
+---
+
+import CommandReferenceList from '../../../../components/CommandReferenceList.astro';
+
+本頁完整列出 **NBTExplorerCLI**（`nbtcli.exe`）註冊的所有命令與子命令，內容與自動化測試驗證的機器命令表（`nbtcli.command-surface` 版本 `1`）完全同步。
+
+## 全域協定與旗標規則
+
+- **單行 JSON 標準輸出**：所有指令皆會在標準輸出（`stdout`）回傳單一 UTF-8 JSON 信封物件（`schemaFamily: "nbtcli.cli"`，`schemaVersion: 1`）。
+- **介面顯示語言（`--ui-locale`）**：可於指令前後加上 `--ui-locale zh-TW`（預設）或 `--ui-locale en-US`，僅改變說明與錯誤訊息文字，不影響地圖翻譯與資源包的語言設定（`--source-language`、`--target-language`、`--lang`、`--original-lang`、`--target-lang`）。
+- **參數語法**：帶值參數支援 `--option value` 或 `--option=value` 兩種寫法；布林旗標不帶值。若檔案路徑以連字號開頭，可使用 `--` 結束旗標解析。
+- **支援的簡寫別名（Aliases）**：
+  - 根命令 `--help` 與 `-h` 等同於 `help`。
+  - 根命令 `--version` 與 `-v` 等同於 `version`。
+  - 所有命令皆支援以 `-h` 查詢該命令的 `--help` 說明。
+
+## 結構化檔案與標準輸入（`-`）格式對照
+
+當指令透過檔案路徑或標準輸入（`-`）讀取 JSON 時，皆會先驗證對應的 `schemaFamily` 與 `schemaVersion`：
+
+| 輸入 JSON Schema Family | 使用該格式的指令與參數 |
+| --- | --- |
+| `nbtcli.typed-nbt` | `set --value <json>` 或 `set --value-file <檔案\|->` |
+| `nbtcli.operations` | `batch <檔案\|-> --world <世界目錄>` 或 `plan <世界目錄> --request <檔案\|->` |
+| `nbtcli.patch-plan` | `apply <世界目錄> --plan <檔案\|->` |
+| `nbtcli.session-reply` | `translate submit --reply <檔案\|->` 或 `translate advance --reply <檔案\|->` |
+| `nbtcli.session-command` | `translate jump`、`note`、`glossary` 或 `reset` 搭配 `--request <檔案\|->` |
+| `nbtcli.agent-questionnaire` | `agent submit <世界目錄> --request <檔案\|->` |
+
+---
+
+## 查閱與搜尋命令（Inspection & Query）
+
+用於檢查版本、查詢參數說明、讀取 NBT 節點、檢視區塊與搜尋資料包 JSON 的唯讀命令。
+
+<CommandReferenceList lang="zh-tw" group="inspect" />
+
+## 世界文字掃描與驗證命令（Scanning & Validation）
+
+用於掃描世界文字、抽取字串、驗證檔案完整性與查詢支援版本的唯讀命令。
+
+<CommandReferenceList lang="zh-tw" group="scan" />
+
+## 安全編輯、備份與復原命令（Editing, Backup & Recovery）
+
+用於預覽修改計畫、離線套用變更、建立備份與從中斷狀態復原世界的命令。
+
+<CommandReferenceList lang="zh-tw" group="edit" />
+
+## 地圖翻譯、轉換與外部助手設定命令（Translation & Agent）
+
+用於單次翻譯鍵轉換、分頁式翻譯工作階段以及外部翻譯助手偏好設定的根命令。
+
+<CommandReferenceList lang="zh-tw" group="translate" />
+
+<CommandReferenceList lang="zh-tw" group="agent" />
+
+---
+
+## `translate` 子命令完整參考
+
+除 `translate help` 外，所有 `translate` 子命令皆需指定目標 `<world>` 路徑，並支援 `--state-root`、`--output`、`--help` 與 `--ui-locale`。
+
+<CommandReferenceList lang="zh-tw" group="translate-sub" />

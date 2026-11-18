@@ -1,0 +1,175 @@
+---
+title: 安全編輯與中斷復原
+description: 學習如何預覽 NBT 編輯計畫、在離線狀態下安全套用修改，以及當寫入中斷時如何判斷狀態並復原存檔。
+---
+
+import SafetyBanner from '../../../../components/SafetyBanner.astro';
+import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
+
+<SafetyBanner tier="write" lang="zh-tw" />
+
+**NBTExplorerCLI** 的核心設計原則是「絕不盲目覆寫存檔」。任何針對世界的修改都遵循 **查閱型別 -> 預覽計畫（Preview Plan） -> 確認遊戲關閉 -> 離線套用（Apply） -> 寫後讀回驗證** 的安全流程，並在外部狀態目錄自動保留寫前備份與執行日誌（Journal）。
+
+<WorkflowPipeline kind="edit" lang="zh-tw" />
+
+## 1. 修改世界前的三項基本原則
+
+1. **務必在世界副本上測試**：在修改重要存檔前，請先複製一份世界副本（例如 `D:\WorldCopy`）確認流程。
+2. **寫入前關閉 Minecraft 與其他工具**：執行任何帶有 `--apply` 或 `apply` 的指令前，請先關閉 Minecraft 遊戲與其他地圖編輯工具，再傳入 `--world-offline`。
+3. **狀態與輸出檔放在世界資料夾外**：請勿將 `--state-root` 或 `--output` 指向世界資料夾內部，建議統一存放在獨立目錄（如 `D:\Plans`）。
+
+## 2. 指定節點位址與使用明確型別（`typed-nbt`）
+
+為了防止因猜測型別而破壞 NBT 資料（例如誤把 `Byte` 或 `Short` 數值寫成 `Int` 或字串），`set` 不接受無型別的純文字，而是要求傳入版本化的 `nbtcli.typed-nbt` JSON（透過 `--value` 或 `--value-file`）。
+
+### 步驟 A：先用 `get --types` 取得目前的型別結構
+
+```powershell
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
+```
+
+回傳結果中的 `data.value` 即為標準的 `typed-nbt` 結構：
+
+```json
+{
+  "schemaFamily": "nbtcli.typed-nbt",
+  "schemaVersion": 1,
+  "data": {
+    "rootName": "",
+    "value": {
+      "type": "String",
+      "value": "Original Map Name"
+    }
+  }
+}
+```
+
+### 選擇節點定位方式
+
+指定要修改的節點時，請擇一使用以下定位旗標：
+
+- **`--pointer`**：標準 JSON Pointer 語法（以 `/` 分隔層級；若欄位名稱本身含 `~` 寫為 `~0`，含 `/` 寫為 `~1`），例如 `--pointer /Data/LevelName` 或 `--pointer /Data/Player/Inventory/0/id`。
+- **`--segments`**：最多 256 層的明確 JSON 陣列，適合欄位名稱含有句點或特殊符號時使用：
+  `--segments '[{"kind":"key","key":"Data"},{"kind":"key","key":"Custom.Key"}]'`
+
+若目標為區塊檔（`.mca`），請一併加上 `--chunk <x,z>`（全域區塊座標）。
+
+## 3. 預覽編輯計畫（不修改世界檔案）
+
+<SafetyBanner tier="preview" lang="zh-tw" />
+
+將準備替換的 `typed-nbt` 內容存為外部檔案（例如 `D:\Plans\new-level-name.json`），接著執行**不加 `--apply`** 的 `set` 指令以產生預覽計畫：
+
+```powershell
+.\nbtcli.exe set 'D:\WorldCopy' `
+  --path level.dat `
+  --pointer /Data/LevelName `
+  --value-file 'D:\Plans\new-level-name.json' `
+  --output 'D:\Plans\level-name-plan.json'
+```
+
+由於沒有加上 `--apply`，此時 `D:\WorldCopy` 完全不會被修改，工具只會在 `D:\Plans\level-name-plan.json` 輸出不可變的修補計畫（`nbtcli.patch-plan`），並回傳該計畫的 `planHash`。
+
+> [!NOTE]
+> 若需一次預覽多筆修改，可準備一份包含 1 至 100,000 筆操作的 `nbtcli.operations` JSON 檔案，交由 `nbtcli plan 'D:\WorldCopy' --request 'D:\Plans\ops.json' --output 'D:\Plans\batch-plan.json'` 或 `nbtcli batch 'D:\Plans\ops.json' --world 'D:\WorldCopy' --output 'D:\Plans\batch-plan.json'` 產生計畫。
+
+## 4. 離線套用計畫（`apply --world-offline`）
+
+確認計畫內容正確且 Minecraft 已關閉後，執行 `apply` 並加上 `--world-offline`：
+
+```powershell
+.\nbtcli.exe apply 'D:\WorldCopy' `
+  --plan 'D:\Plans\level-name-plan.json' `
+  --world-offline `
+  --output 'D:\Plans\level-name-receipt.json'
+```
+
+在執行 `apply` 時，寫入引擎會依序完成四道安全保護：
+
+1. **前置雜湊核對**：檢查目標檔案是否仍與建立計畫時的 SHA-256 雜湊完全一致。若期間檔案曾被其他程式改動，會直接以退出碼 `3`（`Conflict`）拒絕寫入，不破壞現有檔案。
+2. **寫前備份與暫存準備**：將原始檔案備份至外部 `objects/` 儲存庫，並在暫存檔完成新內容的驗證。
+3. **寫入日誌與原子替換**：在外部 `journals/` 記錄執行狀態後，才替換世界內的目標檔案。
+4. **寫後讀回校驗（Readback）**：重新讀取寫入後的檔案，確認雜湊值與計畫預期結果完全吻合，最後標記回執完成（`"receiptIsTerminal": true`）。
+
+### 認識回執中的九種操作結果狀態
+
+每份寫入回執（`nbtcli.apply-receipt`）都會將所有操作明確歸類為以下九種統計欄位之一：
+
+| 狀態欄位 | 白話說明 |
+| --- | --- |
+| `applied` | 修改已成功寫入世界並通過讀回校驗。 |
+| `unchanged` | 目標節點原本就已經是指定的值，經核對無需實際重寫檔案。 |
+| `skipped` | 在正式寫入前的驗證階段即被拒絕，未修改任何世界檔案。 |
+| `failed` | 操作在準備或執行階段發生錯誤。 |
+| `conflict` | 目標檔案自建立計畫後曾被外部修改，或存在衝突的操作。 |
+| `unsupported` | 目標格式或結構不支援此寫入操作。 |
+| `cancelled` | 操作被記錄為取消狀態（退出碼 `130`）。 |
+| `recoveryRequired` | 寫入途中發生中斷或 I/O 錯誤，需執行 `status` 與 `recover`（退出碼 `7`）。 |
+| `rolledBack` | 已透過復原機制安全退回修改前的原始狀態（退出碼 `8`）。 |
+
+## 5. 寫入中斷後如何判斷與恢復（`status` 與 `recover`）
+
+如果在寫入過程中遭遇斷電、磁碟 I/O 異常或程序非預期中斷，指令會回傳**退出碼 `7`（`RECOVERY_REQUIRED`）**，並在 JSON 中提供 `planHash` 與 `stateRoot`：
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": false,
+  "command": "apply",
+  "outcome": "RecoveryRequired",
+  "data": {
+    "planHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "recovery": {
+      "world": "D:\\WorldCopy",
+      "stateRoot": "C:\\Users\\Player\\AppData\\Local\\nbtcli\\worlds\\4a8b9c..."
+    }
+  },
+  "error": {
+    "code": "RECOVERY_REQUIRED",
+    "message": "World write requires recovery before further use."
+  }
+}
+```
+
+### 第一步：切勿在遊戲中開啟該世界
+
+在完成復原之前，請不要用 Minecraft 開啟該存檔，以免遊戲改寫區塊時間戳記而影響復原比對。
+
+### 第二步：使用 `status` 查詢日誌狀態
+
+帶入同一個世界路徑、同一個 `--plan-hash`（若有自訂 `--state-root` 也請一併帶入）執行唯讀查詢：
+
+```powershell
+.\nbtcli.exe status 'D:\WorldCopy' `
+  --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+```
+
+觀察回傳的欄位：
+
+- **`receiptIsTerminal: true`**：代表先前的寫入或回滾其實已經完整結束。
+- **`journalMayBeAbsent: true`**：代表中斷發生在日誌建立之前，尚未進入實際替換階段；可檢查檔案狀態後重新建立計畫。
+- **`receiptIsTerminal: false`**：代表存在未完成的寫入日誌，請接著執行 `recover`。
+
+### 第三步：執行 `recover`（繼續完成寫入，或完整退回原狀）
+
+您可以根據需求選擇以下兩種復原方式之一：
+
+- **繼續完成原本的修改計畫**：
+
+  ```powershell
+  .\nbtcli.exe recover 'D:\WorldCopy' `
+    --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 `
+    --world-offline
+  ```
+
+- **放棄修改並退回修改前的原始存檔（`--rollback`）**：
+
+  ```powershell
+  .\nbtcli.exe recover 'D:\WorldCopy' `
+    --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 `
+    --rollback `
+    --world-offline
+  ```
+
+當執行 `--rollback` 成功將世界完整還原至修改前的位元組狀態時，CLI 會回傳**退出碼 `8`（`RolledBack`）**，讓您或自動化腳本能清楚確認存檔已安全退回原狀。

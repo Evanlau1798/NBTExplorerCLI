@@ -1,0 +1,91 @@
+---
+title: 支援範圍與疑難排解
+description: 支援的 Minecraft Java 版 DataVersion 清單、退出碼對照表、實機驗證邊界說明與常見錯誤處理方式。
+---
+
+import ExitCodeTable from '../../../../components/ExitCodeTable.astro';
+import ProfileTable from '../../../../components/ProfileTable.astro';
+import SafetyBanner from '../../../../components/SafetyBanner.astro';
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+本頁整理 **NBTExplorerCLI** 支援的 **Minecraft Java Edition** 版本設定（Profiles）、說明「CLI 解析驗證」與「尚待實機驗證」的邊界、列出所有退出碼（Exit Codes），並提供常見錯誤的排解步驟。
+
+## 1. 支援的 Minecraft Java 版 Profile 清單
+
+您可以隨時執行 `nbtcli capabilities`，查詢目前執行檔註冊的命令清單與各 Minecraft `DataVersion` Profile 的支援宣告：
+
+```powershell
+.\nbtcli.exe capabilities
+```
+
+<ProfileTable lang="zh-tw" />
+
+### 如何判讀 `capabilities` 的支援範圍
+
+針對每個 Profile，`capabilities` 會分別列出六個面向（`layout`、`itemSchema`、`textSchema`、`commandGrammar`、`compression`、`packLayout`）在五種操作（`read`、`extract`、`plan`、`write`、`recover`）上的支援狀態：
+
+- **可讀取（Readable）不等於可寫入（Writable）**：能用 `get` 或 `list` 讀出資料，不代表該結構一定能直接修改或轉為翻譯鍵。在建立計畫（`plan`）與寫入（`apply`）時，工具會嚴格檢查該目標類型與版本是否支援寫入。
+- **CLI 解析驗證與「尚待實機驗證」的區別**：
+  - `validate`、`scan`、`plan` 與 `apply` 負責在 CLI 層級驗證二進位 NBT/區塊結構、JSON 語法、寫前／寫後 SHA-256 雜湊與型別規則。
+  - 通過 CLI 驗證**不等同於**已在 Minecraft 遊戲客戶端內完成實機測試。涉及遊戲內實際載入畫面、字型排版顯示與機關指令觸發等尚未在遊戲內逐一實測的行為，均屬**尚待實機驗證**範圍——在正式發布或遊玩修改後的地圖前，請務必使用世界副本進入 Minecraft 遊戲內實機確認。
+
+## 2. 支援的 21 種世界文字類型（`--types`）
+
+在執行 `scan`、`extract`、`validate`、`convert` 或 `translate start` 時，可透過 `--types` 以逗號分隔篩選以下 21 種文字角色：
+
+- **方塊與告示牌**：`Sign`、`HangingSign`、`ContainerName`、`CommandBlock`
+- **書本與講台**：`Book`、`LecternBook`、`Title`、`Author`
+- **物品與實體**：`ItemName`、`ItemLore`、`ArmorStand`、`EntityName`、`TextDisplay`
+- **世界與介面狀態**：`BossBar`、`ScoreboardTeam`、`ScoreboardObjective`
+- **資料包與語言資源**：`McFunction`、`Advancement`、`CommandStorage`、`LangKey`、`TranslationKey`
+
+## 3. 退出碼（Exit Codes）對照表
+
+每次執行指令都會回傳明確的退出碼與 JSON 輸出。當退出碼非 `0`（`success: false`）時，請檢視 JSON 中的 `error.code`、`error.message` 與 `error.details` 取得詳細原因。
+
+<ExitCodeTable lang="zh-tw" />
+
+## 4. 常見錯誤與疑難排解
+
+### 情境 A：世界檔案被鎖定或拒絕存取（退出碼 `5`）
+
+**常見訊息**：執行 `scan`、`backup` 或 `apply` 時回傳退出碼 `5`（`IO_ERROR` 或 `ACCESS_DENIED`）。
+**處理方式**：
+1. 請確認已完全關閉 Minecraft Java 版遊戲客戶端或伺服器程序。
+2. 關閉其他正在開啟該世界資料夾的軟體（例如其他 NBT 編輯器、壓縮軟體或預覽工具）。
+3. 對世界副本重新執行指令。
+
+### 情境 B：寫入中斷並提示 `RECOVERY_REQUIRED`（退出碼 `7`）
+
+**常見訊息**：`apply` 或 `recover` 回傳退出碼 `7`（`RECOVERY_REQUIRED`）。
+**處理方式**：
+1. **請勿在 Minecraft 中開啟該世界。**
+2. 從回傳的 JSON 中複製 `planHash` 與 `stateRoot`。
+3. 執行 `nbtcli status <世界路徑> --plan-hash <雜湊值> --state-root <狀態目錄>` 檢查日誌狀態。
+4. 執行 `nbtcli recover <世界路徑> --plan-hash <雜湊值> --state-root <狀態目錄> --world-offline` 繼續完成寫入，或加上 `--rollback` 安全退回修改前的原始存檔（回傳退出碼 `8`）。
+
+### 情境 C：建立計畫或工作階段後，世界曾被外部修改（退出碼 `3`）
+
+**常見訊息**：`apply` 或 `translate submit` 回傳退出碼 `3`（`CONFLICT`）。
+**發生原因**：目標世界中的檔案在您建立修補計畫或翻譯工作階段之後曾發生變動。為了防止覆蓋新資料，工具會拒絕套用過期的計畫。
+**處理方式**：
+- 若是一般編輯計畫過期：請對目前的世界檔案重新執行 `get --types` 與 `set` / `plan` 產生新計畫。
+- 若是翻譯工作階段過期（提示 `repair: "start-new-session"`）：請針對更新後的世界重新執行 `translate start` 建立新工作階段，並透過 `translate memory --source-sessions <舊工作階段ID>` 載入已翻譯過的內容。
+
+### 情境 D：部分區塊／檔案損壞或含不支援格式（退出碼 `4` 或 `5`）
+
+**常見訊息**：`scan` 或 `validate` 回報 `coverageComplete: false`，並回傳退出碼 `4`（不支援的格式）或退出碼 `5`（檔案損壞，例如 0 位元組的區塊檔或語法錯誤的資料包 JSON）。
+**處理方式**：
+1. 執行 `nbtcli validate <世界路徑>`，從輸出 JSON 的逐檔診斷紀錄中找出發生問題的相對檔案路徑。
+2. 若該檔案有建立過備份，可使用 `nbtcli restore <世界路徑> --manifest-hash <雜湊值> --path <相對路徑> --apply --world-offline` 單獨修復該檔案。
+3. 若您只需要翻譯或編輯正常的維度與檔案，可使用 `--dimension`、`--region`、`--path` 或 `--types` 明確指定範圍，避開損壞或不支援的檔案。
+
+### 情境 E：超過安全資源上限或正規表示式逾時（退出碼 `6`）
+
+**常見訊息**：指令回傳退出碼 `6`（`RESOURCE_LIMIT` 或 `PATTERN_TIMEOUT`）。
+**發生原因**：為防止記憶體耗盡或複雜正規表示式卡死，工具設有單檔／單次輸出 64 MiB 上限、工作階段 100,000 個槽位上限、節點深度 256 層上限，以及正規表示式 100 毫秒配對逾時限制。
+**處理方式**：
+- 使用 `--dimension`、`--region`、`--path` 或 `--types` 縮小單次掃描或工作階段的範圍。
+- 在建立或匯出翻譯工作階段時調降 `--page-size` 或 `--page-bytes`。
+- 簡化 `--match-pattern` 的正規表示式條件。

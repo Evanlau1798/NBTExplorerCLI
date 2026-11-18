@@ -1,0 +1,66 @@
+---
+import { SUPPORTED_PROFILES, type LocaleKey } from '../data/cli-surface';
+
+interface Props {
+  lang?: LocaleKey;
+}
+
+const { lang = 'en' } = Astro.props;
+const headers =
+  lang === 'zh-tw'
+    ? {
+        profile: 'Profile 名稱',
+        dv: 'DataVersion',
+        layout: '維度目錄結構',
+        items: '物品資料結構',
+        text: '文字組件格式',
+        pack: '資源包目錄規則',
+      }
+    : {
+        profile: 'Profile',
+        dv: 'DataVersion',
+        layout: 'Dimension Layout',
+        items: 'Item Schema',
+        text: 'Text Component Schema',
+        pack: 'Pack Layout',
+      };
+---
+
+<table>
+  <thead>
+    <tr>
+      <th>{headers.profile}</th>
+      <th>{headers.dv}</th>
+      <th>{headers.layout}</th>
+      <th>{headers.items}</th>
+      <th>{headers.text}</th>
+      <th>{headers.pack}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {
+      SUPPORTED_PROFILES.map((row) => (
+        <tr>
+          <td>
+            <code>{row.profile}</code>
+          </td>
+          <td>
+            <code>{row.dataVersion}</code>
+          </td>
+          <td>
+            <code>{row.layout}</code>
+          </td>
+          <td>
+            <code>{row.itemSchema}</code>
+          </td>
+          <td>
+            <code>{row.textSchema}</code>
+          </td>
+          <td>
+            <code>{row.packLayout}</code>
+          </td>
+        </tr>
+      ))
+    }
+  </tbody>
+</table>

@@ -1,0 +1,107 @@
+---
+title: 備份與狀態檔管理
+description: 建立與驗證內容定址世界備份、還原損壞檔案，並了解外部狀態目錄（state-root）中各資料夾的用途。
+---
+
+import SafetyBanner from '../../../../components/SafetyBanner.astro';
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+**NBTExplorerCLI** 會將所有的掃描快取、翻譯進度、備份檔案與寫入復原日誌統一存放在**世界資料夾外部**。這確保無論您執行多少次掃描或翻譯，都不會在您的 Minecraft 存檔資料夾內留下多餘的暫存檔。
+
+## 1. 認識外部狀態目錄（`--state-root`）
+
+預設情況下，工具會依世界資料夾的識別碼，將狀態檔存放在 Windows 本機應用程式資料目錄下：
+
+```text
+%LOCALAPPDATA%\nbtcli\worlds\<scope-id>\
+```
+
+您也可以透過 `--state-root 'D:\NbtState\MyWorld'` 指定自訂的外部資料夾。請注意：同一組工作流程中的 `plan`、`apply`、`status`、`recover`、`backup`、`restore`、`translate` 與 `agent` 指令，都必須使用**同一個** `--state-root`。
+
+### 狀態目錄內的資料夾與檔案說明
+
+| 子資料夾／檔案 | 用途說明 | 是否可清理或重建？ |
+| --- | --- | --- |
+| `cache/` | 儲存 `scan`、`extract` 與 `validate` 使用的掃描快取索引。 | **可隨時重建**：可透過 `scan --refresh` 重新建立，或用 `--no-cache` 略過快取。 |
+| `sessions/` | 儲存翻譯工作階段（`translate start`、譯文回覆、備註、術語表與封存紀錄）。 | **翻譯期間請保留**：內含您的翻譯進度與歷史版本紀錄。 |
+| `agent/` | 儲存外部翻譯助手的問卷偏好設定（`agent setup` / `submit`）。 | **使用者設定**：保留此目錄即可維持該世界的預設翻譯語言與每頁筆數設定。 |
+| `objects/` | 以 SHA-256 雜湊命名的內容定址儲存庫，保存寫前原始檔案映像與備份實體內容。 | **還原與回滾必備**：`restore` 與 `recover` 必須依賴此資料夾才能還原世界檔案。 |
+| `journals/` | 儲存 `apply`、`status` 與 `recover` 的寫入日誌與完成回執。 | **復原必備**：當寫入進行中或出現退出碼 `7`（待復原）時，切勿刪除此資料夾。 |
+| `backup_<後綴>_*.json` | 執行 `backup --suffix <名稱>` 時產生的具名備份清單檔。 | **需與 `objects/` 一起保留**：記錄該次備份的所有檔案路徑與 SHA-256 雜湊索引。 |
+
+### 狀態目錄與世界路徑的綁定關係
+
+`<scope-id>` 綁定的是該世界資料夾在 Windows NTFS 檔案系統上的目錄識別，而非跨資料夾通用的 UUID：
+
+- 針對 `D:\WorldCopy` 建立的修補計畫或備份，不能直接套用到另一個路徑（如 `D:\OtherWorld`），防止誤寫其他存檔。
+- 若您刪除了原本的世界資料夾並重新解壓縮，或將世界複製到新的路徑，請針對新資料夾重新執行掃描或建立計畫。
+
+## 2. 建立並驗證世界備份（`backup`）
+
+在進行重要修改前，可執行 `backup` 為整個世界（或搭配 `--path <相對路徑>` 為單一檔案）建立經 SHA-256 驗證的完整備份：
+
+```powershell
+.\nbtcli.exe backup 'D:\WorldCopy' `
+  --suffix before-translation `
+  --output 'D:\Backups\before-translation-manifest.json'
+```
+
+回傳 JSON 範例：
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "backup",
+  "outcome": "Success",
+  "data": {
+    "manifestHash": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+    "stateRoot": "C:\\Users\\Player\\AppData\\Local\\nbtcli\\worlds\\4a8b9c...",
+    "backupPath": "C:\\Users\\Player\\AppData\\Local\\nbtcli\\worlds\\4a8b9c...\\backup_before-translation_20261118T070000Z_a1b2c3.json",
+    "namedManifestPublished": true
+  },
+  "error": null
+}
+```
+
+> [!IMPORTANT]
+> 備份清單檔（`before-translation-manifest.json`）記錄的是檔案清單與雜湊索引，實際的檔案內容儲存在 `stateRoot` 下的 `objects/` 目錄中。請同時保留 `manifestHash` 與該 `stateRoot` 目錄，以便日後隨時還原。
+
+## 3. 從備份還原世界或修復損壞檔案（`restore`）
+
+<SafetyBanner tier="write" lang="zh-tw" />
+
+`restore` 會核對備份清單（`manifestHash`）與 `objects/` 內的檔案雜湊，將世界（或指定的單一 `--path`）安全還原。即使世界內目前的目標檔案已經損壞或被誤刪，`restore` 依然能正常修復。
+
+### 步驟 1：先預覽還原計畫
+
+不加 `--apply` 執行 `restore`，即可預覽預計還原的檔案清單：
+
+```powershell
+.\nbtcli.exe restore 'D:\WorldCopy' `
+  --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
+  --output 'D:\Backups\restore-plan.json'
+```
+
+### 步驟 2：關閉遊戲並離線執行還原
+
+確認 Minecraft 已關閉後，加上 `--apply --world-offline` 正式還原：
+
+```powershell
+.\nbtcli.exe restore 'D:\WorldCopy' `
+  --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
+  --apply `
+  --world-offline
+```
+
+若只想從全地圖備份中單獨還原某一個檔案（例如只修復 `level.dat`），可加上 `--path level.dat`：
+
+```powershell
+.\nbtcli.exe restore 'D:\WorldCopy' `
+  --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
+  --path level.dat `
+  --apply `
+  --world-offline
+```

@@ -1,0 +1,177 @@
+---
+title: Safe Editing and Recovery
+description: Preview typed NBT edits, apply verified patch plans while offline, and recover or roll back interrupted writes.
+---
+
+import SafetyBanner from '../../../components/SafetyBanner.astro';
+import WorkflowPipeline from '../../../components/WorkflowPipeline.astro';
+
+<SafetyBanner tier="write" lang="en" />
+
+**NBTExplorerCLI** is designed so that you never overwrite a Minecraft world blindly. Every modification follows a strict **Preview -> Plan -> Offline Apply -> Verify** workflow, backed by automatic pre-write backups and a crash recovery journal stored outside your world folder.
+
+<WorkflowPipeline kind="edit" lang="en" />
+
+## 1. Golden Rules Before Editing
+
+1. **Always test on a world copy** (`D:\WorldCopy`) before modifying an important save.
+2. **Close Minecraft and any other external tools** (such as map editors or server processes) before running any command with `--apply` or `apply`.
+3. **Never place `--state-root` or `--output` files inside the world folder.** Keep plans, receipts, and state folders in a separate directory such as `D:\Plans` or `D:\NbtState`.
+
+## 2. Selecting Nodes and Using Explicit Typed NBT
+
+To prevent accidental data corruption (such as turning a `Byte` or `Short` tag into an `Int` or `String`), `set` does not guess NBT types from plain strings. Instead, it accepts a versioned `nbtcli.typed-nbt` JSON document via `--value` or `--value-file`.
+
+### Step A: Read the Current Typed Value
+
+First, inspect the target node with `get --types`:
+
+```powershell
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
+```
+
+The response includes the exact `typed-nbt` representation inside `data.value`:
+
+```json
+{
+  "schemaFamily": "nbtcli.typed-nbt",
+  "schemaVersion": 1,
+  "data": {
+    "rootName": "",
+    "value": {
+      "type": "String",
+      "value": "Original Map Name"
+    }
+  }
+}
+```
+
+### Choosing a Node Selector
+
+When targeting a node inside an NBT or JSON file, provide **one** selector format:
+
+- **`--pointer`**: Standard JSON Pointer syntax (`/` separates keys; escape `~` as `~0` and `/` as `~1`), such as `--pointer /Data/LevelName` or `--pointer /Data/Player/Inventory/0/id`.
+- **`--segments`**: Explicit JSON array of up to 256 key/index objects for keys that contain special characters or dots:
+  `--segments '[{"kind":"key","key":"Data"},{"kind":"key","key":"Custom.Key"}]'`
+
+For region files (`.mca`), also specify `--chunk <x,z>` (global chunk coordinates) and, when querying standalone region files, `--dimension <namespace:id>`.
+
+## 3. Previewing an Edit (No World Files Modified)
+
+<SafetyBanner tier="preview" lang="en" />
+
+Save your replacement `typed-nbt` JSON to a file outside the world (for example, `D:\Plans\new-level-name.json`), then run `set` **without** `--apply` to generate a preview plan:
+
+```powershell
+.\nbtcli.exe set 'D:\WorldCopy' `
+  --path level.dat `
+  --pointer /Data/LevelName `
+  --value-file 'D:\Plans\new-level-name.json' `
+  --output 'D:\Plans\level-name-plan.json'
+```
+
+Because `--apply` was omitted, your world folder is completely untouched. The CLI outputs a preview envelope (`"preview": true`) and writes the immutable `nbtcli.patch-plan` file to `D:\Plans\level-name-plan.json`.
+
+> [!NOTE]
+> For multi-node edits, you can pass a `nbtcli.operations` JSON file (containing 1 to 100,000 operations with distinct IDs) to `nbtcli plan 'D:\WorldCopy' --request 'D:\Plans\ops.json' --output 'D:\Plans\batch-plan.json'` or `nbtcli batch 'D:\Plans\ops.json' --world 'D:\WorldCopy' --output 'D:\Plans\batch-plan.json'`.
+
+## 4. Applying the Plan Offline
+
+Once you have reviewed the plan and confirmed that Minecraft is closed, commit the plan with `apply` and `--world-offline`:
+
+```powershell
+.\nbtcli.exe apply 'D:\WorldCopy' `
+  --plan 'D:\Plans\level-name-plan.json' `
+  --world-offline `
+  --output 'D:\Plans\level-name-receipt.json'
+```
+
+During `apply`, the engine performs four safety steps in order:
+
+1. **Precondition & Hash Verification**: Confirms that the target files in `D:\WorldCopy` still match the exact SHA-256 hashes recorded when the plan was created. If a file was modified externally, `apply` stops with exit code `3` (`Conflict`) before writing anything.
+2. **Preimage Backup & Staging**: Stores the original file bytes in the external `objects/` repository and writes the updated data to temporary staged candidate files.
+3. **Journal Publication & Atomic Replace**: Records the operation in the external `journals/` directory and replaces the target world files.
+4. **Readback Verification**: Re-reads the written files to prove their hashes match the planned postimages, then marks the receipt terminal (`"receiptIsTerminal": true`).
+
+### Understanding the Nine Operation Outcomes
+
+Every apply receipt accounts for all requested operations across nine mutually exclusive outcome counters:
+
+| Outcome Field | Plain-Language Meaning |
+| --- | --- |
+| `applied` | The change was written and verified on disk. |
+| `unchanged` | The target already had the requested value; verified with no physical write needed. |
+| `skipped` | Pre-commit validation rejected the plan before any world file was touched. |
+| `failed` | An operation failed during preparation or execution. |
+| `conflict` | The target file or node changed since the plan was created, or had a competing edit. |
+| `unsupported` | The operation targets a format or structure that is not supported for writing. |
+| `cancelled` | The operation was recorded as cancelled (exit code `130`). |
+| `recoveryRequired` | The write was interrupted mid-commit; run `status` and `recover` (exit code `7`). |
+| `rolledBack` | Recovery restored the world to its verified pre-edit state (exit code `8`). |
+
+## 5. How to Judge and Recover After an Interrupted Write
+
+If power is lost, a disk I/O error occurs, or the process is interrupted after committing begins, `nbtcli.exe` exits with code **`7` (`RECOVERY_REQUIRED`)** and returns the `planHash` and `stateRoot` in the JSON response:
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": false,
+  "command": "apply",
+  "outcome": "RecoveryRequired",
+  "data": {
+    "planHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "recovery": {
+      "world": "D:\\WorldCopy",
+      "stateRoot": "C:\\Users\\Player\\AppData\\Local\\nbtcli\\worlds\\4a8b9c..."
+    }
+  },
+  "error": {
+    "code": "RECOVERY_REQUIRED",
+    "message": "World write requires recovery before further use."
+  }
+}
+```
+
+### Step 1: Do Not Open the World in Minecraft
+
+Opening a partially updated world in Minecraft can overwrite chunk timestamps and prevent clean recovery. Keep the game closed.
+
+### Step 2: Inspect the Journal State with `status`
+
+Run `status` with the exact same world path, `--plan-hash`, and `--state-root` (if you used a custom state root):
+
+```powershell
+.\nbtcli.exe status 'D:\WorldCopy' `
+  --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+```
+
+Look at the returned `data` fields:
+
+- **`receiptIsTerminal: true`**: The write or rollback has already completed cleanly.
+- **`journalMayBeAbsent: true`**: The interruption happened before any journal was published; check your files and create a new plan if needed.
+- **`receiptIsTerminal: false`**: An unfinished journal exists and is ready for `recover`.
+
+### Step 3: Run `recover` (Forward Complete or Roll Back)
+
+You have two safe choices with `recover`:
+
+- **Complete the planned edit forward** (using the staged postimages stored in the journal):
+
+  ```powershell
+  .\nbtcli.exe recover 'D:\WorldCopy' `
+    --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 `
+    --world-offline
+  ```
+
+- **Roll back to the exact original world files** (using the verified preimage backups stored before the write began):
+
+  ```powershell
+  .\nbtcli.exe recover 'D:\WorldCopy' `
+    --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 `
+    --rollback `
+    --world-offline
+  ```
+
+A successful rollback returns **exit code `8` (`RolledBack`)** so automated scripts never mistake a rollback for a forward edit, and your world files are restored byte-for-byte to their pre-edit state.

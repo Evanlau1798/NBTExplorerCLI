@@ -1,0 +1,107 @@
+---
+title: Backups and State Files
+description: Create and verify content-addressed world backups, restore damaged files, and understand how NBTExplorerCLI organizes external state files.
+---
+
+import SafetyBanner from '../../../components/SafetyBanner.astro';
+
+<SafetyBanner tier="safe" lang="en" />
+
+**NBTExplorerCLI** keeps all tool metadata, scan caches, translation sessions, backup blobs, and recovery journals **outside** your Minecraft world folder. This guarantees that inspecting a world, caching a scan, or working on a translation session never pollutes your save folder with extra files.
+
+## 1. How the External State Root Works (`--state-root`)
+
+By default, world-scoped state is stored under your local Windows application data folder:
+
+```text
+%LOCALAPPDATA%\nbtcli\worlds\<scope-id>\
+```
+
+You can also specify a dedicated folder outside the world with `--state-root 'D:\NbtState\MyWorld'`. Make sure to pass the **same** `--state-root` across related `plan`, `apply`, `status`, `recover`, `backup`, `restore`, `translate`, and `agent` commands.
+
+### Directory Layout Inside a State Root
+
+| Subfolder / File | Purpose | Can It Be Deleted or Rebuilt? |
+| --- | --- | --- |
+| `cache/` | Stores the scan cache index used by `scan`, `extract`, and `validate`. | **Rebuildable**: Can be refreshed at any time with `scan --refresh` or bypassed with `--no-cache`. |
+| `sessions/` | Stores translation sessions (`translate start`, `submit`, `note`, `glossary`, `seal`). | **Keep while translating**: Contains your translation progress, slot replies, and glossary history. |
+| `agent/` | Stores external assistant questionnaire settings (`agent setup` / `submit`). | **User configuration**: Keep to retain default language and page-size preferences for that world. |
+| `objects/` | Content-addressed store (by SHA-256) holding verified preimage files and backup blobs. | **Critical for restore & rollback**: Required by `restore` and `recover` to reconstruct original world files. |
+| `journals/` | Stores active and completed write journals and receipts for `apply`, `status`, and `recover`. | **Critical for recovery**: Never delete while an edit is in progress or requires recovery (exit code `7`). |
+| `backup_<suffix>_*.json` | Named backup manifests created when you run `backup --suffix <name>`. | **Keep with `objects/`**: Records the exact file paths and SHA-256 hashes of a world backup. |
+
+### How World Scope Binding Works
+
+The `<scope-id>` is bound to the specific NTFS directory identity of your chosen world folder (such as `D:\WorldCopy`). It is **not** a cross-folder UUID:
+
+- A plan or backup created for `D:\WorldCopy` cannot be accidentally applied to a different folder such as `D:\OtherWorld`, even if the files inside look identical.
+- If you delete and recreate the world folder (or copy it to a new directory path), run a fresh scan or plan on the new directory path.
+
+## 2. Creating a Verified World Backup (`backup`)
+
+Run `backup` before major edits to capture a verified, content-addressed snapshot of the entire world (or pass `--path <relative-path>` to back up a single file):
+
+```powershell
+.\nbtcli.exe backup 'D:\WorldCopy' `
+  --suffix before-translation `
+  --output 'D:\Backups\before-translation-manifest.json'
+```
+
+Example response:
+
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "backup",
+  "outcome": "Success",
+  "data": {
+    "manifestHash": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+    "stateRoot": "C:\\Users\\Player\\AppData\\Local\\nbtcli\\worlds\\4a8b9c...",
+    "backupPath": "C:\\Users\\Player\\AppData\\Local\\nbtcli\\worlds\\4a8b9c...\\backup_before-translation_20261118T070000Z_a1b2c3.json",
+    "namedManifestPublished": true
+  },
+  "error": null
+}
+```
+
+> [!IMPORTANT]
+> A backup manifest JSON file (`before-translation-manifest.json`) is an **index** of file paths and SHA-256 hashes; the actual file contents live inside the `objects/` subfolder of `stateRoot`. Keep both the `manifestHash` and the `stateRoot` directory intact so you can restore later.
+
+## 3. Restoring from a Backup (`restore`)
+
+<SafetyBanner tier="write" lang="en" />
+
+`restore` uses the verified backup manifest and the `objects/` store to restore your world (or a single `--path`). Even if a target file in the world is currently corrupted or missing on disk, `restore` can replace it cleanly.
+
+### Step 1: Preview the Restoration
+
+Run `restore` without `--apply` first to inspect the restoration plan:
+
+```powershell
+.\nbtcli.exe restore 'D:\WorldCopy' `
+  --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
+  --output 'D:\Backups\restore-plan.json'
+```
+
+### Step 2: Apply the Restoration Offline
+
+Close Minecraft and run `restore` with `--apply --world-offline` (or pass the saved `restore-plan.json` to `nbtcli apply`):
+
+```powershell
+.\nbtcli.exe restore 'D:\WorldCopy' `
+  --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
+  --apply `
+  --world-offline
+```
+
+To restore only a single file from a full-world backup (such as `level.dat`), add `--path level.dat`:
+
+```powershell
+.\nbtcli.exe restore 'D:\WorldCopy' `
+  --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
+  --path level.dat `
+  --apply `
+  --world-offline
+```

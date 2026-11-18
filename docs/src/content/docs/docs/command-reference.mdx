@@ -1,0 +1,67 @@
+---
+title: Command Reference
+description: Complete reference for all NBTExplorerCLI commands, subcommands, accepted flags, input schemas, and safety levels.
+---
+
+import CommandReferenceList from '../../../components/CommandReferenceList.astro';
+
+This page lists every registered command and subcommand in **NBTExplorerCLI** (`nbtcli.exe`), aligned with the verified command surface contract (`nbtcli.command-surface`, version `1`).
+
+## Global CLI Rules
+
+- **Single JSON Output**: Every command writes exactly one newline-delimited UTF-8 JSON envelope (`schemaFamily: "nbtcli.cli"`, `schemaVersion: 1`) to `stdout`.
+- **Global Display Locale (`--ui-locale`)**: Pass `--ui-locale zh-TW` (default) or `--ui-locale en-US` before or after any command to select the language of error and help messages. It does not affect translation source/target locales (`--source-language`, `--target-language`, `--lang`, `--original-lang`, `--target-lang`).
+- **Option Syntax**: Value options accept `--option value` or `--option=value`. Boolean flags take no value. Use `--` to end option parsing when a path begins with a hyphen.
+- **Root and Option Aliases**:
+  - Root `--help` and `-h` invoke `help`.
+  - Root `--version` and `-v` invoke `version`.
+  - `-h` is accepted as `--help` on any command.
+
+## File and Standard Input (`-`) Schemas
+
+Commands that read structured JSON from a file or standard input (`-`) validate the exact `schemaFamily` and `schemaVersion` before executing:
+
+| Input Schema Family | Accepted By |
+| --- | --- |
+| `nbtcli.typed-nbt` | `set --value <json>` or `set --value-file <file\|->` |
+| `nbtcli.operations` | `batch <file\|-> --world <dir>` or `plan <dir> --request <file\|->` |
+| `nbtcli.patch-plan` | `apply <dir> --plan <file\|->` |
+| `nbtcli.session-reply` | `translate submit --reply <file\|->` or `translate advance --reply <file\|->` |
+| `nbtcli.session-command` | `translate jump`, `note`, `glossary`, or `reset` via `--request <file\|->` |
+| `nbtcli.agent-questionnaire` | `agent submit <dir> --request <file\|->` |
+
+---
+
+## Inspection and Query Commands
+
+Read-only commands for checking version, command options, NBT tags, region chunks, and datapack JSON files.
+
+<CommandReferenceList lang="en" group="inspect" />
+
+## World Text Scanning and Validation Commands
+
+Read-only commands for indexing world text occurrences, extracting strings, validating world sources, and checking supported Minecraft profiles.
+
+<CommandReferenceList lang="en" group="scan" />
+
+## Editing, Backup, and Recovery Commands
+
+Commands for previewing changes, applying verified plans offline, managing backups, and recovering from interrupted writes.
+
+<CommandReferenceList lang="en" group="edit" />
+
+## Translation, Conversion, and Agent Commands
+
+Root commands for one-shot key conversion, paginated translation sessions, and external assistant preferences.
+
+<CommandReferenceList lang="en" group="translate" />
+
+<CommandReferenceList lang="en" group="agent" />
+
+---
+
+## `translate` Subcommands Reference
+
+All `translate` subcommands (except `translate help`) take the target `<world>` path and accept `--state-root`, `--output`, `--help`, and `--ui-locale`.
+
+<CommandReferenceList lang="en" group="translate-sub" />
