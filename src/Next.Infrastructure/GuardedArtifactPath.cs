@@ -39,6 +39,16 @@ internal sealed class GuardedArtifactPath : IDisposable
         BinaryPrimitives.WriteUInt64LittleEndian(key[32..], identity.FileIdHigh);
         return Hash256.Compute([.. "nbtcli.next.ntfs-directory-v1\0"u8, .. key]);
     }
+    internal static Hash256 FileIdentity(FileStream file)
+    {
+        if (!GetFileInformationByHandleEx(file.SafeFileHandle, 18, out var identity, 24))
+            throw new IOException("Cannot identify the guarded NTFS file", new Win32Exception(Marshal.GetLastPInvokeError()));
+        Span<byte> bytes = stackalloc byte[24];
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes, identity.VolumeSerialNumber);
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes[8..], identity.FileIdLow);
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes[16..], identity.FileIdHigh);
+        return Hash256.Compute(bytes);
+    }
     private static GuardedArtifactPath AcquireCore(string root, string relativePath, bool directory, bool allowMissingParents = false)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Artifact access requires validated Windows NTFS");

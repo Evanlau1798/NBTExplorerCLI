@@ -12,7 +12,8 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
     public string CandidatePath { get; }
     public ArtifactImage Preimage { get; }
     public ArtifactImage Postimage { get; }
-    public ArtifactCandidate(GuardedArtifactPath path, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, ArtifactFileIo io, bool delete = false)
+    public CandidateCleanupProof? CleanupProof { get; }
+    public ArtifactCandidate(GuardedArtifactPath path, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, ArtifactFileIo io, bool delete = false, bool track = false)
     {
         this.path = path; this.io = io; Preimage = preimage; stagedImage = ArtifactImage.Present(Hash256.Compute(bytes.Span));
         Postimage = delete ? ArtifactImage.Absent : stagedImage;
@@ -25,6 +26,7 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
             using var output = GuardedArtifactPath.OpenFile(CandidatePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
             created = true;
             io.Write(output, bytes);
+            if (track) CleanupProof = new(CandidatePath, GuardedArtifactPath.FileIdentity(output), stagedImage.Hash!);
         }
         catch { if (created) File.Delete(CandidatePath); throw; }
     }

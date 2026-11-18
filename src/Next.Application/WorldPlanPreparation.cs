@@ -55,7 +55,7 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
             {
                 var input = plan.Preconditions.Single(item => item.Artifact == output.Artifact);
                 var transformed = create(output, input);
-                var candidate = output.Intent == OutputIntent.Delete ? storage.StageDelete(output.Artifact, input.Image) : storage.Stage(output.Artifact, input.Image, transformed.Bytes);
+                var candidate = storage.StageTracked(output.Artifact, input.Image, transformed.Bytes, output.Intent == OutputIntent.Delete);
                 candidates.Add(candidate); candidate.Flush(); candidate.Verify(transformed.Verify);
                 artifacts.Add(new(output.Artifact, candidate.Postimage.ExpectedAbsent ? null : candidate.CandidatePath, candidate.Postimage, output.RequiredChecks.Select(name => new ValidationCheck(name, true, name == "preimage" ? input.Image.Hash ?? plan.PlanHash : candidate.Postimage.Hash ?? plan.PlanHash))));
             }

@@ -12,6 +12,111 @@ namespace Next.Verification;
 internal static class WorldApplyProcessTests
 {
     public static void RequiredWindowsSurviveProcessKills() => Run().GetAwaiter().GetResult();
+    public static void RecoverCleansOnlyProvedInactiveCandidates()
+    {
+        LockedBeforeVerification();
+        ProvedCandidates().GetAwaiter().GetResult();
+    }
+    private static void LockedBeforeVerification()
+    {
+        foreach (var replay in new[] { false, true })
+        {
+            var world = WorldQueryTests.CreateWorld(); var state = ScratchDirectory.CreateChild();
+            try
+            {
+                var storage = new ArtifactStorage(world, World); var engine = WorldApplyTests.Engine(world, state, storage);
+                using var prepared = WorldApplyTests.Functions(world, state, storage);
+                if (replay)
+                {
+                    using var first = WorldApplyTests.Functions(world, state, storage);
+                    Require(engine.Apply(first, true).Success, "replay control has a completed journal before the second candidate is disposed");
+                }
+                var path = prepared.Manifest.Artifacts[0].CandidatePath!;
+                using (var locked = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    try { engine.Apply(prepared, true); }
+                    catch (Exception error) when (error is IOException or AggregateException) { }
+                    Require(File.Exists(path), "a pre-verification lock prevents immediate disposal of the original candidate");
+                }
+                if (!replay)
+                {
+                    using var retry = WorldApplyTests.Functions(world, state, storage);
+                    Require(engine.Apply(retry, true).Success, "retry publishes a complete journal after the original verification was blocked");
+                }
+                Require(engine.Recover(prepared.Plan.PlanHash, true).Success && !File.Exists(path),
+                    "recover reclaims the proved original candidate after a pre-verification or replay-disposal lock is released");
+            }
+            finally { Directory.Delete(world, true); Directory.Delete(state, true); }
+        }
+    }
+    private static async Task ProvedCandidates()
+    {
+        var root = ScratchDirectory.CreateChild(); var world = WorldQueryTests.CreateWorld(); var state = Path.Combine(root, "state");
+        try
+        {
+            await KillAt(root, world, state, "before-first", recover: false);
+            var plan = new Hash256(File.ReadAllText(Path.Combine(root, "plan-hash")));
+            var journals = new FileSystemApplyJournalStore(Path.Combine(state, "journals"));
+            var objects = new FileSystemWorldBackupStore(Path.Combine(state, "objects"));
+            var active = ApplyJournalJson.Read(Encoding.UTF8.GetString(journals.Read(plan)!));
+            var bytes = objects.ReadBlob(active.HeaderHash)!;
+            var header = ApplyJournalHeaderJson.Read(Encoding.UTF8.GetString(bytes));
+            var candidates = header.Prepared.Artifacts.Select(item => item.CandidatePath!).ToArray();
+            Require(candidates.Length == 3 && candidates.All(path => path.StartsWith(world + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && File.Exists(path)),
+                "native crash leaves three exact candidates from a durable journal inside the owned fixture");
+            var replaced = candidates[1];
+            var former = Path.Combine(root, "former-candidate.bin");
+            File.Move(replaced, former);
+            File.Copy(former, replaced);
+            var unknown = Path.Combine(Path.GetDirectoryName(candidates[0])!, ".nbtcli-" + Guid.NewGuid().ToString("N") + ".candidate");
+            File.WriteAllBytes(unknown, [17, 19]);
+            using (var file = File.OpenRead(unknown))
+            {
+                var scope = Hash256.Compute(Encoding.ASCII.GetBytes(plan.Hex + header.AccessBinding.Hex));
+                File.WriteAllText(unknown + ".owner", "nbtcli.next.owned-candidate-v1\n" + scope.Hex
+                    + GuardedArtifactPath.FileIdentity(file).Hex + Hash256.Compute([17, 19]).Hex);
+            }
+            File.Delete(Path.Combine(root, "ready"));
+            await KillAt(root, world, state, "after-first", recover: true);
+            var storage = new ArtifactStorage(world, World);
+            var engine = WorldApplyTests.Engine(world, state, storage);
+            ApplyReceipt receipt;
+            using (var locked = File.Open(candidates[2], FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                receipt = engine.Recover(plan, true);
+                Require(receipt.Success && !File.Exists(candidates[0]) && File.Exists(candidates[2]),
+                    "completion reclaims the proved inactive candidate and defers a locked candidate");
+                Require(File.Exists(unknown), "a world-local marker cannot grant reclamation authority");
+            }
+            IApplyJournalStore cleanup = journals;
+            var ledger = cleanup.ReadCleanup(plan)!;
+            var invalid = "{}"u8.ToArray();
+            cleanup.WriteCleanup(plan, invalid, Hash256.Compute(ledger));
+            Require(engine.Recover(plan, true).Success && File.Exists(candidates[2]), "unverifiable cleanup metadata cannot authorize deletion or change recovery");
+            cleanup.WriteCleanup(plan, ledger, Hash256.Compute(invalid));
+            var output = header.Prepared.Artifacts[0];
+            using (var pending = storage.Stage(output.Artifact, output.Postimage, storage.Read(output.Artifact)))
+            {
+                Require(engine.Recover(plan, true).Success && File.Exists(candidates[2]) && File.Exists(pending.CandidatePath),
+                    "terminal replay defers collection while an independent stage holds writer authority");
+            }
+            var replay = engine.Recover(plan, true);
+            Require(!File.Exists(candidates[2]) && File.ReadAllBytes(replaced).SequenceEqual(File.ReadAllBytes(former))
+                && File.ReadAllBytes(unknown).SequenceEqual(new byte[] { 17, 19 }), "retry cannot delete a different file at a reused name or unregistered bytes");
+            Require(Directory.GetFiles(Path.GetDirectoryName(replaced)!, "*.candidate", SearchOption.TopDirectoryOnly).Length == 2,
+                "proved stage files from both terminated processes are reclaimed");
+            Require(ApplyReceiptJson.Write(receipt) == ApplyReceiptJson.Write(replay) && objects.ReadBlob(active.HeaderHash)!.SequenceEqual(bytes)
+                && objects.ReadManifest(header.BackupManifestHash) is not null, "cleanup retains the exact durable receipt, header and verified backup");
+            using (var retained = System.Text.Json.JsonDocument.Parse(cleanup.ReadCleanup(plan)!))
+                Require(retained.RootElement.GetProperty("Entries").EnumerateArray().Any(entry => entry.GetProperty("Path").GetString() == replaced),
+                    "a replaced candidate retains its original proof for a later exact-identity retry");
+            File.Delete(replaced);
+            File.Move(former, replaced);
+            Require(engine.Recover(plan, true).Success && !File.Exists(replaced) && File.Exists(unknown),
+                "returning the exact original file identity permits retry collection while unknown bytes remain protected");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(root, true); }
+    }
     private static async Task Run()
     {
         foreach (var phase in new[] { "before-first", "after-first", "after-n", "before-receipt", "recover-again", "rollback-again", "delete-after-mark" })

@@ -47,12 +47,16 @@ public sealed class ArtifactStorage : IArtifactStorage
         => StageCore(artifact, preimage, bytes, delete: false);
     public IArtifactCandidate StageDelete(ArtifactAddress artifact, ArtifactImage preimage)
         => StageCore(artifact, preimage, ReadOnlyMemory<byte>.Empty, delete: true);
-    private IArtifactCandidate StageCore(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, bool delete)
+    IArtifactCandidate IArtifactStorage.StageTracked(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, bool delete)
+        => StageCore(artifact, preimage, bytes, delete, track: true);
+    IReadOnlyList<CandidateCleanupProof> IArtifactStorage.CollectInactive(Hash256 access, IReadOnlyList<CandidateCleanupProof> proofs)
+        => CandidateOwnership.Collect(root, world, access, proofs);
+    private IArtifactCandidate StageCore(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, bool delete, bool track = false)
     {
         ArgumentNullException.ThrowIfNull(preimage);
         if (bytes.Length > MaximumBytes) throw new ArtifactSizeLimitException();
         var path = GuardedArtifactPath.Acquire(root, world, artifact, allowMissingParents: preimage.ExpectedAbsent);
-        try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io, delete); }
+        try { path.HoldWriter(writer); return new ArtifactCandidate(path, preimage, bytes, io, delete, track); }
         catch { path.Dispose(); throw; }
     }
     private static byte[] ReadStream(Stream stream, int maximumBytes)

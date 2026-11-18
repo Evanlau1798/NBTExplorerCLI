@@ -88,8 +88,13 @@ content. Resolving a conflict requires an explicit new plan with current precond
 Process-kill verification covers first replacement before/after, a later replacement,
 readback before receipt, repeated recovery interruption, rollback interruption and
 deletion after handle disposition. This is not a kernel or power-loss guarantee.
-Reserved candidates left by killed processes are retained as recovery evidence; this
-service does not yet garbage-collect all orphan candidates or immutable history.
+Before commit, the native writer records staged candidate paths, NTFS file identities
+and image hashes in a bounded ledger in the owned journal store. Apply and recovery
+can reclaim a recorded candidate after the operation has a complete durable result.
+Collection takes a separate writer lease and checks the world binding, guarded path,
+file identity and image hash on the handle used for deletion. A later recovery retry
+can collect a candidate that was locked. Changed, unregistered and unverifiable files
+stay in place. Immutable journal, receipt and backup history remains available.
 
 Plans containing reference synchronization also recheck the relevant source catalog
 before and between physical commits. New sources stop the stale group; interrupted

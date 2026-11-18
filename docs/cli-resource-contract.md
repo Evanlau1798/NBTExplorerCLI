@@ -66,5 +66,5 @@ operation counts once and proves every output. Partial failure retains normal
 recovery identity and never marks the source translation session applied.
 
 These commands do not establish Minecraft loading, power-loss behavior, peak
-RSS or release acceptance. Orphan candidate/history cleanup remains a separate
-documented limitation of the shared engine.
+RSS or release acceptance. The [shared recovery engine](apply-recovery.md)
+describes eligible candidate reclamation and retention of immutable history.

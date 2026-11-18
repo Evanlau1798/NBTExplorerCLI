@@ -133,9 +133,11 @@ recovery identity. Both `recovery.repair` and `policyRepair` then direct explici
 rollback and replanning; forward resume remains refused.
 
 A cleanup I/O failure can leave reserved `.candidate` files containing derived
-output bytes. Recovery repairs the promised world artifacts; it does not collect
-those old candidates or immutable history. They retain their filesystem access
-controls and may consume disk space. Automatic garbage collection is not provided.
+output bytes. Recovery repairs the promised world artifacts. After a complete
+durable result, the native writer can reclaim an inactive candidate whose exact file
+identity and image are recorded in the owned journal store. Reissuing recovery can
+retry locked candidates. Immutable history and unregistered, changed or
+unverifiable files retain their filesystem access controls and may consume disk space.
 
 Backups contain verified immutable raw blobs and manifests. Without `--path`,
 backup selects the physical inventory excluding tool-reserved `.nbtcli-*` names;

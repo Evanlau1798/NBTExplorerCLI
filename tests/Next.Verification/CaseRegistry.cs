@@ -110,6 +110,7 @@ internal static class CaseRegistry
         new("apply-journal-object-binding-integrity", "apply", _ => WorldApplyIntegrityTests.DamagedObjectsAndMismatchedBindingsCannotAuthorizeWrites()),
         new("apply-real-process-recovery-windows", "apply", _ => WorldApplyProcessTests.RequiredWindowsSurviveProcessKills()),
         new("apply-process-child", "calibration", _ => WorldApplyProcessTests.Child()),
+        new("apply-recovery-proved-orphan-ownership", "apply", _ => WorldApplyProcessTests.RecoverCleansOnlyProvedInactiveCandidates()),
         new("apply-journal-bound-history", "journal", _ => ApplyJournalContractTests.HeaderAndProgressBindImmutableContentAndHistory()),
         new("apply-journal-invalid-progress", "journal", _ => ApplyJournalContractTests.AmbiguousBindingsAndInvalidProgressAreRejected()),
         new("apply-journal-durable-cas", "journal", _ => ApplyJournalPersistenceTests.ProgressPointersUseDurableCompareExchange()),

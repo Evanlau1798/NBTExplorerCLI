@@ -24,12 +24,19 @@ public sealed partial class WorldApplyEngine
     }
     public ApplyReceipt Apply(PreparedWorldPlan prepared, bool worldOffline, CancellationToken cancellation = default)
     {
+        var result = ApplyPrepared(prepared, worldOffline, cancellation);
+        CollectInactive(prepared.Plan, prepared.AccessBinding, result);
+        return result;
+    }
+    private ApplyReceipt ApplyPrepared(PreparedWorldPlan prepared, bool worldOffline, CancellationToken cancellation)
+    {
         ArgumentNullException.ThrowIfNull(prepared); Offline(worldOffline);
         LoadedJournal? active = null;
         try
         {
             using var resourceScope = ResourceOutputPolicy.Guard(inventory, prepared.Plan);
             if (prepared.AccessBinding != Access()) throw new ArgumentException("Prepared candidates belong to a different world root", nameof(prepared));
+            RecordCandidates(prepared.Plan, prepared.AccessBinding, prepared.Candidates);
             if (Load(prepared.Plan.PlanHash) is not null) { prepared.Dispose(); return Recover(prepared.Plan.PlanHash, true, cancellation: cancellation); }
             WorldPlanBuilder.RequireReferencePolicy(prepared.Plan);
             if (prepared.Plan.WorldId != inventory.WorldId) throw new ArtifactConflictException("Prepared plan belongs to another world");
@@ -62,6 +69,12 @@ public sealed partial class WorldApplyEngine
     public ApplyReceipt Recover(Hash256 planHash, bool worldOffline, bool rollback = false, CancellationToken cancellation = default)
     {
         Offline(worldOffline); var active = Load(planHash) ?? throw new ApplyJournalMissingException();
+        var result = Recover(active, rollback, cancellation);
+        CollectInactive(active.Header.Plan, active.Header.AccessBinding, result);
+        return result;
+    }
+    private ApplyReceipt Recover(LoadedJournal active, bool rollback, CancellationToken cancellation)
+    {
         using var resourceScope = ResourceOutputPolicy.Guard(inventory, active.Header.Plan);
         ApplyReceiptJson.ValidateStorageBudget(active.Header.Plan, MaximumReceiptReasonCodeUnits);
         var previous = Receipt(active);
@@ -84,7 +97,7 @@ public sealed partial class WorldApplyEngine
                 cancellation.ThrowIfCancellationRequested();
                 var target = direction == ApplyDirection.Forward ? output.Postimage : preimages[output.Artifact];
                 var current = images[output.Artifact]!;
-                var candidate = target.ExpectedAbsent ? storage.StageDelete(output.Artifact, current) : storage.Stage(output.Artifact, current, Object(target.Hash!));
+                var candidate = storage.StageTracked(output.Artifact, current, target.ExpectedAbsent ? [] : Object(target.Hash!), target.ExpectedAbsent);
                 candidates.Add(candidate); candidate.Flush();
                 candidate.Verify(stream =>
                 {
@@ -97,7 +110,11 @@ public sealed partial class WorldApplyEngine
         }
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or OperationCanceledException)
         { return Interrupted(active, direction, error, cancellation); }
-        finally { PreparedWorldPlan.Cleanup(candidates); }
+        finally
+        {
+            RecordCandidates(active.Header.Plan, active.Header.AccessBinding, candidates);
+            PreparedWorldPlan.Cleanup(candidates);
+        }
     }
     public ApplyReceipt? ReadReceipt(Hash256 planHash, long? revision = null)
     {
@@ -126,6 +143,7 @@ public sealed partial class WorldApplyEngine
         ResourceOutputPolicy.CheckCatalog(inventory, active.Header.Plan);
         if (active.Header.AccessBinding != Access()) throw new ArtifactConflictException("Journal target root differs from the current write authority");
         foreach (var candidate in candidates) candidate.Verify(_ => { });
+        RecordCandidates(active.Header.Plan, active.Header.AccessBinding, candidates);
         var images = Images(active.Header);
         if (!Known(active.Header, images)) return Finish(active, images, direction, "Source image differs before commit", cancellation);
         active = Advance(active, direction, ApplyJournalPhase.Committing, 0, active.Journal.ReceiptHash);

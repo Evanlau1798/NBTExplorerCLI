@@ -11,6 +11,9 @@ public sealed class FileSystemApplyJournalStore : IApplyJournalStore
     public FileSystemApplyJournalStore(string root) : this(root, new ArtifactFileIo()) { }
     internal FileSystemApplyJournalStore(string root, ArtifactFileIo io) => repository = new(root, "nbtcli.next.apply-journal-store", io);
     public byte[]? Read(Hash256 planHash) => repository.Read(Key(planHash));
+    byte[]? IApplyJournalStore.ReadCleanup(Hash256 planHash) => repository.Read("cleanup-" + Key(planHash));
+    void IApplyJournalStore.WriteCleanup(Hash256 planHash, ReadOnlyMemory<byte> bytes, Hash256? expected)
+        => repository.Write("cleanup-" + Key(planHash), bytes, expected);
     public void Write(Hash256 planHash, ReadOnlyMemory<byte> bytes, Hash256? expected)
     {
         var key = Key(planHash);
