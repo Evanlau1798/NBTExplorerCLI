@@ -37,7 +37,7 @@
     "portableSha256": "623cf5fde6f9273eaecee1ada49c2d001b43f79754f82b98f0a0b3559ee230f8"
   },
   "workflowControls": {
-    "scope": "Public cases indexed by docs/capabilities.md, plus cli-session-write-public-legacy-through-seal and architecture suite",
+    "scope": "Public cases listed below, cli-session-write-public-legacy-through-seal, and the architecture suite",
     "settings": "Preserve each case's explicit input/worker settings. scanWorkers=1 applies to the separate serial scan control; cases run sequentially in isolated workers.",
     "canonicalTruth": "Case assertions fix exact typed values, protected bytes, complete slot/operation sets, receipts, recovery identities, raw restores and session completion; random temporary paths are not semantic outputs",
     "exportImport": "cli-session-file-exchange-replay",

@@ -26,7 +26,7 @@ internal static class IdentityGoldenTests
             var snapshot = SourceIdentity.Snapshot(world,
                 [new(address.Artifact, Hash256.Compute([1, 2, 3]), SourceOutcome.Success)],
                 SnapshotScope.All, new("1", "1", "1", "1"));
-            // Independent Python struct/hashlib vectors; inputs and encoding are frozen in docs/domain-contracts.md.
+            // Independent Python struct/hashlib vectors for the frozen domain encoding.
             (StableIdentity Identity, int Length, string Digest)[] vectors =
             [
                 (artifact, 122, "3bc0b827727a2420fdfb8382dcbe487d01bbbffda09f6f7d285feec3a7dff00f"),

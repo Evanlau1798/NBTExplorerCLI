@@ -77,9 +77,9 @@ internal static class AssemblyPolicyTests
         }
         VerifyDigest(Path.Combine(root, "ICSharpCode.SharpZipLib.dll"), "32EA2D0CE3512E74F1C7AD82591FE67E6B8939D76A8A4FF9C93EAD030131E71C", 2_097_152);
         VerifyLicenses(Path.Combine(root, "licenses"));
-        var sourceManifest = Path.Combine(AppContext.BaseDirectory, "ArchitectureFixture", "legacy-source.json");
+        var sourceManifest = Path.Combine(AppContext.BaseDirectory, "Fixtures", "verification", "legacy-source-hashes.json");
         using var json = JsonDocument.Parse(File.ReadAllBytes(sourceManifest));
-        var forbidden = json.RootElement.EnumerateArray().Select(item => item.GetProperty("sha256").GetString()!)
+        var forbidden = json.RootElement.EnumerateArray().Select(item => item.GetString()!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var name in names)
         {

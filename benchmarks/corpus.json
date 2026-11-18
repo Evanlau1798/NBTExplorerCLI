@@ -73,7 +73,7 @@
     }
   ],
   "otherCorpora": {
-    "legacyWorlds": "docs/baselines/corpus-summary.json",
+    "legacyWorlds": "Local archive: .old/next-docs-pre-docfx/baselines/corpus-summary.json",
     "legacyWorldScope": "Raw byte preservation only; semantic oracle adoption in G02/G03, not yet accepted game compatibility",
     "minimalCases": "fixtures/manifest.json"
   },

@@ -8,6 +8,6 @@
 
 資料分類及逐檔 hash 見 `manifest.json`、`user-data-classification.json`；新 importer 必須保留原始 bytes／origin hash，不可整包刪除 `.nbtcli_cache`。
 
-舊 GoldenTestWorld 的 139 份原件僅保存 hash manifest 於 `docs/baselines/golden-worlds.json`，本機 pristine 副本位於忽略的 `tmp/corpus/C-G`。授權尚未建立，不重新散佈世界；其 DataVersion、chunk 與完整 slot 集合待 G02/G03 獨立核對。它是保留的歷史資料，不是已獨立裁決的 expected output。所有寫入測試必須先建立另外的可丟棄副本。
+舊 GoldenTestWorld 的 139 份原件僅保存 hash manifest 於本機封存的 `.old/next-docs-pre-docfx/baselines/golden-worlds.json`，本機 pristine 副本位於忽略的 `tmp/corpus/C-G`。使用該資料的歷史證據保留於本機。所有寫入測試必須先建立另外的可丟棄副本。
 
 S/M/L 的具體 workload 與資源預算由 G00-C06 凍結；測例 runner 及 fixture-root 解析由 G00-C05 提供。後續更動 fixture 必須更新 manifest hash，不能沿用舊驗收。

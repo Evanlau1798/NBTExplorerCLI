@@ -78,7 +78,7 @@ Legacy oracle 接受 24／拒絕 20，modern 接受 29／拒絕 15。fixtures �
 
 輸出存至 `src/Next.Formats/Unicode/java21-names.json`，UTF-8／LF。使用 Java 21.0.8 runtime `21.0.8+12-LTS-250`、Unicode15.0，共 288,767 個 getName／codePointOf 可逆的 entries。gzip 內文為 `hex-codepoint<TAB>name<LF>`；SHA256 `7820d9a7ab31fa78e4241d89d48e1a41df8fa906456062b250cef6d82466822d`。整份 JSON 2,143,040 bytes，SHA256 `660194030d42081ab3b1e22468630d8b848c59c160494f7da9f4585b6bc3f173`。不要把大型 Base64 印入診斷或 review；只核對 metadata、digest 與再生結果。
 
-產品內嵌資料、按需載入，不呼叫 JDK。Unicode 授權完整保留在 `docs/licenses/Unicode.md`（原 JDK21 legal/java.base/unicode.md，僅統一 LF），並複製到產品輸出。JDK／Mojang 程式及 jars 均未納入 source 或產品依賴；只有本專案生成器與合成 oracle 資料。
+產品內嵌資料、按需載入，不呼叫 JDK。Unicode 授權完整保留在 `licenses/Unicode.md`（原 JDK21 legal/java.base/unicode.md，僅統一 LF），並複製到產品輸出。JDK／Mojang 程式及 jars 均未納入 source 或產品依賴；只有本專案生成器與合成 oracle 資料。
 
 ## Session percent formatter reference
 

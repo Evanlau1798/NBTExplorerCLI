@@ -1,0 +1,175 @@
+name: Windows CI and release
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish an approved release from an existing version tag
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    outputs:
+      revision: ${{ steps.source.outputs.revision }}
+      version: ${{ steps.package.outputs.version }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify source and archive boundaries
+        id: source
+        shell: pwsh
+        env:
+          REQUEST_PUBLISH: ${{ inputs.publish }}
+        run: |
+          if ($env:REQUEST_PUBLISH -eq 'true' -and $env:GITHUB_REF_TYPE -ne 'tag') { throw 'Publication requires a version tag' }
+          $revision = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { throw 'Cannot resolve candidate revision' }
+          $excluded = @('.old', 'plan', '.test_worlds', '.tools', 'tmp', 'artifacts') | ForEach-Object { ":(top,icase)$_" }
+          $history = @(git log --full-history -1 --format=%H $revision -- @excluded)
+          if ($LASTEXITCODE -ne 0 -or $history.Count -ne 0) { throw 'Candidate history includes local-only paths' }
+          "revision=$revision" >> $env:GITHUB_OUTPUT
+          Write-Host "Revision $revision on $env:RUNNER_OS $env:RUNNER_ARCH image $env:ImageVersion"
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Restore locked solution
+        shell: pwsh
+        run: |
+          dotnet --info
+          if ((dotnet --version) -ne '10.0.404' -or $LASTEXITCODE -ne 0) { throw 'Unexpected SDK' }
+          dotnet restore NBTExplorerCLI.slnx --configfile NuGet.Config --locked-mode --packages "$env:RUNNER_TEMP/nbt-packages"
+      - name: Build Release
+        shell: pwsh
+        env:
+          REVISION: ${{ steps.source.outputs.revision }}
+        run: |
+          dotnet build NBTExplorerCLI.slnx -c Release --no-restore "-p:SourceRevisionId=$env:REVISION" '-p:ContinuousIntegrationBuild=true' "-p:PathMap=$($PWD.Path)=/_/"
+      - name: Run verification harness
+        shell: pwsh
+        run: |
+          dotnet tests/Next.Verification/bin/Release/net10.0/Next.Verification.dll --suite all --timeout-ms 120000 |
+            Tee-Object "$env:RUNNER_TEMP/nbt-verification.json"
+          exit $LASTEXITCODE
+      - name: Build self-contained Windows candidate
+        shell: pwsh
+        env:
+          REVISION: ${{ steps.source.outputs.revision }}
+        run: |
+          $project = 'src/Next.Cli/Next.Cli.csproj'
+          $release = @('--runtime','win-x64','-p:SelfContained=true','-p:RuntimeFrameworkVersion=10.0.15',
+            '-p:NuGetLockFilePath=packages.win-x64.lock.json','-p:DisableTransitiveFrameworkReferenceDownloads=true')
+          dotnet restore $project @release --configfile NuGet.Config --locked-mode --packages "$env:RUNNER_TEMP/nbt-rid-packages"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet publish $project @release -c Release --no-restore -o "$env:RUNNER_TEMP/nbt-publish" "-p:SourceRevisionId=$env:REVISION" '-p:ContinuousIntegrationBuild=true' "-p:PathMap=$($PWD.Path)=/_/"
+      - name: Package and verify inventory
+        id: package
+        shell: pwsh
+        env:
+          REVISION: ${{ steps.source.outputs.revision }}
+        run: |
+          $root = "$env:RUNNER_TEMP/nbt-artifact"
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $pack = "$env:RUNNER_TEMP/nbt-rid-packages/microsoft.netcore.app.runtime.win-x64/10.0.15/microsoft.netcore.app.runtime.win-x64.10.0.15.nupkg"
+          $receipt = ./New-WindowsCandidate.ps1 -PublishDirectory "$env:RUNNER_TEMP/nbt-publish" -RuntimePackage $pack -Revision $env:REVISION -OutputZip "$root/nbtcli-next-win-x64.zip"
+          $receipt | Set-Content -Encoding utf8NoBOM "$root/package.json"
+          $manifest = $receipt | ConvertFrom-Json
+          "$($manifest.sha256)  $($manifest.file)" | Set-Content -Encoding ascii "$root/SHA256SUMS.txt"
+          "version=$($manifest.version)" >> $env:GITHUB_OUTPUT
+          "sha256=$($manifest.sha256)" >> $env:GITHUB_OUTPUT
+      - name: Exercise the ZIP in a Windows container without an SDK
+        shell: pwsh
+        run: |
+          if ((docker info --format '{{.OSType}}') -ne 'windows' -or $LASTEXITCODE -ne 0) { throw 'A Windows container engine is required' }
+          $smokeRoot = "$env:RUNNER_TEMP/nbt-smoke-input"
+          New-Item -ItemType Directory -Path $smokeRoot | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/nbt-artifact/*" -Destination $smokeRoot
+          Copy-Item .github/scripts/Test-WindowsCandidate.ps1,fixtures/control/level-java121.dat -Destination $smokeRoot
+          Copy-Item -LiteralPath fixtures/legacy-user-data -Destination "$smokeRoot/legacy" -Recurse
+          $image = 'mcr.microsoft.com/windows/servercore:ltsc2025'
+          docker pull $image
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $digest = docker image inspect --format '{{index .RepoDigests 0}}' $image
+          if ($LASTEXITCODE -ne 0 -or $digest -notmatch '@sha256:[a-f0-9]{64}$') { throw 'Cannot resolve the Windows image digest' }
+          Write-Host "Smoke image: $digest"
+          $source = (Resolve-Path -LiteralPath $smokeRoot).Path
+          docker run --rm --isolation=process --mount "type=bind,source=$source,target=C:\input,readonly" $digest `
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\input\Test-WindowsCandidate.ps1 -InputDirectory C:\input -RequireSdkFree |
+            Tee-Object "$env:RUNNER_TEMP/nbt-sdk-free-smoke.log"
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: nbtcli-next-windows-x64
+          path: ${{ runner.temp }}/nbt-artifact/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: windows-verification-evidence
+          path: |
+            ${{ runner.temp }}/nbt-verification.json
+            ${{ runner.temp }}/nbt-sdk-free-smoke.log
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref_type == 'tag'
+    needs: verify
+    runs-on: windows-2025
+    timeout-minutes: 10
+    environment: github-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: nbtcli-next-windows-x64
+          path: ${{ runner.temp }}/nbt-verified
+      - name: Publish the verified candidate and checksum
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVISION: ${{ needs.verify.outputs.revision }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          SHA256: ${{ needs.verify.outputs.sha256 }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -cne "v$env:VERSION" -or $tag -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw 'Tag and package version differ' }
+          $head = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $head -cne $env:REVISION) { throw 'Tag and verified revision differ' }
+          git merge-base --is-ancestor $head refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Release revision must be in main' }
+          $root = "$env:RUNNER_TEMP/nbt-verified"
+          $zip = "$root/nbtcli-next-win-x64.zip"
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne $env:SHA256 -or
+              (Get-Content -LiteralPath "$root/SHA256SUMS.txt" -Raw).Trim() -cne "$env:SHA256  nbtcli-next-win-x64.zip") { throw 'Verified artifact digest differs' }
+          $receipt = Get-Content -LiteralPath "$root/package.json" -Raw | ConvertFrom-Json
+          if ($receipt.sha256 -cne $env:SHA256 -or $receipt.revision -cne $head -or
+              $receipt.version -cne $env:VERSION -or $receipt.file -cne 'nbtcli-next-win-x64.zip') { throw 'Verified receipt differs' }
+          $tagObject = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object' | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify remote tag' }
+          if ($tagObject.type -eq 'tag') {
+            $tagObject = gh api "repos/$env:GITHUB_REPOSITORY/git/tags/$($tagObject.sha)" --jq '.object' | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot verify annotated tag' }
+          }
+          if ($tagObject.type -ne 'commit' -or $tagObject.sha -cne $head) { throw 'Remote tag no longer selects the verified revision' }
+          $flags = @('--verify-tag', '--generate-notes')
+          if ($tag.Contains('-')) { $flags += '--prerelease' }
+          gh release create $tag $zip "$root/SHA256SUMS.txt" "$root/package.json" --repo $env:GITHUB_REPOSITORY @flags

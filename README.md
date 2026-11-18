@@ -1,35 +1,48 @@
-# NBTExplorerCLI vNext
+# NBTExplorerCLI
 
-Windows x64 / .NET 10 的獨立新核心，直接開發於本目錄。舊版位於 `.old/`，不參與新版 build 或 runtime。
+[English](README.en.md)
 
-目前公開 CLI 包含查閱、掃描、通用編輯／恢復、翻譯／資源生成及檔案式 session／agent 管理。完整命令／參數與 JSON／退出碼見 [公開協議](docs/cli-protocol-contract.md)及 [機器命令表](docs/cli-command-surface.json)。help/version、get、list/ls、search/find、scan/scan-world、extract/extract-text、validate、capabilities 可查閱 NBT、原生 JSON、ZIP entry、region chunk 與世界盤點，並透過共用 verified cache 掃描／抽取文字；精確路徑與退出碼見 [查閱契約](docs/cli-query-contract.md)，完整性、快取、篩選及匯出見 [世界查詢契約](docs/cli-scan-contract.md)。尚未提供正式發行版本；公開功能範圍見下段及 [能力帳本](docs/capabilities.md)，重寫邊界見 [章程](docs/rewrite-charter.md)，模型規格見 [Domain 契約](docs/domain-contracts.md)。
+NBTExplorerCLI 是 Windows x64 的 Minecraft Java 版世界資料 CLI。它能查閱 NBT、掃描文字、管理翻譯、輸出資源包，以及預覽和驗證世界編輯。請在世界副本上確認工作流程，並在遊戲及其他寫入工具關閉時修改世界。
 
-通用 set/batch/plan、apply/status/recover 及 verified backup/restore 已接入新版服務，預設預覽與寫入條件見 [編輯命令契約](docs/cli-edit-contract.md)。`translate` 提供 [檔案式 session 管理](docs/cli-session-contract.md)及 [direct plan → apply/recover → seal](docs/cli-session-write-contract.md)；`agent setup/submit/status/help` 提供版本化問卷與可重送設定，見 [agent 契約](docs/cli-agent-contract.md)。`import-legacy` 保留舊資料、匯出報告並在完整證據下建立 session，見 [legacy CLI 契約](docs/cli-legacy-contract.md)。key plan 已接入必要 lang/pack 依賴，見 [key plan 契約](docs/cli-key-plan-contract.md)；[convert](docs/cli-convert-contract.md) 支援共用轉換、scope、keepdup 與備份政策；`translate export-lang/create-pack` 提供獨立語言檔、ZIP／目錄 pack 與 verified merge，見 [資源命令契約](docs/cli-resource-contract.md)。操作與交換規格見 [操作契約](docs/operation-contracts.md)，session 及封存見 [session 契約](docs/session-contract.md)，唯讀映射見 [legacy mapping](docs/legacy-mapping-contract.md)。世界寫入須明確套用並確認離線；預覽與管理命令不寫世界。
+## 安裝與查閱
 
-識別名稱與引用的同步需明確使用 `translate plan --direct --synchronize-references`；完整世界範圍、typed 群組、共同碰撞檢查與舊 journal 的回退方式見 [引用同步契約](docs/cli-reference-contract.md)。raw TypedEdit 與引用群組須分開規劃並重新掃描。
+從 GitHub Releases 取得 Windows x64 ZIP，依同一版本的 `SHA256SUMS.txt` 驗證下載，解壓到新目錄，保留隨附的 DLL。發布包內含 .NET runtime。
 
-舊 batch JSON 可透過 `batch --legacy --world ... --migration-report ...` 保存原輸入及映射報告，再使用共用計畫與寫入流程；欄位、唯一路徑與值型別限制見 [legacy batch 契約](docs/cli-legacy-batch-contract.md)。
+```powershell
+Get-FileHash .\nbtcli-next-win-x64.zip -Algorithm SHA256
+.\nbtcli-next.exe --version
+.\nbtcli-next.exe --help
+.\nbtcli-next.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+```
 
-## 建置與驗證
+`help <命令>` 顯示實際選項。CLI 輸出單一 JSON，使用 `--ui-locale zh-TW` 或 `en-US` 選擇介面語言。寫入前請先預覽，核對計畫及來源，並只在世界離線時提供 `--world-offline`。若提交中斷，使用同一個 state root 和計畫 hash 查詢 `status`，再依結果決定如何 `recover`。
 
-SDK 鎖定於 `global.json`。可使用已安裝的相同 SDK，或本機隔離工具鏈 `.tools/dotnet/dotnet.exe`；`.tools/` 不提交、不修改系統 SDK。Codec 的 SharpZipLib 1.4.2 由 packages.lock.json 固定，NuGet.Config 清除隱藏 fallback folders。
+## 遷移舊資料
+
+保留原世界、備份、譯文、術語、問卷及設定。`.nbtcli_cache` 內的問卷、設定與筆記也是使用者資料。指定舊格式和世界副本，並將新版 state 和報告放在世界之外。
+
+```powershell
+.\nbtcli-next.exe import-legacy 'D:\WorldCopy' --input 'D:\Legacy\session.json' `
+  --profile command-session --source-language en_us --target-language zh_tw `
+  --state-root 'D:\NextState' --output 'D:\Migration\session-report.json'
+```
+
+匯入報告保存原始 bytes、雜湊及逐筆決策，請像原資料一樣保護。設定與問卷需透過 `agent setup` 和 `agent submit` 重新確認。完全核對世界副本與來源後，可用 `--acknowledge-world-rebind --create-session` 建立 session。歧義、來源變更與沒有可靠位置的譯文須人工處理。匯入本身不套用世界變更。
+
+遷移中斷時，重送相同輸入與選項，或用 `import-legacy <世界> --list` 找回 ID，再用 `--import-id <ID> --create-session` 接續。同一版回退請使用已驗證備份與 journal。切換 executable 不會復原已寫入的資料。
+
+## 開發與發布
+
+使用 `global.json` 指定的 SDK。建置與驗證分開執行。
 
 ```powershell
 dotnet restore NBTExplorerCLI.slnx --configfile NuGet.Config --locked-mode
-dotnet build NBTExplorerCLI.slnx --no-restore -c Release
-dotnet tests/Next.Verification/bin/Release/net10.0/Next.Verification.dll
-dotnet tests/Next.Verification/bin/Release/net10.0/Next.Verification.dll --suite architecture
-dotnet tests/Next.Verification/bin/Release/net10.0/Next.Verification.dll --case help-identifies-implemented-commands
-dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --help
-dotnet src/Next.Cli/bin/Release/net10.0/nbtcli-next.dll --version
+dotnet build NBTExplorerCLI.slnx -c Release --no-restore
+dotnet tests/Next.Verification/bin/Release/net10.0/Next.Verification.dll --suite all --timeout-ms 120000
 ```
 
-建置與測試分開執行。驗證工程為無外部測試套件的 assertion harness，suite 例為 cli-read、session、session-apply、scan、discovery、storage、foundation、architecture；`--suite cli-read` 會啟動實際 CLI 做黑箱查閱，預設執行全部一般案例。使用 `--fixture-root <absolute-path>` 可覆寫預設輸出資源根，結果不依 shell cwd。每個案例在獨立 worker 執行；`--timeout-ms` 預設 30000，接受 100–120000。Stdout 為單一 JSON，stderr 為診斷；失敗、unsupported、timeout、未知／空選擇皆非零。
+GitHub Actions 建置並驗證 Windows x64 候選，發布則由通過驗證的 tag 工作流程執行。
 
-校準案例不包含於預設 suite：顯式選擇 `runner-calibration-failure`、`runner-calibration-unsupported` 應 exit 1；`--case runner-calibration-timeout --timeout-ms 1000` 應終止 worker 並 exit 1。校準失敗不能計為通過。
+## 授權
 
-`Directory.Build.targets` 檢查 project graph、Compile containment、HintPath 與 Domain 套件邊界；architecture suite 另檢查 compiled assembly／PDB、舊來源 checksum、process／動態 assembly APIs。`--artifact-root <publish-dir>` 可檢查最小 framework-dependent 發布內容與 deps。這些是工程防線，不代表已完成世界流程或 G08 自足發行驗收。語義改寫後的舊演算法仍需獨立 review，checksum 不能判斷所有抄寫。
-
-benchmarks 的 `generate-corpus S|M|L <new-output-root>` 可建立固定容量資料；既有輸出根拒絕覆寫。正確串行 scan 設定、canonical 真值與公開工作流 control 見 [control.json](benchmarks/control.json)。`measure-scan` 已提供 [掃描量測入口](docs/benchmark-measurement-contract.md)，分開語義 hash、source/cache traffic、allocation 與 process working set；已量測的場景、完整工作流結果與觀察限制見 [效能與操作範圍](docs/performance-results.md)。固定來源、limits、差異裁決與切換規則見 [量測與切換契約](docs/measurement-and-cutover.md)。
-
-資料根為 `%LOCALAPPDATA%/nbtcli-next`，暫存根為系統 temp 下的 `nbtcli-next`；取得根路徑不建立任何目錄。世界、譯文及 `.old` 使用者檔案不會因 help/version 被讀寫。候選不安裝至 PATH。
+本專案採用 [MIT](LICENSE)。隨附的第三方元件依各自的授權與聲明散布。見 [SharpZipLib](licenses/SharpZipLib.md) 與 [Unicode](licenses/Unicode.md)。Windows 發行包也附有 .NET 授權及第三方聲明。

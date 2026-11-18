@@ -23,7 +23,7 @@ internal static class CliProtocolTests
 
     public static void EveryRegisteredSurfaceHasMatchingHelpAndLocaleStableErrors()
     {
-        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CliContract", "cli-command-surface.json")));
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "verification", "cli-command-surface.json")));
         var entries = contract.RootElement.GetProperty("entries").EnumerateArray().ToArray();
         VerifyAliases(contract.RootElement, entries);
         using var root = Invoke(["help"], 0);
