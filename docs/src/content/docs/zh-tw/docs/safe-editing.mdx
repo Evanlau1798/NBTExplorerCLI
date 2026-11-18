@@ -175,6 +175,10 @@ New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
 
 若 CLI 回傳結束代碼 **`7`（`RECOVERY_REQUIRED`）**，請保持遊戲關閉，並在重試前先檢查復原日誌。若程序被強制終止，可能不會輸出任何回應；無論哪種情況，請使用保存下來的 `--plan-hash` 與相同的 `--state-root`。此復原機制已在 Windows NTFS 檔案系統上通過程序終止測試；斷電（Power Loss）情境則不在已驗證保證範圍內。
 
+若回應包含 `data.pendingPlanHash`，同一世界有另一筆寫入仍待復原。請使用該雜湊與中斷命令原本的狀態目錄執行 `recover`。復原期間世界內可能會有 `.nbtcli-pending-write` 標記，請保留此標記與外部狀態，直到復原完成。
+
+出現 `Conflict` 時，工具會保留外部變更，並繼續阻擋新寫入。如果你已在離線狀態下將整份計畫的檔案還原為經驗證的修改前版本，請再執行 `recover --rollback`。工具確認所有修改前檔案均相符後才解除阻擋，並保留原本的 `Conflict` 回執。
+
 ```json title="stdout (RecoveryRequired)"
 {
   "schemaFamily": "nbtcli.cli",

@@ -7,6 +7,7 @@ namespace NBTExplorerCLI.Infrastructure;
 
 public sealed class FileSystemApplyJournalStore : IApplyJournalStore
 {
+    public Hash256 AccessBinding => repository.AccessBinding;
     private readonly AtomicStateRepository repository;
     public FileSystemApplyJournalStore(string root) : this(root, new ArtifactFileIo()) { }
     internal FileSystemApplyJournalStore(string root, ArtifactFileIo io) => repository = new(root, "nbtcli.apply-journal-store", io);

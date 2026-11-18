@@ -31,16 +31,34 @@ public sealed partial class WorldApplyEngine
     private ApplyReceipt ApplyPrepared(PreparedWorldPlan prepared, bool worldOffline, CancellationToken cancellation)
     {
         ArgumentNullException.ThrowIfNull(prepared); Offline(worldOffline);
-        LoadedJournal? active = null;
         try
         {
             using var resourceScope = ResourceOutputPolicy.Guard(inventory, prepared.Plan);
             if (prepared.AccessBinding != Access()) throw new ArgumentException("Prepared candidates belong to a different world root", nameof(prepared));
-            RecordCandidates(prepared.Plan, prepared.AccessBinding, prepared.Candidates);
-            if (Load(prepared.Plan.PlanHash) is not null) { prepared.Dispose(); return Recover(prepared.Plan.PlanHash, true, cancellation: cancellation); }
-            WorldPlanBuilder.RequireReferencePolicy(prepared.Plan);
             if (prepared.Plan.WorldId != inventory.WorldId) throw new ArtifactConflictException("Prepared plan belongs to another world");
             if (prepared.Plan.Preconditions.IsEmpty) return prepared.Manifest.Receipt(prepared.Plan, 0, [], true);
+            using (var pending = prepared.Storage.AcquirePendingWrite())
+            {
+                CheckPending(pending, prepared.Plan.PlanHash);
+                RecordCandidates(prepared.Plan, prepared.AccessBinding, prepared.Candidates);
+                if (pending.Current is null)
+                {
+                    var prior = Load(prepared.Plan.PlanHash);
+                    if (prior is null) return ApplyNew(prepared, pending, cancellation);
+                    ProtectUnfinished(pending, prior);
+                }
+            }
+            prepared.Dispose();
+            return Recover(prepared.Plan.PlanHash, true, cancellation: cancellation);
+        }
+        finally { prepared.Dispose(); }
+    }
+    private ApplyReceipt ApplyNew(PreparedWorldPlan prepared, IPendingWorldWrite pending, CancellationToken cancellation)
+    {
+        LoadedJournal? active = null;
+        try
+        {
+            WorldPlanBuilder.RequireReferencePolicy(prepared.Plan);
             if (prepared.Candidates.Count != prepared.Manifest.Artifacts.Length) throw new ArgumentException("Incomplete prepared candidate set", nameof(prepared));
             for (var index = 0; index < prepared.Candidates.Count; index++)
             {
@@ -59,29 +77,59 @@ public sealed partial class WorldApplyEngine
             if (prepared.AccessBinding != Access()) throw new ArtifactConflictException("World root access changed before journal publication");
             var header = new ApplyJournalHeader(prepared.Plan, prepared.Manifest, backup.ManifestHash, prepared.AccessBinding);
             var headerHash = SaveObject(Bytes(ApplyJournalHeaderJson.Write(header)));
-            active = Save(header, new(JournalBinding.From(prepared.Manifest), headerHash, 0, null, ApplyDirection.Forward, ApplyJournalPhase.Prepared, 0, null), null);
-            return Commit(active, prepared.Candidates, ApplyDirection.Forward, cancellation);
+            var journal = new ApplyJournal(JournalBinding.From(prepared.Manifest), headerHash, 0, null, ApplyDirection.Forward, ApplyJournalPhase.Prepared, 0, null);
+            var bytes = Bytes(ApplyJournalJson.Write(journal));
+            var hash = SaveObject(bytes);
+            BeginPending(pending, prepared.Plan.PlanHash, hash);
+            journals.Write(prepared.Plan.PlanHash, bytes, null);
+            active = new(header, journal, hash);
+            CheckPending(pending, prepared.Plan.PlanHash);
+            return CloseIfTerminal(pending, Commit(active, prepared.Candidates, ApplyDirection.Forward, cancellation));
         }
         catch (Exception error) when (active is not null && error is IOException or InvalidDataException or UnauthorizedAccessException or OperationCanceledException)
-        { return Interrupted(active!, ApplyDirection.Forward, error, cancellation); }
-        finally { prepared.Dispose(); }
+        { return CloseIfTerminal(pending, Interrupted(active!, ApplyDirection.Forward, error, cancellation)); }
     }
     public ApplyReceipt Recover(Hash256 planHash, bool worldOffline, bool rollback = false, CancellationToken cancellation = default)
     {
-        Offline(worldOffline); var active = Load(planHash) ?? throw new ApplyJournalMissingException();
-        var result = Recover(active, rollback, cancellation);
+        Offline(worldOffline);
+        LoadedJournal active;
+        ApplyReceipt result;
+        using (var pending = storage.AcquirePendingWrite())
+        {
+            CheckPending(pending, planHash);
+            active = LoadRecovery(planHash, pending.Current);
+            ProtectUnfinished(pending, active);
+            result = Recover(active, pending, rollback, cancellation);
+        }
         CollectInactive(active.Header.Plan, active.Header.AccessBinding, result);
         return result;
     }
-    private ApplyReceipt Recover(LoadedJournal active, bool rollback, CancellationToken cancellation)
+    private void ProtectUnfinished(IPendingWorldWrite pending, LoadedJournal active)
+    {
+        if (pending.Current is null && active.Journal.Phase != ApplyJournalPhase.Completed)
+            BeginPending(pending, active.Header.Plan.PlanHash, active.Hash);
+    }
+    private ApplyReceipt Recover(LoadedJournal active, IPendingWorldWrite pending, bool rollback, CancellationToken cancellation)
     {
         using var resourceScope = ResourceOutputPolicy.Guard(inventory, active.Header.Plan);
         ApplyReceiptJson.ValidateStorageBudget(active.Header.Plan, MaximumReceiptReasonCodeUnits);
         var previous = Receipt(active);
         var direction = rollback || active.Journal.Direction == ApplyDirection.Rollback ? ApplyDirection.Rollback : ApplyDirection.Forward;
         if (previous is not null && (active.Journal.Phase == ApplyJournalPhase.Completed && direction == active.Journal.Direction
-            || previous.Results.Any(result => result.Outcome is OperationOutcome.Conflict or OperationOutcome.Cancelled or OperationOutcome.Failed or OperationOutcome.Unsupported or OperationOutcome.Skipped))) return previous;
+            || previous.Results.Any(result => result.Outcome is OperationOutcome.Conflict or OperationOutcome.Cancelled or OperationOutcome.Failed or OperationOutcome.Unsupported or OperationOutcome.Skipped)))
+        {
+            if (active.Journal.Phase == ApplyJournalPhase.Completed) pending.Complete();
+            else if (rollback && pending.Current is not null && previous.Results.Any(result => result.Outcome == OperationOutcome.Conflict)
+                && PreimagesRestored(active.Header))
+            {
+                // Manual restoration resolves the write order without rewriting the historical Conflict result.
+                _ = Advance(active, active.Journal.Direction, ApplyJournalPhase.Completed, active.Journal.CompletedCount, active.Journal.ReceiptHash);
+                pending.Complete();
+            }
+            return previous;
+        }
         if (direction == ApplyDirection.Forward) WorldPlanBuilder.RequireReferencePolicy(active.Header.Plan);
+        if (pending.Current is null) BeginPending(pending, active.Header.Plan.PlanHash, active.Hash);
         var candidates = new List<IArtifactCandidate>();
         try
         {
@@ -91,7 +139,7 @@ public sealed partial class WorldApplyEngine
             if (saved.Count != preimages.Count || preimages.Any(input => !saved.TryGetValue(input.Key, out var image) || image != input.Value))
                 throw new InvalidDataException("Journal backup does not exactly bind its plan preimages");
             var images = Images(active.Header);
-            if (!Known(active.Header, images)) return Finish(active, images, direction, "Source image is unknown or conflicts with the journal", cancellation);
+            if (!Known(active.Header, images)) return CloseIfTerminal(pending, Finish(active, images, direction, "Source image is unknown or conflicts with the journal", cancellation));
             foreach (var output in active.Header.Prepared.Artifacts)
             {
                 cancellation.ThrowIfCancellationRequested();
@@ -106,10 +154,10 @@ public sealed partial class WorldApplyEngine
                 });
                 if (candidate.Postimage != target) throw new ArtifactConflictException("Recovery candidate postimage is not authorized");
             }
-            return Commit(active, candidates, direction, cancellation);
+            return CloseIfTerminal(pending, Commit(active, candidates, direction, cancellation));
         }
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or OperationCanceledException)
-        { return Interrupted(active, direction, error, cancellation); }
+        { return CloseIfTerminal(pending, Interrupted(active, direction, error, cancellation)); }
         finally
         {
             RecordCandidates(active.Header.Plan, active.Header.AccessBinding, candidates);

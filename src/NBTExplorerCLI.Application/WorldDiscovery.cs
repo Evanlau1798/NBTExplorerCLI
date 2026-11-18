@@ -63,7 +63,7 @@ public static class WorldDiscovery
                 try
                 {
                     var artifact = new ArtifactAddress(inventory.WorldId, entry.RelativePath, ArtifactKind.Text);
-                    if (entry.RelativePath == ".nbtcli-writer.lock" && entry.Outcome == SourceOutcome.Success && !entry.IsDirectory)
+                    if (InternalWriterState(entry.RelativePath) && entry.Outcome == SourceOutcome.Success && !entry.IsDirectory)
                     {
                         if (!Add(new(new(artifact, WorldSourceRole.Irrelevant), null, SourceOutcome.Irrelevant, "InternalWriterLease", null, new()))) break;
                         continue;
@@ -133,7 +133,7 @@ public static class WorldDiscovery
                     if (!Add(new(location with { PackRoot = packRoot, PackKind = packs[packRoot] }, null, packState.Outcome, packState.Code, rawHash, new(), PackMetadataHash: packState.ContentHash))) break;
                     continue;
                 }
-                if (entry.RelativePath == ".nbtcli-writer.lock")
+                if (InternalWriterState(entry.RelativePath))
                 {
                     if (!Add(new(location, null, SourceOutcome.Irrelevant, "InternalWriterLease", null, new()))) break;
                     continue;
@@ -195,6 +195,9 @@ public static class WorldDiscovery
         }
         return Finish();
     }
+    private static bool InternalWriterState(string path)
+        => path is ".nbtcli-writer.lock" or PendingWorldWrite.FileName;
+
     private static bool InternalCandidate(string path)
     {
         var name = path[(path.LastIndexOf('/') + 1)..];

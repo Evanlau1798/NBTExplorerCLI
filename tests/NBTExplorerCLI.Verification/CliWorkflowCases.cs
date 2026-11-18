@@ -10,6 +10,7 @@ internal static class CliWorkflowCases
         new("cli-convert-empty-plan-roundtrip", "cli-convert", _ => CliConvertTests.EmptyConversionPlansRoundTripWithoutResourceOrGameplayWrites()),
         new("cli-write-replay-status-initial-io", "cli-write-recovery", _ => ReferencePolicyRecoveryTests.ReplayAndStatusReadFailuresRetainExistingPartialJournalIdentity()),
         new("cli-write-native-cleanup-io-identity", "cli-write-recovery", _ => CliWriteRecoveryTests.RealCandidateCleanupFailuresKeepRecoveryIdentityAndSavedReceipt()),
+        new("cli-write-refuses-new-plan-during-recovery", "cli-write-recovery", _ => CliWriteRecoveryTests.NewPlanWaitsForAnInterruptedWorldWrite()),
         new("cli-write-policy-status-io-identity", "cli-write-recovery", _ => ReferencePolicyRecoveryTests.PolicyRefusalStatusIoKeepsRecoveryIdentity()),
         new("cli-write-missing-journal-classification", "cli-write-recovery", _ => CliWriteRecoveryTests.MissingJournalKeepsItsNotFoundClassification()),
         new("cli-write-postcommit-io-identity", "cli-write-recovery", _ => CliWriteRecoveryTests.PostcommitJournalFailuresKeepRecoveryIdentityAndHonestAccounting()),

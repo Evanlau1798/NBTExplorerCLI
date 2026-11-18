@@ -175,6 +175,10 @@ Every apply receipt accounts for all requested operations across nine mutually e
 
 If the CLI returns exit code **`7` (`RECOVERY_REQUIRED`)**, keep the game closed and inspect the journal before retrying. A process that is terminated may produce no response. Use the saved plan hash and the same state root in either case. Recovery has been tested after process termination on Windows NTFS. Recovery after power loss has not been verified.
 
+If the response contains `data.pendingPlanHash`, a different write is waiting for recovery on the same world. Use that hash with `recover` and the state root from the interrupted command. The world may contain `.nbtcli-pending-write` while recovery is pending. Keep this marker and the external state together until recovery finishes.
+
+A `Conflict` preserves external changes and keeps new writes blocked. If you restore the entire plan's verified preimages offline, rerun `recover --rollback`. The CLI verifies those images before releasing the block and preserves the original `Conflict` receipt.
+
 ```json title="stdout (RecoveryRequired)"
 {
   "schemaFamily": "nbtcli.cli",

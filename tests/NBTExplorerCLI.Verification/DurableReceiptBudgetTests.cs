@@ -23,6 +23,7 @@ internal static class DurableReceiptBudgetTests
     }
     private sealed class FailureReason(IApplyJournalStore inner, string message) : IApplyJournalStore
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         internal bool Enabled { get; set; } = true;
         public byte[]? Read(Hash256 planHash) => inner.Read(planHash);
         public void Write(Hash256 planHash, ReadOnlyMemory<byte> bytes, Hash256? expected)

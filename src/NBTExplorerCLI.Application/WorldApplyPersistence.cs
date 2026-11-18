@@ -23,12 +23,55 @@ public sealed partial class WorldApplyEngine
     private LoadedJournal? Load(Hash256 planHash)
     {
         ArgumentNullException.ThrowIfNull(planHash); var bytes = journals.Read(planHash); if (bytes is null) return null;
+        return DecodeJournal(planHash, bytes);
+    }
+    private LoadedJournal DecodeJournal(Hash256 planHash, byte[] bytes)
+    {
         var hash = Hash256.Compute(bytes); if (!Object(hash).AsSpan().SequenceEqual(bytes)) throw new InvalidDataException("Journal pointer differs from its immutable generation");
         var journal = ApplyJournalJson.Read(Text(bytes)); var header = ApplyJournalHeaderJson.Read(Text(Object(journal.HeaderHash)));
         if (journal.Binding.PlanHash != planHash || header.Plan.PlanHash != planHash || header.Plan.WorldId != inventory.WorldId
             || header.AccessBinding != Access() || journal.Binding != JournalBinding.From(header.Prepared) || journal.CompletedCount > header.Prepared.Artifacts.Length)
             throw new InvalidDataException("Journal header, plan, progress or world binding differs");
         return new(header, journal, hash);
+    }
+    private Hash256 JournalStoreBinding() => journals.AccessBinding ?? throw new NotSupportedException("Journal storage requires an exact access binding");
+    private void CheckPending(IPendingWorldWrite pending, Hash256 requested)
+    {
+        if (pending.Current is not { } marker) return;
+        if (marker.WorldBinding != Access()) throw new InvalidDataException("Pending write marker belongs to a different physical root");
+        if (marker.PlanHash != requested || marker.StoreBinding != JournalStoreBinding()) throw new PendingWorldWriteException(marker.PlanHash);
+    }
+    private void BeginPending(IPendingWorldWrite pending, Hash256 plan, Hash256 anchor)
+        => pending.Begin(new(plan, Access(), JournalStoreBinding(), anchor));
+    private LoadedJournal LoadRecovery(Hash256 planHash, PendingWorldWrite? marker)
+    {
+        var active = Load(planHash);
+        if (marker is null) return active ?? throw new ApplyJournalMissingException();
+        var bytes = Object(marker.Anchor);
+        var anchor = ApplyJournalJson.Read(Text(bytes));
+        if (active is not null)
+        {
+            if (active.Journal.HeaderHash != anchor.HeaderHash || active.Journal.Sequence < anchor.Sequence)
+                throw new InvalidDataException("Journal pointer differs from its pending write anchor");
+            return active;
+        }
+        var initial = DecodeJournal(planHash, bytes);
+        if (anchor.Phase != ApplyJournalPhase.Prepared || !PreimagesRestored(initial.Header))
+            throw new InvalidDataException("Pending recovery is missing its journal pointer");
+        journals.Write(planHash, bytes, null);
+        return initial;
+    }
+    private bool PreimagesRestored(ApplyJournalHeader header)
+    {
+        var images = Images(header);
+        return header.Plan.Preconditions.All(input => images[input.Artifact] == input.Image);
+    }
+    private static bool Terminal(ApplyReceipt receipt) => receipt.DependenciesComplete
+        || receipt.Results.All(result => result.Outcome is OperationOutcome.Cancelled or OperationOutcome.Failed or OperationOutcome.Skipped or OperationOutcome.Unsupported);
+    private static ApplyReceipt CloseIfTerminal(IPendingWorldWrite pending, ApplyReceipt receipt)
+    {
+        if (Terminal(receipt)) pending.Complete();
+        return receipt;
     }
     private LoadedJournal Save(ApplyJournalHeader header, ApplyJournal journal, Hash256? expected)
     {
@@ -90,8 +133,7 @@ public sealed partial class WorldApplyEngine
         if (prior is not null) _ = prior.Revise(revision, results, complete);
         var receipt = header.Prepared.Receipt(header.Plan, revision, results, complete);
         var hash = SaveObject(Bytes(ApplyReceiptJson.Write(receipt)));
-        var terminal = complete || results.All(result => result.Outcome is OperationOutcome.Cancelled or OperationOutcome.Failed or OperationOutcome.Skipped or OperationOutcome.Unsupported);
-        _ = Advance(active, direction, terminal ? ApplyJournalPhase.Completed : ApplyJournalPhase.RecoveryRequired, active.Journal.CompletedCount, hash);
+        _ = Advance(active, direction, Terminal(receipt) ? ApplyJournalPhase.Completed : ApplyJournalPhase.RecoveryRequired, active.Journal.CompletedCount, hash);
         return receipt;
     }
 }

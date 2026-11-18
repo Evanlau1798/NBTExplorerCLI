@@ -205,6 +205,7 @@ internal static class WorldApplyProcessTests
     }
     private sealed class PausedReceipt(IApplyJournalStore inner, string root) : IApplyJournalStore
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         public byte[]? Read(Hash256 planHash) => inner.Read(planHash);
         public void Write(Hash256 planHash, ReadOnlyMemory<byte> bytes, Hash256? expected)
         {

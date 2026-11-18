@@ -18,6 +18,7 @@ public sealed class ArtifactStorage : IArtifactStorage
     private readonly Guid world;
     private readonly ArtifactFileIo io;
     private readonly ArtifactWriterLock writer;
+    private readonly object pendingWriteGate = new();
     public ArtifactStorage(string root, Guid worldId) : this(root, worldId, new ArtifactFileIo()) { }
     internal ArtifactStorage(string root, Guid worldId, ArtifactFileIo io)
     {
@@ -28,6 +29,7 @@ public sealed class ArtifactStorage : IArtifactStorage
     }
     public byte[] Read(ArtifactAddress artifact)
         => ReadBounded(artifact, MaximumBytes);
+    IPendingWorldWrite IArtifactStorage.AcquirePendingWrite() => PendingWorldWriteFile.Acquire(root, world, writer, pendingWriteGate);
     public byte[] ReadBounded(ArtifactAddress artifact, int maximumBytes)
     {
         if (maximumBytes is < 1 or > MaximumBytes) throw new ArgumentOutOfRangeException(nameof(maximumBytes));

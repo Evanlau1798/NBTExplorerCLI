@@ -192,6 +192,7 @@ internal static class SessionApplyTests
     }
     private sealed class StopRollbackProgress(IApplyJournalStore inner) : IApplyJournalStore
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         public byte[]? Read(Hash256 hash) => inner.Read(hash);
         public void Write(Hash256 hash, ReadOnlyMemory<byte> bytes, Hash256? expected)
         {

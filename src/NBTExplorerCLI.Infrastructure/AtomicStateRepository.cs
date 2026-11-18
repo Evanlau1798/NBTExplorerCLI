@@ -11,6 +11,7 @@ internal sealed class AtomicStateRepository
     private readonly string family;
     private readonly ArtifactStorage storage;
     private readonly object writeGate = new();
+    internal Hash256 AccessBinding => storage.AccessBinding;
     internal AtomicStateRepository(string root, string family, ArtifactFileIo io)
     {
         this.root = SafeStateDirectory.Ensure(root); this.family = family;

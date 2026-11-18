@@ -153,6 +153,7 @@ internal static class ResourceOutputTests
     }
     private sealed class InterruptedStorage(IArtifactStorage inner) : IArtifactStorage
     {
+        public IPendingWorldWrite AcquirePendingWrite() => inner.AcquirePendingWrite();
         private int commits;
         public Hash256? AccessBinding => inner.AccessBinding;
         public byte[] Read(ArtifactAddress artifact) => inner.Read(artifact);
@@ -185,6 +186,7 @@ internal static class ResourceOutputTests
     }
     private sealed class ScopeChangingStorage(IArtifactStorage inner, Action change) : IArtifactStorage
     {
+        public IPendingWorldWrite AcquirePendingWrite() => inner.AcquirePendingWrite();
         private readonly Action change = change;
         private int commits;
         internal int Commits => commits;

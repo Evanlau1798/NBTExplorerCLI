@@ -94,6 +94,7 @@ internal static class WorldApplyTests
     }
     private sealed class RefuseTerminalPointer(IApplyJournalStore inner) : IApplyJournalStore
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         public byte[]? Read(Hash256 planHash) => inner.Read(planHash);
         public void Write(Hash256 planHash, ReadOnlyMemory<byte> bytes, Hash256? expected)
         {

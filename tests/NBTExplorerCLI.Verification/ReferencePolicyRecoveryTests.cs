@@ -57,18 +57,23 @@ internal static class ReferencePolicyRecoveryTests
                 && before.All(pair => File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value)), "policy/status failure retains exact context and writes no world content");
             Require(data.GetProperty("policyRepair").GetString() == "rollback-and-create-new-reference-plan"
                 && data.GetProperty("recovery").GetProperty("repair").GetString() == data.GetProperty("policyRepair").GetString(), "policy refusal has one consistent rollback/replan repair across both projections");
+            var lease = (IArtifactStorage)new ArtifactStorage(world, frame.Unapproved.Plan.WorldId);
+            using (var pending = lease.AcquirePendingWrite())
+                Require(pending.Current?.PlanHash == frame.Unapproved.Plan.PlanHash, "recovering a markerless journal must register it before policy refusal");
             Require(Run(work, "recover", world, "--plan-hash", frame.Unapproved.Plan.PlanHash.Hex, "--state-root", State(work), "--world-offline", "--rollback").Exit == 8, "the retained identity still supports an explicit real CLI rollback after removing the read fault");
         }
         finally { Directory.Delete(world, true); Directory.Delete(work, true); }
     }
     private sealed class FailPolicyStatus(IApplyJournalStore inner) : IApplyJournalStore
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         public int Reads { get; private set; }
         public byte[]? Read(Hash256 hash) => ++Reads == 1 ? inner.Read(hash) : throw new IOException("Injected status read after reference policy refusal");
         public void Write(Hash256 hash, ReadOnlyMemory<byte> bytes, Hash256? expected) => throw new InvalidOperationException("Policy refusal must not publish journal changes");
     }
     private sealed class StopPrepared(IApplyJournalStore inner) : IApplyJournalStore
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         public byte[]? Read(Hash256 hash) => inner.Read(hash);
         public void Write(Hash256 hash, ReadOnlyMemory<byte> bytes, Hash256? expected)
         {
@@ -92,6 +97,8 @@ internal static class ReferencePolicyRecoveryTests
         var plan = new WorldPlanBuilder(inventory).Build(snapshot, groups); var objects = new FileSystemWorldBackupStore(Path.Combine(State(work), "objects")); var journals = new FileSystemApplyJournalStore(Path.Combine(State(work), "journals"));
         using var prepared = new WorldPlanPreparation(inventory, storage).Prepare(snapshot, plan, true);
         CandidateIoTests.Reject<InvalidOperationException>(() => new WorldApplyEngine(inventory, storage, objects, new StopPrepared(journals)).Apply(prepared, true));
+        // Construct an older journal without a world marker to exercise its recovery policy directly.
+        using (var pending = ((IArtifactStorage)storage).AcquirePendingWrite()) pending.Complete();
         var record = ApplyJournalJson.Read(Encoding.UTF8.GetString(journals.Read(plan.PlanHash)!)); var current = ApplyJournalHeaderJson.Read(Encoding.UTF8.GetString(objects.ReadBlob(record.HeaderHash)!));
         var unapprovedPlan = new PatchPlan(plan.WorldId, plan.SnapshotId, plan.ProfileVersion, "unapproved-group-policy", plan.Operations, plan.Preconditions, plan.Outputs, plan.Dependencies, plan.Recovery);
         var manifest = new PreparedManifest(unapprovedPlan, current.Prepared.Artifacts); var unapproved = new ApplyJournalHeader(unapprovedPlan, manifest, current.BackupManifestHash, current.AccessBinding);

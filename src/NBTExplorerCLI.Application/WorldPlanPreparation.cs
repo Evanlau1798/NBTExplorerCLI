@@ -69,7 +69,7 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
             foreach (var candidate in candidates) candidate.Verify(_ => { });
             WorldPlanBuilder.CheckPreimages(inventory, plan);
             if (inventory.AccessBinding != access || storage.AccessBinding != access) throw new ArtifactConflictException("World root access changed during preparation");
-            return new(plan, new PreparedManifest(plan, artifacts), candidates, access);
+            return new(plan, new PreparedManifest(plan, artifacts), candidates, access, storage);
         }
         catch (Exception error)
         {
@@ -84,10 +84,11 @@ public sealed class PreparedWorldPlan : IDisposable
     public PreparedManifest Manifest { get; }
     internal IReadOnlyList<IArtifactCandidate> Candidates { get; }
     internal Hash256 AccessBinding { get; }
-    internal PreparedWorldPlan(PatchPlan plan, PreparedManifest manifest, IReadOnlyList<IArtifactCandidate> candidates, Hash256 accessBinding)
+    internal IArtifactStorage Storage { get; }
+    internal PreparedWorldPlan(PatchPlan plan, PreparedManifest manifest, IReadOnlyList<IArtifactCandidate> candidates, Hash256 accessBinding, IArtifactStorage storage)
     {
         ApplyReceiptJson.ValidateStorageBudget(plan, WorldApplyEngine.MaximumReceiptReasonCodeUnits);
-        (Plan, Manifest, Candidates, AccessBinding) = (plan, manifest, candidates, accessBinding);
+        (Plan, Manifest, Candidates, AccessBinding, Storage) = (plan, manifest, candidates, accessBinding, storage);
     }
     public void Dispose() => Cleanup(Candidates);
     internal static void Cleanup(IEnumerable<IArtifactCandidate> candidates)

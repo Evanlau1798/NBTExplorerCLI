@@ -13,6 +13,117 @@ namespace NBTExplorerCLI.Verification;
 
 internal static class CliWriteRecoveryTests
 {
+    public static void NewPlanWaitsForAnInterruptedWorldWrite()
+    {
+        foreach (var interruption in new[] { "replace", "journal-publication", "external-conflict", "markerless-conflict", "markerless-replay" })
+            VerifyWriteOrder(interruption);
+    }
+
+    private static void VerifyWriteOrder(string interruption)
+    {
+        var world = WorldQueryTests.CreateWorld(); var state = ScratchDirectory.CreateChild(); var other = ScratchDirectory.CreateChild();
+        try
+        {
+            var first = Path.Combine(state, "first.json"); var second = Path.Combine(state, "second.json");
+            using var previewA = Success(Run(state, "convert", world, "--path", WorldQueryTests.Function(0), "--lang", "en_us", "--state-root", state, "--output", first));
+            using var previewB = Success(Run(state, "convert", world, "--path", WorldQueryTests.Function(2), "--lang", "en_us", "--language-output", "second.zip#assets/test/lang/en_us.json", "--state-root", state, "--output", second));
+            var plan = PatchPlanJson.Read(File.ReadAllText(first)); var inventory = new WorldInventory(world, plan.WorldId);
+            var snapshot = new WorldQueryService(inventory, new FileSystemScanCacheStore(Path.Combine(state, "cache")))
+                .QueryAsync(new(new(SourceIdentity.ReadSnapshotScope(plan.SnapshotId)))).GetAwaiter().GetResult().Snapshot!;
+            var storage = new ArtifactStorage(world, plan.WorldId, new WorldApplyTests.FailReplace(1, after: true));
+            var initialFile = Path.Combine(world, WorldQueryTests.Function(0)); var initialBytes = File.ReadAllBytes(initialFile);
+            using var prepared = new WorldPlanPreparation(inventory, storage).Prepare(snapshot, plan, true);
+            var journals = new FileSystemApplyJournalStore(Path.Combine(state, "journals"));
+            var engine = new WorldApplyEngine(inventory, storage, new FileSystemWorldBackupStore(Path.Combine(state, "objects")),
+                interruption == "journal-publication" ? new FailInitialJournalWrite(journals) : journals);
+            if (interruption == "journal-publication")
+            {
+                CandidateIoTests.Reject<IOException>(() => engine.Apply(prepared, true));
+                Require(engine.ReadStatus(plan.PlanHash) is null && File.ReadAllBytes(initialFile).SequenceEqual(initialBytes),
+                    "an interrupted pointer publication leaves only the pending marker and its immutable anchor");
+            }
+            else
+            {
+                var receipt = engine.Apply(prepared, true);
+                Require(!receipt.Success && engine.ReadStatus(plan.PlanHash)?.Phase == ApplyJournalPhase.RecoveryRequired
+                    && !File.ReadAllBytes(initialFile).SequenceEqual(initialBytes), "the interrupted plan has changed an actual world file");
+            }
+            var output = Path.Combine(world, "second.zip"); var file = Path.Combine(world, WorldQueryTests.Function(2));
+            var before = File.ReadAllBytes(file);
+            string[] apply = ["apply", world, "--plan", second, "--world-offline"];
+            string[] recover = ["recover", world, "--plan-hash", plan.PlanHash.Hex, "--world-offline"];
+            foreach (var selected in new[] { state, other })
+            {
+                var refused = Run(state, [.. apply, "--state-root", selected]);
+                using var json = JsonDocument.Parse(refused.Output);
+                Require(refused.Exit == 7 && json.RootElement.GetProperty("data").TryGetProperty("pendingPlanHash", out var pending)
+                    && pending.GetString() == plan.PlanHash.Hex && !File.Exists(output) && File.ReadAllBytes(file).SequenceEqual(before),
+                    $"new plan must identify the pending plan and preserve its own outputs; {interruption}: exit {refused.Exit}, {refused.Output}");
+            }
+            Require(Run(state, [.. recover, "--state-root", other]).Exit == 7, "the pending plan cannot be recovered with a different physical state store");
+            if (interruption == "markerless-replay")
+            {
+                using (var pending = ((IArtifactStorage)storage).AcquirePendingWrite()) pending.Complete();
+                File.WriteAllBytes(initialFile, initialBytes);
+                using var retry = new WorldPlanPreparation(inventory, new ArtifactStorage(world, plan.WorldId)).Prepare(snapshot, plan, true);
+                var recoveryStorage = new ObserveRecoveryLock(new ArtifactStorage(world, plan.WorldId), () =>
+                {
+                    var duringHandoff = Run(state, [.. apply, "--state-root", other]);
+                    Require(duringHandoff.Exit == 7 && !File.Exists(output) && File.ReadAllBytes(file).SequenceEqual(before),
+                        $"the adopted marker must protect the lock handoff before replay reacquires it; apply exit {duringHandoff.Exit}");
+                });
+                var restarted = new WorldApplyEngine(inventory, recoveryStorage, new FileSystemWorldBackupStore(Path.Combine(state, "objects")), journals);
+                Require(restarted.Apply(retry, true).Success, "the interrupted plan still finishes through replay after releasing the preparation lease");
+            }
+            else if (interruption is "external-conflict" or "markerless-conflict")
+            {
+                File.WriteAllBytes(initialFile, [9]);
+                var conflict = Run(state, [.. recover, "--state-root", state, "--rollback"]);
+                Require(conflict.Exit == 3 && File.ReadAllBytes(initialFile).SequenceEqual(new byte[] { 9 })
+                    && Run(state, [.. apply, "--state-root", state]).Exit == 7, "a third image remains intact and cannot release the world for new writes");
+                if (interruption == "markerless-conflict")
+                {
+                    // Model an existing Conflict journal written before world markers were introduced.
+                    using (var pending = ((IArtifactStorage)storage).AcquirePendingWrite()) pending.Complete();
+                    var older = Run(state, [.. recover, "--state-root", state, "--rollback"]);
+                    var attempt = Run(state, [.. apply, "--state-root", other]);
+                    Require(older.Exit == 3 && attempt.Exit == 7 && File.ReadAllBytes(initialFile).SequenceEqual(new byte[] { 9 })
+                        && !File.Exists(output) && File.ReadAllBytes(file).SequenceEqual(before),
+                        $"recovering a markerless Conflict preserves files and prevents a new plan; recovery exit {older.Exit}, apply exit {attempt.Exit}");
+                }
+                File.WriteAllBytes(initialFile, initialBytes);
+                var resolved = Run(state, [.. recover, "--state-root", state, "--rollback"]);
+                using var result = JsonDocument.Parse(resolved.Output);
+                Require(resolved.Exit == 3 && result.RootElement.GetProperty("data").GetProperty("phase").GetString() == "completed",
+                    $"all verified preimages may release the pending marker without rewriting the conflict receipt; {resolved.Output}");
+            }
+            else
+            {
+                using var recovered = Success(Run(state, [.. recover, "--state-root", state]));
+            }
+            using var applied = Success(Run(state, [.. apply, "--state-root", other]));
+            Require(File.Exists(output) && !File.ReadAllBytes(file).SequenceEqual(before), "the new plan can write after the first recovery is settled");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(state, true); Directory.Delete(other, true); }
+    }
+
+    private sealed class FailInitialJournalWrite(IApplyJournalStore inner) : IApplyJournalStore
+    {
+        public Hash256? AccessBinding => inner.AccessBinding;
+        public byte[]? Read(Hash256 hash) => inner.Read(hash);
+        public void Write(Hash256 hash, ReadOnlyMemory<byte> bytes, Hash256? expected) => throw new IOException("Interrupted before the first journal pointer publication");
+    }
+
+    private sealed class ObserveRecoveryLock(IArtifactStorage inner, Action beforeAcquire) : IArtifactStorage
+    {
+        public Hash256? AccessBinding => inner.AccessBinding;
+        public IPendingWorldWrite AcquirePendingWrite() { beforeAcquire(); return inner.AcquirePendingWrite(); }
+        public byte[] Read(ArtifactAddress artifact) => inner.Read(artifact);
+        public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes) => inner.Stage(artifact, preimage, bytes);
+        public IArtifactCandidate StageTracked(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, bool delete)
+            => inner.StageTracked(artifact, preimage, bytes, delete);
+    }
+
     public static void RealCandidateCleanupFailuresKeepRecoveryIdentityAndSavedReceipt()
     {
         var world = WorldQueryTests.CreateWorld(); var state = ScratchDirectory.CreateChild(); var locks = new List<FileStream>();
@@ -114,6 +225,7 @@ internal static class CliWriteRecoveryTests
     }
     private sealed class FaultJournal(IApplyJournalStore inner, string mode) : IApplyJournalStore
     {
+        public Hash256? AccessBinding => inner.AccessBinding;
         public bool Disabled { get; set; }
         private bool terminal;
         public byte[]? Read(Hash256 hash) => !Disabled && terminal && mode == "status" ? throw new IOException("Injected postapply status I/O failure") : inner.Read(hash);

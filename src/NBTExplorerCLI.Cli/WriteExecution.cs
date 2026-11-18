@@ -38,6 +38,11 @@ internal static class WriteExecution
             if (currentStatus is null && receipt is null) throw new ApplyJournalMissingException();
             return WriteCommands.Status(currentStatus, receipt);
         }
+        catch (PendingWorldWriteException pending)
+        {
+            return new(new { planHash = hash, pendingPlanHash = pending.PlanHash, recovery = new { recovery.world, repair = "resume-pending-plan-using-original-state-root" } },
+                "RECOVERY_REQUIRED", "RecoveryRequired", 7);
+        }
         catch (Exception error) when (StateFailure(error))
         {
             var missing = error is ApplyJournalMissingException;

@@ -20,6 +20,7 @@ public interface IArtifactCandidate : IDisposable
 public interface IArtifactStorage
 {
     Hash256? AccessBinding => null;
+    IPendingWorldWrite AcquirePendingWrite() => throw new NotSupportedException("Storage does not support durable world write ordering");
     byte[] Read(ArtifactAddress artifact);
     IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes);
     IArtifactCandidate StageDelete(ArtifactAddress artifact, ArtifactImage preimage)
@@ -27,4 +28,21 @@ public interface IArtifactStorage
     IArtifactCandidate StageTracked(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes, bool delete)
         => delete ? StageDelete(artifact, preimage) : Stage(artifact, preimage, bytes);
     IReadOnlyList<CandidateCleanupProof> CollectInactive(Hash256 access, IReadOnlyList<CandidateCleanupProof> proofs) => proofs;
+}
+
+public sealed record PendingWorldWrite(Hash256 PlanHash, Hash256 WorldBinding, Hash256 StoreBinding, Hash256 Anchor)
+{
+    public const string FileName = ".nbtcli-pending-write";
+}
+
+public interface IPendingWorldWrite : IDisposable
+{
+    PendingWorldWrite? Current { get; }
+    void Begin(PendingWorldWrite write);
+    void Complete();
+}
+
+public sealed class PendingWorldWriteException(Hash256 planHash) : IOException("Recover the pending plan using its original state root before writing again")
+{
+    public Hash256 PlanHash { get; } = planHash;
 }

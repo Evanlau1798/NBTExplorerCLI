@@ -1,4 +1,5 @@
 using Microsoft.Win32.SafeHandles;
+using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
@@ -27,6 +28,8 @@ internal sealed class GuardedArtifactPath : IDisposable
         if (relativeDirectory.Length != 0) ArtifactAddress.ValidatePath(relativeDirectory, entry: false);
         return AcquireCore(root, relativeDirectory, directory: true);
     }
+    internal static GuardedArtifactPath AcquirePendingWrite(string root)
+        => AcquireCore(root, PendingWorldWrite.FileName, directory: false);
     internal static Hash256 AccessBinding(string root, Guid world)
     {
         using var lease = AcquireDirectory(root, "");
