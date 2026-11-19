@@ -21,6 +21,7 @@ public static class SessionReplyValidator
             if (item is null || item.SlotId is null || !byId.TryGetValue(item.SlotId, out var slot) || !expected.TryAdd(item.SlotId, slot)
                 || item.SourceTextHash != slot.SourceTextHash || item.SourceText != slot.SourceText || item.Context != slot.Context || item.AllowedEmpty != slot.AllowedEmpty
                 || item.Placeholders.IsDefault || !item.Placeholders.Order(StringComparer.Ordinal).SequenceEqual(slot.Placeholders.Tokens.Order(StringComparer.Ordinal))
+                || item.ProtectVisibleText != slot.Placeholders.ProtectVisibleText
                 || !Enum.IsDefined(item.Format) || item.Format != (formats?.GetValueOrDefault(item.SlotId) ?? PlaceholderFormat.Literal)
                 || slot.SourceLocale != page.SourceLocale || slot.TargetLocale != page.TargetLocale) return Invalid("LocalSlotMismatch");
         }

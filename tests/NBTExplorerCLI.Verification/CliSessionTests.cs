@@ -21,6 +21,13 @@ internal static class CliSessionTests
     private static string FileInput(string work, string name, string json)
     { var file = Path.Combine(work, name); File.WriteAllText(file, json, new UTF8Encoding(false)); return file; }
     private static SessionReply Reply(JsonDocument page) => SessionExchangeJson.ReadReply(page.RootElement.GetProperty("data").GetProperty("replyTemplate").GetRawText());
+    private static SessionReply WithTranslations(JsonDocument export, string prefix)
+    {
+        var page = SessionExchangeJson.ReadPage(export.RootElement.GetProperty("data").GetProperty("page").GetRawText());
+        var reply = Reply(export);
+        return reply with { Slots = reply.Slots.Select(slot => slot with { State = SessionReplyState.Translated,
+            Text = prefix + page.Slots.Single(source => source.SlotId == slot.SlotId).SourceText }).ToImmutableArray() };
+    }
     public static void ReadProjectionsReuseOneDecodedSession(string? artifactRoot)
     {
         var world = WorldQueryTests.CreateWorld(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
@@ -86,7 +93,7 @@ internal static class CliSessionTests
             var page = SessionExchangeJson.ReadPage(exported.RootElement.GetProperty("data").GetProperty("page").GetRawText());
             Require(page.SourceLocale == "en_us" && page.TargetLocale == "zh_tw" && page.Slots.Length == 2
                 && File.ReadAllText(prompt).TrimEnd('\r', '\n') == exported.RootElement.GetProperty("data").GetProperty("prompt").GetString(), "page and human prompt are distinct exports with complete schema identities");
-            var reply = Reply(exported); reply = reply with { Slots = reply.Slots.Select(slot => slot with { State = SessionReplyState.Translated, Text = "譯文\U00020000" }).ToImmutableArray() };
+            var reply = WithTranslations(exported, "譯文\U00020000");
             var file = FileInput(work, "reply.json", SessionExchangeJson.WriteReply(reply));
             using var advanced = Success(Call(work, world, id, "advance", "--reply", file));
             var revision = advanced.RootElement.GetProperty("data").GetProperty("status").GetProperty("revision").GetInt64();
@@ -100,7 +107,7 @@ internal static class CliSessionTests
             var projected = get.RootElement.GetProperty("data").GetProperty("slot");
             Require(projected.TryGetProperty("slotId", out var publicId) && publicId.ValueKind == JsonValueKind.String && !projected.TryGetProperty("slot", out _)
                 && !projected.TryGetProperty("address", out _), "slot lookup exposes opaque IDs and text, with canonical local write addresses retained locally");
-            Require(projected.GetProperty("reply").GetProperty("text").GetString() == "譯文\U00020000"
+            Require(projected.GetProperty("reply").GetProperty("text").GetString() == reply.Slots[0].Text
                 && File.ReadAllBytes(Path.Combine(world, WorldQueryTests.Function(0))).SequenceEqual(before), "local validated replies remain separate from world writes");
         }
         finally { Directory.Delete(world, true); Directory.Delete(work, true); }
@@ -146,7 +153,7 @@ internal static class CliSessionTests
             var glossary = new SessionCommand(Guid.NewGuid(), id, 2, SessionCommandKind.Glossary, Text: "衛兵", Source: "Guard", Origin: "user", Confirmed: true, ResetSlots: []);
             using var term = Success(Call(work, world, id, "glossary", "--request", FileInput(work, "glossary.json", SessionCommandJson.Write(glossary))));
             using var terms = Success(Call(work, world, id, "glossary")); Require(terms.RootElement.GetProperty("data").GetProperty("glossary")[0].GetProperty("translation").GetString() == "衛兵", "glossary is durable metadata");
-            using var current = Success(Call(work, world, id, "export", "--page", "0")); reply = Reply(current) with { Slots = Reply(current).Slots.Select(slot => slot with { State = SessionReplyState.Translated, Text = "已翻譯" }).ToImmutableArray() };
+            using var current = Success(Call(work, world, id, "export", "--page", "0")); reply = WithTranslations(current, "已翻譯");
             using var submitted = Success(Call(work, world, id, "submit", "--reply", FileInput(work, "reply.json", SessionExchangeJson.WriteReply(reply))));
             var reset = new SessionCommand(Guid.NewGuid(), id, 4, SessionCommandKind.Reset, Confirmed: true, ResetSlots: [reply.Slots[0].SlotId]); var resetFile = FileInput(work, "reset.json", SessionCommandJson.Write(reset));
             using var preview = Success(Call(work, world, id, "reset", "--request", resetFile));
@@ -202,13 +209,13 @@ internal static class CliSessionTests
         var world = WorldQueryTests.CreateWorld(); var work = ScratchDirectory.CreateChild(); var source = Guid.NewGuid(); var target = Guid.NewGuid();
         try
         {
-            using var started = Start(work, world, source); using var page = Success(Call(work, world, source, "export")); var reply = Reply(page);
-            reply = reply with { Slots = reply.Slots.Select(slot => slot with { State = SessionReplyState.Translated, Text = "可靠譯文" }).ToImmutableArray() };
+            using var started = Start(work, world, source); using var page = Success(Call(work, world, source, "export")); var reply = WithTranslations(page, "可靠譯文");
             using var submitted = Success(Call(work, world, source, "submit", "--reply", FileInput(work, "reply.json", SessionExchangeJson.WriteReply(reply))));
             using var targetStart = Start(work, world, target); using var targetPage = Success(Call(work, world, target, "export")); var targetReply = Reply(targetPage);
             using var memory = Success(Call(work, world, target, "memory", "--slot-id", targetReply.Slots[0].SlotId.Hex, "--source-sessions", source.ToString(), "--glossary-version", "1", "--limit", "1"));
             var candidate = memory.RootElement.GetProperty("data").GetProperty("candidates")[0];
-            Require(candidate.GetProperty("key").ValueKind == JsonValueKind.String && candidate.GetProperty("text").GetString() == "可靠譯文" && candidate.GetProperty("provenance").GetString()!.StartsWith("validated-session:", StringComparison.Ordinal), "memory projects an opaque key and exact validated provenance without implicitly importing it");
+            Require(candidate.GetProperty("key").ValueKind == JsonValueKind.String && candidate.GetProperty("text").GetString() == reply.Slots.Single(slot => slot.SlotId == targetReply.Slots[0].SlotId).Text
+                && candidate.GetProperty("provenance").GetString()!.StartsWith("validated-session:", StringComparison.Ordinal), "memory projects an opaque key and exact validated provenance without implicitly importing it");
         }
         finally { Directory.Delete(world, true); Directory.Delete(work, true); }
     }

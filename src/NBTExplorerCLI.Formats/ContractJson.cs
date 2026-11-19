@@ -2,6 +2,7 @@ using NBTExplorerCLI.Domain;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace NBTExplorerCLI.Formats;
 
@@ -16,7 +17,8 @@ internal static class ContractJson
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
             RespectRequiredConstructorParameters = true,
-            MaxDepth = 1024
+            MaxDepth = 1024,
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OmitInactiveTranslationOptions } }
         };
         options.Converters.Add(new LosslessStringConverter());
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
@@ -32,6 +34,15 @@ internal static class ContractJson
         options.Converters.Add(new EditJsonConverter());
         options.Converters.Add(new OperationJsonConverter());
         return options;
+    }
+    private static void OmitInactiveTranslationOptions(JsonTypeInfo type)
+    {
+        if (type.Type == typeof(SessionPageSlot))
+            type.Properties.Single(property => property.Name == "protectVisibleText").ShouldSerialize =
+                (slot, _) => ((SessionPageSlot)slot).ProtectVisibleText;
+        else if (type.Type == typeof(SessionPolicy))
+            type.Properties.Single(property => property.Name == "groupRelatedText").ShouldSerialize =
+                (policy, _) => ((SessionPolicy)policy).GroupRelatedText;
     }
     private sealed record Envelope<T>(string SchemaFamily, int SchemaVersion, T Data);
     public static string Write<T>(string family, T data) => JsonSerializer.Serialize(new Envelope<T>(family, 1, data), Options);

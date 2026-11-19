@@ -245,7 +245,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         if (translation.Reply.Text != slot.SourceText && WorldReferenceService.IsIdentifyingName(slot.Role))
             throw new EditRejectedException(EditFailure.Precondition, "Identifying names require an explicitly verified complete reference synchronization");
         var id = Guid.NewGuid(); var pageId = Hash256.Compute([]); var format = MinecraftPlaceholderProfiles.ForRole(slot.Role);
-        var page = new SessionPage(id, 0, snapshot, 0, pageId, slot.SourceLocale, slot.TargetLocale, "literal-v1", false, [new(slot.Id.Digest, slot.SourceTextHash, slot.SourceText, slot.Context, slot.AllowedEmpty, slot.Placeholders.Tokens, format)]);
+        var page = new SessionPage(id, 0, snapshot, 0, pageId, slot.SourceLocale, slot.TargetLocale, "literal-v1", false,
+            [new(slot.Id.Digest, slot.SourceTextHash, slot.SourceText, slot.Context, slot.AllowedEmpty, slot.Placeholders.Tokens, format, slot.Placeholders.ProtectVisibleText)]);
         var reply = new SessionReply(Guid.NewGuid(), id, 0, snapshot, 0, pageId, slot.TargetLocale, [new(slot.Id.Digest, slot.SourceTextHash, SessionReplyState.Translated, translation.Reply.Text)]);
         var validation = SessionReplyValidator.Validate(page, [slot], reply, new Dictionary<Hash256, PlaceholderFormat> { [slot.Id.Digest] = format });
         if (!validation.Valid) throw new SessionReplyRejectedException(validation.Issues);

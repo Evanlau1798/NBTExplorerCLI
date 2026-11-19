@@ -17,7 +17,8 @@ public sealed partial class TranslationSessionService(ITranslationSessionStore s
         var source = new SessionSourceSnapshot(manifest.WorldId, manifest.SnapshotId, manifest.InputSources, manifest.Scope.Dimensions, manifest.Scope.Regions, manifest.Scope.Types, manifest.Scope.ArtifactPaths, manifest.Versions, manifest.CoverageComplete);
         var selected = snapshot.ReadSources().SelectMany(item => item.Text?.Occurrences ?? []).Where(item => select?.Invoke(item) ?? true).Take(100_001).ToArray();
         if (selected.Length > 100_000) throw new SessionSlotLimitException();
-        var slots = selected.Select(item => item.ToSlot(sourceLocale, targetLocale)).ToImmutableArray();
+        var protection = new PlaceholderPolicy([], protectVisibleText: true);
+        var slots = selected.Select(item => item.ToSlot(sourceLocale, targetLocale, protection)).ToImmutableArray();
         source = source with { ContextRoots = SessionStorageRoots.Build(snapshot, slots) };
         return new(sessionId, source, sourceLocale, targetLocale, policy ?? new(), slots);
     }

@@ -44,7 +44,11 @@ internal static class SessionContextGrouping
         if (role is "language.value" or "command_storage.literal") return path;
         var marker = -1;
         for (var index = 0; index < path.Segments.Length; index++)
+        {
+            if (role.StartsWith("sign.front", StringComparison.Ordinal) && path.Segments[index].Key is "Text1" or "Text2" or "Text3" or "Text4")
+                return new(path.Segments.Take(index));
             if (path.Segments[index].Kind == PathSegmentKind.Key && path.Segments[index].Key is "pages" or "filtered_pages" or "messages" or "filtered_messages" or "Lore" or "lore" or "minecraft:lore") marker = index;
+        }
         if (marker >= 0) return new(path.Segments.Take(marker + 1));
         if (nativeComponent)
         {

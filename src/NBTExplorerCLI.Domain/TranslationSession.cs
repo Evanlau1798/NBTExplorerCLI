@@ -3,7 +3,8 @@ using System.Collections.Immutable;
 namespace NBTExplorerCLI.Domain;
 
 public enum SessionSlotState { Pending, Translated, Unchanged, Conflict, Applied }
-public sealed record SessionPolicy(int MaximumPageSlots = 30, int MaximumPageBytes = 65_536, bool PreservePlaceholderOrder = false);
+public sealed record SessionPolicy(int MaximumPageSlots = 30, int MaximumPageBytes = 65_536, bool PreservePlaceholderOrder = false,
+    bool GroupRelatedText = false);
 public sealed record SessionGroupRoot(Hash256 SlotId, SourceAddress Container);
 public sealed record SessionSourceSnapshot(Guid WorldId, StableIdentity SnapshotId, ImmutableArray<ManifestSource> Sources,
     ImmutableArray<string> Dimensions, ImmutableArray<string> Regions, ImmutableArray<string> Types, ImmutableArray<string> ArtifactPaths,

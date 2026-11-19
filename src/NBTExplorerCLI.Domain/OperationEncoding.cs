@@ -98,7 +98,7 @@ internal static class OperationEncoding
         writer.Text(slot.TargetLocale);
         writer.Byte(slot.AllowedEmpty ? (byte)1 : (byte)0);
         var tokens = slot.Placeholders.Tokens.Order(StringComparer.Ordinal).ToArray();
-        writer.Int(tokens.Length);
+        writer.Int(slot.Placeholders.ProtectVisibleText ? ~tokens.Length : tokens.Length);
         foreach (var token in tokens) writer.Text(token);
         writer.Identity(reply.SlotId);
         writer.Hash(reply.SourceTextHash);

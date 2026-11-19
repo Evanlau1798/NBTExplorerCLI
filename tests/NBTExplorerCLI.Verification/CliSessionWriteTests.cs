@@ -404,8 +404,12 @@ internal static class CliSessionWriteTests
         try
         {
             Start(work, world, id); using var exported = Success(Call(work, world, id, "export"));
-            var reply = SessionExchangeJson.ReadReply(exported.RootElement.GetProperty("data").GetProperty("replyTemplate").GetRawText());
-            reply = reply with { Slots = reply.Slots.Select((slot, index) => slot with { State = index == 0 ? SessionReplyState.Translated : SessionReplyState.Unchanged, Text = index == 0 ? "translated" : null }).ToImmutableArray() };
+            var data = exported.RootElement.GetProperty("data");
+            var page = SessionExchangeJson.ReadPage(data.GetProperty("page").GetRawText());
+            var reply = SessionExchangeJson.ReadReply(data.GetProperty("replyTemplate").GetRawText());
+            reply = reply with { Slots = reply.Slots.Select((slot, index) => index == 0
+                ? slot with { State = SessionReplyState.Translated, Text = "translated " + page.Slots.Single(source => source.SlotId == slot.SlotId).SourceText }
+                : slot).ToImmutableArray() };
             var file = Path.Combine(work, "mixed-reply.json"); File.WriteAllText(file, SessionExchangeJson.WriteReply(reply)); using var submitted = Success(Call(work, world, id, "submit", "--reply", file));
             var service = new TranslationSessionService(Store(work)); var state = service.Read(id); var selected = state.Slots.Single(slot => slot.State == SessionSlotState.Translated);
             var unchanged = state.Slots.Where(slot => slot.State == SessionSlotState.Unchanged).ToDictionary(slot => Path.Combine(world, slot.Slot.Address.Artifact.RelativePath), slot => File.ReadAllBytes(Path.Combine(world, slot.Slot.Address.Artifact.RelativePath)));

@@ -36,7 +36,8 @@ internal static class SessionCommands
         ScanOptions? options = null; SessionPolicy? policy = null; string? sourceLanguage = null; string? targetLanguage = null;
         if (request.Subcommand == "start")
         {
-            options = new ScanOptions(request); policy = new(request.Number("page-size", 30, 1, 100_000), request.Number("page-bytes", 65_536, 1024, 67_108_864));
+            options = new ScanOptions(request); policy = new(request.Number("page-size", 30, 1, 100_000), request.Number("page-bytes", 65_536, 1024, 67_108_864),
+                GroupRelatedText: !request.Flag("no-group"));
             sourceLanguage = request.Get("source-language"); targetLanguage = request.Get("target-language");
         }
         var context = new WriteContext(request.Input!, request);
@@ -56,7 +57,7 @@ internal static class SessionCommands
             var receipt = service.Start(start, operationId);
             try { Preferences(context).Create(id, !request.Flag("no-group")); }
             catch (Exception error) { throw new CliFailure(CliApplication.Code(error), error.Message, new { sessionId = id, receipt, repair = "retry-start-with-same-identities" }); }
-            return new(new { receipt, status = service.Status(id), groups = Groups(service, id, request, context) });
+            return new(new { receipt, status = service.Status(id), groups = Groups(service, id, request, context).Select(Group).ToArray() });
         }
         var state = service.Read(id);
         if (state.Source.WorldId != context.Inventory.WorldId) throw new ArtifactConflictException("Session belongs to a different world root");
@@ -68,13 +69,16 @@ internal static class SessionCommands
             case "get":
                 var item = TranslationSessionService.Get(state, new(Required(request, "slot-id"))); var slot = item.Slot;
                 return new(new { slot = new { slotId = slot.Id.Digest, slot.SourceTextHash, slot.SourceText, slot.Context, slot.Role, slot.SourceLocale, slot.TargetLocale,
-                    slot.AllowedEmpty, placeholders = slot.Placeholders.Tokens, item.Format, item.State, item.Reason,
+                    slot.AllowedEmpty, placeholders = slot.Placeholders.Tokens, slot.Placeholders.ProtectVisibleText, item.Format, item.State, item.Reason,
                     reply = item.Reply is { } translation ? new { translation.TargetLocale, translation.Text } : null } });
             case "export":
                 var page = TranslationSessionService.Export(state, request.Number("page", state.Workspace?.CurrentPage ?? 0, 0, Math.Max(0, state.Pages.Length - 1)));
-                var prompt = SessionExchangeJson.Prompt(page, operationId);
+                var pageContext = state.Policy.GroupRelatedText ? groups.SelectMany(group => group.Slots.Select(slot => (slot, group)))
+                    .ToDictionary(item => item.slot, item => item.group) : null;
+                var prompt = SessionExchangeJson.Prompt(page, operationId, pageContext);
+                if (Encoding.UTF8.GetByteCount(prompt) > state.Policy.MaximumPageBytes) throw new InvalidDataException("Stored session page exceeds its byte policy");
                 return new(new { page = Json(SessionExchangeJson.WritePage(page)), replyTemplate = Json(SessionExchangeJson.ReplyTemplate(page, operationId)), prompt,
-                    groups }, Export: prompt);
+                    groups = groups.Select(Group).ToArray() }, Export: prompt);
             case "advance": case "submit":
                 SessionOperationReceipt? accepted = null;
                 if (request.Get("reply") is { } file)
@@ -88,7 +92,7 @@ internal static class SessionCommands
                 }
                 else if (request.Subcommand == "submit") throw new CliFailure("INVALID_ARGUMENTS", "Missing --reply");
                 var status = service.Status(id); var pending = status.Pending + status.Conflict == 0 ? null : service.Advance(id);
-                return new(new { receipt = accepted, status, pendingPage = pending is null ? (JsonElement?)null : Json(SessionExchangeJson.WritePage(pending)), groups });
+                return new(new { receipt = accepted, status, pendingPage = pending is null ? (JsonElement?)null : Json(SessionExchangeJson.WritePage(pending)), groups = groups.Select(Group).ToArray() });
             case "groups": return new(new { groups = TranslationSessionService.Groups(state).Skip(request.Number("offset", 0, 0, 2_000_000)).Take(request.Number("limit", 100, 1, 10_000)).Select(Group).ToArray() });
             case "memory":
                 var sources = Required(request, "source-sessions").Split(',').Select(GuidValue).ToArray();
@@ -108,8 +112,8 @@ internal static class SessionCommands
         }
     }
     private static FileSystemSessionPreferencesStore Preferences(WriteContext context) => new(Path.Combine(context.State, "session-preferences"));
-    private static object[] Groups(TranslationSessionService service, Guid id, CliArguments request, WriteContext context, TranslationSession? state = null)
-        => request.Flag("no-group") || Preferences(context).Read(id) == false ? [] : TranslationSessionService.Groups(state ?? service.Read(id)).Select(Group).ToArray();
+    private static SessionContextGroup[] Groups(TranslationSessionService service, Guid id, CliArguments request, WriteContext context, TranslationSession? state = null)
+        => request.Flag("no-group") || Preferences(context).Read(id) == false ? [] : TranslationSessionService.Groups(state ?? service.Read(id)).ToArray();
     private static object Group(SessionContextGroup group) => new { group.Kind, groupId = group.GroupId.Digest, memberDigest = group.MemberDigest.Digest, group.Slots };
     internal static SnapshotScope Scope(TranslationSession state) => new(state.Source.Dimensions, state.Source.Regions, state.Source.Types, state.Source.ArtifactPaths);
     internal static CliResult Status(WriteContext context, TranslationSession state)

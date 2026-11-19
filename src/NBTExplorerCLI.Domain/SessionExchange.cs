@@ -4,7 +4,9 @@ namespace NBTExplorerCLI.Domain;
 
 public enum SessionReplyState { Translated, Unchanged }
 public enum PlaceholderFormat { Literal, Percent, NormalizedPercent }
-public sealed record SessionPageSlot(Hash256 SlotId, Hash256 SourceTextHash, string SourceText, string Context, bool AllowedEmpty, ImmutableArray<string> Placeholders, PlaceholderFormat Format = PlaceholderFormat.Literal);
+public sealed record SessionPageSlot(Hash256 SlotId, Hash256 SourceTextHash, string SourceText, string Context, bool AllowedEmpty,
+    ImmutableArray<string> Placeholders, PlaceholderFormat Format = PlaceholderFormat.Literal,
+    bool ProtectVisibleText = false);
 public sealed record SessionPage(Guid SessionId, long Revision, Hash256 SnapshotId, int Page, Hash256 PageId,
     string SourceLocale, string TargetLocale, string PolicyVersion, bool PreservePlaceholderOrder, ImmutableArray<SessionPageSlot> Slots);
 public sealed record SessionReplySlot(Hash256 SlotId, Hash256 SourceTextHash, SessionReplyState State, string? Text);

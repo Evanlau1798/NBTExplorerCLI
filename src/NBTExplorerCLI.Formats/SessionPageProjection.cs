@@ -11,6 +11,7 @@ public static class SessionPageProjection
     {
         if (page < 0 || page >= session.Pages.Length) throw new ArgumentOutOfRangeException(nameof(page));
         return SessionExchangeJson.SealPage(new(session.SessionId, revision, session.Source.SnapshotId.Digest, page, Hash256.Compute([]), session.SourceLocale, session.TargetLocale, "literal-v1", session.Policy.PreservePlaceholderOrder,
-            session.Pages[page].Select(id => { var slot = slots[id]; return new SessionPageSlot(id, slot.SourceTextHash, slot.SourceText, slot.Context, slot.AllowedEmpty, slot.Placeholders.Tokens.Order(StringComparer.Ordinal).ToImmutableArray(), formats.GetValueOrDefault(id)); }).ToImmutableArray()));
+            session.Pages[page].Select(id => { var slot = slots[id]; return new SessionPageSlot(id, slot.SourceTextHash, slot.SourceText, slot.Context, slot.AllowedEmpty,
+                slot.Placeholders.Tokens.Order(StringComparer.Ordinal).ToImmutableArray(), formats.GetValueOrDefault(id), slot.Placeholders.ProtectVisibleText); }).ToImmutableArray()));
     }
 }

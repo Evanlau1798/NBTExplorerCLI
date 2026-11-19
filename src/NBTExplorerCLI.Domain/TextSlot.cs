@@ -7,10 +7,12 @@ namespace NBTExplorerCLI.Domain;
 public sealed class PlaceholderPolicy
 {
     public ImmutableArray<string> Tokens { get; }
-    public PlaceholderPolicy(IEnumerable<string> tokens)
+    public bool ProtectVisibleText { get; }
+    public PlaceholderPolicy(IEnumerable<string> tokens, bool protectVisibleText = false)
     {
         ArgumentNullException.ThrowIfNull(tokens);
         Tokens = tokens.Take(257).ToImmutableArray();
+        ProtectVisibleText = protectVisibleText;
         if (Tokens.Length > 256 || Tokens.Any(string.IsNullOrEmpty) || Tokens.Distinct(StringComparer.Ordinal).Count() != Tokens.Length)
             throw new ArgumentException("Expected at most 256 distinct nonempty literal tokens", nameof(tokens));
     }
@@ -36,7 +38,7 @@ public sealed class PlaceholderPolicy
     public static PlaceholderPolicy None { get; } = new([]);
 }
 
-public enum SlotValidation { Valid, WrongSlot, StaleSource, WrongLocale, EmptyDisallowed, PlaceholderMismatch }
+public enum SlotValidation { Valid, WrongSlot, StaleSource, WrongLocale, EmptyDisallowed, PlaceholderMismatch, VisibleTextMismatch }
 public sealed record SlotReply(StableIdentity SlotId, Hash256 SourceTextHash, string TargetLocale, string Text);
 
 public sealed class TextSlot
@@ -73,7 +75,9 @@ public sealed class TextSlot
         if (reply.SourceTextHash != SourceTextHash) return SlotValidation.StaleSource;
         if (reply.TargetLocale != TargetLocale) return SlotValidation.WrongLocale;
         if (!AllowedEmpty && reply.Text.Length == 0) return SlotValidation.EmptyDisallowed;
-        return Placeholders.Accepts(SourceText, reply.Text) ? SlotValidation.Valid : SlotValidation.PlaceholderMismatch;
+        if (!Placeholders.Accepts(SourceText, reply.Text)) return SlotValidation.PlaceholderMismatch;
+        return Placeholders.ProtectVisibleText && !VisibleTextProtection.Equivalent(SourceText, reply.Text, Role)
+            ? SlotValidation.VisibleTextMismatch : SlotValidation.Valid;
     }
 }
 

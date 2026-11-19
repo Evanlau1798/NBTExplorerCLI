@@ -35,10 +35,10 @@ internal static class SessionScannerTests
             var page = service.Export(SessionId, 0); var json = SessionExchangeJson.WritePage(page);
             Require(!json.Contains("clickEvent", StringComparison.Ordinal) && !json.Contains("run_command", StringComparison.Ordinal) && !json.Contains("nodePath", StringComparison.Ordinal), "protected source structure and writable addresses never become reply fields");
             var template = SessionExchangeJson.ReadReply(SessionExchangeJson.ReplyTemplate(page, Guid.NewGuid()));
-            var reply = template with { Slots = template.Slots.Select((item, index) => item with { State = SessionReplyState.Translated, Text = index == 0 ? "字面 {{T1}} | ‖§‖" : "尾端" }).ToImmutableArray() };
+            var reply = template with { Slots = template.Slots.Select((item, index) => item with { State = SessionReplyState.Translated, Text = index == 0 ? "字面 {{T0}} | ‖§‖" : "尾端" }).ToImmutableArray() };
             service.Submit(SessionId, Encoding.UTF8.GetBytes(SessionExchangeJson.WriteReply(reply)));
             var validated = service.ValidatedPage(SessionId, 0);
-            Require(validated.Valid && validated.Value!.Translations.Select(item => item.Reply.Text).SequenceEqual(new[] { "字面 {{T1}} | ‖§‖", "尾端" })
+            Require(validated.Valid && validated.Value!.Translations.Select(item => item.Reply.Text).SequenceEqual(new[] { "字面 {{T0}} | ‖§‖", "尾端" })
                 && validated.Value.Translations.Select(item => item.Slot.Address).SequenceEqual(expected.Select(item => item.Address)), "shared validator returns distinct decoded slots with stable original syntax positions, without marker substitution");
             var after = Hashes(inventory);
             Require(before.Count == after.Count && before.All(pair => after[pair.Key] == pair.Value) && Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(root, Function(0)))) == command,

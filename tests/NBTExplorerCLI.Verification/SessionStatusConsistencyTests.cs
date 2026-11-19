@@ -21,7 +21,8 @@ internal static class SessionStatusConsistencyTests
             var service = new TranslationSessionService(new FileSystemTranslationSessionStore(System.IO.Path.Combine(work, "sessions"))); var id = Guid.NewGuid();
             service.Start(snapshot, id, "en_us", "zh_tw", Guid.NewGuid()); var page = service.Export(id, 0);
             var reply = SessionExchangeJson.ReadReply(SessionExchangeJson.ReplyTemplate(page, Guid.NewGuid()));
-            reply = reply with { Slots = reply.Slots.Select(slot => slot with { State = SessionReplyState.Translated, Text = "translated" }).ToImmutableArray() };
+            reply = reply with { Slots = reply.Slots.Select(slot => slot with { State = SessionReplyState.Translated,
+                Text = "translated " + page.Slots.Single(source => source.SlotId == slot.SlotId).SourceText }).ToImmutableArray() };
             service.Submit(id, Encoding.UTF8.GetBytes(SessionExchangeJson.WriteReply(reply))); var translated = service.Read(id);
             var inventory = new WorldInventory(world, snapshot.Manifest.WorldId); var storage = new ArtifactStorage(world, snapshot.Manifest.WorldId);
             var plan = new WorldPlanBuilder(inventory).Build(snapshot, translated.Slots.Select((slot, index) => new LiteralPatch("slot-" + index, new(slot.Slot, slot.Reply!))));

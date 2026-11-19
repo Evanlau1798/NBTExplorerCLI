@@ -5,8 +5,8 @@ namespace NBTExplorerCLI.Domain;
 public sealed record TextOccurrence(SourceAddress Address, string Text, string Context, bool AllowedEmpty)
 {
     public NbtType Type => NbtType.String;
-    public TextSlot ToSlot(string sourceLocale, string targetLocale)
-        => new(Address, Text, Context, sourceLocale, targetLocale, AllowedEmpty, PlaceholderPolicy.None);
+    public TextSlot ToSlot(string sourceLocale, string targetLocale, PlaceholderPolicy? placeholders = null)
+        => new(Address, Text, Context, sourceLocale, targetLocale, AllowedEmpty, placeholders ?? PlaceholderPolicy.None);
 }
 public sealed record TranslationKeyReference(SourceAddress Address, string Key);
 public sealed record ExtractionDiagnostic(SourceAddress Address, string Code);
