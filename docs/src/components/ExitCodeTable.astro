@@ -19,29 +19,31 @@ const kindOf = (code: number) => {
 };
 ---
 
-<table>
-  <thead>
-    <tr>
-      <th>{headers.code}</th>
-      <th>{headers.status}</th>
-      <th>{headers.meaning}</th>
-      <th>{headers.action}</th>
-    </tr>
-  </thead>
-  <tbody>
-    {
-      EXIT_CODES.map((row) => (
-        <tr>
-          <td>
-            <span class="nbt-exit-code" data-kind={kindOf(row.code)}>{row.code}</span>
-          </td>
-          <td>
-            <strong>{row.label[lang] ?? row.label.en}</strong>
-          </td>
-          <td>{row.meaning[lang] ?? row.meaning.en}</td>
-          <td>{row.action[lang] ?? row.action.en}</td>
-        </tr>
-      ))
-    }
-  </tbody>
-</table>
+<div class="nbt-table-wrap nbt-table-exit-codes">
+  <table>
+    <thead>
+      <tr>
+        <th>{headers.code}</th>
+        <th>{headers.status}</th>
+        <th>{headers.meaning}</th>
+        <th>{headers.action}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        EXIT_CODES.map((row) => (
+          <tr>
+            <td>
+              <span class="nbt-exit-code" data-kind={kindOf(row.code)}>{row.code}</span>
+            </td>
+            <td>
+              <strong>{row.label[lang] ?? row.label.en}</strong>
+            </td>
+            <td>{row.meaning[lang] ?? row.meaning.en}</td>
+            <td>{row.action[lang] ?? row.action.en}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

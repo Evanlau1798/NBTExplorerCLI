@@ -1,11 +1,39 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+function wrapMarkdownTablesIntegration() {
+  return {
+    name: 'nbt-wrap-markdown-tables',
+    hooks: {
+      'astro:config:setup': ({ config }) => {
+        const hastPlugins = config.markdown?.processor?.options?.hastPlugins;
+        if (Array.isArray(hastPlugins)) {
+          hastPlugins.push({
+            name: 'nbt-wrap-tables',
+            element: {
+              filter: ['table'],
+              visit(node) {
+                return {
+                  type: 'element',
+                  tagName: 'div',
+                  properties: { class: 'nbt-table-wrap' },
+                  children: [node],
+                };
+              },
+            },
+          });
+        }
+      },
+    },
+  };
+}
+
 export default defineConfig({
   site: process.env.PAGES_ORIGIN?.replace(/^http:/, 'https:') || 'https://nbtcli.evanlau1798.com',
   base: process.env.PAGES_BASE_PATH || '/',
   trailingSlash: 'always',
   integrations: [
+    wrapMarkdownTablesIntegration(),
     starlight({
       title: {
         en: 'NBTExplorerCLI',
