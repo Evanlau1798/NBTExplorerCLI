@@ -19,11 +19,15 @@ internal sealed partial class CommandTextReader
             Component(value.Start, value.Start + value.Text.Length, At(path, "data.entity.CustomName"), storedRole: role);
             return;
         }
-        if (tokens.Count == index + 10 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "block"
+        var blockItems = tokens.Count == index + 10 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "block"
             && BlockCoordinates(tokens[index + 3].Text, tokens[index + 4].Text, tokens[index + 5].Text)
-            && tokens[index + 6].Text == "Items" && tokens[index + 7].Text is "append" or "prepend" && tokens[index + 8].Text == "value")
+            && tokens[index + 6].Text == "Items" && tokens[index + 7].Text is "append" or "prepend" && tokens[index + 8].Text == "value";
+        var droppedItem = tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"
+            && EntityTarget(tokens[index + 3].Text) && selectorTypes.GetValueOrDefault(tokens[index + 3].Start) == "minecraft:item"
+            && tokens[index + 4].Text == "Item" && tokens[index + 5].Text == "set" && tokens[index + 6].Text == "value";
+        if (blockItems || droppedItem)
         {
-            var token = tokens[index + 9]; var grammarPath = At(path, "data.block.Items");
+            var token = tokens[^1]; var grammarPath = At(path, blockItems ? "data.block.Items" : "data.entity.Item");
             var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, "item.stack", source.Address.Dimension, source.Address.Chunk);
             var result = SnbtTextExtractor.ItemStack(binding, token.Text, profile, limits, scope, ComponentCallback(grammarPath, token.Start, true));
             var tokenEnd = token.Start + token.Text.Length;
