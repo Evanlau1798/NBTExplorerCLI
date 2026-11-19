@@ -31,7 +31,7 @@ internal sealed partial class CommandTextReader
             if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(token.Text), token.Start, tokenEnd, grammarPath, true, itemTree: true, commandTag: true);
             return;
         }
-        if (NumericDataWrite(tokens, index)) return;
+        if (StaticDataWrite(tokens, index)) return;
         if (tokens.Count >= index + 5 && tokens[index + 1].Text == "merge" && tokens[index + 2].Text == "entity")
         {
             if (tokens.Count != index + 5) throw new CommandSyntaxException();
@@ -80,20 +80,49 @@ internal sealed partial class CommandTextReader
         }
         return true;
     }
-    private bool NumericDataWrite(List<CommandToken> tokens, int index)
+    private bool StaticDataWrite(List<CommandToken> tokens, int index)
     {
         if (index + 2 >= tokens.Count || tokens[index + 1].Text != "modify") return false;
         var path = DataTargetEnd(tokens, index + 2);
         if (path < 0 || path + 3 >= tokens.Count || !StaticDataPath(tokens[path].Text)) return false;
         var value = path + 2;
-        if (tokens[path + 1].Text == "insert")
+        var operation = tokens[path + 1].Text;
+        if (operation == "insert")
         {
             if (!Integer(tokens[value++].Text, out _)) return false;
         }
-        else if (tokens[path + 1].Text is not ("set" or "append" or "prepend")) return false;
+        else if (operation is not ("set" or "append" or "prepend" or "merge")) return false;
+        if (tokens[value].Text == "from")
+        {
+            var sourcePath = DataTargetEnd(tokens, value + 1);
+            if (operation == "merge" || sourcePath < 0 || tokens.Count != sourcePath + 1) return false;
+            var sourceType = tokens[value + 1].Text;
+            var source = tokens[sourcePath].Text;
+            return sourceType == "entity" && NumericEntityVector(source) || StaticItemSource(sourceType, source);
+        }
         if (tokens.Count != value + 2 || tokens[value].Text != "value") return false;
         var parsed = Snbt.ParseDocument(Utf8.GetBytes(tokens[value + 1].Text), MinecraftProfiles.SnbtGrammar(profile), limits);
-        return !parsed.Root.ContainsStringValues;
+        return !parsed.Root.ContainsStringValues && (operation != "merge" || parsed.Root.Value is LogicalMinecraftCompound);
+    }
+    private static bool NumericEntityVector(string path)
+    {
+        var start = path.IndexOf('[');
+        if ((start < 0 ? path : path[..start]) is not ("Pos" or "Motion" or "Rotation")) return false;
+        return start < 0 || path[^1] == ']' && (start + 2 == path.Length || Integer(path[(start + 1)..^1], out _));
+    }
+    private bool StaticItemSource(string target, string path)
+    {
+        var bracket = path.IndexOf('[');
+        var field = bracket < 0 ? path : path[..bracket];
+        if (target == "entity" && path == "SelectedItem") return true;
+        if (!(target == "entity" && field is "Inventory" or "EnderItems" or "ArmorItems" or "HandItems"
+            || target == "block" && field == "Items")) return false;
+        if (bracket < 0) return true;
+        if (path[^1] != ']') return false;
+        var item = path[(bracket + 1)..^1];
+        if (item.Length == 0 || Integer(item, out _)) return true;
+        return item[0] == '{' && CompoundEnd(item, 0) == item.Length
+            && StaticNbtMatch.ItemStack(Snbt.ParseDocument(Utf8.GetBytes(item), MinecraftProfiles.SnbtGrammar(profile), limits).Root);
     }
     private bool DataControl(List<CommandToken> tokens, int index)
     {
@@ -136,6 +165,9 @@ internal sealed partial class CommandTextReader
     {
         var start = path.IndexOf('{');
         if (start < 0) return PlainDataPath(path);
+        if (start == 0)
+            return CompoundEnd(path, 0) == path.Length
+                && !Snbt.ParseDocument(Utf8.GetBytes(path), MinecraftProfiles.SnbtGrammar(profile), limits).Root.ContainsStringValues;
         var structural = new StringBuilder(path.Length);
         var copied = 0;
         while (start >= 0)
@@ -171,11 +203,17 @@ internal sealed partial class CommandTextReader
     }
     private void ItemCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
-        if (index + 2 < tokens.Count && tokens[index + 1].Text == "modify" && tokens[index + 2].Text is "entity" or "block")
+        var slot = ItemTargetEnd(tokens, index + 2);
+        if (slot >= 0 && slot < tokens.Count && SingleItemSlot(tokens[slot].Text))
         {
-            var slot = DataTargetEnd(tokens, index + 2);
-            if (slot >= 0 && tokens.Count == slot + 2 && PlainControlToken(tokens[slot].Text)
+            if (tokens[index + 1].Text == "modify" && tokens.Count == slot + 2
                 && MinecraftIdentifier.ResourceLocation(tokens[slot + 1].Text)) return;
+            if (tokens[index + 1].Text == "replace" && slot + 2 < tokens.Count && tokens[slot + 1].Text == "from")
+            {
+                var sourceSlot = ItemTargetEnd(tokens, slot + 2);
+                if (sourceSlot >= 0 && sourceSlot < tokens.Count && SingleItemSlot(tokens[sourceSlot].Text)
+                    && (tokens.Count == sourceSlot + 1 || tokens.Count == sourceSlot + 2 && MinecraftIdentifier.ResourceLocation(tokens[sourceSlot + 1].Text))) return;
+            }
         }
         if (tokens.Count >= index + 7 && tokens[index + 1].Text == "replace" && tokens[index + 2].Text == "entity" && tokens[index + 5].Text == "with")
         { CountArgument(tokens, index + 7); ItemArgument(tokens[index + 6], At(path, "item.replace")); return; }
@@ -183,6 +221,8 @@ internal sealed partial class CommandTextReader
         { CountArgument(tokens, index + 9); ItemArgument(tokens[index + 8], At(path, "item.replace")); return; }
         Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownItemCommandGrammar");
     }
+    private static int ItemTargetEnd(List<CommandToken> tokens, int index) => index < tokens.Count && tokens[index].Text is "entity" or "block"
+        ? DataTargetEnd(tokens, index) : -1;
     private static void CountArgument(List<CommandToken> tokens, int afterItem)
     {
         if (tokens.Count > afterItem + 1 || tokens.Count == afterItem + 1 && (!int.TryParse(tokens[afterItem].Text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var count) || count < 1))

@@ -92,7 +92,7 @@ public static class SelectorNames
         try
         {
             var root = Snbt.ParseDocument(Encoding.UTF8.GetBytes(spelling.ToString()), limits: limits).Root;
-            return root.Value is LogicalMinecraftCompound && !root.ContainsStringValues;
+            return StaticNbtMatch.Entity(root);
         }
         catch (SnbtException error) when (error.Code != SnbtError.LimitExceeded) { return false; }
     }

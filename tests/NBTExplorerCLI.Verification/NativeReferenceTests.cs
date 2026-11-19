@@ -23,7 +23,10 @@ internal static class NativeReferenceTests
         var numeric = SelectorNames.Parse("@e[nbt=!{HurtTime:10s,ActiveEffects:[{Id:12}],UUID:[I;1,2,3,4]},name=Guard]");
         Require(numeric.Complete && numeric.Names.Single().Name == "Guard",
             "numeric compound predicates never match translated strings and preserve independent name references");
-        foreach (var selector in new[] { "@e[nbt={SelectedItem:{tag:{display:{Name:'Visible'}}}}]", "@e[nbt=[1]]", "@e[nbt={HurtTime:}]" })
+        var item = SelectorNames.Parse("""@e[nbt={Tags:["checkpoint"],SelectedItem:{id:"minecraft:paper",tag:{Enchantments:[{id:"minecraft:unbreaking",lvl:2s}]}}},name=Guard]""");
+        Require(item.Complete && item.Names.Single().Name == "Guard",
+            "vanilla entity tags and exact item/enchantment identifiers keep their structural meaning");
+        foreach (var selector in new[] { "@e[nbt={SelectedItem:{tag:{display:{Name:'Visible'}}}}]", "@e[nbt={SelectedItem:{tag:{id:'minecraft:paper'}}}]", "@e[nbt=[1]]", "@e[nbt={HurtTime:}]" })
             Require(!SelectorNames.Parse(selector).Complete, "dynamic or malformed NBT filters stay incomplete: " + selector);
     }
     public static void NativeSelectorsUseOriginalAddresses()

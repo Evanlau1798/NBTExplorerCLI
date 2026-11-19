@@ -65,9 +65,7 @@ public static partial class PackTextExtractor
             try
             {
                 var parsed = Snbt.ParseDocument(PredicateUtf8.GetBytes(NativeJsonStrings.Read(value)), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
-                return parsed.Value is LogicalMinecraftCompound && parsed.Children.All(child => !child.Node.ContainsStringValues
-                    || entityTags && child.Selector.Key == "Tags" && child.Node.Value is LogicalMinecraftList list
-                    && list.Items.All(item => item is LogicalMinecraftLeaf { Value: NbtString }));
+                return entityTags ? StaticNbtMatch.Entity(parsed) : parsed.Value is LogicalMinecraftCompound && !parsed.ContainsStringValues;
             }
             catch (SnbtException error) when (error.Code != SnbtError.LimitExceeded) { return false; }
             catch (EncoderFallbackException) { return false; }

@@ -14,6 +14,7 @@ internal static class CommandReviewTests
     private static SourceAddress Source => new(new(World, "review.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
     public static void StaticCoordinateControls()
     {
+        StaticResourceAndTeamControls();
         const string commands = """
             execute as @e[name=Guard] run damage @s 2.5 magic
             fill ~-0.5 ~-0.5 ~-0.5 ~0.05 ~0.05 ~0.05 air replace stone
@@ -33,6 +34,44 @@ internal static class CommandReviewTests
         })
             Require(!CommandTextExtractor.Extract(new(Source, unsupported), profile).Complete,
                 "negative damage and structured particle or fill arguments remain unresolved: " + unsupported);
+    }
+
+    private static void StaticResourceAndTeamControls()
+    {
+        const string body = """
+            stopsound @a[name=Guard] voice test:alarm
+            gamerule doMobSpawning false
+            gamerule randomTickSpeed 3
+            gamerule keepInventory
+            clear @s #test:tools 0
+            team join guides @s
+            team modify guides color green
+            item replace block ~ ~ ~ container.0 from entity @s weapon.mainhand
+            data modify storage test:state position set from entity @s Pos[0]
+            tellraw @s {"text":"Guidance"}
+            """;
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var result = CommandTextExtractor.Extract(new(Source, body), profile);
+        Require(result.Complete && result.Text.Occurrences.Single().Text == "Guidance" && result.References.Single().Name == "Guard",
+            "static target and resource operands preserve nearby text and vanilla selectors");
+        var unsupported = new[]
+        {
+            "stopsound @a other test:alarm",
+            """clear @s paper{display:{Name:'{"text":"Guard"}'}}""",
+            "gamerule doMobSpawning maybe", "gamerule doMobSpawning 1", "gamerule randomTickSpeed true", "gamerule invented true",
+            "team modify guides color unknown",
+            "item replace block ~ ~ ~ bogus from entity @s weapon.mainhand",
+            "item replace block ~ ~ ~ container.54 from entity @s weapon.mainhand",
+            "item replace block ~ ~ ~ container.0 from entity @s inventory.27",
+            "item modify entity @s bogus test:modifier",
+            "item replace block ~ ~ ~ container.0 from storage test:unsafe field",
+            "data modify storage test:state position set from storage test:unsafe Pos[0]",
+            "data modify storage test:state position set from entity @s CustomName",
+            "data modify storage test:state copies append from entity @s HandItems[{tag:{display:{Name:'Guard'}}}]",
+            "data modify storage test:state {} merge value {CustomName:'Guard'}"
+        };
+        var accepted = unsupported.Where(command => CommandTextExtractor.Extract(new(Source, command), profile).Complete).ToArray();
+        Require(accepted.Length == 0, "wrong grammar and unbound payloads stay unresolved: " + string.Join(", ", accepted));
     }
 
     public static void InertFieldsCannotBecomeReferences()

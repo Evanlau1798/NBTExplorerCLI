@@ -1,4 +1,5 @@
 using System.Globalization;
+using NBTExplorerCLI.Domain;
 using static NBTExplorerCLI.Minecraft.MinecraftIdentifier;
 
 namespace NBTExplorerCLI.Minecraft;
@@ -56,8 +57,27 @@ internal sealed partial class CommandTextReader
             case "playsound":
                 return (count == 4 || count is >= 7 and <= 10 && Position(4)
                     && tokens.Skip(index + 7).All(token => Decimal(token.Text, out var value) && value >= 0))
-                    && ResourceLocation(Arg(1)) && Arg(2) is "master" or "music" or "record" or "weather" or "block" or "hostile" or "neutral" or "player" or "ambient" or "voice"
-                    && EntityTarget(Arg(3));
+                    && ResourceLocation(Arg(1)) && SoundChannel(Arg(2)) && EntityTarget(Arg(3));
+            case "stopsound":
+                return count is >= 2 and <= 4 && EntityTarget(Arg(1))
+                    && (count == 2 || SoundChannel(Arg(2)) || count == 4 && Arg(2) == "*")
+                    && (count < 4 || ResourceLocation(Arg(3)));
+            case "gamerule":
+                return count is 2 or 3 && profile.Id == "java-1.20.1" && KnownGameRule(Arg(1), count == 2 ? null : Arg(2));
+            case "clear":
+                return count is >= 1 and <= 4 && (count == 1 || EntityTarget(Arg(1)))
+                    && (count < 3 || ResourceOrTag(Arg(2)))
+                    && (count < 4 || Integer(Arg(3), out var maximumItems) && maximumItems >= 0);
+            case "team":
+                return Arg(1) switch
+                {
+                    "list" => count == 2 || count == 3 && PlainControlToken(Arg(2)),
+                    "add" or "remove" or "empty" => count == 3 && PlainControlToken(Arg(2)),
+                    "join" => PlainControlToken(Arg(2)) && (count == 3 || count == 4 && ScoreHolder(Arg(3))),
+                    "leave" => count == 3 && ScoreHolder(Arg(2)),
+                    "modify" => count == 5 && PlainControlToken(Arg(2)) && TeamOption(Arg(3), Arg(4)),
+                    _ => false
+                };
             case "fill":
                 return (count == 8 || count == 9 && Arg(8) is "replace" or "destroy" or "keep" or "hollow" or "outline"
                     || count == 10 && Arg(8) == "replace" && StaticBlock(Arg(9), allowTag: true))
@@ -144,6 +164,50 @@ internal sealed partial class CommandTextReader
     }
     private static bool ItemSlots(string value) => PlainControlToken(value)
         || value.EndsWith(".*", StringComparison.Ordinal) && PlainControlToken(value[..^2]);
+
+    private static bool SoundChannel(string value) => value is "master" or "music" or "record" or "weather" or "block" or "hostile"
+        or "neutral" or "player" or "ambient" or "voice";
+    private static bool KnownGameRule(string name, string? value) => name switch
+    {
+        "randomTickSpeed" or "spawnRadius" or "maxEntityCramming" or "maxCommandChainLength" or "commandModificationBlockLimit"
+            or "playersSleepingPercentage" or "snowAccumulationHeight" => value is null || Integer(value, out _),
+        "doFireTick" or "mobGriefing" or "keepInventory" or "doMobSpawning" or "doMobLoot" or "doTileDrops" or "doEntityDrops"
+            or "commandBlockOutput" or "naturalRegeneration" or "doDaylightCycle" or "logAdminCommands" or "showDeathMessages"
+            or "sendCommandFeedback" or "reducedDebugInfo" or "spectatorsGenerateChunks" or "disableElytraMovementCheck" or "doWeatherCycle"
+            or "doLimitedCrafting" or "announceAdvancements" or "disableRaids" or "doInsomnia" or "doImmediateRespawn" or "drowningDamage"
+            or "fallDamage" or "fireDamage" or "freezeDamage" or "doPatrolSpawning" or "doTraderSpawning" or "doWardenSpawning"
+            or "forgiveDeadPlayers" or "universalAnger" or "blockExplosionDropDecay" or "mobExplosionDropDecay" or "tntExplosionDropDecay"
+            or "waterSourceConversion" or "lavaSourceConversion" or "globalSoundEvents" or "doVinesSpread" => value is null or "true" or "false",
+        _ => false
+    };
+    private bool SingleItemSlot(string value)
+    {
+        if (value is "weapon" or "weapon.mainhand" or "weapon.offhand" or "armor.head" or "armor.chest" or "armor.legs" or "armor.feet" or "horse.chest")
+            return true;
+        var itemTags = profile.Features[ProfileFacet.ItemSchema].Schema == "java-item-tags-1.20.4";
+        if (value is "horse.armor" or "horse.saddle") return itemTags;
+        if (value is "armor.body" or "player.cursor") return MinecraftProfiles.SupportsItemConditions(profile);
+        var split = value.LastIndexOf('.');
+        if (split < 0) return false;
+        var maximum = value[..split] switch
+        {
+            "container" => 53, "hotbar" => 8, "inventory" or "enderchest" => 26,
+            "horse" => 14, "villager" when itemTags => 7,
+            "player.crafting" when MinecraftProfiles.SupportsItemConditions(profile) => 3, _ => -1
+        };
+        var digits = value.AsSpan(split + 1);
+        return (digits.Length == 1 || digits.Length > 1 && digits[0] != '0')
+            && int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var index) && index <= maximum;
+    }
+    private static bool TeamOption(string name, string value) => name switch
+    {
+        "color" => value is "reset" or "black" or "dark_blue" or "dark_green" or "dark_aqua" or "dark_red" or "dark_purple"
+            or "gold" or "gray" or "dark_gray" or "blue" or "green" or "aqua" or "red" or "light_purple" or "yellow" or "white",
+        "friendlyFire" or "seeFriendlyInvisibles" => value is "true" or "false",
+        "collisionRule" => value is "always" or "never" or "pushOtherTeams" or "pushOwnTeam",
+        "nametagVisibility" or "deathMessageVisibility" => value is "always" or "never" or "hideForOtherTeams" or "hideForOwnTeam",
+        _ => false
+    };
 
     private static bool SelectorTarget(string text) => text.Length >= 2 && text[0] == '@'
         && text[1] is 'a' or 'e' or 'n' or 'p' or 'r' or 's' && (text.Length == 2 || text[2] == '[');

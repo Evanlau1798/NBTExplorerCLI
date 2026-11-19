@@ -25,6 +25,8 @@ internal static class WorldCommandExtractionTests
                 fill ~ ~ ~ ~ ~ ~ light[level=3] keep
                 item modify entity @s armor.head test:restore
                 data get storage test:state stages[{Progress:2b}].Progress
+                data modify storage test:state copies append from entity @s HandItems[{id:"minecraft:paper"}]
+                data modify storage test:state {} merge value {phase:3b}
                 execute if blocks 0 64 0 0 64 0 1 64 0 all if predicate test:gate run tellraw @a[name=Guard] [{"text":"Function"}]
                 execute if data storage test:state stages[{Progress:2b}] run return 7
                 """;

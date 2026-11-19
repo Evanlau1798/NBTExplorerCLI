@@ -132,6 +132,9 @@ internal static class PackTextExtractionTests
         var nested = "{\"condition\":\"minecraft:all_of\",\"terms\":[" + staticCondition + "]}";
         TextExtractionResult ReadCondition(string value) => PackTextExtractor.Extract(predicate, Encoding.UTF8.GetBytes(value), Metadata(15));
         Require(ReadCondition(nested) is { Complete: true, Occurrences.IsEmpty: true }, "a vanilla item and entity predicate is recognized without creating editable text");
+        const string itemCondition = """{"condition":"minecraft:entity_properties","entity":"this","predicate":{"nbt":"{SelectedItem:{id:'minecraft:paper',tag:{Enchantments:[{id:'minecraft:unbreaking',lvl:2s}]}}}"}}""";
+        Require(ReadCondition(itemCondition) is { Complete: true, Occurrences.IsEmpty: true },
+            "entity predicate item and enchantment IDs stay structural");
         const string nameCondition = """{"condition":"minecraft:entity_properties","entity":"this","predicate":{"nbt":"{CustomName:'{\"text\":\"Guard\"}'}"}}""";
         Require(!ReadCondition(nameCondition).Complete
             && !ReadCondition(nested.Replace("minecraft:entity_properties", "test:unknown", StringComparison.Ordinal)).Complete,
