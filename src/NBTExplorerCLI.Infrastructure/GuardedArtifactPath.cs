@@ -152,7 +152,8 @@ internal sealed class GuardedArtifactPath : IDisposable
 
     private static SafeFileHandle OpenNative(string path, uint access, FileShare share, uint mode, uint flags)
     {
-        var handle = CreateFileW(path, access, share, IntPtr.Zero, mode, flags, IntPtr.Zero);
+        var nativePath = path.Length >= 260 ? @"\\?\" + Path.GetFullPath(path) : path;
+        var handle = CreateFileW(nativePath, access, share, IntPtr.Zero, mode, flags, IntPtr.Zero);
         if (!handle.IsInvalid) return handle;
         var error = Marshal.GetLastPInvokeError(); handle.Dispose();
         if (error is 2 or 3) throw new FileNotFoundException("Artifact path does not exist", path);

@@ -5,7 +5,7 @@ namespace NBTExplorerCLI.Formats;
 
 internal static class ScanCacheValidation
 {
-    internal static void Shard(ArtifactCacheShard shard)
+    internal static long Shard(ArtifactCacheShard shard, bool checkRetention = true)
     {
         if (shard is null || shard.ParseKey is null || shard.Sources.IsDefault || shard.Sources.Length is < 1 or > 100_000) Invalid();
         var keys = new HashSet<(ArtifactAddress, WorldSourceRole, ChunkPosition?)>(); var paths = new HashSet<string>(StringComparer.Ordinal); var worlds = new HashSet<Guid>(); long retained = 0;
@@ -14,22 +14,24 @@ internal static class ScanCacheValidation
             if (source is null || source.Artifact is null || !Enum.IsDefined(source.Role) || !Enum.IsDefined(source.Outcome) || source.Outcome == SourceOutcome.Cancelled
                 || !keys.Add((source.Artifact, source.Role, source.Chunk))) Invalid();
             paths.Add(source!.Artifact.RelativePath); worlds.Add(source.Artifact.WorldId);
-            if (source.Text is not null) Text(source.Text, source);
+            retained = checked(retained + 2L * (source.Artifact.RelativePath.Length + (source.Artifact.ContainerEntry?.Length ?? 0) + (source.DiagnosticCode?.Length ?? 0)));
+            if (source.Text is not null) retained = checked(retained + Text(source.Text, source));
             if (source.Commands is not null)
             {
-                Text(source.Commands.Text, source);
+                retained = checked(retained + Text(source.Commands.Text, source));
                 if (source.Commands.References.IsDefault || source.Commands.References.Any(reference => reference is null || reference.Name is null || !Bound(reference.Address, source)) || !Enum.IsDefined(source.Commands.ReferenceCompleteness)) Invalid();
+                foreach (var reference in source.Commands.References)
+                    retained = checked(retained + TextExtractionBudget.RecordBytes(reference.Address, reference.Name.Length) + AddressBytes(reference.Address));
             }
-            var retainedText = source.Text ?? source.Commands?.Text;
-            if (retainedText is not null) retained = checked(retained + TextExtractionBudget.ResultBytes(retainedText, source.Commands?.References));
-            if (retained > DecodeLimits.Default.MaxDecodedBytes || source.Outcome == SourceOutcome.Success && (source.Text is null || !source.Text.Complete || source.Commands is { Complete: false })
+            if (checkRetention && retained > DecodeLimits.Default.MaxDecodedBytes || source.Outcome == SourceOutcome.Success && (source.Text is null || !source.Text.Complete || source.Commands is { Complete: false })
                 || source.Outcome == SourceOutcome.Irrelevant && (source.Text is { } irrelevant && (!irrelevant.Complete || !irrelevant.Occurrences.IsEmpty || !irrelevant.TranslationKeys.IsEmpty)
                     || source.Commands is { } commands && (!commands.Complete || !commands.References.IsEmpty || !commands.Text.Occurrences.IsEmpty || !commands.Text.TranslationKeys.IsEmpty))
                 || source.Outcome is SourceOutcome.Failed or SourceOutcome.Unsupported && string.IsNullOrWhiteSpace(source.DiagnosticCode)) Invalid();
         }
         if (paths.Count != 1 || worlds.Count != 1) Invalid();
+        return retained;
     }
-    private static void Text(TextExtractionResult? text, CachedSource source)
+    private static long Text(TextExtractionResult? text, CachedSource source)
     {
         if (text is null || text.Occurrences.IsDefault || text.TranslationKeys.IsDefault || text.Diagnostics.IsDefault || text.PendingCommands.IsDefault || text.Unclassified.IsDefault) Invalid();
         if (text!.Occurrences.Any(item => item is null || item.Text is null || item.Context is null || !Bound(item.Address, source))
@@ -37,6 +39,18 @@ internal static class ScanCacheValidation
             || text.Diagnostics.Any(item => item is null || string.IsNullOrWhiteSpace(item.Code) || !Bound(item.Address, source))
             || text.PendingCommands.Any(item => item is null || item.Command is null || !Bound(item.Address, source))
             || text.Unclassified.Any(item => item is null || item.Text is null || !Bound(item.Address, source))) Invalid();
+        return checked(TextExtractionBudget.ResultBytes(text) + text.Occurrences.Sum(item => AddressBytes(item.Address) + 2L * item.Context.Length)
+            + text.TranslationKeys.Sum(item => AddressBytes(item.Address)) + text.Diagnostics.Sum(item => AddressBytes(item.Address))
+            + text.PendingCommands.Sum(item => AddressBytes(item.Address)) + text.Unclassified.Sum(item => AddressBytes(item.Address)));
+    }
+    private static long AddressBytes(SourceAddress address)
+    {
+        static long KeyLength(TypedPath? path) => path?.Segments.Sum(segment => (long)(segment.Key?.Length ?? 0)) ?? 0;
+        var syntax = address.Syntax;
+        var syntaxLength = syntax is null ? 0 : (long)syntax.GrammarProfile.Length + syntax.PreimageHash.Length + syntax.Encoding.Length + syntax.Newline.Length;
+        return 2 * (KeyLength(address.NodePath) + KeyLength(address.ComponentPath) + KeyLength(syntax?.NodePath)
+            + address.Artifact.RelativePath.Length + (address.Artifact.ContainerEntry?.Length ?? 0)
+            + address.SemanticRole.Length + (address.Dimension?.Length ?? 0) + syntaxLength);
     }
     private static bool Bound(SourceAddress? address, CachedSource source) => address is not null && address.Artifact == source.Artifact && address.Chunk == source.Chunk;
     internal static void Manifest(ScanCacheManifest manifest)

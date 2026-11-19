@@ -227,6 +227,7 @@ internal static class CommandTextExtractionTests
             "scoreboard players set $timer countdown 4",
             "execute if score $timer countdown matches 1.. run function p:advance",
             "execute store result score $count counts if entity @e[nbt={HurtTime:10s}]",
+            "execute store result bossbar test:health value run scoreboard players set #current counts 7",
             "execute store result score $pass counts if score $count counts matches 27..",
             "execute store result score $pass counts unless block ~0.8 ~ ~ #example:solid",
             "particle block minecraft:sculk ~ ~ ~ 0.3 0.5 0.3 0.01 2 normal",
@@ -242,12 +243,27 @@ internal static class CommandTextExtractionTests
         foreach (var command in new[] {
             "scoreboard players set $ countdown 4", "particle block oak_sign{CustomName:'Guide'} ~ ~ ~ 0 0 0 0 1 normal",
             "execute store result score $count counts", "execute positioned ~ ~ ~",
+            "execute store result bossbar test:health title run scoreboard players set #current counts 7",
             "execute store result score $pass counts if block 0.8 0 0 stone",
             "particle dust ~ ~ ~ 0 0 0 0 1 force",
             "particle dust_color_transition 0.3 0.4 0 1 0.9 0.1 ~ ~ ~ 0 0 0 0 1 force",
             "data modify entity @s CustomNameVisible set value 'Guide'"
         })
             Require(!CommandTextExtractor.Extract(new(source, command), java1201).Complete, "dynamic or invalid operands remain unresolved: " + command);
+        var renamed = CommandTextExtractor.Extract(new(source,
+            """execute as @e[type=sheep] run data modify entity @s CustomName set value '{"text":"Keeper"}'"""), java1201);
+        Require(renamed.Complete && renamed.Text.Occurrences.Single() is { Text: "Keeper", Context: "entity.name", Address.ComponentPath: not null },
+            "direct name values retain their JSON layer and identifying-name role");
+        var stacked = CommandTextExtractor.Extract(new(source,
+            """data modify block ~ ~ ~ Items append value {Slot:0b,id:'minecraft:paper',Count:1b,tag:{display:{Name:'{"text":"Chart"}'}}}"""), java1201);
+        Require(stacked.Complete && stacked.Text.Occurrences.Single() is { Text: "Chart", Context: "item.name", Address.ComponentPath: not null },
+            "an inserted container item exposes only its exact known text leaves");
+        foreach (var body in new[] {
+            """data modify entity @s arbitrary set value '{"text":"Internal"}'""",
+            """data modify block ~ ~ ~ Records append value {id:'minecraft:paper',tag:{display:{Name:'{"text":"Internal"}'}}}""",
+            """data modify storage test:state pages set value ['{"text":"Internal"}']"""
+        })
+            Require(!CommandTextExtractor.Extract(new(source, body), java1201).Complete, "similarly shaped internal values do not acquire write authority");
         foreach (var command in new[] {
             "execute if block 353 125 -115 minecraft:honey_block run tellraw @a {text:'Test'}",
             "execute if items block 132 60 -31 contents minecraft:music_disc_wait run tellraw @a {text:'Test'}",

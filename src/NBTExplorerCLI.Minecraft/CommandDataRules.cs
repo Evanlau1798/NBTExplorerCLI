@@ -7,6 +7,26 @@ internal sealed partial class CommandTextReader
 {
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
+        if (tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"
+            && EntityTarget(tokens[index + 3].Text) && tokens[index + 4].Text == "CustomName" && tokens[index + 5].Text == "set" && tokens[index + 6].Text == "value")
+        {
+            var target = tokens[index + 3]; var value = tokens[index + 7];
+            var role = selectorTypes.GetValueOrDefault(target.Start) == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name";
+            Component(value.Start, value.Start + value.Text.Length, At(path, "data.entity.CustomName"), storedRole: role);
+            return;
+        }
+        if (tokens.Count == index + 10 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "block"
+            && BlockCoordinates(tokens[index + 3].Text, tokens[index + 4].Text, tokens[index + 5].Text)
+            && tokens[index + 6].Text == "Items" && tokens[index + 7].Text is "append" or "prepend" && tokens[index + 8].Text == "value")
+        {
+            var token = tokens[index + 9]; var grammarPath = At(path, "data.block.Items");
+            var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, "item.stack", source.Address.Dimension, source.Address.Chunk);
+            var result = SnbtTextExtractor.ItemStack(binding, token.Text, profile, limits, scope, ComponentCallback(grammarPath, token.Start, true));
+            var tokenEnd = token.Start + token.Text.Length;
+            MergeComponent(result, grammarPath, token.Start, tokenEnd, true);
+            if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(token.Text), token.Start, tokenEnd, grammarPath, true, itemTree: true);
+            return;
+        }
         if (profile.Id == "java-1.20.1" && tokens.Count == index + 8
             && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity" && EntityTarget(tokens[index + 3].Text)
             && tokens[index + 4].Text is ("CustomNameVisible" or "Invulnerable" or "Glowing")

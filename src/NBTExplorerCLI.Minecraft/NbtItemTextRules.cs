@@ -23,7 +23,7 @@ internal sealed partial class NbtTextReader
         "wolf", "zoglin", "zombie", "zombie_horse", "zombie_villager", "zombified_piglin"
     }.ToFrozenSet(StringComparer.Ordinal);
 
-    private void Item(NbtValue value, TypedPath path, string bookRole = "book")
+    internal void Item(NbtValue value, TypedPath path, string bookRole = "book")
     {
         if (value is NbtCompound { Entries.Length: 0 }) return;
         var identity = Field(value, "id", path);
@@ -83,7 +83,8 @@ internal sealed partial class NbtTextReader
             Component(Field(display, "Name", displayPath), At(displayPath, "Name"), "item.name");
             foreach (var (lore, lorePath) in Sequence(Field(display, "Lore", displayPath), At(displayPath, "Lore"))) Component(lore, lorePath, "item.lore");
         }
-        if (Field(tag, "BlockEntityTag", path) is { } block) BlockEntity(block, At(path, "BlockEntityTag"));
+        if (Field(tag, "BlockEntityTag", path) is { } block && !(id == "minecraft:shield" && ShieldPatterns(block)))
+            BlockEntity(block, At(path, "BlockEntityTag"), fallbackIdentity: TaggedBlockIdentity(id));
         if (Field(tag, "EntityTag", path) is { } entity)
         {
             // Tagged vanilla spawn eggs use their registered entity when EntityTag omits id.
@@ -114,6 +115,25 @@ internal sealed partial class NbtTextReader
             foreach (var entry in filtered.Entries)
                 if (written) Component(entry.Value, At(At(path, "filtered_pages"), entry.Name), bookRole + ".page", classicEncoded: true); else Literal(entry.Value, At(At(path, "filtered_pages"), entry.Name), bookRole + ".page");
     }
+    private static string? TaggedBlockIdentity(string? item) => item switch
+    {
+        "minecraft:chest" => "minecraft:chest",
+        "minecraft:white_banner" or "minecraft:orange_banner" or "minecraft:magenta_banner" or "minecraft:light_blue_banner"
+            or "minecraft:yellow_banner" or "minecraft:lime_banner" or "minecraft:pink_banner" or "minecraft:gray_banner"
+            or "minecraft:light_gray_banner" or "minecraft:cyan_banner" or "minecraft:purple_banner" or "minecraft:blue_banner"
+            or "minecraft:brown_banner" or "minecraft:green_banner" or "minecraft:red_banner" or "minecraft:black_banner" => "minecraft:banner",
+        _ => null
+    };
+    private static bool ShieldPatterns(NbtValue value)
+        => value is NbtCompound tag && tag.Entries.Select(entry => entry.Name).Distinct(StringComparer.Ordinal).Count() == tag.Entries.Length
+            && tag.Entries.All(entry => entry switch
+            {
+                { Name: "Base", Value: NbtInt } => true,
+                { Name: "Patterns", Value: NbtList list } => list.Items.All(item => item is NbtCompound { Entries.Length: 2 } pattern
+                    && pattern.Entries.Any(field => field is { Name: "Color", Value: NbtInt })
+                    && pattern.Entries.Any(field => field is { Name: "Pattern", Value: NbtString })),
+                _ => false
+            });
     private void Book(NbtValue value, TypedPath path, string role, bool written)
     {
         if (written)

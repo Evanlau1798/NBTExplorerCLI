@@ -13,6 +13,8 @@ internal static class SnbtTextExtractor
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Component(root, TypedPath.Root, source.SemanticRole), false, componentRoot);
     internal static TextExtractionResult ItemNbtTag(SourceAddress source, string syntax, CapabilityProfile profile, string? itemId, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemTag(root, itemId), componentRoot: componentRoot);
+    internal static TextExtractionResult ItemStack(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Item(root, TypedPath.Root), componentRoot: componentRoot);
     internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null)
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.BlockEntity(root, TypedPath.Root, knownIdentity), componentRoot: componentRoot);
     internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null, string? fallbackIdentity = null)

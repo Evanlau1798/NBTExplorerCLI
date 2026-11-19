@@ -8,6 +8,7 @@ namespace NBTExplorerCLI.Formats;
 
 internal static class ContractJson
 {
+    internal const int MaximumBytes = 67_108_864;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     internal static readonly JsonSerializerOptions Options = CreateOptions();
     private static JsonSerializerOptions CreateOptions()
@@ -64,7 +65,7 @@ internal static class ContractJson
     }
     private sealed class LimitedJsonOutput : MemoryStream
     {
-        private void Check(int count) { if (count > 67_108_864 - Position) throw new JsonOutputLimitException(); }
+        private void Check(int count) { if (count > MaximumBytes - Position) throw new JsonOutputLimitException(); }
         public override void Write(byte[] buffer, int offset, int count) { Check(count); base.Write(buffer, offset, count); }
         public override void Write(ReadOnlySpan<byte> buffer) { Check(buffer.Length); base.Write(buffer); }
         public override void WriteByte(byte value) { Check(1); base.WriteByte(value); }
@@ -72,13 +73,13 @@ internal static class ContractJson
     public static T Read<T>(string json, string family, Func<JsonElement, T> decode)
     {
         ArgumentNullException.ThrowIfNull(json);
-        if (json.Length > 67_108_864 || LosslessStringConverter.HasUnpairedSurrogate(json)
-            || Encoding.UTF8.GetByteCount(json) > 67_108_864) throw new JsonException("Invalid or oversized contract JSON");
+        if (json.Length > MaximumBytes || LosslessStringConverter.HasUnpairedSurrogate(json)
+            || Encoding.UTF8.GetByteCount(json) > MaximumBytes) throw new JsonException("Invalid or oversized contract JSON");
         return ReadBytes(Encoding.UTF8.GetBytes(json), family, decode);
     }
     internal static T ReadUtf8<T>(ReadOnlyMemory<byte> bytes, string family, Func<JsonElement, T> decode)
     {
-        if (bytes.Length > 67_108_864) throw new JsonException("Invalid or oversized contract JSON");
+        if (bytes.Length > MaximumBytes) throw new JsonException("Invalid or oversized contract JSON");
         _ = StrictUtf8.GetCharCount(bytes.Span);
         return ReadBytes(bytes, family, decode);
     }

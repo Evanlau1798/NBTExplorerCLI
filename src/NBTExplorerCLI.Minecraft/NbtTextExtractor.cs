@@ -57,10 +57,13 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
     private readonly bool modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
     private readonly bool classic = profile == MinecraftProfiles.ClassicAnvil || MinecraftProfiles.IsVersionedClassic(profile);
     private NbtValue? Field(NbtValue value, string key, TypedPath path)
+        => Field(value, key, path, out _);
+    private NbtValue? Field(NbtValue value, string key, TypedPath path, out ResolutionStatus status)
     {
         var resolution = NbtLocator.Resolve(value, new([PathSegment.ForKey(key)]));
-        if (resolution.Status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid) output.Diagnostic(At(path, key), "AmbiguousOrInvalidField");
-        return resolution.Status == ResolutionStatus.Found ? resolution.Value : null;
+        status = resolution.Status;
+        if (status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid) output.Diagnostic(At(path, key), "AmbiguousOrInvalidField");
+        return status == ResolutionStatus.Found ? resolution.Value : null;
     }
     private IEnumerable<(NbtValue Value, TypedPath Path)> Sequence(NbtValue? value, TypedPath path)
     {

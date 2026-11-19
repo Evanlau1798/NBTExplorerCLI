@@ -41,11 +41,17 @@ internal sealed partial class NbtTextReader
     {
         foreach (var (entity, path) in Sequence(Field(root, "Entities", TypedPath.Root), At(TypedPath.Root, "Entities"))) Entity(entity, path);
     }
-    internal void BlockEntity(NbtValue value, TypedPath path, string? knownIdentity = null)
+    internal void BlockEntity(NbtValue value, TypedPath path, string? knownIdentity = null, string? fallbackIdentity = null)
     {
-        var rawIdentity = Field(value, "id", path);
-        if (rawIdentity is not NbtString && (rawIdentity is not null || knownIdentity is null)) { output.Diagnostic(path, "MissingBlockEntityIdentity"); return; }
-        var identity = rawIdentity is NbtString id ? MinecraftIdentifier.DefaultNamespace(id.Value) : knownIdentity!;
+        var rawIdentity = Field(value, "id", path, out var status);
+        if (status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid) return;
+        var identity = rawIdentity switch
+        {
+            NbtString id => MinecraftIdentifier.DefaultNamespace(id.Value),
+            null when status == ResolutionStatus.Missing && value is NbtCompound => knownIdentity ?? fallbackIdentity,
+            _ => null
+        };
+        if (identity is null) { output.Diagnostic(path, "MissingBlockEntityIdentity"); return; }
         if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingBlockEntityIdentity"); return; }
         var signsOnly = profile == MinecraftProfiles.Java125;
         if (signsOnly && (identity is "minecraft:sign" or "minecraft:hanging_sign"
@@ -113,10 +119,12 @@ internal sealed partial class NbtTextReader
     }
     internal void Entity(NbtValue value, TypedPath path, string? knownIdentity = null, string? fallbackIdentity = null)
     {
-        var identity = Field(value, "id", path) switch
+        var rawIdentity = Field(value, "id", path, out var status);
+        if (status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid) return;
+        var identity = rawIdentity switch
         {
             NbtString id => MinecraftIdentifier.DefaultNamespace(id.Value),
-            null => knownIdentity ?? fallbackIdentity,
+            null when status == ResolutionStatus.Missing && value is NbtCompound => knownIdentity ?? fallbackIdentity,
             _ => null
         };
         if (identity is null) { output.Diagnostic(path, "MissingEntityIdentity"); return; }

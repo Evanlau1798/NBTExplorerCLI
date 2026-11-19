@@ -7,9 +7,13 @@ namespace NBTExplorerCLI.Formats;
 
 public static class ScanCacheJson
 {
+    public const int MaximumStoredShardBytes = ContractJson.MaximumBytes;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private const string ShardFamily = "nbtcli.scan-shard";
+    private const string ShardIndexFamily = "nbtcli.scan-shard-index";
     private const string ManifestFamily = "nbtcli.scan-manifest";
     private sealed record ScopeDto(string[] Dimensions, string[] Regions, string[] Types, string[] ArtifactPaths);
+    private sealed record ShardIndex(Hash256 ParseKey, ImmutableArray<Hash256> Parts);
     private sealed record ManifestDto(Guid WorldId, ScopeDto Scope, InterpretationVersions Versions, StableIdentity SnapshotId,
         CachedArtifact[] Artifacts, ManifestSource[] InputSources, bool CoverageComplete, string? CatalogDiagnosticCode);
     public static Hash256 BindingHash(string? layoutProfile, IEnumerable<CacheSourceBinding> sources)
@@ -29,6 +33,51 @@ public static class ScanCacheJson
         if (WriteShard(shard) != json) throw new JsonException("Cache shard is not canonical");
         return shard;
     });
+    public static byte[]? EncodeShardWithinBudget(ArtifactCacheShard shard, out long retained)
+    {
+        retained = ScanCacheValidation.Shard(shard, checkRetention: false);
+        if (retained > DecodeLimits.Default.MaxDecodedBytes) return null;
+        try { return Encoding.UTF8.GetBytes(ContractJson.WriteForStorage(ShardFamily, shard)); }
+        catch (JsonOutputLimitException) { return null; }
+    }
+    public static byte[] WriteShardIndex(Hash256 parseKey, ImmutableArray<Hash256> parts)
+        => ContractJson.WriteUtf8(ShardIndexFamily, ValidateIndex(new(parseKey, parts), 100_000));
+
+    public static ArtifactCacheShard ReadStoredShard(byte[] bytes, int sourceCount, Func<Hash256, byte[]> readPart)
+    {
+        if (sourceCount is < 1 or > 100_000 || bytes.Length > MaximumStoredShardBytes) throw new JsonException("Invalid cache shard size");
+        var json = StrictUtf8.GetString(bytes);
+        if (!json.StartsWith("{\"schemaFamily\":\"" + ShardIndexFamily + "\",", StringComparison.Ordinal)) return ReadShard(json);
+        var index = ContractJson.Read(json, ShardIndexFamily, data =>
+        {
+            ContractJson.Fields(data, "parseKey", "parts");
+            var decoded = ValidateIndex(ContractJson.Decode<ShardIndex>(data), sourceCount);
+            if (ContractJson.Write(ShardIndexFamily, decoded) != json) throw new JsonException("Cache shard index is not canonical");
+            return decoded;
+        });
+        var sources = ImmutableArray.CreateBuilder<CachedSource>(); long retained = 0;
+        var remaining = MaximumStoredShardBytes - bytes.Length;
+        foreach (var hash in index.Parts)
+        {
+            var encoded = readPart(hash);
+            if (encoded.Length > remaining) throw new JsonException("Cache shard parts exceed the aggregate byte budget");
+            remaining -= encoded.Length;
+            var part = ReadShard(StrictUtf8.GetString(encoded));
+            retained = checked(retained + ScanCacheValidation.Shard(part));
+            if (part.ParseKey != index.ParseKey || part.Sources.Length > sourceCount - sources.Count || retained > DecodeLimits.Default.MaxDecodedBytes)
+                throw new JsonException("Cache shard part exceeds its aggregate binding or budget");
+            sources.AddRange(part.Sources);
+        }
+        var result = new ArtifactCacheShard(index.ParseKey, sources.ToImmutable());
+        ScanCacheValidation.Shard(result);
+        return result;
+    }
+    private static ShardIndex ValidateIndex(ShardIndex index, int maximumParts)
+    {
+        if (index is null || index.ParseKey is null || index.Parts.IsDefault || index.Parts.Length < 2 || index.Parts.Length > maximumParts
+            || index.Parts.Any(part => part is null) || index.Parts.Distinct().Count() != index.Parts.Length) throw new JsonException("Invalid cache shard index");
+        return index;
+    }
     public static string WriteManifest(ScanCacheManifest manifest)
     {
         ScanCacheValidation.Manifest(manifest);

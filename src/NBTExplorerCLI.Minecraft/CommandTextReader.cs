@@ -120,6 +120,8 @@ internal sealed partial class CommandTextReader
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text is "block" or "items") operands = BlockOrItemCondition(tokens, cursor);
                 if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "score"
                     && ScoreHolder(tokens[cursor + 2].Text, allowWildcard: true) && PlainControlToken(tokens[cursor + 3].Text)) operands = 4;
+                if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "bossbar"
+                    && MinecraftIdentifier.ResourceLocation(tokens[cursor + 2].Text) && tokens[cursor + 3].Text is "value" or "max") operands = 4;
                 if (cursor < tokens.Count && clause is "positioned" or "rotated" && tokens[cursor].Text == "as") operands = 2;
                 if (operands < 0 || cursor + operands > tokens.Count) { Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownExecuteGrammar"); return; }
                 cursor += operands;
@@ -143,10 +145,10 @@ internal sealed partial class CommandTextReader
         if (argument < 0) { Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownCommandGrammar"); return; }
         Component(tokens[argument].Start, end, At(path, name + ".text"));
     }
-    private void Component(int start, int end, TypedPath grammarPath, string? itemComponent = null)
+    private void Component(int start, int end, TypedPath grammarPath, string? itemComponent = null, string? storedRole = null)
     {
-        var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, source.Address.SemanticRole + ".text", source.Address.Dimension, source.Address.Chunk);
-        var modern = itemComponent is not null || profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
+        var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, storedRole ?? source.Address.SemanticRole + ".text", source.Address.Dimension, source.Address.Chunk);
+        var modern = itemComponent is not null || storedRole is not null || profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
         var bytes = Utf8.GetBytes(source.Command[start..end]);
         var spans = modern ? null : componentRoot is null ? NativeJsonStringSpans.Read(bytes, limits) : NativeJsonValueSpans.Read(bytes, limits);
         var callback = ComponentCallback(grammarPath, start, modern, spans);

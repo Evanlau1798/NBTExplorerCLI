@@ -52,21 +52,7 @@ public sealed partial class WorldQueryService
             if (reused.TryGetValue(batch.RelativePath, out var descriptor)) { descriptors.Add(descriptor); reusedSources += batch.Sources.Length; reusedArtifacts++; }
             else
             {
-                var shard = CachedArtifactResults.Create(batch, context.ParseKeys[batch.RelativePath]);
-                var json = ScanCacheJson.WriteShard(shard);
-                try { _ = ScanCacheJson.ReadShard(json); }
-                catch (JsonException)
-                {
-                    // The validated model can still exceed the serialized byte/token budget.
-                    batch = batch with { Sources = batch.Sources.Select(source => source.Source.Outcome == SourceOutcome.Success
-                        ? new TextSourceExtraction(source.Source, SourceOutcome.Failed, null, "CacheSerializationLimit")
-                        : new(source.Source, source.Outcome, null, source.DiagnosticCode)).ToImmutableArray() };
-                    shard = CachedArtifactResults.Create(batch, context.ParseKeys[batch.RelativePath]);
-                    json = ScanCacheJson.WriteShard(shard); _ = ScanCacheJson.ReadShard(json);
-                }
-                var bytes = Encoding.UTF8.GetBytes(json); var hash = Hash256.Compute(bytes); store.WriteShard(hash, bytes);
-                descriptor = new(batch.RelativePath, shard.ParseKey, hash, batch.Sources.Length, batch.Sources.Sum(source => source.Text?.Occurrences.Length ?? 0),
-                    batch.Sources.Sum(source => source.Commands?.References.Length ?? 0), batch.Sources.All(source => source.Outcome is SourceOutcome.Success or SourceOutcome.Irrelevant));
+                descriptor = CachedArtifactResults.Write(store, batch, context.ParseKeys[batch.RelativePath], token);
                 _ = CachedArtifactResults.Read(store, descriptor, inventory.WorldId);
                 descriptors.Add(descriptor); parsedArtifacts++; scannedSources += batch.Sources.Length;
             }

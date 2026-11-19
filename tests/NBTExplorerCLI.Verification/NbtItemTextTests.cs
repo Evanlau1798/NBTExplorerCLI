@@ -92,6 +92,25 @@ internal static class NbtItemTextTests
             Require(!unbound.Complete && unbound.Diagnostics.Single().Code == "MissingEntityIdentity",
                 $"{unknown}: only registered vanilla spawn eggs can supply a default entity identity");
         }
+        TextExtractionResult TaggedBlock(string itemId, NbtCompound block)
+        {
+            var stack = C(E("id", S(itemId)), E("tag", C(E("BlockEntityTag", block))));
+            return NbtTextExtractor.Extract(Player, new("", C(E("DataVersion", new NbtInt(3465)), E("Inventory", L(stack)))));
+        }
+        var paper = C(E("id", S("minecraft:paper")), E("tag", C(E("display", C(E("Name", Text("Nested name", false)))))));
+        var chest = TaggedBlock("minecraft:chest", C(E("Items", L(paper))));
+        Require(chest.Complete && chest.Occurrences.Single().Text == "Nested name", "a chest supplies its block entity identity and exact nested item text");
+        var banner = TaggedBlock("minecraft:white_banner", C(E("CustomName", Text("Banner name", false))));
+        Require(banner.Complete && banner.Occurrences.Single().Text == "Banner name", "a vanilla colored banner supplies its banner identity");
+        var pattern = L(C(E("Color", new NbtInt(1)), E("Pattern", S("mr"))));
+        var shield = TaggedBlock("minecraft:shield", C(E("Base", new NbtInt(2)), E("Patterns", pattern)));
+        Require(shield.Complete && shield.Occurrences.IsEmpty, "shield pattern identifiers are not visible text");
+        Require(!TaggedBlock("mod:white_banner", C(E("CustomName", Text("Unknown", false)))).Complete
+            && !TaggedBlock("minecraft:shield", C(E("Items", L(paper)))).Complete,
+            "unknown item identities and unexpected shield payloads do not acquire a text schema");
+        var ambiguous = TaggedBlock("minecraft:chest", C(E("id", S("minecraft:chest")), E("id", S("minecraft:banner")), E("Items", L(paper))));
+        Require(!ambiguous.Complete && ambiguous.Occurrences.IsEmpty && ambiguous.Diagnostics.Any(row => row.Code == "AmbiguousOrInvalidField"),
+            "a duplicated identity cannot grant fallback access to nested text");
     }
     public static void EmbeddedBlockEntityAndEntityItems()
     {

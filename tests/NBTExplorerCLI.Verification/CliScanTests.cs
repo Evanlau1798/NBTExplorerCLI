@@ -16,12 +16,15 @@ internal static class CliScanTests
     internal sealed record Invocation(int Exit, string Output);
     internal static Invocation Run(string cwd, params string[] args) => Invoke(cwd, args, null);
     internal static Invocation RunInput(string cwd, string input, params string[] args) => Invoke(cwd, args, input);
-    private static Invocation Invoke(string cwd, string[] args, string? input)
+    private static Invocation Invoke(string cwd, string[] args, string? input, bool appHost = false)
     {
-        var host = Path.GetFullPath(Path.Combine(RuntimeEnvironment.GetRuntimeDirectory(), "..", "..", "..", "dotnet.exe"));
+        var assembly = typeof(CliApplication).Assembly.Location;
+        var host = appHost ? Path.ChangeExtension(assembly, ".exe")
+            : Path.GetFullPath(Path.Combine(RuntimeEnvironment.GetRuntimeDirectory(), "..", "..", "..", "dotnet.exe"));
         var start = new ProcessStartInfo(host) { WorkingDirectory = cwd, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         start.RedirectStandardInput = input is not null;
-        start.ArgumentList.Add(typeof(CliApplication).Assembly.Location); foreach (var arg in args) start.ArgumentList.Add(arg);
+        if (!appHost) start.ArgumentList.Add(assembly);
+        foreach (var arg in args) start.ArgumentList.Add(arg);
         using var process = Process.Start(start) ?? throw new IOException("Cannot start product CLI");
         var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
         if (input is not null) { process.StandardInput.Write(input); process.StandardInput.Close(); }
@@ -54,6 +57,12 @@ internal static class CliScanTests
                 && changed.GetProperty("telemetry").GetProperty("reusedArtifacts").GetInt32() > 0, "CLI detects same-size same-mtime edits incrementally");
             using var refreshed = Success(Run(root, "scan", root, "--cache-root", cache, "--refresh"));
             Require(refreshed.RootElement.GetProperty("data").GetProperty("telemetry").GetProperty("reusedArtifacts").GetInt32() == 0, "refresh forces a real full scan");
+            var deep = "datapacks/p/data/test/function/" + string.Join('/', new string('a', 90), new string('b', 90), new string('c', 90)) + "/part.mcfunction";
+            Put(root, deep, "tellraw @a \"Long path\"\n"u8.ToArray());
+            Require(Path.Combine(root, deep).Length > 260, "the app host case crosses the Windows native path boundary");
+            using var longPath = Success(Invoke(root, ["extract", root, "--path", deep, "--no-cache"], null, appHost: true));
+            Require(longPath.RootElement.GetProperty("data").GetProperty("counts").GetProperty("occurrences").GetInt32() == 1,
+                "the actual CLI executable reads the guarded long path");
         }
         finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
     }

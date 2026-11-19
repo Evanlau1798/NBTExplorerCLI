@@ -37,6 +37,21 @@ internal static class CandidatePathTests
             Reject<ArgumentException>(() => store.Stage(new(Guid.NewGuid(), "level.dat", ArtifactKind.Nbt), ArtifactImage.Absent, new byte[] { 4 }));
             Reject<ArgumentException>(() => store.Stage(new(World, "pack.zip", ArtifactKind.Archive, "../escape"), ArtifactImage.Absent, new byte[] { 4 }));
             Reject<ArgumentException>(() => store.Stage(new(World, ".nbtcli-writer.lock", ArtifactKind.Nbt), ArtifactImage.Absent, new byte[] { 4 }));
+            var relative = string.Join('/', new string('a', 90), new string('b', 90), new string('c', 90), "part.dat");
+            var full = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+            var before = new byte[] { 2, 5 };
+            var after = new byte[] { 3, 6 };
+            File.WriteAllBytes(full, before);
+            var deepArtifact = new ArtifactAddress(World, relative, ArtifactKind.Nbt);
+            Require(full.Length > 260 && store.Read(deepArtifact).SequenceEqual(before), "verified reads support a local path longer than MAX_PATH");
+            using (var candidate = store.Stage(deepArtifact, ArtifactImage.Present(Hash256.Compute(before)), after))
+            {
+                candidate.Flush();
+                candidate.Verify(bytes => Require(bytes.ReadByte() == 3, "long path candidate readback"));
+                candidate.Commit();
+            }
+            Require(store.Read(deepArtifact).SequenceEqual(after), "the same guarded long path survives staging and commit");
         }
         finally
         {
