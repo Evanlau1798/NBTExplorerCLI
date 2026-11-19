@@ -27,12 +27,17 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     internal BoundWorldPlan Bind(WorldQuerySnapshot snapshot, IEnumerable<PatchOperation> operations)
     {
         ArgumentNullException.ThrowIfNull(snapshot); ArgumentNullException.ThrowIfNull(operations);
-        if (snapshot.Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil)
+        var classicVersion = MinecraftProfiles.ClassicVersion(snapshot.Manifest.Versions.Profile);
+        if (snapshot.Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && classicVersion is null)
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Classic Anvil supports inspection and extraction only");
         using var bindingTrace = NBTExplorerCLI.Formats.WorkDiagnostics.Start("plan.bind", phase: "bind", worldId: inventory.WorldId);
         if (snapshot.Manifest.WorldId != inventory.WorldId) throw new ArgumentException("Snapshot belongs to another world", nameof(snapshot));
         var requested = operations.Take(100_001).ToArray();
         if (requested.Length > 100_000 || requested.Any(operation => operation is null)) throw new ArgumentException("Invalid or oversized operation set", nameof(operations));
+        if (classicVersion is not null && requested.Any(operation => operation is not LiteralPatch literalOperation
+            || literalOperation.Translation.Slot.Address.Artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Region)
+            || WorldReferenceService.IsIdentifyingName(literalOperation.Translation.Slot.Role) && literalOperation.Translation.Slot.SourceText != literalOperation.Translation.Reply.Text))
+            throw new CodecException(CodecError.UnsupportedProfile, 0, "Classic translation supports only literal world text and preserves entity reference names");
         if (requested.Any(operation => operation is not (LiteralPatch or TypedPatch or KeyConversionPatch or ReferencePatch))) throw new NotSupportedException("This preparation path requires explicit semantic operations");
         RequireReferenceComposition(requested);
         var referenceInputs = WorldReferenceService.Validate(inventory, snapshot, requested.OfType<ReferencePatch>());
@@ -66,7 +71,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         CheckPreimages(inventory, plan);
         var scope = new SnapshotScope(snapshot.Manifest.Scope.Dimensions, snapshot.Manifest.Scope.Regions, snapshot.Manifest.Scope.Types, outputs.Select(artifact => artifact.RelativePath));
         var rules = snapshot.StorageRules.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<StorageTextRule>)pair.Value);
-        var extraction = new WorldTextExtraction(inventory, new(scope, snapshot.Limits), rules);
+        var extraction = new WorldTextExtraction(inventory, new(scope, snapshot.Limits, ClassicVersion: classicVersion), rules);
         var literal = requested.OfType<LiteralPatch>().Select(operation => operation.Translation)
             .Concat(requested.OfType<KeyConversionPatch>().Select(operation => new LiteralTranslation(operation.Conversion.Slot, operation.Conversion.Reply)))
             .ToDictionary(translation => translation.Slot.Address); var found = new HashSet<SourceAddress>();

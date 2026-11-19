@@ -91,7 +91,7 @@ public sealed class RegionFile
     }
 
     public (byte[] Bytes, IReadOnlyDictionary<int, (RegionChunk Descriptor, Hash256 Payload)> Expected) WithEditedChunks(
-        IEnumerable<int> indices, Func<int, NbtDocument, NbtDocument> edit, DecodeLimits? limits = null)
+        IEnumerable<int> indices, Func<int, NbtDocument, NbtDocument> edit, DecodeLimits? limits = null, bool classicAnvil = false)
     {
         ArgumentNullException.ThrowIfNull(indices);
         ArgumentNullException.ThrowIfNull(edit);
@@ -104,7 +104,7 @@ public sealed class RegionFile
         {
             var chunk = Existing(index);
             if (expected.ContainsKey(index)) throw new ArgumentException("Region edit indices must be distinct", nameof(indices));
-            var before = ReadChunk(index, limits).Document;
+            var before = ReadChunk(index, limits, classicAnvil).Document;
             var after = edit(index, before) ?? throw new InvalidDataException("Region edit returned no document");
             if (before == after)
             {

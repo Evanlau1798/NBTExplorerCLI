@@ -4,6 +4,7 @@ using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Infrastructure;
+using NBTExplorerCLI.Minecraft;
 
 namespace NBTExplorerCLI.Cli;
 
@@ -15,7 +16,7 @@ internal static class SessionCommands
         if (action == "help") return ["help"];
         string[] options = action switch
         {
-            "start" => ["source-language", "target-language", "operation-id", "page-size", "page-bytes", "match-pattern", "types", "path", "dimension", "region", "standalone", "no-group"],
+            "start" => ["source-language", "target-language", "operation-id", "page-size", "page-bytes", "match-pattern", "types", "path", "dimension", "region", "standalone", "no-group", "minecraft-version"],
             "status" => [], "export" => ["page", "operation-id", "no-group"], "advance" => ["reply", "no-group"], "submit" => ["reply", "no-group"],
             "get" => ["slot-id"], "jump" => ["request"], "note" or "glossary" => ["request", "limit", "offset"],
             "reset" => ["request", "confirm"], "groups" => ["limit", "offset"], "memory" => ["slot-id", "source-sessions", "glossary-version", "limit", "offset"],
@@ -49,7 +50,7 @@ internal static class SessionCommands
         var service = new TranslationSessionService(new FileSystemTranslationSessionStore(Path.Combine(context.State, "sessions")));
         if (request.Subcommand == "start")
         {
-            var snapshot = Query(context, options!.Scope);
+            var snapshot = Query(context, options!.Scope, classicVersion: request.Get("minecraft-version"));
             var start = TranslationSessionService.CreateStartRequest(snapshot, id, sourceLanguage!, targetLanguage!, policy, item => options.Matches(item.Text));
             if (start.Slots.IsEmpty) throw new CliFailure("NOT_FOUND", "No text slots match the requested selection");
             var receipt = service.Start(start, operationId);
@@ -116,14 +117,16 @@ internal static class SessionCommands
         var status = TranslationSessionService.Status(state);
         if (state.Slots.All(slot => slot.State == SessionSlotState.Applied))
             return new(new { status, sourceFresh = (bool?)null, snapshotId = state.Source.SnapshotId, freshness = "not-checked", validationScope = "sealed-session-history" });
-        var current = Query(context, Scope(state)); var fresh = current.Manifest.SnapshotId == state.Source.SnapshotId;
+        var current = Query(context, state); var fresh = current.Manifest.SnapshotId == state.Source.SnapshotId;
         return new(new { status, sourceFresh = fresh, snapshotId = state.Source.SnapshotId, currentSnapshotId = current.Manifest.SnapshotId,
             repair = fresh ? null : "start-new-session" }, fresh ? null : "CONFLICT", fresh ? "Success" : "Conflict", fresh ? 0 : 3);
     }
-    internal static WorldQuerySnapshot Query(WriteContext context, SnapshotScope scope, WorldQueryPurpose purpose = WorldQueryPurpose.Session, int workers = 2)
+    internal static WorldQuerySnapshot Query(WriteContext context, TranslationSession state)
+        => Query(context, Scope(state), classicVersion: MinecraftProfiles.ClassicVersion(state.Source.Versions.Profile));
+    internal static WorldQuerySnapshot Query(WriteContext context, SnapshotScope scope, WorldQueryPurpose purpose = WorldQueryPurpose.Session, int workers = 2, string? classicVersion = null)
     {
         var result = new WorldQueryService(context.Inventory, new FileSystemScanCacheStore(Path.Combine(context.State, "cache")))
-            .QueryAsync(new(new(scope), purpose, new(Workers: workers))).GetAwaiter().GetResult();
+            .QueryAsync(new(new(scope, ClassicVersion: classicVersion), purpose, new(Workers: workers))).GetAwaiter().GetResult();
         var snapshot = result.Snapshot ?? throw new CliFailure("INCOMPLETE_SOURCE", "World query was interrupted");
         if (!snapshot.Manifest.CoverageComplete)
         {
@@ -142,7 +145,7 @@ internal static class SessionCommands
     }
     private static void RequireFresh(WriteContext context, TranslationSession state)
     {
-        if (Query(context, Scope(state)).Manifest.SnapshotId != state.Source.SnapshotId)
+        if (Query(context, state).Manifest.SnapshotId != state.Source.SnapshotId)
             throw new CliFailure("CONFLICT", "World sources changed; retain this session and start a new session from current sources", new { sessionId = state.SessionId, repair = "start-new-session" });
     }
     private static Guid GuidValue(string text) => Guid.TryParse(text, out var id) && id != Guid.Empty ? id : throw new CliFailure("INVALID_ARGUMENTS", "Use a nonempty GUID");

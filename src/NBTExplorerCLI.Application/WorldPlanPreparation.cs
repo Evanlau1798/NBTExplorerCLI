@@ -1,5 +1,6 @@
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using NBTExplorerCLI.Minecraft;
 
 namespace NBTExplorerCLI.Application;
 
@@ -36,7 +37,8 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
             if (input.Image.ExpectedAbsent) return WorldLanguageOutputs.Create(output.Artifact, operations, snapshot.Limits);
             var bytes = inventory.Read(output.Artifact);
             if (ArtifactImage.Present(Hash256.Compute(bytes)) != input.Image) throw new ArtifactConflictException("Source changed before preparation");
-            return WorldArtifactEdits.Create(output.Artifact, bytes, operations, bound.Sources.Values.Where(source => source.Location.Artifact.RelativePath == output.Artifact.RelativePath).ToArray(), snapshot.Limits);
+            var classic = plan.ProfileVersion == MinecraftProfiles.Java181.Id ? MinecraftProfiles.Java181 : null;
+            return WorldArtifactEdits.Create(output.Artifact, bytes, operations, bound.Sources.Values.Where(source => source.Location.Artifact.RelativePath == output.Artifact.RelativePath).ToArray(), snapshot.Limits, classic);
         });
     }
     private static void CheckOffline(PatchPlan plan, bool worldOffline)

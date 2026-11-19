@@ -38,6 +38,67 @@ internal static class CliSessionWriteTests
     private static Invocation Seal(string work, string world, Guid id, long revision, Guid operation, Hash256 hash) => Call(work, world, id, "seal",
         "--revision", revision.ToString(), "--operation-id", operation.ToString(), "--plan-hash", hash.Hex);
     private static FileSystemTranslationSessionStore Store(string work) => new(Path.Combine(State(work), "sessions"));
+    public static void VersionlessAnvilUsesAnExplicitVersionForSessionApplyAndRollback()
+    {
+        var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
+        try
+        {
+            const string path = "region/r.0.0.mca";
+            static NbtCompound Data(params NbtEntry[] fields) => new(fields);
+            var sign = Data(new("id", new NbtString("Sign")), new("Text1", new NbtString("{\"text\":\"Welcome\",\"color\":\"gold\"}")),
+                new("Text2", new NbtString("Old plain text")), new("Text3", new NbtString("null")));
+            var command = Data(new("id", new NbtString("Control")), new("Command", new NbtString("/say Hello adventurer")));
+            var title = Data(new("id", new NbtString("Control")), new("Command", new NbtString(
+                "/execute @a ~ ~ ~ title @p subtitle {text:\"Arena\",color:gold,extra:[{score:{name:\"Points\",objective:\"Round\"}}]}")));
+            const string givePrefix = "/give @p minecraft:diamond_sword 1 2 ";
+            var give = Data(new("id", new NbtString("Control")), new("Command", new NbtString(givePrefix + "{display:{Name:\"Arena Token\"},ench:[{id:16s,lvl:2s}]}")));
+            const string summon = "summon Item ~ ~1 ~ {Item:{id:minecraft:bow,Damage:,Count:1b,tag:{ench:[id:48,lvl:3],display:{Name:\"Runner's Bow\"}}}}";
+            var drop = Data(new("id", new NbtString("Control")), new("Command", new NbtString(summon)));
+            const string opaque = "summon Slime ~ ~ ~ {Size:2)";
+            var control = Data(new("id", new NbtString("Control")), new("Command", new NbtString(opaque)));
+            var chunk = new NbtDocument("", Data(new NbtEntry("Level", Data(new("xPos", new NbtInt(0)), new("zPos", new NbtInt(0)),
+                new("TileEntities", new NbtList(NbtType.Compound, [sign, command, title, give, drop, control]))))));
+            var original = WorldDiscoveryTests.Region(chunk, [0]);
+            WorldDiscoveryTests.Put(world, path, original);
+            WorldDiscoveryTests.Put(world, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Classic(), NbtCompression.GZip));
+            string[] locales = ["--source-language", "en_us", "--target-language", "zh_tw"];
+            Require(Call(work, world, Guid.NewGuid(), "start", locales).Exit == 4, "a versionless world cannot choose a writable grammar automatically");
+            using var started = Success(Call(work, world, id, "start", [.. locales, "--minecraft-version", "1.8.1"]));
+            var service = new TranslationSessionService(Store(work));
+            Require(service.Read(id).Slots.Select(item => item.Slot.SourceText).Order().SequenceEqual(["Arena", "Arena Token", "Hello adventurer", "Old plain text", "Runner's Bow", "Welcome"]),
+                "only encoded and plain display strings are translatable, preserving blank sign lines and score identifiers");
+            var revision = Submit(work, world, id);
+            var (plan, file) = Plan(work, world, id, revision);
+            Require(plan.ProfileVersion == "java-1.8.1", "the plan binds the explicitly supplied engine profile");
+            using var applied = Success(Apply(work, world, file));
+            using var sealedSession = Success(Seal(work, world, id, revision, Guid.NewGuid(), plan.PlanHash));
+            var stored = RegionFile.Read(File.ReadAllBytes(Path.Combine(world, path))).ReadChunk(0).Document;
+            var tiles = (NbtList)NbtLocator.Resolve(stored.Root, new([PathSegment.ForKey("Level"), PathSegment.ForKey("TileEntities")])).Value!;
+            string Read(int tile, string key) => ((NbtString)((NbtCompound)tiles.Items[tile]).Entries.Single(entry => entry.Name == key).Value).Value;
+            using var component = JsonDocument.Parse(Read(0, "Text1"));
+            Require(component.RootElement.GetProperty("text").GetString() == "譯文:Welcome"
+                && component.RootElement.GetProperty("color").GetString() == "gold"
+                && JsonSerializer.Deserialize<string>(Read(0, "Text2")) == "譯文:Old plain text" && Read(0, "Text3") == "null",
+                "translation preserves encoded sign presentation and never edits null lines");
+            Require(Read(1, "Command") == "/say 譯文:Hello adventurer", "translation preserves the command verb");
+            var outputTitle = Read(2, "Command"); var start = outputTitle.IndexOf('{');
+            using var rendered = JsonDocument.Parse(outputTitle[start..]);
+            Require(outputTitle[..start] == "/execute @a ~ ~ ~ title @p subtitle "
+                && rendered.RootElement.GetProperty("text").GetString() == "譯文:Arena"
+                && rendered.RootElement.GetProperty("extra")[0].GetProperty("score").GetProperty("objective").GetString() == "Round",
+                "rewritten title preserves the command prefix and score identifier");
+            Require(Read(3, "Command") == givePrefix + "{display:{Name:\"譯文:Arena Token\"},ench:[{id:16s,lvl:2s}]}",
+                "a classic give rewrites only the exact item name string inside the data tag");
+            Require(Read(4, "Command") == summon.Replace("Runner's Bow", "譯文:Runner's Bow", StringComparison.Ordinal),
+                "an exact classic summon patch preserves the bare namespaced ID, blank data value and labeled list");
+            Require(Read(5, "Command") == opaque, "a pre-existing opaque non-text command remains byte-for-byte unchanged");
+            var rollback = Run(work, "recover", world, "--plan-hash", plan.PlanHash.Hex, "--rollback", "--world-offline", "--state-root", State(work));
+            using var rolledBack = JsonDocument.Parse(rollback.Output);
+            Require(rollback.Exit == 8 && rolledBack.RootElement.GetProperty("outcome").GetString() == "RolledBack"
+                && File.ReadAllBytes(Path.Combine(world, path)).SequenceEqual(original), "rollback restores the complete region including the original padded bytes");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
     public static void PureMixedAndUnchangedSessionsUseThePublicPlanApplySealWorkflow()
     {
         foreach (var mode in new[] { "pure", "mixed", "unchanged" })

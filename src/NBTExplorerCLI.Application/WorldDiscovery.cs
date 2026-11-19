@@ -5,7 +5,7 @@ using NBTExplorerCLI.Formats;
 
 namespace NBTExplorerCLI.Application;
 
-public sealed record ScanRequest(SnapshotScope Scope, DecodeLimits? Limits = null, int MaximumSources = 100_000);
+public sealed record ScanRequest(SnapshotScope Scope, DecodeLimits? Limits = null, int MaximumSources = 100_000, string? ClassicVersion = null);
 public sealed record DiscoveredSource(WorldSourceLocation Location, ChunkPosition? Chunk, SourceOutcome Outcome,
     string? DiagnosticCode, Hash256? ContentHash, OperationSupport Capability, PackMetadata? Pack = null, Hash256? PackMetadataHash = null);
 public sealed record WorldDiscoveryResult(WorldMetadata? Metadata, SnapshotScope Scope, WorldInventorySnapshot Inventory, ImmutableArray<DiscoveredSource> Sources, string? DiagnosticCode, ImmutableArray<ManifestSource> MetadataSources = default)

@@ -54,7 +54,7 @@ internal sealed class SnbtWriter(DecodeLimits limits, SnbtProfile profile)
             case LogicalMinecraftList list:
                 if (list.Items.IsEmpty && list.EmptyElementType != NbtType.End)
                     throw new SnbtException(SnbtError.UnsupportedValue, _bytes, "SNBT cannot represent an empty list's non-End header");
-                if (profile == SnbtProfile.JavaThrough1214 && list.Items.Select(SnbtLiterals.Type).Distinct().Skip(1).Any())
+                if (profile != SnbtProfile.Java1215 && list.Items.Select(SnbtLiterals.Type).Distinct().Skip(1).Any())
                     throw new SnbtException(SnbtError.MixedList, _bytes, "SNBT through Java 1.21.4 requires homogeneous lists");
                 Add("[");
                 for (var index = 0; index < list.Items.Length; index++)
@@ -88,6 +88,8 @@ internal sealed class SnbtWriter(DecodeLimits limits, SnbtProfile profile)
     }
     private void Array(string prefix, IEnumerable<NbtValue> values, int depth)
     {
+        if (profile == SnbtProfile.Java181)
+            throw new SnbtException(SnbtError.UnsupportedValue, _bytes, "Typed array output is unavailable in the 1.8.1 command profile");
         Add("[" + prefix + ";"); var index = 0;
         foreach (var value in values)
         {

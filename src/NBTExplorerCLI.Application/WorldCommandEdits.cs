@@ -51,12 +51,20 @@ internal static class WorldCommandEdits
             var first = group.First(); var span = first.Slot.Address.Syntax!;
             if (group.All(item => item.Slot.SourceText == item.Reply.Text)) continue;
             byte[] replacement;
-            if (first.Slot.Address.ComponentPath is not null)
+            if (profile == MinecraftProfiles.Java181 && first.Slot.Address.ComponentPath is not null
+                && span.NodePath?.Segments.LastOrDefault()?.Key is "tellraw.text" or "title.text")
+            {
+                var component = encoding.GetString(bytes.AsSpan(checked((int)span.StartByte), checked((int)span.LengthBytes)));
+                replacement = encoding.GetBytes(WorldJsonEdits.RewriteJson(ClassicTextJson.Normalize(component, limits), group.ToArray(), limits));
+            }
+            else if (first.Slot.Address.ComponentPath is not null)
             {
                 if (group.Any(item => item.Slot.Address.ComponentPath is null)) throw new EditRejectedException(EditFailure.Precondition, "Command syntax layers conflict");
-                var parsed = Snbt.ParseFragment(bytes, checked((int)span.StartByte), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+                var parsed = Snbt.ParseFragment(bytes, checked((int)span.StartByte), profile == MinecraftProfiles.Java181
+                    ? SnbtProfile.Java181 : modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
                 if (parsed.Root.Span.LengthBytes != span.LengthBytes || parsed.Root.Value is not LogicalMinecraftLeaf { Value: NbtString text }) throw new EditRejectedException(EditFailure.Precondition, "Command embedded JSON span differs");
-                var json = WorldJsonEdits.RewriteJson(text.Value, group.ToArray(), limits);
+                var originalText = profile == MinecraftProfiles.Java181 ? ClassicTextJson.Normalize(text.Value, limits, storedComponent: true) : text.Value;
+                var json = WorldJsonEdits.RewriteJson(originalText, group.ToArray(), limits);
                 replacement = Snbt.Write(new LogicalMinecraftLeaf(new NbtString(json)), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
             }
             else
@@ -73,7 +81,14 @@ internal static class WorldCommandEdits
                             ? rawClick.Value : throw new EditRejectedException(EditFailure.Precondition, "Command click payload is not a string");
                     value = ClickCommandText.Rewrite(previous, first.Slot.SourceText, value, modern, limits);
                 }
-                replacement = jsonString
+                if (profile == MinecraftProfiles.Java181 && first.Slot.Role == source.Address.SemanticRole + ".message")
+                {
+                    static IEnumerable<string> Selectors(string text) => text.Split(' ').Where(token => token.StartsWith('@'));
+                    if (!Selectors(first.Slot.SourceText).SequenceEqual(Selectors(value)))
+                        throw new EditRejectedException(EditFailure.Precondition, "A translated message cannot change selector arguments");
+                    replacement = encoding.GetBytes(value);
+                }
+                else replacement = jsonString
                     ? NativeJsonEdits.ReplaceStrings("\"\""u8.ToArray(), [(TypedPath.Root, "", value)], limits)
                     : Snbt.Write(new LogicalMinecraftLeaf(new NbtString(value)), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
             }

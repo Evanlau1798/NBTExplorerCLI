@@ -15,7 +15,8 @@ internal static class ScanCommands
             return new(new { commands = CliArguments.Commands, profiles = new[] { 3700, 3953, 4325, 4671, 4774 }.Select(version =>
                 new { dataVersion = version, profile = MinecraftProfiles.ForDataVersion(version)!.Id,
                     features = MinecraftProfiles.ForDataVersion(version)!.Features.OrderBy(pair => pair.Key).Select(pair => new { facet = pair.Key, pair.Value.Schema, pair.Value.Version, pair.Value.Operations }).ToArray() }).ToArray(),
-                storageProfiles = new[] { new { storageVersion = WorldMetadata.ClassicAnvilStorageVersion, profile = MinecraftProfiles.ClassicAnvil.Id, readOnly = true } } });
+                storageProfiles = new[] { new { storageVersion = WorldMetadata.ClassicAnvilStorageVersion, profile = MinecraftProfiles.ClassicAnvil.Id, readOnly = true,
+                    explicitTranslationVersions = new[] { MinecraftProfiles.ClassicGameVersion } } } });
         var options = new ScanOptions(request); var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.Input!));
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException("World directory not found");
         if (request.Get("output") is { } export) OutsideWorld(root, Path.GetFullPath(export));
@@ -37,7 +38,7 @@ internal static class ScanCommands
         OutsideWorld(root, cache);
         using var temporary = transient ? new TemporaryQueryDirectory(cache) : null;
         var store = new FileSystemScanCacheStore(cache);
-        var query = new WorldQueryService(inventory, store).QueryAsync(new(new(options.Scope), request.Command == "extract" ? WorldQueryPurpose.Extract : WorldQueryPurpose.Scan,
+        var query = new WorldQueryService(inventory, store).QueryAsync(new(new(options.Scope, ClassicVersion: request.Get("minecraft-version")), request.Command == "extract" ? WorldQueryPurpose.Extract : WorldQueryPurpose.Scan,
             new(Workers: options.Workers), ForceFull: transient || request.Flag("refresh"))).GetAwaiter().GetResult();
         var result = ScanProjection.Create(query, options, request);
         if (request.Flag("verbose") || request.Flag("debug")) Console.Error.WriteLine(request.Locale == "en-US" ? "World query completed; inspect coverage and per-source outcomes." : "世界查詢結束；請核對完整性與逐來源結果。");

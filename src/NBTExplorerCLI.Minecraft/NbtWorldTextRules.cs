@@ -44,8 +44,8 @@ internal sealed partial class NbtTextReader
         foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
         if (classic && identity == "minecraft:Sign")
             foreach (var field in new[] { "Text1", "Text2", "Text3", "Text4" })
-                Literal(Field(value, field, path), At(path, field), "sign.front.line");
-        if (classic && identity == "minecraft:Control")
+                Component(Field(value, field, path), At(path, field), "sign.front.line", classicEncoded: true);
+        if (profile == MinecraftProfiles.ClassicAnvil && identity == "minecraft:Control")
             Literal(Field(value, "Command", path), At(path, "Command"), "command.block.raw");
         if (identity is "minecraft:sign" or "minecraft:hanging_sign")
         {
@@ -60,7 +60,7 @@ internal sealed partial class NbtTextReader
             }
         }
         if (identity == "minecraft:lectern" && Field(value, "Book", path) is { } book) Item(book, At(path, "Book"), "lectern.book");
-        if (identity == "minecraft:command_block") StoredCommand(value, path);
+        if (identity == "minecraft:command_block" || profile == MinecraftProfiles.Java181 && identity == "minecraft:Control") StoredCommand(value, path);
         if (identity == "minecraft:mob_spawner")
         {
             SpawnedEntity(value, path, "SpawnData");
@@ -95,7 +95,7 @@ internal sealed partial class NbtTextReader
         if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingEntityIdentity"); return; }
         var armorStand = identity == "minecraft:armor_stand" || classic && identity == "minecraft:ArmorStand";
         Component(Field(value, "CustomName", path), At(path, "CustomName"), armorStand ? "armor_stand.name" : "entity.name");
-        if (identity == "minecraft:command_block_minecart") StoredCommand(value, path);
+        if (identity == "minecraft:command_block_minecart" || profile == MinecraftProfiles.Java181 && identity == "minecraft:MinecartCommandBlock") StoredCommand(value, path);
         if (identity == "minecraft:text_display") Component(Field(value, "text", path), At(path, "text"), "text_display.text");
         Player(value, path);
         foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);

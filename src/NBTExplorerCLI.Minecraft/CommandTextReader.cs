@@ -65,10 +65,11 @@ internal sealed partial class CommandTextReader
             else if (trimmed.StartsWith('#')) body = "";
             try
             {
-                var tokens = CommandTokens.Read(body, start, limits);
+                var tokens = profile == MinecraftProfiles.Java181 ? [] : CommandTokens.Read(body, start, limits);
                 tokensConsumed = checked(tokensConsumed + tokens.Count);
                 if (tokensConsumed > limits.MaxNodes) Limit();
-                if (tokens.Count != 0 && !tokens[0].Text.StartsWith('#'))
+                if (profile == MinecraftProfiles.Java181) ClassicCommand(body, start, path);
+                else if (tokens.Count != 0 && !tokens[0].Text.StartsWith('#'))
                 {
                     if (tokens[0].Text.StartsWith('$')) Unknown(path, start, end - start, "DynamicCommandMacro");
                     else { Selectors(tokens, path); Command(tokens, 0, path, end); }

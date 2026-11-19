@@ -30,7 +30,7 @@ internal static class SessionWorldCommands
                 if (state.Source.WorldId != context.Inventory.WorldId) throw new ArtifactConflictException("Session belongs to a different world root");
                 if (state.Revision != revision || state.Slots.Any(slot => slot.State is not (SessionSlotState.Translated or SessionSlotState.Unchanged)))
                     throw new CliFailure("CONFLICT", "Retain this session; inspect its revision and complete all pending replies before planning", Repair("inspect-session-status-and-complete-replies"));
-                var snapshot = SessionCommands.Query(context, SessionCommands.Scope(state));
+                var snapshot = SessionCommands.Query(context, state);
                 if (snapshot.Manifest.SnapshotId != state.Source.SnapshotId) throw new CliFailure("CONFLICT", "World sources changed; retain this session and start a new session from current sources", Repair("start-new-session"));
                 var literals = state.Slots.Select(slot => new LiteralTranslation(slot.Slot, slot.Reply ?? new(slot.Slot.Id, slot.Slot.SourceTextHash, slot.Slot.TargetLocale, slot.Slot.SourceText))).ToArray();
                 var operations = literals.Select(translation => (PatchOperation)new LiteralPatch("session-" + operation.ToString("N") + "-" + translation.Slot.Id.Digest.Hex, translation)).ToArray();

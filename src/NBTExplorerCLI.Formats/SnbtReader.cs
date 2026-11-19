@@ -12,6 +12,7 @@ internal sealed class SnbtReader
     private readonly DecodeLimits _limits;
     private readonly SnbtBudget _budget;
     private bool Modern => _profile == SnbtProfile.Java1215;
+    private bool Java181 => _profile == SnbtProfile.Java181;
     private int _pos, _mappedChar, _mappedByte;
     public SnbtReader(ImmutableArray<byte> source, SnbtProfile profile, DecodeLimits limits)
     {
@@ -62,11 +63,12 @@ internal sealed class SnbtReader
         if (_text[_pos] == '{') return Compound(depth, start);
         if (_text[_pos] == '[') return ListOrArray(depth, start);
         NbtValue value;
-        if (_text[_pos] is '\'' or '"') value = new NbtString(Quoted());
+        if (Java181 && _text[_pos] is ',' or '}' or ']') value = new NbtString("");
+        else if (_text[_pos] is '\'' or '"') value = new NbtString(Quoted());
         else if (Modern && SnbtModernNumbers.Starts(_text[_pos])) value = SnbtModernNumbers.Parse(NumberToken(), context, start);
         else
         {
-            var token = Token();
+            var token = Token(value: true);
             var saved = _pos;
             if (Modern && Take('('))
             {
@@ -111,7 +113,7 @@ internal sealed class SnbtReader
         var arrayType = NbtType.End;
         var arrayStart = _pos;
         if (Modern) White();
-        if (_pos < _text.Length && _text[_pos] is 'B' or 'I' or 'L')
+        if (!Java181 && _pos < _text.Length && _text[_pos] is 'B' or 'I' or 'L')
         {
             var marker = _text[_pos++];
             if (Modern) White();
@@ -129,6 +131,11 @@ internal sealed class SnbtReader
             {
                 _budget.Element(Offset());
                 White();
+                if (Java181 && _pos < _text.Length && SnbtLiterals.Unquoted(_text[_pos]))
+                {
+                    var label = _pos; _ = Token();
+                    if (!Take(':')) _pos = label;
+                }
                 if (Modern && arrayType != NbtType.End && (_pos == _text.Length || !SnbtModernNumbers.Starts(_text[_pos])))
                     throw Error(SnbtError.InvalidArrayElement, "Modern typed arrays require number literals");
                 var child = Value(depth + 1, Modern ? arrayType : NbtType.End);
@@ -205,10 +212,10 @@ internal sealed class SnbtReader
         if (signOrType is 'u' or 'U' or 's' or 'S') Part("bBsSiIlL");
         return token.ToString();
     }
-    private string Token()
+    private string Token(bool value = false)
     {
         var start = _pos;
-        while (_pos < _text.Length && SnbtLiterals.Unquoted(_text[_pos]))
+        while (_pos < _text.Length && (SnbtLiterals.Unquoted(_text[_pos]) || Java181 && value && _text[_pos] == ':'))
         {
             if (_pos - start >= 65_535) SnbtBudget.Limit(Offset());
             _pos++;

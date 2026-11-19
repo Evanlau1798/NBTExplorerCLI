@@ -22,16 +22,17 @@ internal sealed class WorldQueryContext
         if (!Enum.IsDefined(request.Purpose)) throw new ArgumentOutOfRangeException(nameof(request));
         Execution = request.Execution ?? new(); Execution.Validate();
         Extraction = new(inventory, request.Scan, request.StorageRules, cancellationToken);
-        if (Extraction.Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && request.Purpose is WorldQueryPurpose.Session or WorldQueryPurpose.Convert)
+        if (Extraction.LayoutProfile == MinecraftProfiles.ClassicAnvil && request.Purpose == WorldQueryPurpose.Session
+            || Extraction.Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && request.Purpose == WorldQueryPurpose.Convert)
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Classic Anvil supports inspection and extraction only");
         Groups = Extraction.ScanSources
             .GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal).ToImmutableDictionary(group => group.Key, group => group.ToImmutableArray(), StringComparer.Ordinal);
         Inputs = Groups.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => Input(pair.Value)).ToImmutableArray();
         var policyRules = Extraction.StorageRules.SelectMany(pair => pair.Value.Select(rule => SourceIdentity.Occurrence(new(pair.Key, rule.Path, "policy.storage." + rule.Kind)).Digest.Hex)).Order(StringComparer.Ordinal).ToArray();
         var policy = Hash256.Compute(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { limits = Extraction.Limits, request.Scan.MaximumSources, Execution.InFlightBytes, storageRules = policyRules })));
-        var layout = Extraction.Discovery.Metadata?.Profile.Id;
+        var layout = Extraction.LayoutProfile?.Id;
         var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-1" : "world-text-command-12";
-        var baseline = new InterpretationVersions("nbt-snbt-json-zip-1", "minecraft-known-3", extractor, "scan-2." + policy.Hex);
+        var baseline = new InterpretationVersions("nbt-snbt-json-zip-1", Extraction.LayoutProfile == MinecraftProfiles.Java181 ? layout! : "minecraft-known-3", extractor, "scan-2." + policy.Hex);
         static IEnumerable<CacheSourceBinding> Bindings(IEnumerable<DiscoveredSource> sources) => sources.Select(source => new CacheSourceBinding(source.Location, source.Chunk, source.PackMetadataHash));
         Versions = baseline with { Policy = baseline.Policy + "." + ScanCacheJson.BindingHash(layout, Bindings(Groups.Values.SelectMany(group => group))).Hex };
         SnapshotId = SourceIdentity.Snapshot(inventory.WorldId, Inputs, request.Scan.Scope, Versions);

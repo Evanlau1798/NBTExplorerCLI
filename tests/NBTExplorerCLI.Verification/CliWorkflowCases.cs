@@ -43,6 +43,7 @@ internal static class CliWorkflowCases
         new("cli-session-status-captured-reset", "cli-session-write", _ => SessionStatusConsistencyTests.TheStatusBranchUsesItsCapturedSessionDuringAnInterleavedReset()),
         new("cli-session-write-arguments-world-export", "cli-session-write", _ => CliSessionWriteTests.ArgumentsForeignWorldsAndExistingExportsNeverConsumeSessionWork()),
         new("cli-session-write-public-pure-mixed-unchanged", "cli-session-write", _ => CliSessionWriteTests.PureMixedAndUnchangedSessionsUseThePublicPlanApplySealWorkflow()),
+        new("cli-session-write-java-1-8-1", "cli-session-write", _ => CliSessionWriteTests.VersionlessAnvilUsesAnExplicitVersionForSessionApplyAndRollback()),
         new("cli-session-write-pending-revision-source", "cli-session-write", _ => CliSessionWriteTests.PendingStaleRevisionAndChangedSourcesCannotProduceWritablePlans()),
         new("cli-session-write-missing-subset-proof", "cli-session-write", _ => CliSessionWriteTests.MissingAndSubsetWorldProofsKeepTheSessionUnsealed()),
         new("cli-session-write-native-seal-retry", "cli-session-write", _ => CliSessionWriteTests.ABlockedSessionSealPreservesCompletedWorldsAndOffersExactRetry()),

@@ -25,8 +25,8 @@ internal sealed class WriteContext
     }
     internal IWorldBackupStore Objects() => new FileSystemWorldBackupStore(Path.Combine(State, "objects"));
     internal WorldApplyEngine Engine() => new(Inventory, Storage, Objects(), new FileSystemApplyJournalStore(Path.Combine(State, "journals")));
-    internal WorldQuerySnapshot Query(SnapshotScope? scope = null) => new WorldQueryService(Inventory, new FileSystemScanCacheStore(Path.Combine(State, "cache")))
-        .QueryAsync(new(new(scope ?? SnapshotScope.All))).GetAwaiter().GetResult().Snapshot ?? throw new CliFailure("INCOMPLETE_SOURCE", "World query was interrupted");
+    internal WorldQuerySnapshot Query(SnapshotScope? scope = null, string? classicVersion = null) => new WorldQueryService(Inventory, new FileSystemScanCacheStore(Path.Combine(State, "cache")))
+        .QueryAsync(new(new(scope ?? SnapshotScope.All, ClassicVersion: classicVersion))).GetAwaiter().GetResult().Snapshot ?? throw new CliFailure("INCOMPLETE_SOURCE", "World query was interrupted");
     internal ArtifactImage Image(ArtifactAddress artifact)
     {
         try { return ArtifactImage.Present(Hash256.Compute(Inventory.Read(artifact))); }

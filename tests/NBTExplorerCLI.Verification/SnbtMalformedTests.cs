@@ -46,11 +46,11 @@ internal static class SnbtMalformedTests
             case 0: return Leaf(new NbtInt(random.Next(int.MinValue, int.MaxValue)));
             case 1: return Leaf(new NbtByte((sbyte)random.Next(-128, 128)));
             case 2: return Leaf(new NbtString(profile == SnbtProfile.Java1215 ? "雪\ud800\n\"\U00020000" : "雪\n\"\U00020000"));
-            case 3: return Leaf(new NbtIntArray([random.Next(), -1]));
+            case 3: return Leaf(profile == SnbtProfile.Java181 ? new NbtShort((short)random.Next(short.MinValue, short.MaxValue)) : new NbtIntArray([random.Next(), -1]));
             case 4: return Leaf(new NbtDouble(SampleBits(random)));
-            case 5: return Leaf(new NbtLongArray([long.MinValue, random.NextInt64()]));
+            case 5: return Leaf(profile == SnbtProfile.Java181 ? new NbtLong(random.NextInt64()) : new NbtLongArray([long.MinValue, random.NextInt64()]));
             case 6: return new LogicalMinecraftCompound(Enumerable.Range(0, random.Next(4)).Select(index => new LogicalMinecraftEntry("key" + index, Value(random, depth + 1, profile))));
-            default: return profile == SnbtProfile.JavaThrough1214 ? new LogicalMinecraftList([Leaf(new NbtInt(random.Next())), Leaf(new NbtInt(-1))])
+            default: return profile != SnbtProfile.Java1215 ? new LogicalMinecraftList([Leaf(new NbtInt(random.Next())), Leaf(new NbtInt(-1))])
                 : new LogicalMinecraftList(Enumerable.Range(0, random.Next(4)).Select(_ => Value(random, depth + 1, profile)));
         }
     }

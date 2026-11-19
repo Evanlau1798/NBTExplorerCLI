@@ -22,7 +22,9 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 <ProfileTable lang="zh-tw" />
 
-`capabilities.storageProfiles` 的 `java-classic-anvil` 支援唯讀查閱和文字抽取，適用於儲存格式為 `19133` 且沒有 `DataVersion` 的舊 Anvil 存檔。儲存格式編號無法推斷確切遊戲版本。告示牌文字和完整指令均保留存檔中的原始編碼。翻譯工作階段及世界修改需要有明確版本的組合。無法識別的檔案與舊式內附資源包會使掃描標記為不完整，其餘可讀內容仍會回傳。
+`capabilities.storageProfiles` 的 `java-classic-anvil` 支援唯讀查閱，適用於儲存格式為 `19133` 且沒有 `DataVersion` 的舊 Anvil 存檔。這些欄位無法判定確切的遊戲版本或指令語法。
+
+已知世界使用 **Java 1.8.1** 時，可在 `scan`、`extract` 或 `translate start` 指定 `--minecraft-version 1.8.1`。工作階段及直接翻譯計畫會保留選定版本，供後續開啟與套用。如果舊式內附資源包不在翻譯範圍內，可用 `--types` 選擇世界文字角色。此版本可直接修改告示牌、書本、顯示欄位和可辨識的指令文字參數。實體名稱可能被選擇器引用，請保留原名。CLI 掃描提供文字覆蓋結果，每條指令是否能執行仍須由原版遊戲驗證。
 
 對於有序及無序工作台配方，`scan` 和 `validate` 會依資料包已登錄的格式檢查產物物品欄位。若該欄位缺漏、格式無效或指定為空氣，會回報 `InvalidRecipeResult`。物品是否存在、材料與堆疊數量是否合法，以及資料包間的交互作用，仍由對應版本的 Minecraft 伺服器驗證。
 

@@ -29,7 +29,7 @@ internal sealed class ScanOptions
         Offset = request.Number("offset", 0, 0, 2_000_000); Limit = request.Number("limit", 100, 1, 10_000); Workers = request.Number("workers", 2, 1, 8);
         if (request.Flag("summary") && request.Flag("show-items") || request.Flag("all") && (request.Flag("limit") || request.Flag("offset")))
             throw new CliFailure("INVALID_ARGUMENTS", "Choose one pagination or summary mode");
-        if (request.Flag("quick") && request.Options.Keys.Any(key => key is "cache-root" or "refresh" or "workers" or "no-cache" or "types"))
+        if (request.Flag("quick") && request.Options.Keys.Any(key => key is "cache-root" or "refresh" or "workers" or "no-cache" or "types" or "minecraft-version"))
             throw new CliFailure("INVALID_ARGUMENTS", "Quick validation only checks the catalog");
         string[] paths = request.Get("path") is { } exact ? [exact] : []; foreach (var path in paths) ArtifactAddress.ValidatePath(path, false);
         var dimensions = Values(request.Get("dimension"));

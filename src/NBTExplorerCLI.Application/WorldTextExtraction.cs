@@ -14,6 +14,7 @@ public sealed partial class WorldTextExtraction
     private readonly ScanRequest request;
     public ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> StorageRules { get; }
     public WorldDiscoveryResult Discovery { get; }
+    internal CapabilityProfile? LayoutProfile { get; }
     internal DecodeLimits Limits => request.Limits ?? DecodeLimits.Default;
     internal IEnumerable<DiscoveredSource> ScanSources => Discovery.Sources.Where(source => source.DiagnosticCode is not ("InternalWriterLease" or "InternalCandidate"));
     public WorldTextExtraction(IWorldInventory inventory, ScanRequest request, IReadOnlyDictionary<ArtifactAddress, IReadOnlyList<StorageTextRule>>? storageRules = null, CancellationToken cancellationToken = default)
@@ -34,6 +35,9 @@ public sealed partial class WorldTextExtraction
             }
         }
         StorageRules = rules.ToImmutable(); Discovery = WorldDiscovery.Discover(inventory, request, cancellationToken);
+        LayoutProfile = request.ClassicVersion is null ? Discovery.Metadata?.Profile
+            : request.ClassicVersion == MinecraftProfiles.ClassicGameVersion && Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil
+                ? MinecraftProfiles.Java181 : throw new CodecException(CodecError.UnsupportedProfile, 0, "Explicit Minecraft version requires recognized Classic Anvil metadata and a registered version");
     }
     public IEnumerable<TextSourceExtraction> ReadSources() => ReadSourcesCore(Discovery.Sources);
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
@@ -91,14 +95,14 @@ public sealed partial class WorldTextExtraction
                 var index = chunk.LocalZ * 32 + chunk.LocalX;
                 var document = (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && source.Location.Role == WorldSourceRole.Terrain
                     ? region.ReadClassicAnvilChunk(index, request.Limits) : region.ReadChunk(index, request.Limits)).Document;
-                text = NbtTextExtractor.Extract(source.Location, document, chunk, request.Limits, scope: request.Scope, layoutProfile: Discovery.Metadata?.Profile);
-                if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document);
+                text = NbtTextExtractor.Extract(source.Location, document, chunk, request.Limits, scope: request.Scope, layoutProfile: LayoutProfile);
+                if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Artifact.Kind == ArtifactKind.Nbt || source.Location.Role == WorldSourceRole.Structure)
             {
                 var document = ReadDat(bytes);
-                text = NbtTextExtractor.Extract(source.Location, document, limits: request.Limits, storageRules: StorageRules.GetValueOrDefault(source.Location.Artifact, ImmutableArray<StorageTextRule>.Empty), scope: request.Scope, layoutProfile: Discovery.Metadata?.Profile);
-                if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document);
+                text = NbtTextExtractor.Extract(source.Location, document, limits: request.Limits, storageRules: StorageRules.GetValueOrDefault(source.Location.Artifact, ImmutableArray<StorageTextRule>.Empty), scope: request.Scope, layoutProfile: LayoutProfile);
+                if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
             {

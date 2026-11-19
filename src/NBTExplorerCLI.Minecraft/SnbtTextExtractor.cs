@@ -15,14 +15,15 @@ internal static class SnbtTextExtractor
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemTag(root, itemId), componentRoot: componentRoot);
     internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null)
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.BlockEntity(root, TypedPath.Root, knownIdentity), componentRoot: componentRoot);
-    internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Entity(root, TypedPath.Root, knownIdentity), componentRoot: componentRoot);
+    internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null, string? fallbackIdentity = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Entity(root, TypedPath.Root, knownIdentity, fallbackIdentity), componentRoot: componentRoot);
     private static TextExtractionResult Read(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<NbtTextReader, NbtValue> extract, bool compound = true, Action<SourceAddress>? componentRoot = null)
     {
         if (source.Syntax is not null || source.ComponentPath is not null) throw new CodecException(CodecError.UnsupportedProfile, 0, "Nested syntax binding is unsupported");
         var encoding = new UTF8Encoding(false, true);
         if (encoding.GetByteCount(syntax) > limits.MaxDecodedBytes) throw new SnbtException(SnbtError.LimitExceeded, 0, "SNBT string exceeds decode budget");
-        var grammar = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt" ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214;
+        var grammar = profile == MinecraftProfiles.Java181 ? SnbtProfile.Java181
+            : profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt" ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214;
         var parsed = Snbt.ParseDocument(encoding.GetBytes(syntax), grammar, limits);
         var document = MinecraftNbtAdapter.Encode(new("", parsed.Root.Value), profile, limits);
         if (compound && document.Root is not NbtCompound) throw new SnbtException(SnbtError.InvalidToken, 0, "Item tag requires an SNBT compound");
@@ -52,7 +53,8 @@ internal static class SnbtTextExtractor
                 }
             }
             var span = parsed.Resolve(new(logical)).Span;
-            var locator = new SyntaxLocator(grammar == SnbtProfile.JavaThrough1214 ? "java-snbt-through-1.21.4" : "java-snbt-1.21.5", 1,
+            var locator = new SyntaxLocator(grammar switch
+                { SnbtProfile.Java181 => "java-snbt-1.8.1", SnbtProfile.Java1215 => "java-snbt-1.21.5", _ => "java-snbt-through-1.21.4" }, 1,
                 span.StartByte, span.LengthBytes, parsed.SourceHash.Hex, "utf8-java-string", SyntaxLocator.DetectNewline(syntax), new(logical));
             return new(source.Artifact, source.NodePath, address.SemanticRole, source.Dimension, source.Chunk, address.ComponentPath, locator, address.JsonTarget);
         }

@@ -4,6 +4,7 @@ using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Infrastructure;
+using NBTExplorerCLI.Minecraft;
 
 namespace NBTExplorerCLI.Cli;
 
@@ -97,7 +98,8 @@ internal static class WriteCommands
                 using var resource = Prepare(plan.Operations, () => new ResourceOutputService(context.Inventory, context.Storage, context.Objects()).Prepare(plan, true));
                 return Apply(resource, engine, context.Root, context.State);
             }
-            using var candidate = Prepare(plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage).Prepare(context.Query(SourceIdentity.ReadSnapshotScope(plan.SnapshotId)), plan, true));
+            using var candidate = Prepare(plan.Operations, () => new WorldPlanPreparation(context.Inventory, context.Storage)
+                .Prepare(context.Query(SourceIdentity.ReadSnapshotScope(plan.SnapshotId), MinecraftProfiles.ClassicVersion(plan.ProfileVersion)), plan, true));
             return Apply(candidate, engine, context.Root, context.State);
         }
         IReadOnlyList<PatchOperation> operations;

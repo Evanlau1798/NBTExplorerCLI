@@ -14,26 +14,26 @@ internal static class WorldArtifactEdits
         var codec = bytes.Length == 0 || bytes[0] == (byte)NbtType.Compound ? NbtCompression.Raw : bytes[0] == 0x1f ? NbtCompression.GZip : NbtCompression.Zlib;
         return (CompressedNbt.ReadDocument(bytes, codec, limits).Document, codec);
     }
-    internal static PreparedArtifactBytes Create(ArtifactAddress artifact, byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits)
+    internal static PreparedArtifactBytes Create(ArtifactAddress artifact, byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits, CapabilityProfile? classic = null)
     {
         var source = sources.Single(item => item.Location.Artifact == artifact && item.Chunk is null);
         if (source.Location.Role == WorldSourceRole.Language && operations.Any(operation => operation is KeyConversionPatch)) return WorldLanguageEdits.Create(artifact, bytes, operations, limits);
-        if (artifact.Kind == ArtifactKind.Nbt) return Nbt(bytes, operations, source, limits);
+        if (artifact.Kind == ArtifactKind.Nbt) return Nbt(bytes, operations, source, limits, classic);
         if (artifact.Kind == ArtifactKind.Json) return WorldJsonEdits.Create(bytes, operations, limits, artifact);
         if (artifact.Kind == ArtifactKind.McFunction) return WorldCommandEdits.Create(artifact, bytes, operations, source, limits);
-        if (artifact.Kind is ArtifactKind.Region or ArtifactKind.Entities) return Region(bytes, operations, sources, limits);
+        if (artifact.Kind is ArtifactKind.Region or ArtifactKind.Entities) return Region(bytes, operations, sources, limits, classic);
         if (artifact.Kind == ArtifactKind.Archive) return WorldArchiveEdits.Create(bytes, operations, sources, limits);
         throw new NotSupportedException("Artifact format preparation is not implemented");
     }
-    private static PreparedArtifactBytes Nbt(byte[] bytes, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits)
+    private static PreparedArtifactBytes Nbt(byte[] bytes, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits, CapabilityProfile? classic)
     {
-        var parsed = ReadNbt(bytes, limits); var expected = Transform(parsed.Document, operations, source, limits);
+        var parsed = ReadNbt(bytes, limits); var expected = Transform(parsed.Document, operations, source, limits, classic);
         var output = expected == parsed.Document ? bytes : CompressedNbt.WriteDocument(expected, parsed.Compression, limits);
         return new(output, stream => { if (CompressedNbt.ReadDocument(stream, parsed.Compression, limits).Document != expected) throw new InvalidDataException("Persisted NBT candidate differs from its authorized tree"); });
     }
-    internal static NbtDocument Transform(NbtDocument document, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits)
+    internal static NbtDocument Transform(NbtDocument document, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits, CapabilityProfile? classic = null)
     {
-        var profile = NbtTextExtractor.Profile(source.Location, document);
+        var profile = NbtTextExtractor.Profile(source.Location, document, classic);
         var edits = operations.OfType<TypedPatch>().Select(operation => operation.Edit).ToList();
         var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
         var keyed = WorldKeyEdits.ApplyNative(document, conversions.Where(conversion => conversion.Address.Artifact == source.Location.Artifact && conversion.Rule != KeyConversionRule.EncodedTextToTranslate).ToArray());
@@ -44,15 +44,17 @@ internal static class WorldArtifactEdits
         foreach (var path in encodedPaths)
         {
             if (NbtLocator.Resolve(document.Root, path).Value is not NbtString text) throw new EditRejectedException(EditFailure.Precondition, "Encoded component source is not a string");
-            var changed = WorldKeyEdits.RewriteJson(text.Value, conversions.Where(conversion => conversion.Rule == KeyConversionRule.EncodedTextToTranslate && conversion.Address.Syntax is null && conversion.Address.NodePath.Equals(path)).ToArray(), limits,
-                literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is not null && item.Slot.Address.NodePath.Equals(path)).ToArray());
+            var replacements = literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is not null && item.Slot.Address.NodePath.Equals(path)).ToArray();
+            if (classic is not null && replacements.All(item => item.Reply.Text == item.Slot.SourceText)) continue;
+            var component = classic is not null ? ClassicTextJson.Normalize(text.Value, limits, storedComponent: true) : text.Value;
+            var changed = WorldKeyEdits.RewriteJson(component, conversions.Where(conversion => conversion.Rule == KeyConversionRule.EncodedTextToTranslate && conversion.Address.Syntax is null && conversion.Address.NodePath.Equals(path)).ToArray(), limits, replacements);
             edits.Add(TypedEdit.Replace(path, text, new NbtString(changed)));
         }
         var commandPaths = literal.Where(item => item.Slot.Address.Syntax is not null).Select(item => item.Slot.Address.NodePath)
             .Concat(conversions.Where(conversion => conversion.Address.Syntax is not null).Select(conversion => conversion.Address.NodePath)).Distinct();
         foreach (var path in commandPaths)
         {
-            var pending = NbtTextExtractor.Extract(source.Location, document, source.Chunk, limits).PendingCommands.SingleOrDefault(item => item.Address.NodePath.Equals(path))
+            var pending = NbtTextExtractor.Extract(source.Location, document, source.Chunk, limits, layoutProfile: classic).PendingCommands.SingleOrDefault(item => item.Address.NodePath.Equals(path))
                 ?? throw new EditRejectedException(EditFailure.Precondition, "NBT syntax target is not an actual command field");
             var changed = WorldCommandEdits.Rewrite(pending, literal.Where(item => item.Slot.Address.Syntax is not null && item.Slot.Address.NodePath.Equals(path)).ToArray(), profile, limits,
                 conversions.Where(conversion => conversion.Address.Syntax is not null && conversion.Address.NodePath.Equals(path)).ToArray());
@@ -70,10 +72,10 @@ internal static class WorldArtifactEdits
             else edits.Add(TypedEdit.Replace(path, new NbtString(item.Slot.SourceText), new NbtString(item.Reply.Text)));
         }
         var expected = TypedTreeEdits.Apply(keyed, edits);
-        if (NbtTextExtractor.Profile(source.Location, expected).Id != profile.Id) throw new NotSupportedException("Data version migration requires its explicit profile conversion");
+        if (NbtTextExtractor.Profile(source.Location, expected, classic).Id != profile.Id) throw new NotSupportedException("Data version migration requires its explicit profile conversion");
         return expected;
     }
-    private static PreparedArtifactBytes Region(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits)
+    private static PreparedArtifactBytes Region(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits, CapabilityProfile? classic)
     {
         var original = RegionFile.Read(bytes);
         var artifact = sources[0].Location.Artifact;
@@ -87,8 +89,8 @@ internal static class WorldArtifactEdits
         var (output, expected) = original.WithEditedChunks(groups.Select(group => Index(group.Key)), (index, before) =>
         {
             var group = byChunk[index];
-            return Transform(before, group.Select(item => item.Operation).ToArray(), bySource[group.Key], limits);
-        }, limits);
+            return Transform(before, group.Select(item => item.Operation).ToArray(), bySource[group.Key], limits, classic);
+        }, limits, classicAnvil: classic is not null);
         return new(output, stream =>
         {
             var candidate = RegionFile.Read(Read(stream));

@@ -109,10 +109,10 @@ internal sealed partial class NbtTextReader
         Literal(Field(tag, "filtered_title", path), At(path, "filtered_title"), bookRole + ".title");
         Literal(Field(tag, "author", path), At(path, "author"), bookRole + ".author");
         foreach (var (page, pagePath) in Sequence(Field(tag, "pages", path), At(path, "pages")))
-            if (written) Component(page, pagePath, bookRole + ".page"); else Literal(page, pagePath, bookRole + ".page");
+            if (written) Component(page, pagePath, bookRole + ".page", classicEncoded: true); else Literal(page, pagePath, bookRole + ".page");
         if (Field(tag, "filtered_pages", path) is NbtCompound filtered)
             foreach (var entry in filtered.Entries)
-                if (written) Component(entry.Value, At(At(path, "filtered_pages"), entry.Name), bookRole + ".page"); else Literal(entry.Value, At(At(path, "filtered_pages"), entry.Name), bookRole + ".page");
+                if (written) Component(entry.Value, At(At(path, "filtered_pages"), entry.Name), bookRole + ".page", classicEncoded: true); else Literal(entry.Value, At(At(path, "filtered_pages"), entry.Name), bookRole + ".page");
     }
     private void Book(NbtValue value, TypedPath path, string role, bool written)
     {
