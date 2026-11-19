@@ -376,6 +376,14 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
     packLayout: 'java-pack-singular',
   },
   {
+    profile: 'java-1.21.11',
+    dataVersion: 4671,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-components-1.21.11',
+    textSchema: 'java-text-nbt (v2)',
+    packLayout: 'java-pack-singular',
+  },
+  {
     profile: 'java-26.1-snapshot-6',
     dataVersion: 4774,
     layout: 'java-dimensions-namespaced',

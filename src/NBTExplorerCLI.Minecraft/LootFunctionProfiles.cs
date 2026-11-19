@@ -15,6 +15,13 @@ public static class LootFunctionProfiles
         if (!identifier.Contains(':')) identifier = "minecraft:" + identifier;
         if (!identifier.StartsWith("minecraft:", StringComparison.Ordinal)) return false;
         var name = identifier[10..];
-        return profile.Id switch { "java-1.20.4" => NbtTags.Contains(name), "java-1.21" or "java-1.21.5" => Components.Contains(name), "java-26.1-snapshot-6" => Snapshot.Contains(name), _ => false };
+        return profile.Id switch
+        {
+            "java-1.20.4" => NbtTags.Contains(name),
+            "java-1.21" or "java-1.21.5" => Components.Contains(name),
+            "java-1.21.11" => name == "discard" || Components.Contains(name),
+            "java-26.1-snapshot-6" => Snapshot.Contains(name),
+            _ => false
+        };
     }
 }

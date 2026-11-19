@@ -10,7 +10,7 @@ public static class CommandTextExtractor
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(profile);
         using var observation = WorkDiagnostics.Start("command.parse", source.Address.Artifact.RelativePath, worldId: source.Address.Artifact.WorldId);
         limits ??= DecodeLimits.Default; limits.Validate();
-        var expected = MinecraftProfiles.ForDataVersion(profile.Id switch { "java-1.20.4" => 3700, "java-1.21" => 3953, "java-1.21.5" => 4325, "java-26.1-snapshot-6" => 4774, _ => 0 });
+        var expected = MinecraftProfiles.ForId(profile.Id);
         if (expected is null || profile.Features[ProfileFacet.CommandGrammar] != expected.Features[ProfileFacet.CommandGrammar])
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Unknown command grammar");
         if (source.Address.Syntax is { } syntax && (syntax.GrammarProfile != expected.Features[ProfileFacet.CommandGrammar].Schema || syntax.GrammarVersion != expected.Features[ProfileFacet.CommandGrammar].Version))

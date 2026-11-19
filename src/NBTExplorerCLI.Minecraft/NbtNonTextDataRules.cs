@@ -8,7 +8,9 @@ internal sealed partial class NbtTextReader
     private static readonly HashSet<string> NamespacedNonTextData = new("game_rules.dat scheduled_events.dat stopwatches.dat wandering_trader.dat weather.dat world_clocks.dat world_gen_settings.dat chunk_tickets.dat world_border.dat ender_dragon_fight.dat".Split(' '), StringComparer.Ordinal);
     private bool KnownNonTextData(string artifact, string filename)
     {
-        if (!CommonNonTextData.Contains(filename) && !(layoutProfile.Features[ProfileFacet.Layout].Schema == "java-dimensions-namespaced" && NamespacedNonTextData.Contains(filename))) return false;
+        var java12111Settings = layoutProfile.Id == "java-1.21.11" && filename is "stopwatches.dat" or "world_border.dat";
+        if (!java12111Settings && !CommonNonTextData.Contains(filename)
+            && !(layoutProfile.Features[ProfileFacet.Layout].Schema == "java-dimensions-namespaced" && NamespacedNonTextData.Contains(filename))) return false;
         return VanillaSavedDataPath(artifact, filename);
     }
     private bool VanillaSavedDataPath(string artifact, string filename)

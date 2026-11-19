@@ -22,7 +22,7 @@ public static class ClickCommandText
             var tokens = CommandTokens.Read(command, 0, limits);
             if (tokens.Count == 2 && tokens[0].Text == "/function" && CommandTextReader.FunctionLocation(tokens[1].Text)) return NoText;
             if (tokens.Count == 5 && tokens[0].Text is "/tp" or "/teleport" && tokens[1].Text is "@s" or "@p" or "@a"
-                && tokens.Skip(2).All(token => Coordinate(token.Text))) return NoText;
+                && tokens.Skip(2).All(token => CommandTextReader.Coordinate(token.Text))) return NoText;
             if (tokens.Count != 3 || tokens[0].Text != "/tellraw" || tokens[1].Text is not ("@s" or "@p" or "@a")) return null;
             var start = tokens[2].Start;
             var bytes = Utf8.GetBytes(command[start..]);
@@ -70,15 +70,4 @@ public static class ClickCommandText
 
     private static bool LiteralField(string key) => key is "text" or "color" or "bold" or "italic" or "underlined" or "strikethrough" or "obfuscated" or "font";
     private static TypedPath Child(TypedPath path, PathSegment segment) => new(path.Segments.Add(segment));
-    private static bool Coordinate(string value)
-    {
-        var number = value.AsSpan();
-        if (number.StartsWith("~") || number.StartsWith("^"))
-        {
-            number = number[1..];
-            if (number.IsEmpty) return true;
-        }
-        return double.TryParse(number, System.Globalization.NumberStyles.AllowLeadingSign | System.Globalization.NumberStyles.AllowDecimalPoint,
-            System.Globalization.CultureInfo.InvariantCulture, out var coordinate) && double.IsFinite(coordinate);
-    }
 }

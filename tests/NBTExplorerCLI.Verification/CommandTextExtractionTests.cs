@@ -153,6 +153,36 @@ internal static class CommandTextExtractionTests
         }
     }
 
+    public static void StaticMapControlsKeepExactSelectorNames()
+    {
+        var source = new SourceAddress(new(World, "region/r.0.0.mca", ArtifactKind.Region), TypedPath.Root, "command.block", "minecraft:overworld",
+            new ChunkPosition(0, 0));
+        var profile = MinecraftProfiles.ForDataVersion(4671)!;
+        foreach (var command in new[] {
+            "/tp @e[type=minecraft:fox,name=Rocky] -71.45 74.00 -113.17",
+            "/tag @e[type=minecraft:fox,name=Rocky] add checkpointOne",
+            "/execute as @e[type=minecraft:fox,name=Rocky] run effect give @s minecraft:darkness 15 1 true",
+            "/playsound minecraft:block.anvil.land master @e[type=minecraft:fox,name=Rocky] ~ ~ ~ 1 0.1"
+        })
+        {
+            var result = CommandTextExtractor.Extract(new(source, command), profile);
+            Require(result.Complete && result.Text.Occurrences.IsEmpty && result.References.Single().Name == "Rocky",
+                "nontext controls still index their real typed selector: " + command);
+        }
+        foreach (var (command, expected) in new[] {
+            ("/fill 84 59 26 84 61 28 air destroy", true), ("/fill 84 59 26 84 61 28 oak_sign{front_text:{}}", false),
+            ("/tp @s ~ nope ~", false), ("/effect give @p minecraft:darkness 15 1 maybe", false),
+            ("/playsound minecraft:block.anvil.land master @p ~ bad ~", false), ("/tag @s add", false),
+            ("/tag @ add checkpointOne", false), ("/tp * ~ ~ ~", false), ("/effect clear @", false),
+            ("/playsound minecraft:block.anvil.land master *", false), ("/tag Evan_lau add checkpointOne", true),
+            ("/tag 15e6d9d5-567f-44df-94c4-22928f73a935 list", true), ("/tag @z add checkpointOne", false),
+            ("/scoreboard players set @ objective 1", false), ("/scoreboard players get * objective", false),
+            ("/scoreboard players set * objective 1", true), ("/scoreboard players get #hidden objective", true),
+            ("/scoreboard players operation * left += * right", true)
+        })
+            Require(CommandTextExtractor.Extract(new(source, command), profile).Complete == expected, "static control grammar boundary: " + command);
+    }
+
     public static void SelfScoreComponentsKeepAdjacentTextAndProtectOtherSelectors()
     {
         var command = new SourceAddress(new(World, "self-score.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
