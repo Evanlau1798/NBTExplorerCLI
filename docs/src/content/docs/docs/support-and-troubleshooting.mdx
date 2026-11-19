@@ -25,6 +25,8 @@ Worlds from Java 1.14.4 through 1.19.x can contain older Anvil chunks where bloc
 
 The namespaced world layout introduced in 26.1 Snapshot 6 has an open upper bound in `capabilities` (`maximumDataVersion: null`). A later snapshot can reuse it when the save has the same layout and separate dimension registry. This has been verified on an original 26.4 Snapshot 10 save. Use `scan` to check coverage for the contents of a particular save.
 
+Later datapacks and resource packs can reuse the same readers when their metadata and content follow the existing format. If `create-pack` cannot infer the output format, specify a verified format with `--pack-format`.
+
 ### Classic Older Anvil Worlds (`1.2.5`, `1.5.2`, `1.6.4`, `1.8.1`)
 
 Older Minecraft Java Edition Anvil saves (storage version `19133`, before Minecraft added `DataVersion`) do not store an exact version number inside `level.dat`:

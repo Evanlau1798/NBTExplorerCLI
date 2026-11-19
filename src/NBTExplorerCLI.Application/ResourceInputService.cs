@@ -101,7 +101,8 @@ public sealed class ResourceInputService(IWorldBackupStore objects)
         ArgumentNullException.ThrowIfNull(request);
         if (request.Format == ResourceOutputFormat.LanguageFiles || request.PackFormat is null) throw new ArgumentException("Merge input requires a declared pack output");
         var format = request.PackFormat;
-        if (MinecraftProfiles.ForPackMetadata(new(PackSourceKind.ResourcePack, format.Major < 65 ? format.Major : null, format, format)) is null)
+        // Publishing metadata requires an output format verified against the game.
+        if (format.Major > 104 || MinecraftProfiles.ForPackMetadata(new(PackSourceKind.ResourcePack, format.Major < 65 ? format.Major : null, format, format)) is null)
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Unknown resource generation pack format");
     }
     internal static void ValidateFiles(Dictionary<string, byte[]> files, PackFormatVersion required, ResourceGeneration? output = null)

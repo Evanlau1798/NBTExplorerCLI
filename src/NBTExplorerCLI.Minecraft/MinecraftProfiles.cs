@@ -54,7 +54,7 @@ public static class MinecraftProfiles
             (PackSourceKind.Datapack, >= 69 and <= 82, _) or (PackSourceKind.ResourcePack, >= 54 and <= 64, 0) or (PackSourceKind.ResourcePack, 65, 0) => Java1215,
             (PackSourceKind.Datapack, >= 83 and <= 93, _) or (PackSourceKind.ResourcePack, 65, > 0) or (PackSourceKind.ResourcePack, >= 66 and <= 74, _) => Java1219,
             (PackSourceKind.Datapack, >= 94 and <= 98, _) or (PackSourceKind.ResourcePack, >= 75 and <= 79, _) => Java12111,
-            (PackSourceKind.Datapack, >= 99 and <= 128, _) or (PackSourceKind.ResourcePack, >= 80 and <= 104, _) => Snapshot2616,
+            (PackSourceKind.Datapack, >= 99, _) or (PackSourceKind.ResourcePack, >= 80, _) => Snapshot2616,
             _ => null
         };
     }

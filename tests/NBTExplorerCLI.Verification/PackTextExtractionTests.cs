@@ -79,8 +79,20 @@ internal static class PackTextExtractionTests
             Require(MinecraftProfiles.ForPackMetadata(new(kind, null, format, format))?.Id == "java-26.1-snapshot-6",
                 $"the namespaced world era reads verified pack format {kind} {major}.{minor}");
         }
-        Require(MinecraftProfiles.ForPackMetadata(new(PackSourceKind.ResourcePack, null, new(105, 0), new(105, 0))) is null,
-            "unverified new resource pack major format stays unsupported");
+        foreach (var (kind, major, role, path, json) in new[]
+        {
+            (PackSourceKind.Datapack, 129, WorldSourceRole.PackJson, "data/test/advancement/example.json", "{\"display\":{\"title\":\"Example\"}}"),
+            (PackSourceKind.ResourcePack, 105, WorldSourceRole.Language, "assets/test/lang/en_us.json", "{\"test.example\":\"Example\"}")
+        })
+        {
+            var metadata = PackMetadata.Read(Encoding.UTF8.GetBytes($$$"""{"pack":{"min_format":[{{{major}}},1],"max_format":[{{{major}}},2],"description":"Example"}}"""), kind);
+            Require(MinecraftProfiles.ForPackMetadata(metadata) == MinecraftProfiles.ForDataVersion(5130),
+                "a new format number with the same metadata structure reuses the current schema");
+            var source = new WorldSourceLocation(new(World, "pack/" + path, ArtifactKind.Json), role, PackRoot: "pack", PackKind: kind);
+            var text = PackTextExtractor.Extract(source, Encoding.UTF8.GetBytes(json), metadata);
+            Require(text.Complete && text.Occurrences.Single().Text == "Example", "same-schema pack contents remain readable with a new format number");
+        }
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => MinecraftProfiles.RequiredResourcePackFormat(5131));
         foreach (var entry in new[] { "assets/p/models/item/display.json", "assets/p/font/icons.json", "assets/p/shaders/core/demo.json" })
         {
             var source = new WorldSourceLocation(new(World, "resources.zip", ArtifactKind.Archive, entry),
