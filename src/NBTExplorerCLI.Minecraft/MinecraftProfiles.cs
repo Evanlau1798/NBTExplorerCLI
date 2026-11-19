@@ -45,7 +45,7 @@ public static class MinecraftProfiles
         if (!metadata.DeclaresSupport(version)) return null;
         return (metadata.Kind, version.Major, version.Minor) switch
         {
-            (PackSourceKind.Datapack, >= 4 and <= 23, 0) or (PackSourceKind.ResourcePack, >= 15 and <= 20, 0) => Java1201,
+            (PackSourceKind.Datapack, >= 4 and <= 23, 0) or (PackSourceKind.ResourcePack, >= 4 and <= 20, 0) => Java1201,
             (PackSourceKind.Datapack, >= 24 and <= 32, 0) or (PackSourceKind.ResourcePack, >= 21 and <= 27, 0) => Java1204,
             // Resource format 28 was shared before and after item conditions arrived.
             (PackSourceKind.Datapack, 33, 0) or (PackSourceKind.ResourcePack, 28, 0) => InitialItemComponents,

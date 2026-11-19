@@ -23,6 +23,15 @@ internal static class PackTextExtractionTests
         }
         Require(MinecraftProfiles.ForPackMetadata(Metadata(3)) is null,
             "metadata predating Java datapacks must not inherit a datapack grammar");
+        var language = new WorldSourceLocation(new(World, "resources.zip", ArtifactKind.Archive, "assets/example/lang/zh_tw.json"),
+            WorldSourceRole.Language, PackRoot: "resources.zip", PackKind: PackSourceKind.ResourcePack);
+        foreach (var format in new[] { 4, 7, 12, 14, 15 })
+        {
+            var result = PackTextExtractor.Extract(language, """{"example.entry":"繁體中文"}"""u8.ToArray(), Metadata(format, PackSourceKind.ResourcePack));
+            Require(result.Complete && result.Occurrences.Single().Text == "繁體中文", $"resource format {format} uses the same JSON language structure");
+        }
+        Require(MinecraftProfiles.ForPackMetadata(Metadata(3, PackSourceKind.ResourcePack)) is null,
+            "packs from the .lang era require a separate language reader");
         var olderPack = MinecraftProfiles.ForPackMetadata(Metadata(6))!;
         var function = new SourceAddress(new(World, "datapacks/example/data/example/functions/start.mcfunction", ArtifactKind.McFunction),
             TypedPath.Root, "command.function");

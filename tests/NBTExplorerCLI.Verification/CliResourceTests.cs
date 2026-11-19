@@ -124,6 +124,7 @@ internal static class CliResourceTests
             Require(Call(world, work, id, revision, "export-lang", "--output", output, "--original-lang", "zh-TW", "--target-lang", "zh_tw").Exit == 2, "locale normalization cannot turn two languages into one overwritten file");
             Require(Call(world, work, id, revision, "export-lang", "--output", Path.Combine(world, "data"), "--apply", "--world-offline").Exit == 4, "public resource commands refuse actual gameplay scopes");
             Require(Call(world, work, id, revision, "create-pack", "--output", output, "--pack-format", "999", "--apply", "--world-offline").Exit == 4, "unknown pack format cannot publish outputs");
+            Require(Call(world, work, id, revision, "create-pack", "--output", output, "--pack-format", "4", "--apply", "--world-offline").Exit == 4, "readable historical packs do not gain pack generation support");
             Require(!Directory.GetFiles(output).Any() && original.All(file => File.ReadAllBytes(file.Key).SequenceEqual(file.Value)), "all refusals preserve source and resource data");
             var file = Path.Combine(work, "direct-resource-plan.json");
             using var applied = Success(Call(world, work, id, revision, "export-lang", "--output", output, "--plan-output", file, "--apply", "--world-offline", "--original-lang", "en-US", "--target-lang", "zh-TW"));
