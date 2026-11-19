@@ -123,7 +123,7 @@ internal sealed partial class CommandTextReader
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "data")
                 {
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
-                    if (dataPath >= 0 && dataPath < tokens.Count && StaticDataPath(tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
+                    if (dataPath >= 0 && dataPath < tokens.Count && StaticDataControlPath(tokens[cursor + 1].Text, tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
                 }
                 if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "score"
                     && ScoreHolder(tokens[cursor + 2].Text, allowWildcard: true) && PlainControlToken(tokens[cursor + 3].Text)) operands = 4;

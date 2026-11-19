@@ -135,9 +135,10 @@ internal sealed partial class CommandTextReader
         var path = DataTargetEnd(tokens, index + 2);
         if (path < 0) return false;
         if (tokens.Count == path) return read;
-        if (!StaticDataPath(tokens[path].Text)) return false;
+        if (!StaticDataControlPath(tokens[index + 2].Text, tokens[path].Text)) return false;
         return tokens.Count == path + 1 || read && tokens.Count == path + 2 && Decimal(tokens[path + 1].Text, out _);
     }
+    private bool StaticDataControlPath(string target, string path) => StaticDataPath(path) || StaticItemSource(target, path);
     private static int DataTargetEnd(List<CommandToken> tokens, int target)
     {
         if (target + 1 >= tokens.Count) return -1;

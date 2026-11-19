@@ -48,6 +48,9 @@ internal static class CommandReviewTests
             team modify guides color green
             item replace block ~ ~ ~ container.0 from entity @s weapon.mainhand
             data modify storage test:state position set from entity @s Pos[0]
+            data get entity @s HandItems[{id:"minecraft:paper"}]
+            execute if data entity @s HandItems[{id:"minecraft:paper"}] run scoreboard players get @s proof
+            data remove block ~ ~ ~ Items[{id:"minecraft:paper"}]
             tellraw @s {"text":"Guidance"}
             """;
         var profile = MinecraftProfiles.ForDataVersion(3465)!;
@@ -68,6 +71,9 @@ internal static class CommandReviewTests
             "data modify storage test:state position set from storage test:unsafe Pos[0]",
             "data modify storage test:state position set from entity @s CustomName",
             "data modify storage test:state copies append from entity @s HandItems[{tag:{display:{Name:'Guard'}}}]",
+            """execute if data entity @s HandItems[{tag:{display:{Name:'Guard'}}}] run scoreboard players get @s proof""",
+            """data get storage test:state HandItems[{id:"minecraft:paper"}]""",
+            """data remove entity @s HandItems[{tag:{display:{Name:'Guard'}}}]""",
             "data modify storage test:state {} merge value {CustomName:'Guard'}"
         };
         var accepted = unsupported.Where(command => CommandTextExtractor.Extract(new(Source, command), profile).Complete).ToArray();
