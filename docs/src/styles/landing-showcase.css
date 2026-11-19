@@ -1,0 +1,341 @@
+/* ==========================================================================
+   Act 2 — Asymmetric 12-Col Bento Visual Showcase
+   ========================================================================== */
+.bento-section {
+  padding-block: 56px 72px;
+}
+
+.section-title {
+  margin-bottom: 34px;
+  font-size: clamp(28px, 3.2vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.bento-wide {
+  grid-column: span 7;
+}
+
+.bento-narrow {
+  grid-column: span 5;
+}
+
+.bento-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: linear-gradient(165deg, rgba(15, 24, 39, 0.78) 0%, rgba(8, 13, 22, 0.9) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale3d(var(--card-scale, 1), var(--card-scale, 1), 1);
+  transition:
+    border-color 0.24s ease,
+    box-shadow 0.24s ease;
+  will-change: transform;
+}
+
+.bento-card:hover {
+  border-color: rgba(56, 189, 248, 0.36);
+  box-shadow:
+    0 24px 52px -24px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(74, 222, 128, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.bento-visual {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  min-height: 208px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(148, 163, 184, 0.11);
+  background: rgba(5, 9, 17, 0.72);
+  overflow: hidden;
+}
+
+.bento-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.bento-body h3 {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.bento-body p {
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+.card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  color: var(--cyan-bright);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: color 0.18s ease, gap 0.2s ease;
+}
+
+.card-link svg {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.2s ease;
+}
+
+.card-link:hover {
+  color: var(--grass-bright);
+}
+
+.card-link:hover svg {
+  transform: translateX(4px);
+}
+
+/* Bento Card 1: Live Translation Sign + Book */
+.mini-switch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mini-progress-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.mini-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  overflow: hidden;
+}
+
+.mini-progress-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--grass-bright), var(--cyan));
+  transform-origin: left center;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-bento-lang='en'] .mini-progress-fill {
+  transform: scaleX(0.32);
+}
+
+.mini-progress-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.segmented-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.seg-btn {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.seg-btn:hover {
+  color: var(--text);
+}
+
+.seg-btn.is-active {
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.26), rgba(56, 189, 248, 0.26));
+  color: #ffffff;
+}
+
+.translate-showcase {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.slot-card-compact {
+  padding: 12px 13px 12px 15px;
+  justify-content: flex-start;
+}
+
+.slot-card-compact .slot-card-stack {
+  min-height: 58px;
+}
+
+.slot-prose {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.56;
+  color: var(--text-soft);
+}
+
+[data-bento-lang='zh'] .b-en {
+  display: none;
+}
+
+[data-bento-lang='en'] .b-zh {
+  display: none;
+}
+
+/* Bento Card 2: Interactive NBT Tree */
+.visual-tree {
+  justify-content: flex-start;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.nbt-tree-root {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.nbt-root-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--grass-bright);
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.7);
+}
+
+.nbt-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 10px;
+  border-left: 1px dashed rgba(148, 163, 184, 0.24);
+}
+
+.nbt-branch-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.65);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.nbt-branch-toggle:hover {
+  border-color: rgba(56, 189, 248, 0.34);
+  background: rgba(19, 32, 51, 0.88);
+}
+
+.nbt-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--cyan-bright);
+  transition: transform 0.22s ease;
+}
+
+.nbt-branch[data-open='true'] .nbt-chevron {
+  transform: rotate(90deg);
+}
+
+.nbt-key {
+  font-weight: 700;
+}
+
+.nbt-children {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 0 2px 18px;
+}
+
+.nbt-branch[data-open='false'] .nbt-children {
+  display: none;
+}
+
+.nbt-leaf {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(8, 14, 24, 0.8);
+  font-size: 11.5px;
+}
+
+.nbt-leaf-key {
+  color: var(--cyan-bright);
+}
+
+.nbt-leaf-val {
+  color: #86efac;
+  overflow-wrap: anywhere;
+}
+
+.nbt-type {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.nbt-type-compound {
+  background: rgba(192, 132, 252, 0.14);
+  color: #d8b4fe;
+}
+
+.nbt-type-str {
+  background: rgba(74, 222, 128, 0.14);
+  color: #86efac;
+}
+
+.nbt-type-int {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fde68a;
+}

@@ -51,8 +51,8 @@
 ### 步驟 1：下載並解壓縮
 
 1. 前往 [GitHub Releases][releases-url]，下載最新版的 **`.zip`** 壓縮檔（以 `.zip` 封裝可避免 Chrome 等瀏覽器直接阻擋 `.exe` 下載）。
-2. 對壓縮檔按右鍵選「**解壓縮全部...**」，解出 `nbtcli.exe` 到方便的資料夾（例如 `C:\Tools\nbtcli`）。
-3. `nbtcli.exe` 是單一獨立執行檔（standalone executable），不需要額外的 `.dll` 檔案，也不必安裝 .NET，你可以自由移動到任何資料夾使用。
+2. 對壓縮檔按右鍵選「**解壓縮全部...**」，將完整內容解壓到方便的資料夾（例如 `C:\Tools\nbtcli`）。
+3. 在該資料夾執行 `nbtcli.exe`，並將隨附檔案保留在一起。ZIP 已包含 .NET 執行環境。
 
 ### 步驟 2：在這個資料夾裡打開 PowerShell
 

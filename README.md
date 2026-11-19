@@ -52,7 +52,7 @@
 
 1. Open [GitHub Releases][releases-url] and download the latest release **`.zip`** (packaged as a `.zip` so browsers like Chrome do not block direct `.exe` downloads).
 2. Right-click the ZIP file and select **Extract All...** to a folder such as `C:\Tools\nbtcli`.
-3. `nbtcli.exe` is a single standalone executable — no extra `.dll` files or separate .NET install are needed, so you can keep it in any folder you like.
+3. Run `nbtcli.exe` from the extracted folder and keep its bundled files together. The ZIP includes the .NET runtime.
 
 ### 2. Open PowerShell in That Folder
 

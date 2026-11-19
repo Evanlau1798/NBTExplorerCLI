@@ -1,6 +1,6 @@
 # NBTExplorerCLI (`nbtcli.exe`)
 
-> Single-file standalone Windows x64 CLI (`nbtcli.exe`, v1.0.0, distributed inside a `.zip` archive on GitHub Releases so browsers do not block direct `.exe` downloads) for Minecraft Java Edition worlds: read-only NBT/region/datapack inspection, 21-role world text scanning, paginated map localization sessions, translation key and resource pack generation, and crash-recoverable offline world editing.
+> Self-contained Windows x64 CLI (`nbtcli.exe`, v1.0.0) for Minecraft Java Edition worlds: read-only NBT/region/datapack inspection, 21-role world text scanning, paginated map localization sessions, translation key and resource pack generation, and crash-recoverable offline world editing. Extract the complete release ZIP and keep its files together. It includes the .NET runtime.
 > This document is structured Markdown serving as the single-source AI Agent manual (`/llms.txt` and `/llms-full.md`).
 
 ## Docs
@@ -12,7 +12,7 @@
 - [AI Agent Quickstart](https://nbtcli.evanlau1798.com/docs/ai-agents/): Web summary and ready-to-use agent prompts.
 - [Command Reference](https://nbtcli.evanlau1798.com/docs/command-reference/): Searchable command and flag reference.
 - [Supported Versions & Troubleshooting](https://nbtcli.evanlau1798.com/docs/support-and-troubleshooting/): Pinned profile matrix, classic Anvil limits, and error diagnosis.
-- [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases): Official release `.zip` containing the standalone `nbtcli.exe`.
+- [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases): Official Windows x64 release ZIP containing `nbtcli.exe` and its dependencies.
 
 ## Core Invariants
 
@@ -374,6 +374,7 @@ Generate with `agent setup <world> --output <file>`, fill `configuration.agentNa
 
 | Profile | `DataVersion` | Resource `pack_format` | Datapack Format | Text Schema | Pack / Layout |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| `java-1.20.1` | `3465` | `15` | `15` | `java-text-json (v1)` | `java-pack-plural` |
 | `java-1.20.4` | `3700` | `22` | `26` | `java-text-json (v1)` | `java-pack-plural` |
 | `java-1.21` | `3953` | `34` | `48` | `java-text-json (v1)` | `java-pack-singular` |
 | `java-1.21.5` | `4325` | `55` | `71` | `java-text-nbt (v1)` | `java-pack-singular` |
