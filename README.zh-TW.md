@@ -39,7 +39,7 @@
 - **輕鬆翻譯整張冒險地圖**：自動掃描告示牌、書本、物品、實體、計分板、Boss 血條、指令方塊與資料包文字，分成一頁一頁慢慢翻，還能搭配術語表保持譯名一致。
 - **彈性輸出語言檔與資源包**：可以把翻譯直接寫回地圖、轉成多語言翻譯鍵，或單獨打包／合併成客戶端 `.zip` 資源包，不改動地圖本身。
 - **內建安全防呆機制**：所有修改都會先產生「預覽計畫」再寫入，寫入前自動在世界資料夾外建立備份；萬一中途當機也能安全續寫或一鍵還原。
-- **對 AI 助手與腳本超級友善**：每個指令都輸出乾淨統一的 JSON 格式，可以直接交給 Claude、ChatGPT、Codex、Cursor 或 PowerShell 腳本自動化操作。
+- **專為 AI 助手與腳本整合設計**：每個指令都輸出乾淨統一的 JSON 格式，可以直接交給 Claude、ChatGPT、Codex、Cursor 或 PowerShell 腳本自動化操作。
 
 > [!NOTE]
 > **適用環境：Windows 64 位元 + Minecraft Java Edition 存檔。** 解壓縮就能執行，**不需要另外安裝 .NET**。要修改存檔前，請務必先關閉 Minecraft 並用「世界副本」測試。不支援基岩版（Bedrock Edition）存檔，也沒有 3D 畫面編輯功能。
@@ -50,9 +50,9 @@
 
 ### 步驟 1：下載並解壓縮
 
-1. 前往 [GitHub Releases][releases-url]，下載最新版的 **`nbtcli-win-x64.zip`**。
-2. 對壓縮檔按右鍵選「**解壓縮全部...**」，解到一個固定的資料夾（例如 `C:\Tools\nbtcli`）。
-3. **請讓資料夾內的所有檔案待在一起**：不要把 `nbtcli.exe` 單獨拉出來，它需要旁邊的 `.dll` 和 `.json` 檔案才能啟動。
+1. 前往 [GitHub Releases][releases-url]，下載最新版的 **`.zip`** 壓縮檔（以 `.zip` 封裝可避免 Chrome 等瀏覽器直接阻擋 `.exe` 下載）。
+2. 對壓縮檔按右鍵選「**解壓縮全部...**」，解出 `nbtcli.exe` 到方便的資料夾（例如 `C:\Tools\nbtcli`）。
+3. `nbtcli.exe` 是單一獨立執行檔（standalone executable），不需要額外的 `.dll` 檔案，也不必安裝 .NET，你可以自由移動到任何資料夾使用。
 
 ### 步驟 2：在這個資料夾裡打開 PowerShell
 
@@ -76,7 +76,7 @@
 .\nbtcli.exe scan 'D:\WorldCopy' --summary
 ```
 
-如果你平常很少用 PowerShell，或想看找存檔、處理 Windows 安全提示、看懂輸出內容的完整圖文級步驟，請直接看 **[下載安裝與初次使用指南][doc-zh-getting-started]** 與 **[常見問題與名詞白話詞典][doc-zh-faq]**。
+完整安裝步驟、存檔目錄位置與常見問題，請參閱 **[下載安裝與初次使用][doc-zh-getting-started]** 與 **[常見問題與名詞詞典][doc-zh-faq]**。
 
 ---
 
@@ -141,26 +141,26 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 
 ## 給 AI Agent 與自動化工具使用
 
-`nbtcli.exe` 非常適合交給 AI 助手（Claude、ChatGPT、Codex、Cursor 等）幫你查存檔、修資料或翻譯整張地圖。我們專門準備了一份**高資訊密度、免讀廢話的 AI Agent 快速完整說明書**：
+`nbtcli.exe` 非常適合交給 AI 助手（Claude、ChatGPT、Codex、Cursor 等）協助查存檔、修資料或翻譯整張地圖。我們專門準備了一份**高資訊密度的 AI Agent 完整操作手冊**：
 
-- **線上直讀版（推薦直接貼給 AI）**：[https://nbtcli.evanlau1798.com/llms.txt][llms-url]
+- **線上直讀版（推薦直接貼給 AI）**：[https://nbtcli.evanlau1798.com/llms.txt][llms-url]（結構化 Markdown 版：[https://nbtcli.evanlau1798.com/llms-full.md][llms-md-url]）
 - **本儲存庫檔案位置**：[`docs/public/llms.txt`](docs/public/llms.txt)
 - **網頁版指南與直接可用的提示詞範本**：**[AI Agent 快速整合指南][doc-zh-ai-agents]**
 
-這份 `llms.txt` 完整收錄了全部指令與旗標、6 種輸入 JSON Schema、退出碼判斷規則、編輯／翻譯／復原標準 SOP 與常見踩坑清單，讓 AI 讀完就能精準安全地操作。
+這份 `llms.txt` 完整收錄了全部指令與旗標、6 種輸入 JSON Schema、退出碼判斷規則、編輯／翻譯／復原標準 SOP 與常見注意事項，讓 AI 讀完就能精準安全地操作。
 
 ---
 
 ## 完整線上文檔導覽
 
-線上文檔提供完整的**繁體中文**與**英文**雙語教學：
+線上文檔提供完整的**繁體中文**與**英文**雙語指南：
 
 | 主題 | 繁體中文 | English |
 | :--- | :--- | :--- |
 | 工具總覽 | [工具總覽][docs-zh] | [Documentation Overview][docs-en] |
 | 下載與入門 | [下載安裝與初次使用][doc-zh-getting-started] | [Install & First Run][doc-getting-started] |
 | 常見任務 | [常見任務速查][doc-zh-recipes] | [Common Tasks (Recipes)][doc-recipes] |
-| 新手必看 | [常見問題與名詞白話詞典][doc-zh-faq] | [FAQ & Plain-Language Glossary][doc-faq] |
+| 常見問題 | [常見問題與名詞詞典][doc-zh-faq] | [FAQ & Glossary][doc-faq] |
 | 地圖翻譯 | [冒險地圖翻譯教學][doc-zh-translation] | [Map Translation Guide][doc-translation] |
 | 資源包與語言檔 | [資源包與語言檔輸出][doc-zh-resources] | [Resource Packs & Language Files][doc-resources] |
 | 安全編輯與復原 | [安全修改存檔與中斷復原][doc-zh-safe-editing] | [Editing Worlds & Crash Recovery][doc-safe-editing] |
@@ -191,6 +191,7 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 [docs-en]: https://nbtcli.evanlau1798.com/docs/
 [docs-zh]: https://nbtcli.evanlau1798.com/zh-tw/docs/
 [llms-url]: https://nbtcli.evanlau1798.com/llms.txt
+[llms-md-url]: https://nbtcli.evanlau1798.com/llms-full.md
 [doc-getting-started]: https://nbtcli.evanlau1798.com/docs/getting-started/
 [doc-recipes]: https://nbtcli.evanlau1798.com/docs/recipes/
 [doc-faq]: https://nbtcli.evanlau1798.com/docs/faq/

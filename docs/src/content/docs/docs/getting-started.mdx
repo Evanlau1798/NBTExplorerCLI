@@ -5,26 +5,26 @@ description: Step-by-step Windows setup guide — download from GitHub Releases,
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
-This guide takes you from zero to running your first safe, read-only commands on a Minecraft Java Edition world — even if you rarely use PowerShell.
+This guide walks through downloading, extracting, and running your first read-only commands on a Minecraft Java Edition world copy.
 
 ## Part 1: Download and Set Up (Takes About 1 Minute)
 
 <Steps>
 
-1. **Download the Windows Release ZIP**
+1. **Download the Release ZIP**
 
-   Go to the official **[GitHub Releases page](https://github.com/Evanlau1798/NBTExplorerCLI/releases)** and download **`nbtcli-win-x64.zip`** from the latest release.
+   Go to the official **[GitHub Releases page](https://github.com/Evanlau1798/NBTExplorerCLI/releases)** and download the latest release **`.zip`** archive (wrapped in a `.zip` so browsers such as Chrome do not block direct `.exe` downloads).
 
    :::tip[No Extra Software Required]
-   Everything needed to run the tool is already bundled inside the ZIP. You do **not** need to install .NET or Java separately.
+   `nbtcli.exe` is compiled as a single standalone executable with the runtime built in. You do **not** need to install .NET or Java separately.
    :::
 
-2. **Extract All Files Into One Folder**
+2. **Extract `nbtcli.exe`**
 
-   Right-click `nbtcli-win-x64.zip` in File Explorer and choose **Extract All...**. Pick a simple folder path without special symbols, such as `C:\Tools\nbtcli`.
+   Right-click the downloaded `.zip` in File Explorer and choose **Extract All...**. Pick a simple folder path without special symbols, such as `C:\Tools\nbtcli`.
 
-   :::caution[Keep All Extracted Files Together]
-   Do **not** move `nbtcli.exe` out of the folder by itself. It needs the `.dll` and `.json` files next to it to start.
+   :::tip[Single Standalone Executable]
+   There is only one executable file (`nbtcli.exe`) with no extra `.dll` dependencies — you can place it in any folder you prefer or add that folder to your `PATH`.
    :::
 
 3. **Open PowerShell Inside That Folder**
@@ -106,7 +106,7 @@ Let's read the world's name and Minecraft data version from `level.dat`:
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName
 ```
 
-What each part means:
+Parameters:
 - `'D:\WorldCopy'` — Your copied world folder (wrap paths in single quotes `'...'`, especially if they have spaces).
 - `--path level.dat` — Which file inside the world to open.
 - `--pointer /Data/DataVersion` — Which field to read inside that file (works just like a folder path: `Data` -> `DataVersion`).

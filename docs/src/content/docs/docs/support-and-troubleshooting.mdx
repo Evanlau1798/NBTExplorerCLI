@@ -55,11 +55,11 @@ Passing `validate`, `scan`, or `apply` confirms that the save files are structur
 
 ### Problem 1: PowerShell Says `nbtcli.exe` Is Not Recognized or Will Not Run
 
-**What happened**: You typed `nbtcli` without `.\`, opened PowerShell in the wrong folder, or moved `nbtcli.exe` away from its `.dll` files.
+**What happened**: You typed `nbtcli` without `.\`, opened PowerShell in the wrong folder, or tried running it inside the compressed `.zip` preview without extracting first.
 
 <Steps>
 
-1. Make sure you extracted **all** files from `nbtcli-win-x64.zip` into the same folder (keep the `.dll` and `.json` files next to `nbtcli.exe`).
+1. Make sure you extracted the standalone `nbtcli.exe` out of the downloaded `.zip` archive into a regular folder (for example, `C:\Tools\nbtcli`).
 2. Open PowerShell **inside that exact folder** (click File Explorer's address bar -> type `powershell` -> press **Enter**).
 3. Put **`.\`** in front of the command: `.\nbtcli.exe --version`.
 4. If Windows SmartScreen pops up on first launch, click **More info** -> **Run anyway**.

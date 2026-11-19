@@ -14,7 +14,8 @@ export default defineConfig({
       description: 'Windows x64 tool for inspecting, translating, and safely editing Minecraft Java Edition worlds.',
       favicon: '/favicon.svg',
       logo: {
-        src: './src/assets/logo.svg',
+        light: './src/assets/logo-light.svg',
+        dark: './src/assets/logo.svg',
         replacesTitle: false,
       },
       defaultLocale: 'root',
@@ -61,7 +62,7 @@ export default defineConfig({
             },
             {
               label: 'FAQ & Glossary',
-              translations: { 'zh-TW': '常見問題與名詞白話詞典' },
+              translations: { 'zh-TW': '常見問題與名詞詞典' },
               slug: 'docs/faq',
             },
           ],

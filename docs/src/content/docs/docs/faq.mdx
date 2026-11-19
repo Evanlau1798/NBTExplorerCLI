@@ -1,9 +1,9 @@
 ---
-title: FAQ & Plain-Language Glossary
-description: Straightforward answers to everyday questions and simple explanations of Minecraft save and CLI terms.
+title: FAQ & Glossary
+description: Common questions about Minecraft save paths, runtime requirements, safety guarantees, and key CLI terms.
 ---
 
-New to command-line tools or Minecraft save internals? This page answers the most common questions in plain English and explains technical terms without jargon.
+Common questions about running NBTExplorerCLI, followed by a concise glossary of Minecraft save and CLI terms.
 
 ---
 
@@ -19,11 +19,11 @@ Always **copy** the world folder to another location (like `D:\WorldCopy`) while
 
 ### Do I need to install .NET or Java to run `nbtcli.exe`?
 
-**No.** The official `nbtcli-win-x64.zip` from GitHub Releases already includes the exact .NET runtime it needs. Just unzip all files into one folder and run `.\nbtcli.exe`.
+**No.** `nbtcli.exe` is built as a single standalone executable with the .NET runtime bundled inside. GitHub Releases ships it inside a `.zip` archive so browsers such as Chrome do not block direct `.exe` downloads — just unzip `nbtcli.exe` and run it.
 
 ### Why did Windows show "Windows protected your PC" (SmartScreen)?
 
-Windows SmartScreen flags new open-source `.exe` files that do not have a paid commercial signing certificate. As long as you downloaded `nbtcli-win-x64.zip` directly from the official [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) page, you can click **More info** -> **Run anyway**.
+Windows SmartScreen flags new open-source `.exe` files that do not have a paid commercial signing certificate. As long as you downloaded the release `.zip` directly from the official [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) page, you can click **More info** -> **Run anyway**.
 
 ### Will running `nbtcli.exe` accidentally break my world?
 
@@ -40,7 +40,7 @@ Still, keeping your own copy of your world before editing is always the #1 best 
 Structured JSON output makes it easy for both people and AI assistants / scripts to see exact results without messy formatting. To read any response quickly:
 - Check `"success": true` (worked) or `"success": false` (stopped).
 - Look inside `"data"` for the result.
-- If it failed, read `"error"."message"` for the plain-language explanation.
+- If it failed, read `"error"."message"` for the failure reason.
 
 ### How is this different from the classic GUI NBTExplorer?
 
@@ -67,9 +67,9 @@ Add `--ui-locale en-US` or `--ui-locale zh-TW` anywhere in your command:
 
 ---
 
-## Plain-Language Glossary
+## Glossary
 
-| Term | Plain-Language Meaning |
+| Term | Description |
 | :--- | :--- |
 | **NBT** | Minecraft's save file format (Named Binary Tag). Think of it like a compact binary folder tree storing world settings, blocks, items, and entities. |
 | **`level.dat`** | The main settings file in every Minecraft world folder (holds the world name, `DataVersion`, gamerules, spawn coordinates, etc.). |

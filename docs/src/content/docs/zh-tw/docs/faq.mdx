@@ -1,9 +1,9 @@
 ---
-title: 常見問題與名詞白話詞典
-description: 用最容易懂的白話回答一般玩家的常見疑問，並將常見的 Minecraft 存檔與命令列術語一次講清楚。
+title: 常見問題與名詞詞典
+description: 彙整 Minecraft 存檔位置、執行環境、安全機制與常用術語說明。
 ---
 
-不常使用命令列，或對存檔結構名詞感到陌生嗎？這頁整理了大家最常問的問題，並把文檔中出現的專有名詞全部翻成白話。
+本頁彙整使用 NBTExplorerCLI 的常見問題，並整理文件中出現的存檔結構與 CLI 術語。
 
 ---
 
@@ -19,11 +19,11 @@ description: 用最容易懂的白話回答一般玩家的常見疑問，並將�
 
 ### 執行 `nbtcli.exe` 需要另外安裝 .NET 或 Java 嗎？
 
-**不需要。** 從 GitHub Releases 下載的 `nbtcli-win-x64.zip` 已經內建所有必要的 .NET 執行環境，解壓縮到同一個資料夾就能直接執行 `.\nbtcli.exe`。
+**不需要。** `nbtcli.exe` 為單一獨立執行檔（standalone executable），已內建所有必要的 .NET 執行環境。GitHub Releases 以 `.zip` 封裝是為了避免 Chrome 等瀏覽器直接阻擋 `.exe` 下載，解壓縮取出 `nbtcli.exe` 即可直接執行。
 
 ### 為什麼第一次執行時 Windows 跳出「Windows 已保護您的電腦」（SmartScreen）？
 
-Windows SmartScreen 預設會對沒有付費商業數位簽章的開源 `.exe` 跳出提醒。只要您確定是從官方 [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) 下載的 `nbtcli-win-x64.zip`，點「**其他資訊**」->「**仍要執行**」即可正常使用。
+Windows SmartScreen 預設會對沒有付費商業數位簽章的開源 `.exe` 跳出提醒。只要確定是從官方 [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) 下載的發行 `.zip`，點選「**其他資訊**」->「**仍要執行**」即可正常使用。
 
 ### 用這個工具會不會不小心把我的存檔弄壞？
 
@@ -35,12 +35,12 @@ NBTExplorerCLI 內建四道防呆保護：
 
 即使如此，**永遠先複製一份世界測試**依然是最安心的好習慣！
 
-### 為什麼每個指令都輸出 JSON 而不是一般純文字？怎麼看懂？
+### 為什麼每個指令都輸出 JSON 格式？
 
-統一的 JSON 格式讓一般人、腳本與 AI 助手都能精準判讀結果。平常只要抓三個重點：
-- 看 `"success"`：`true` 代表成功，`false` 代表失敗。
-- 看 `"data"`：指令查到或建立出來的結果都在這裡。
-- 失敗時看 `"error"` 裡的 `"message"`：裡面會用白話告訴你原因。
+統一的結構化 JSON 讓一般操作、腳本與 AI 助手都能精準判讀結果。重點欄位包含：
+- `"success"`：`true` 代表成功，`false` 代表失敗。
+- `"data"`：指令查詢結果或建立的計畫資訊。
+- `"error"."message"`：執行失敗時的具體錯誤說明。
 
 ### 這個工具跟傳統視窗版 NBTExplorer（GUI）有什麼不同？
 
@@ -67,9 +67,9 @@ NBTExplorerCLI 內建四道防呆保護：
 
 ---
 
-## 名詞白話詞典
+## 名詞詞典
 
-| 名詞 | 白話解釋 |
+| 名詞 | 說明 |
 | :--- | :--- |
 | **NBT** | Minecraft 存檔專用的資料格式（Named Binary Tag）。可以想像成壓縮過的資料夾樹狀結構，用來記世界設定、方塊、物品與實體資料。 |
 | **`level.dat`** | 每個世界資料夾裡最重要的主設定檔，記錄地圖名稱、`DataVersion`、遊戲規則、出生點座標等資訊。 |

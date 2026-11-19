@@ -1,5 +1,6 @@
 ---
 import '../styles/landing.css';
+import logoDark from '../assets/logo.svg';
 import { LANDING_COPY } from '../data/landing-i18n';
 import { PRODUCT_META, type LocaleKey } from '../data/cli-surface';
 
@@ -52,7 +53,7 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
     <header class="site-header" data-header>
       <div class="container header-inner">
         <a href={pageHref(homePath)} class="brand">
-          <img class="brand-logo" src={pageHref('/favicon.svg')} alt="" width="34" height="34" />
+          <img class="brand-logo" src={logoDark.src} alt="" width="34" height="34" />
           <span class="brand-name">{PRODUCT_META.name}</span>
         </a>
 
@@ -562,7 +563,7 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
       <section class="cta-section" aria-labelledby="cta-title">
         <div class="container">
           <div class="cta-dock" data-spotlight data-reveal>
-            <img class="cta-emblem" src={pageHref('/favicon.svg')} alt="" width="56" height="56" />
+            <img class="cta-emblem" src={logoDark.src} alt="" width="56" height="56" />
             <h2 id="cta-title" class="cta-title">{copy.ctaTitle}</h2>
             <p class="cta-subtitle">{copy.ctaSubtitle}</p>
             <div class="cta-actions">
