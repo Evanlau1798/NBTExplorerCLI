@@ -22,6 +22,8 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 <ProfileTable lang="zh-tw" />
 
+`capabilities.storageProfiles` 的 `java-classic-anvil` 支援唯讀查閱和文字抽取，適用於儲存格式為 `19133` 且沒有 `DataVersion` 的舊 Anvil 存檔。儲存格式編號無法推斷確切遊戲版本。告示牌文字和完整指令均保留存檔中的原始編碼。翻譯工作階段及世界修改需要有明確版本的組合。無法識別的檔案與舊式內附資源包會使掃描標記為不完整，其餘可讀內容仍會回傳。
+
 對於有序及無序工作台配方，`scan` 和 `validate` 會依資料包已登錄的格式檢查產物物品欄位。若該欄位缺漏、格式無效或指定為空氣，會回報 `InvalidRecipeResult`。物品是否存在、材料與堆疊數量是否合法，以及資料包間的交互作用，仍由對應版本的 Minecraft 伺服器驗證。
 
 ### 如何解讀 `capabilities` 的支援宣告

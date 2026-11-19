@@ -6,14 +6,14 @@ namespace NBTExplorerCLI.Formats;
 internal sealed class BinaryNbtReader(Stream input, DecodeLimits limits)
 {
     private readonly CodecBudget _budget = new(limits);
-    public NbtReadResult Read()
+    public NbtReadResult Read(bool requireEnd = true)
     {
         if (input.CanSeek && input.Length - input.Position > limits.MaxDecodedBytes)
             throw _budget.Error(CodecError.LimitExceeded, "Input exceeds decoded byte budget");
         var type = Tag(allowEnd: false);
         var name = String();
         var document = new NbtDocument(name, Payload(type, 0));
-        if (input.ReadByte() >= 0)
+        if (requireEnd && input.ReadByte() >= 0)
         {
             _budget.CheckBytes(1);
             throw _budget.Error(CodecError.TrailingData, "Data follows the complete NBT root");

@@ -32,6 +32,8 @@ public static class WorldLayoutLocator
             : parts.Length == 3 && parts[0] == "players" && parts[1] is "advancements" or "stats";
         if (progress && name.EndsWith(".json", StringComparison.Ordinal) && Guid.TryParseExact(name[..^5], "D", out _))
             return new(artifact, WorldSourceRole.Irrelevant);
+        var classic = profile == MinecraftProfiles.ClassicAnvil;
+        if (classic && parts.Length == 2 && parts[0] == "players" && extension == "dat") return new(artifact, WorldSourceRole.Player);
         if (kind == ArtifactKind.Nbt && parts.Length >= 2 && parts[0] == (directoryLayout ? "playerdata" : "players")) return new(artifact, WorldSourceRole.Player);
         if (parts.Length >= 2 && parts[0] == "data" && kind is ArtifactKind.Nbt or ArtifactKind.Json) return new(artifact, WorldSourceRole.SavedData);
         var matches = new List<WorldSourceLocation>();
@@ -46,6 +48,7 @@ public static class WorldLayoutLocator
             {
                 var coordinates = RegionCoordinates(name);
                 var role = segments[0] switch { "region" => WorldSourceRole.Terrain, "entities" => WorldSourceRole.Entities, _ => WorldSourceRole.PointOfInterest };
+                if (classic && role == WorldSourceRole.Terrain && extension == "mcr") role = WorldSourceRole.Irrelevant;
                 matches.Add(new(artifact, role, dimension, coordinates.X, coordinates.Z));
             }
             else if (segments.Length >= 2 && segments[0] == "data" && kind is ArtifactKind.Nbt or ArtifactKind.Json)

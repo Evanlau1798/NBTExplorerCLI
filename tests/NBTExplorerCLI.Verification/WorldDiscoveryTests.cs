@@ -26,9 +26,10 @@ internal static class WorldDiscoveryTests
     }
     internal const string Format48Pack = "{\"pack\":{\"pack_format\":48,\"description\":\"Data\"}}";
     internal const string ResourcePack = "{\"pack\":{\"pack_format\":34,\"description\":\"Resources\"}}";
-    internal static byte[] Region()
+    internal static byte[] Region(NbtDocument? document = null, byte[]? padding = null)
     {
-        var payload = CompressedNbt.WriteDocument(new("", new NbtCompound([])), NbtCompression.Zlib);
+        var nbt = BinaryNbt.WriteDocument(document ?? new("", new NbtCompound([])));
+        var payload = NbtCompressionCodec.Encode(padding is null ? nbt : [.. nbt, .. padding], NbtCompression.Zlib);
         var bytes = new byte[12288]; BinaryPrimitives.WriteUInt32BigEndian(bytes, 0x201);
         BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(8192), (uint)payload.Length + 1); bytes[8196] = 2; payload.CopyTo(bytes, 8197);
         return bytes;

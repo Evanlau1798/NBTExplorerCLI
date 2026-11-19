@@ -21,6 +21,14 @@ public static class BinaryNbt
     }
     public static CodecMetrics Validate(byte[] input, BinaryNbtProfile profile = BinaryNbtProfile.JavaNamed, DecodeLimits? limits = null)
         => ReadDocument(input, profile, limits).Metrics;
+    internal static NbtReadResult ReadZeroPaddedDocument(byte[] input, DecodeLimits limits)
+    {
+        using var stream = new MemoryStream(input, writable: false);
+        var result = new BinaryNbtReader(stream, limits).Read(requireEnd: false);
+        if (input.AsSpan(checked((int)result.ConsumedBytes)).IndexOfAnyExcept((byte)0) >= 0)
+            throw new CodecException(CodecError.TrailingData, result.ConsumedBytes, "Nonzero data follows the complete NBT root");
+        return result;
+    }
     public static CodecMetrics MeasureDocument(NbtDocument document, DecodeLimits? limits = null, BinaryNbtProfile profile = BinaryNbtProfile.JavaNamed)
     {
         ArgumentNullException.ThrowIfNull(document);

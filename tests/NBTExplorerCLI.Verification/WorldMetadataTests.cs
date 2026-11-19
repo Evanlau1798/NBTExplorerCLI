@@ -19,6 +19,9 @@ internal static class WorldMetadataTests
     }
     internal static NbtDocument Separate(int version, NbtCompound dimensions) => new("", new NbtCompound([
         new("DataVersion", new NbtInt(version)), new("data", new NbtCompound([new("dimensions", dimensions)]))]));
+    internal static NbtDocument Classic(params NbtEntry[] extra) => new("", new NbtCompound([
+        new("Data", new NbtCompound([new("version", new NbtInt(19133)), new("RandomSeed", new NbtLong(17)),
+            new("SpawnX", new NbtInt(0)), new("SpawnZ", new NbtInt(0)), .. extra]))]));
     public static void RegistryBackedDimensionRoots()
     {
         var directoryView = WorldMetadata.Read(Level(3953, Dimensions));
@@ -33,6 +36,9 @@ internal static class WorldMetadataTests
     }
     public static void MissingConflictingAndUnsafeEvidence()
     {
+        foreach (var marker in new NbtEntry[] { new("DataVersion", new NbtInt(9999)), new("Version", new NbtCompound([])), new("WorldGenSettings", new NbtCompound([])) })
+            BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Classic(marker)));
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Classic(), Separate(4774, Dimensions)));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4775, Dimensions)));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4774)));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4774), Separate(999999, Dimensions)));

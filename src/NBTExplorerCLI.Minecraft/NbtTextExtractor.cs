@@ -11,7 +11,7 @@ public static class NbtTextExtractor
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(document);
         limits ??= DecodeLimits.Default; _ = BinaryNbt.MeasureDocument(document, limits);
-        var profile = Profile(source, document);
+        var profile = ResolveProfile(source, document, layoutProfile == MinecraftProfiles.ClassicAnvil);
         var binding = new SourceAddress(source.Artifact, TypedPath.Root, "source.document", source.Dimension, chunk);
         var output = new TextExtractionCollector(binding, false, limits, scope) { ComponentRoot = componentRoot };
         var reader = new NbtTextReader(binding, profile, layoutProfile ?? profile, output, limits);
@@ -29,12 +29,17 @@ public static class NbtTextExtractor
         return output.Finish();
     }
     public static CapabilityProfile Profile(WorldSourceLocation source, NbtDocument document)
+        => ResolveProfile(source, document, classic: false);
+
+    private static CapabilityProfile ResolveProfile(WorldSourceLocation source, NbtDocument document, bool classic)
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(document);
         var versionPath = source.Role == WorldSourceRole.Level ? new TypedPath([PathSegment.ForKey("Data"), PathSegment.ForKey("DataVersion")]) : new([PathSegment.ForKey("DataVersion")]);
         var version = NbtLocator.Resolve(document.Root, versionPath);
         if (version.Status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid || version.Status == ResolutionStatus.Found && version.Value is not NbtInt)
             throw new CodecException(CodecError.InvalidTag, 0, "Invalid artifact DataVersion");
+        if (classic && version.Status == ResolutionStatus.Missing && source.Role is WorldSourceRole.Level or WorldSourceRole.Terrain or WorldSourceRole.Player or WorldSourceRole.SavedData)
+            return MinecraftProfiles.ClassicAnvil;
         return version.Value is NbtInt number && MinecraftProfiles.ForDataVersion(number.Value) is { } profile ? profile
             : throw new CodecException(CodecError.UnsupportedProfile, 0, "Missing or unknown artifact DataVersion");
     }
@@ -43,6 +48,7 @@ public static class NbtTextExtractor
 internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityProfile profile, CapabilityProfile layoutProfile, TextExtractionCollector output, DecodeLimits limits)
 {
     private readonly bool modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
+    private readonly bool classic = profile == MinecraftProfiles.ClassicAnvil;
     private NbtValue? Field(NbtValue value, string key, TypedPath path)
     {
         var resolution = NbtLocator.Resolve(value, new([PathSegment.ForKey(key)]));
@@ -64,6 +70,7 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
     internal void Component(NbtValue? value, TypedPath path, string role)
     {
         if (value is null || !output.CouldInclude(role)) return;
+        if (classic) { Literal(value, path, role); return; }
         var source = new SourceAddress(binding.Artifact, path, role, binding.Dimension, binding.Chunk);
         if (modern) output.Merge(TextComponentExtractor.Nbt(source, value, profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
         else if (value is NbtString json) output.Merge(TextComponentExtractor.EmbeddedJsonString(source, json.Value, profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));

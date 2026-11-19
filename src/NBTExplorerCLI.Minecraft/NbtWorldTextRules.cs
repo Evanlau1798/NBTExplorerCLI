@@ -14,7 +14,20 @@ internal sealed partial class NbtTextReader
     }
     internal void Terrain(NbtValue root)
     {
-        foreach (var (block, path) in Sequence(Field(root, "block_entities", TypedPath.Root), At(TypedPath.Root, "block_entities"))) BlockEntity(block, path);
+        var path = TypedPath.Root;
+        if (classic)
+        {
+            path = At(path, "Level");
+            if (Field(root, "Level", TypedPath.Root) is not NbtCompound level
+                || Field(level, "xPos", path) is not NbtInt x || Field(level, "zPos", path) is not NbtInt z
+                || binding.Chunk is { } chunk && (x.Value != chunk.X || z.Value != chunk.Z))
+            { output.Diagnostic(path, "InvalidClassicAnvilChunk"); return; }
+            root = level;
+        }
+        var blocks = classic ? "TileEntities" : "block_entities";
+        foreach (var (block, blockPath) in Sequence(Field(root, blocks, path), At(path, blocks))) BlockEntity(block, blockPath);
+        if (classic)
+            foreach (var (entity, entityPath) in Sequence(Field(root, "Entities", path), At(path, "Entities"))) Entity(entity, entityPath);
     }
     internal void Entities(NbtValue root)
     {
@@ -26,9 +39,14 @@ internal sealed partial class NbtTextReader
         if (rawIdentity is not NbtString && (rawIdentity is not null || knownIdentity is null)) { output.Diagnostic(path, "MissingBlockEntityIdentity"); return; }
         var identity = rawIdentity is NbtString id ? MinecraftIdentifier.DefaultNamespace(id.Value) : knownIdentity!;
         if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingBlockEntityIdentity"); return; }
-        var role = identity == "minecraft:command_block" ? "command_block.name" : "container.name";
+        var role = identity == "minecraft:command_block" || classic && identity == "minecraft:Control" ? "command_block.name" : "container.name";
         Component(Field(value, "CustomName", path), At(path, "CustomName"), role);
         foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
+        if (classic && identity == "minecraft:Sign")
+            foreach (var field in new[] { "Text1", "Text2", "Text3", "Text4" })
+                Literal(Field(value, field, path), At(path, field), "sign.front.line");
+        if (classic && identity == "minecraft:Control")
+            Literal(Field(value, "Command", path), At(path, "Command"), "command.block.raw");
         if (identity is "minecraft:sign" or "minecraft:hanging_sign")
         {
             var signRole = identity == "minecraft:sign" ? "sign" : "hanging_sign";
@@ -75,7 +93,8 @@ internal sealed partial class NbtTextReader
         };
         if (identity is null) { output.Diagnostic(path, "MissingEntityIdentity"); return; }
         if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingEntityIdentity"); return; }
-        Component(Field(value, "CustomName", path), At(path, "CustomName"), identity == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name");
+        var armorStand = identity == "minecraft:armor_stand" || classic && identity == "minecraft:ArmorStand";
+        Component(Field(value, "CustomName", path), At(path, "CustomName"), armorStand ? "armor_stand.name" : "entity.name");
         if (identity == "minecraft:command_block_minecart") StoredCommand(value, path);
         if (identity == "minecraft:text_display") Component(Field(value, "text", path), At(path, "text"), "text_display.text");
         Player(value, path);
@@ -95,7 +114,7 @@ internal sealed partial class NbtTextReader
         }
         else
         {
-            foreach (var field in new[] { "HandItems", "ArmorItems" })
+            foreach (var field in classic ? new[] { "Equipment" } : new[] { "HandItems", "ArmorItems" })
                 foreach (var (item, itemPath) in Sequence(Field(value, field, path), At(path, field)))
                     if (item is not NbtCompound { Entries: [{ Name: "Count", Value: NbtByte or NbtInt }] })
                         Item(item, itemPath);
@@ -114,6 +133,8 @@ internal sealed partial class NbtTextReader
     {
         var filename = artifact[(artifact.LastIndexOf('/') + 1)..];
         if (!VanillaSavedDataPath(artifact, filename)) { output.Diagnostic(TypedPath.Root, "UnsupportedSavedData"); return; }
+        if (classic && artifact == "data/idcounts.dat" && root is NbtCompound counters
+            && counters.Entries.All(entry => entry.Value is NbtShort)) return;
         if (Field(root, "data", TypedPath.Root) is not { } data) { output.Diagnostic(TypedPath.Root, "MissingSavedDataRoot"); return; }
         var path = At(TypedPath.Root, "data");
         if (filename.StartsWith("command_storage_", StringComparison.Ordinal) && filename.EndsWith(".dat", StringComparison.Ordinal))
@@ -133,7 +154,8 @@ internal sealed partial class NbtTextReader
                 Component(Field(team, "MemberNameSuffix", teamPath), At(teamPath, "MemberNameSuffix"), "scoreboard.team.suffix");
             }
         }
-        else if (!KnownNonTextData(artifact, filename)) output.Diagnostic(TypedPath.Root, "UnsupportedSavedData");
+        else if (!(classic && artifact == "data/" + filename && ClassicNonTextData(filename, data, path))
+            && !KnownNonTextData(artifact, filename)) output.Diagnostic(TypedPath.Root, "UnsupportedSavedData");
     }
     private void Bossbars(NbtValue value, TypedPath path)
     {

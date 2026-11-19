@@ -1,5 +1,6 @@
 using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
+using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Infrastructure;
 using static NBTExplorerCLI.Verification.TextSlotTests;
 using static NBTExplorerCLI.Verification.WorldDiscoveryTests;
@@ -55,6 +56,25 @@ internal static class WorldRestorePreparationTests
                 Unchanged(root);
             }
             Unchanged(root); Require(!Directory.EnumerateFiles(root, "*.candidate").Any(), "Dispose removes every raw/deletion staging artifact without committing");
+            using (var prepared = service.Prepare(backup, plan, true))
+            {
+                var level = CompressedNbt.WriteDocument(WorldMetadataTests.Classic(), NbtCompression.GZip);
+                Put(root, "level.dat", level);
+                BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => new WorldPlanBuilder(inventory).Build(backup, Requests(backup)));
+                BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => service.Prepare(backup, plan, true));
+                var engine = new WorldApplyEngine(inventory, new ArtifactStorage(root, World), new FileSystemWorldBackupStore(state),
+                    new FileSystemApplyJournalStore(Path.Combine(state, "journals")));
+                BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => engine.Apply(prepared, true));
+                Unchanged(root);
+                var marker = new ArtifactAddress(World, "level.dat", ArtifactKind.Nbt);
+                var original = new WorldBackupService(inventory, new FileSystemWorldBackupStore(state)).Create([new(marker, Present(level))]);
+                Put(root, marker.RelativePath, [0]);
+                var requested = new RestorePatch("metadata", new(original.ManifestHash, original.Manifest.Artifacts,
+                    new Dictionary<ArtifactAddress, ArtifactImage> { [marker] = Present(0) }));
+                BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => new WorldPlanBuilder(inventory).Build(original, [requested]));
+                Require(File.ReadAllBytes(Path.Combine(root, marker.RelativePath)).SequenceEqual(new byte[] { 0 }),
+                    "restoring Classic metadata is refused even when the current marker is damaged");
+            }
         }
         finally { Directory.Delete(root, true); Directory.Delete(state, true); }
     }

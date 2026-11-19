@@ -88,15 +88,17 @@ public sealed partial class WorldTextExtraction
             TextExtractionResult text; CapabilityProfile? commandProfile = null;
             if (region is not null && source.Chunk is { } chunk)
             {
-                var document = region.ReadChunk(chunk.LocalZ * 32 + chunk.LocalX, request.Limits).Document;
+                var index = chunk.LocalZ * 32 + chunk.LocalX;
+                var document = (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && source.Location.Role == WorldSourceRole.Terrain
+                    ? region.ReadClassicAnvilChunk(index, request.Limits) : region.ReadChunk(index, request.Limits)).Document;
                 text = NbtTextExtractor.Extract(source.Location, document, chunk, request.Limits, scope: request.Scope, layoutProfile: Discovery.Metadata?.Profile);
-                commandProfile = NbtTextExtractor.Profile(source.Location, document);
+                if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document);
             }
             else if (source.Location.Artifact.Kind == ArtifactKind.Nbt || source.Location.Role == WorldSourceRole.Structure)
             {
                 var document = ReadDat(bytes);
                 text = NbtTextExtractor.Extract(source.Location, document, limits: request.Limits, storageRules: StorageRules.GetValueOrDefault(source.Location.Artifact, ImmutableArray<StorageTextRule>.Empty), scope: request.Scope, layoutProfile: Discovery.Metadata?.Profile);
-                commandProfile = NbtTextExtractor.Profile(source.Location, document);
+                if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document);
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
             {

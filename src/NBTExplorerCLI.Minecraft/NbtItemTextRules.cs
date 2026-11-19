@@ -26,13 +26,26 @@ internal sealed partial class NbtTextReader
     private void Item(NbtValue value, TypedPath path, string bookRole = "book")
     {
         if (value is NbtCompound { Entries.Length: 0 }) return;
-        if (Field(value, "id", path) is not NbtString id) { output.Diagnostic(path, "MissingItemIdentity"); return; }
+        var identity = Field(value, "id", path);
+        if (classic && identity is NbtShort or NbtInt or NbtString)
+        {
+            var id = identity switch
+            {
+                NbtShort { Value: 386 } or NbtInt { Value: 386 } => "minecraft:writable_book",
+                NbtShort { Value: 387 } or NbtInt { Value: 387 } => "minecraft:written_book",
+                NbtString text => MinecraftIdentifier.DefaultNamespace(text.Value),
+                _ => null
+            };
+            if (Field(value, "tag", path) is { } tag) TaggedItem(tag, At(path, "tag"), id, bookRole);
+            return;
+        }
+        if (identity is not NbtString named) { output.Diagnostic(path, "MissingItemIdentity"); return; }
         var oldTags = profile.Features[ProfileFacet.ItemSchema].Schema == "java-item-tags-1.20.4";
         var field = oldTags ? "tag" : "components";
         if (Field(value, field, path) is not { } data) return;
         var dataPath = At(path, field);
         if (data is not NbtCompound) { output.Diagnostic(dataPath, "InvalidItemData"); return; }
-        if (oldTags) { TaggedItem(data, dataPath, MinecraftIdentifier.DefaultNamespace(id.Value), bookRole); return; }
+        if (oldTags) { TaggedItem(data, dataPath, MinecraftIdentifier.DefaultNamespace(named.Value), bookRole); return; }
         foreach (var group in ((NbtCompound)data).Entries.GroupBy(entry => MinecraftIdentifier.DefaultNamespace(entry.Name), StringComparer.Ordinal))
         {
             if (group.Count() != 1) { output.Diagnostic(dataPath, "AmbiguousItemComponent"); continue; }

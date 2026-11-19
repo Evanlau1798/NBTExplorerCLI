@@ -57,13 +57,22 @@ public sealed class RegionFile
     }
 
     public NbtReadResult ReadChunk(int index, DecodeLimits? limits = null)
+        => ReadChunk(index, limits, classicAnvil: false);
+
+    public NbtReadResult ReadClassicAnvilChunk(int index, DecodeLimits? limits = null)
+        => ReadChunk(index, limits, classicAnvil: true);
+
+    private NbtReadResult ReadChunk(int index, DecodeLimits? limits, bool classicAnvil)
     {
         using var observation = WorkDiagnostics.Start("region.chunk.load");
         var chunk = Existing(index); RequireSupported(chunk);
         limits ??= DecodeLimits.Default; limits.Validate();
         if (chunk.PayloadLength > limits.MaxCompressedBytes)
             throw new CodecException(CodecError.LimitExceeded, (long)chunk.SectorOffset * 4096 + 5, "Chunk compressed payload limit exceeded");
-        return CompressedNbt.ReadDocument(CompressedPayload(index), (NbtCompression)chunk.CodecId, limits);
+        var codec = (NbtCompression)chunk.CodecId;
+        var bytes = NbtCompressionCodec.Decode(CompressedPayload(index), codec, limits).Bytes;
+        return classicAnvil && codec == NbtCompression.Zlib
+            ? BinaryNbt.ReadZeroPaddedDocument(bytes, limits) : BinaryNbt.ReadDocument(bytes, limits: limits);
     }
 
     public byte[] WithChunk(int index, NbtDocument document, NbtCompression codec, uint timestamp, DecodeLimits? limits = null)

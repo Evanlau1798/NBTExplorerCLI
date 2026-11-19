@@ -22,6 +22,8 @@ Run `nbtcli capabilities` at any time to inspect the registered command list and
 
 <ProfileTable lang="en" />
 
+The `java-classic-anvil` entry under `capabilities.storageProfiles` covers read-only inspection and text extraction from older Anvil saves with storage version `19133` and no `DataVersion`. The storage version does not identify an exact game release. Sign text and full command strings retain their stored encoding. Translation sessions and world edits require a versioned profile. Unrecognized files and bundled classic resource packs can leave an otherwise readable scan incomplete.
+
 For shaped and shapeless crafting recipes, `scan` and `validate` can report `InvalidRecipeResult` for an absent, malformed, or air output item. The check follows the data pack's registered format. The matching Minecraft server verifies registry resolution, ingredients, stack sizes, and data pack interactions.
 
 ### Reading the `capabilities` Output

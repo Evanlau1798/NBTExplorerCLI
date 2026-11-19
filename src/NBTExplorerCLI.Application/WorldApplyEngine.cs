@@ -59,6 +59,8 @@ public sealed partial class WorldApplyEngine
         try
         {
             WorldPlanBuilder.RequireReferencePolicy(prepared.Plan);
+            if (prepared.Plan.Operations.Any(operation => operation is RestorePatch))
+                WorldRestorePlans.RejectClassicWorld(inventory);
             if (prepared.Candidates.Count != prepared.Manifest.Artifacts.Length) throw new ArgumentException("Incomplete prepared candidate set", nameof(prepared));
             for (var index = 0; index < prepared.Candidates.Count; index++)
             {

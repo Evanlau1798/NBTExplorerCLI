@@ -211,6 +211,76 @@ internal static class CliReadOnlyTests
             Require(Run(cwd, "get", region).Exit != 0 && Run(cwd, "get", region, "--chunk", "32,0", "--dimension", "minecraft:overworld").Exit != 0, "missing or different-region coordinates cannot pick an arbitrary chunk");
         }
         finally { Directory.Delete(root, true); Directory.Delete(cwd, true); }
+        ClassicAnvilWorldReads();
+    }
+
+    private static void ClassicAnvilWorldReads()
+    {
+        var root = ScratchDirectory.CreateChild(); var cwd = ScratchDirectory.CreateChild();
+        try
+        {
+            static NbtCompound Compound(params NbtEntry[] fields) => new(fields);
+            var level = WorldMetadataTests.Classic();
+            Put(root, "level.dat", CompressedNbt.WriteDocument(level, NbtCompression.GZip));
+            const string region = "region/r.-1.1.mca";
+            const string coords = "-32,32";
+            var sign = Compound(new("id", new NbtString("Sign")), new("Text1", new NbtString("Read this")),
+                new("Text2", new NbtString("\"Original encoding\"")));
+            var control = Compound(new("id", new NbtString("Control")), new("Command", new NbtString("say Hello")));
+            var signed = Compound(new("id", new NbtShort(387)), new("tag", Compound(new("title", new NbtString("Field notes")),
+                new("author", new NbtString("A writer")), new("pages", new NbtList(NbtType.String, [new NbtString("\"Stored JSON page\"")])))));
+            var draft = Compound(new("id", new NbtShort(386)), new("tag", Compound(
+                new NbtEntry("pages", new NbtList(NbtType.String, [new NbtString("Draft page")])))));
+            var chest = Compound(new("id", new NbtString("Chest")), new("Items", new NbtList(NbtType.Compound, [signed, draft])));
+            var chunk = new NbtDocument("", Compound(new NbtEntry("Level", Compound(new("xPos", new NbtInt(-32)), new("zPos", new NbtInt(32)),
+                new("TileEntities", new NbtList(NbtType.Compound, [sign, control, chest]))))));
+            Put(root, region, Region(chunk, [0, 0]));
+            Put(root, "region/r.-1.1.mcr", [0]);
+            void SavedData(string path, NbtCompound data)
+                => Put(root, path, CompressedNbt.WriteDocument(new("", data), NbtCompression.GZip));
+            SavedData("data/idcounts.dat", Compound(new NbtEntry("map", new NbtShort(1))));
+            SavedData("data/map_0.dat", Compound(new NbtEntry("data", Compound(new("colors", new NbtByteArray([0])),
+                new("width", new NbtShort(1)), new("height", new NbtShort(1))))));
+            SavedData("data/Village.dat", Compound(new NbtEntry("data", Compound(new NbtEntry("Features", Compound())))));
+            SavedData("data/villages_nether.dat", Compound(new NbtEntry("data", Compound(new("Villages", new NbtList(NbtType.Compound, [])),
+                new("Tick", new NbtInt(0))))));
+            using var world = Success(Run(cwd, "list", root));
+            var data = world.RootElement.GetProperty("data");
+            Require(data.GetProperty("dataVersion").ValueKind == JsonValueKind.Null && data.GetProperty("profile").GetString() == "java-classic-anvil",
+                "versionless Anvil world exposes a storage family without claiming a Minecraft version");
+            var overworld = data.GetProperty("dimensions").EnumerateArray().Single(row => row.GetProperty("id").GetString() == "minecraft:overworld");
+            Require(overworld.GetProperty("regions").EnumerateArray().Select(row => row.GetString()).SequenceEqual([region]),
+                "inactive McRegion files do not appear in the active Anvil region list");
+            using var all = Success(Run(cwd, "scan", root, "--no-cache", "--show-items"));
+            Require(all.RootElement.GetProperty("data").GetProperty("items").GetArrayLength() == 7,
+                "inactive McRegion files and classic cartography and structure state do not add text or invalidate the scan");
+            SavedData("data/map_other.dat", Compound(new NbtEntry("data", Compound(new NbtEntry("custom", new NbtString("unclassified"))))));
+            Require(Run(cwd, "scan", root, "--no-cache", "--path", "data/map_other.dat").Exit == 4,
+                "an unknown data file resembling a vanilla name remains unsupported");
+            Require(Run(cwd, "scan", root, "--no-cache", "--path", "data/map_0.dat").Exit == 0,
+                "an exact cartography data file remains readable");
+            using (var resource = File.Create(Path.Combine(root, "resources.zip"))) resource.SetLength(67_108_865);
+            var partial = Run(cwd, "list", root); using var catalog = JsonDocument.Parse(partial.Output);
+            Require(partial.Exit == 4 && catalog.RootElement.GetProperty("data").GetProperty("profile").GetString() == "java-classic-anvil",
+                "an unresolved pack must preserve the readable world catalog in the partial response");
+            using var scanned = Success(Run(cwd, "scan", root, "--no-cache", "--path", region, "--show-items"));
+            var items = scanned.RootElement.GetProperty("data").GetProperty("items").EnumerateArray().ToArray();
+            Require(items.Select(item => item.GetProperty("text").GetString()).SequenceEqual(
+                ["Read this", "\"Original encoding\"", "say Hello", "Field notes", "A writer", "\"Stored JSON page\"", "Draft page"]),
+                "classic extracted sign, command and numeric book item values are exact");
+            using var paddedChunk = Success(Run(cwd, "get", root, "--path", region, "--chunk", coords, "--pointer", "/Level/TileEntities/0/Text1"));
+            Require(paddedChunk.RootElement.GetProperty("data").GetProperty("value").GetString() == "Read this", "world-bound node reads handle classic padding");
+            Require(Run(cwd, "get", Path.Combine(root, region), "--chunk", coords, "--dimension", "minecraft:overworld").Exit == 5,
+                "unbound region reads still enforce strict NBT framing");
+            Put(root, region, Region(chunk, [0, 1]));
+            Require(Run(cwd, "scan", root, "--no-cache", "--path", region).Exit == 5, "nonzero trailing NBT data still fails for classic Anvil");
+            var write = Run(cwd, "translate", "start", root, "--state-root", Path.Combine(cwd, "state"), "--path", region, "--source-language", "en_us", "--target-language", "zh_tw");
+            Require(write.Exit == 4, "historical text whose exact grammar is unknown cannot start a writable translation session");
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(9999, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            var unknown = Run(cwd, "scan", root, "--no-cache", "--path", region);
+            Require(unknown.Exit == 4, "missing metadata support preserves its diagnosis; an out-of-scope large source cannot override it");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cwd, true); }
     }
     public static void ArgumentErrorsLocalesAndHelpMatchThePublicEntryPoint()
     {

@@ -2,6 +2,7 @@ using System.Text.Json;
 using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using NBTExplorerCLI.Minecraft;
 
 namespace NBTExplorerCLI.Cli;
 
@@ -72,20 +73,24 @@ internal static class ReadCommands
         var inventory = QuerySource.Inventory(root); var discovery = WorldDiscovery.Discover(inventory, new(SnapshotScope.All));
         if (IsResourceLimit(discovery.DiagnosticCode) || discovery.Sources.Any(source => IsResourceLimit(source.DiagnosticCode)))
             throw new CliFailure("RESOURCE_LIMIT", "World catalog exceeds a source, path, depth or byte budget");
-        if (!discovery.Complete || discovery.Metadata is null)
+        var partial = discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && !discovery.Complete;
+        if (discovery.Metadata is null || !discovery.Complete && !partial)
             throw new CliFailure(discovery.Sources.Any(source => source.Outcome == SourceOutcome.Unsupported) ? "UNSUPPORTED_SOURCE" : "INCOMPLETE_SOURCE",
                 discovery.DiagnosticCode + " " + string.Join(",", discovery.Sources.Where(source => source.Outcome is not (SourceOutcome.Success or SourceOutcome.Irrelevant)).Take(3).Select(source => source.DiagnosticCode)));
         var level = CompressedNbt.ReadDocument(inventory.Read(new(inventory.WorldId, "level.dat", ArtifactKind.Nbt)), NbtCompression.GZip).Document;
         var named = NbtLocator.Resolve(level.Root, new([PathSegment.ForKey("Data"), PathSegment.ForKey("LevelName")]));
         var dimensions = discovery.Metadata.DimensionDirectories.OrderBy(pair => pair.Value, StringComparer.Ordinal).Select(pair =>
         {
-            var files = discovery.Sources.Where(source => source.Chunk is null && source.Location.Dimension == pair.Value).ToArray();
+            var files = discovery.Sources.Where(source => source.Chunk is null && source.Location.Dimension == pair.Value
+                && source.Location.Role != WorldSourceRole.Irrelevant).ToArray();
             return new { id = pair.Value, directory = pair.Key, regions = files.Where(source => source.Location.Artifact.Kind == ArtifactKind.Region).Select(source => source.Location.Artifact.RelativePath).ToArray(),
                 entities = files.Where(source => source.Location.Artifact.Kind == ArtifactKind.Entities).Select(source => source.Location.Artifact.RelativePath).ToArray() };
         }).ToArray();
         var offset = request.Number("offset", 0, 0, 2_000_000); var limit = request.Number("limit", 100, 1, 10_000);
-        return new { representation = "world-catalog", worldId = inventory.WorldId, worldName = (named.Value as NbtString)?.Value, discovery.Metadata.DataVersion, profile = discovery.Metadata.Profile.Id,
+        var data = new { representation = "world-catalog", worldId = inventory.WorldId, worldName = (named.Value as NbtString)?.Value, discovery.Metadata.DataVersion, profile = discovery.Metadata.Profile.Id,
             dimensions = dimensions.Skip(offset).Take(limit).ToArray(), pagination = new { offset, limit, total = dimensions.Length }, catalogComplete = discovery.Complete };
+        if (partial) throw new CliFailure("UNSUPPORTED_SOURCE", "Classic Anvil catalog has unresolved sources; inspect scan diagnostics", data);
+        return data;
     }
     internal static bool IsResourceLimit(string? code)
     {

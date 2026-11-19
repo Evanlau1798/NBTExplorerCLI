@@ -3,11 +3,16 @@ using NBTExplorerCLI.Domain;
 
 namespace NBTExplorerCLI.Minecraft;
 
-public sealed record WorldMetadata(CapabilityProfile Profile, int DataVersion, int WorldGenDataVersion, ImmutableDictionary<string, string> DimensionDirectories)
+public sealed record WorldMetadata(CapabilityProfile Profile, int? DataVersion, int? WorldGenDataVersion, ImmutableDictionary<string, string> DimensionDirectories)
 {
+    public const int ClassicAnvilStorageVersion = 19133;
+
     public static WorldMetadata Read(NbtDocument level, NbtDocument? separateWorldGen = null)
     {
         ArgumentNullException.ThrowIfNull(level);
+        if (separateWorldGen is null && IsClassicAnvil(level))
+            return new(MinecraftProfiles.ClassicAnvil, null, null, ImmutableDictionary.CreateRange(StringComparer.Ordinal, new Dictionary<string, string>
+            { [""] = "minecraft:overworld", ["DIM-1"] = "minecraft:the_nether", ["DIM1"] = "minecraft:the_end" }));
         var version = Version(At(level.Root, "Data", "DataVersion"));
         var profile = MinecraftProfiles.ForDataVersion(version) ?? throw Unsupported("Unknown world DataVersion");
         var claim = At(level.Root, "Data", "Version", "Id");
@@ -48,6 +53,13 @@ public sealed record WorldMetadata(CapabilityProfile Profile, int DataVersion, i
         }
         return new(profile, version, registryVersion, roots.ToImmutable());
     }
+    public static bool IsClassicAnvil(NbtDocument level)
+        => At(level.Root, "Data", "DataVersion") is null
+            && At(level.Root, "Data", "Version") is null && At(level.Root, "Data", "WorldGenSettings") is null
+            && At(level.Root, "Data", "version") is NbtInt { Value: ClassicAnvilStorageVersion }
+            && At(level.Root, "Data", "RandomSeed") is NbtLong
+            && At(level.Root, "Data", "SpawnX") is NbtInt && At(level.Root, "Data", "SpawnZ") is NbtInt;
+
     private static bool NameCharacter(char character) => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-' or '.';
     private static int Version(NbtValue? value) => value switch
     {

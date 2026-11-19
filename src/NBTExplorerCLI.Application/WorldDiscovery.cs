@@ -60,6 +60,8 @@ public static class WorldDiscovery
             foreach (var entry in physical.Entries)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (entry.RelativePath != activeMetadata && !request.Scope.ArtifactPaths.IsEmpty
+                    && !request.Scope.ArtifactPaths.Contains(entry.RelativePath, StringComparer.Ordinal)) continue;
                 try
                 {
                     var artifact = new ArtifactAddress(inventory.WorldId, entry.RelativePath, ArtifactKind.Text);
@@ -119,6 +121,13 @@ public static class WorldDiscovery
                 continue;
             }
             if (!WorldSourceScope.Includes(location, request.Scope)) continue;
+            if (metadata.Profile == MinecraftProfiles.ClassicAnvil && entry.RelativePath == "resources.zip"
+                && (entry.Outcome == SourceOutcome.Success || entry.DiagnosticCode == "ArtifactSizeLimit"))
+            {
+                if (!WorldSourceScope.CouldIncludeRole("language", request.Scope) && !WorldSourceScope.CouldIncludeRole("pack.description", request.Scope)) continue;
+                if (!Add(new(location, null, SourceOutcome.Unsupported, "UnsupportedClassicResourcePack", null, new()))) break;
+                continue;
+            }
             if (entry.Outcome != SourceOutcome.Success)
             {
                 if (!Add(new(location, null, entry.Outcome, entry.DiagnosticCode, null, new()))) break;
@@ -151,7 +160,8 @@ public static class WorldDiscovery
                 if (location.Role == WorldSourceRole.Irrelevant)
                 {
                     rawHash = Hash256.Compute(inventory.Read(location.Artifact));
-                    if (!Add(new(location, null, SourceOutcome.Irrelevant, null, rawHash, new()))) break;
+                    var reason = location.Artifact.Kind == ArtifactKind.Region ? "InactiveMcRegion" : null;
+                    if (!Add(new(location, null, SourceOutcome.Irrelevant, reason, rawHash, new()))) break;
                     continue;
                 }
                 var bytes = inventory.Read(location.Artifact); var hash = Hash256.Compute(bytes); rawHash = hash;

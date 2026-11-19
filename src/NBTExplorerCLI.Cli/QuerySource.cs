@@ -4,6 +4,7 @@ using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Infrastructure;
+using NBTExplorerCLI.Minecraft;
 
 namespace NBTExplorerCLI.Cli;
 
@@ -63,18 +64,21 @@ internal sealed class QuerySource : IDisposable
             Chunk = new(x, z); var region = RegionPosition();
             if (Chunk.RegionX != region.X || Chunk.RegionZ != region.Z) throw new CliFailure("INVALID_ARGUMENTS", "Chunk is outside this physical region");
             Dimension = request.Get("dimension");
+            var classic = false;
             if (world)
             {
-                var discovery = WorldDiscovery.Discover(inventory, new(SnapshotScope.All));
+                var discovery = WorldDiscovery.Discover(inventory, new(new SnapshotScope([], [], [], [relative])));
                 var source = discovery.Sources.SingleOrDefault(source => source.Location.Artifact == Artifact && source.Chunk == Chunk) ?? throw new CliFailure("NOT_FOUND");
                 if (Dimension is not null && Dimension != source.Location.Dimension) throw new CliFailure("CONFLICT", "Dimension differs from the declared layout");
                 Dimension = source.Location.Dimension;
+                classic = discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && source.Location.Role == WorldSourceRole.Terrain;
             }
             if (Dimension is null) throw new CliFailure("INVALID_ARGUMENTS", "Standalone region lookup needs --dimension");
             var index = Chunk.LocalZ * 32 + Chunk.LocalX;
             if (!Region.Chunks[index].Present) throw new CliFailure("NOT_FOUND", "Region chunk is absent");
             if (Region.Chunks[index].Capability.Read != SupportLevel.Supported) throw new CliFailure("UNSUPPORTED_SOURCE", "Unsupported chunk compression");
-            var document = Region.ReadChunk(index).Document; RootName = document.Name; Root = new(document.Root); return;
+            var document = (classic ? Region.ReadClassicAnvilChunk(index) : Region.ReadChunk(index)).Document;
+            RootName = document.Name; Root = new(document.Root); return;
         }
         if (request.Flag("chunk") || request.Flag("dimension")) throw new CliFailure("INVALID_ARGUMENTS", "Chunk/dimension options require a region");
         if (kind == ArtifactKind.Json || extension == ".json")

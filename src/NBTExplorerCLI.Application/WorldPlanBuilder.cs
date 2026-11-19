@@ -27,6 +27,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     internal BoundWorldPlan Bind(WorldQuerySnapshot snapshot, IEnumerable<PatchOperation> operations)
     {
         ArgumentNullException.ThrowIfNull(snapshot); ArgumentNullException.ThrowIfNull(operations);
+        if (snapshot.Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil)
+            throw new CodecException(CodecError.UnsupportedProfile, 0, "Classic Anvil supports inspection and extraction only");
         using var bindingTrace = NBTExplorerCLI.Formats.WorkDiagnostics.Start("plan.bind", phase: "bind", worldId: inventory.WorldId);
         if (snapshot.Manifest.WorldId != inventory.WorldId) throw new ArgumentException("Snapshot belongs to another world", nameof(snapshot));
         var requested = operations.Take(100_001).ToArray();

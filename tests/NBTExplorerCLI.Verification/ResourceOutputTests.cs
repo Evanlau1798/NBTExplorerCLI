@@ -130,6 +130,11 @@ internal static class ResourceOutputTests
                 Put(world, "level.dat", [9]); var refused = false;
                 try { _ = service.Build(Request(ResourceOutputFormat.ZipPack)); } catch (CodecException) { refused = true; }
                 Require(refused && !File.Exists(Path.Combine(root, "resources.zip")), "malformed world ancestor cannot be classified as a safe external output");
+                if (!modern)
+                {
+                    Put(world, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Classic(), NbtCompression.GZip));
+                    BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => service.Build(Request(ResourceOutputFormat.ZipPack)));
+                }
             }
             finally { Directory.Delete(world, true); Directory.Delete(state, true); }
         }
