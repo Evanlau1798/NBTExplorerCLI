@@ -1,52 +1,69 @@
-# NBTExplorerCLI (nbtcli.exe) — AI Agent Complete Fast-Start Manual
+# NBTExplorerCLI (`nbtcli.exe`)
 
-> Self-contained Windows x64 CLI (`nbtcli.exe`, v1.0.0) for Minecraft Java Edition worlds: read-only NBT/region/datapack inspection, 21-role world text scanning, paginated map localization sessions, translation key & resource pack generation, and crash-recoverable offline world editing.
-> Read this file once to drive `nbtcli.exe` deterministically without needing the beginner guides.
+> Self-contained Windows x64 CLI (`nbtcli.exe`, v1.0.0) for Minecraft Java Edition worlds: read-only NBT/region/datapack inspection, 21-role world text scanning, paginated map localization sessions, translation key and resource pack generation, and crash-recoverable offline world editing. Extract the complete release ZIP and keep its files together. It includes the .NET runtime.
+> This document is structured Markdown serving as the single-source AI Agent manual (`/llms.txt` and `/llms-full.md`).
 
-## 1. Canonical URLs
+## Docs
 
-- Website (EN / zh-TW): https://nbtcli.evanlau1798.com/ | https://nbtcli.evanlau1798.com/zh-tw/
-- Docs Overview: https://nbtcli.evanlau1798.com/docs/
-- AI Agent Quickstart: https://nbtcli.evanlau1798.com/docs/ai-agents/
-- Command Reference: https://nbtcli.evanlau1798.com/docs/command-reference/
-- Support & Troubleshooting: https://nbtcli.evanlau1798.com/docs/support-and-troubleshooting/
-- Official Releases (Windows x64 ZIP): https://github.com/Evanlau1798/NBTExplorerCLI/releases
+- [AI Agent Manual (TXT)](https://nbtcli.evanlau1798.com/llms.txt): Canonical single-file structured Markdown manual at `/llms.txt`.
+- [AI Agent Manual (Markdown)](https://nbtcli.evanlau1798.com/llms-full.md): Identical structured Markdown endpoint at `/llms-full.md`.
+- [Documentation Overview (EN)](https://nbtcli.evanlau1798.com/docs/): Full user documentation index in English.
+- [Documentation Overview (zh-TW)](https://nbtcli.evanlau1798.com/zh-tw/docs/): Full user documentation index in Traditional Chinese.
+- [AI Agent Quickstart](https://nbtcli.evanlau1798.com/docs/ai-agents/): Web summary and ready-to-use agent prompts.
+- [Command Reference](https://nbtcli.evanlau1798.com/docs/command-reference/): Searchable command and flag reference.
+- [Supported Versions & Troubleshooting](https://nbtcli.evanlau1798.com/docs/support-and-troubleshooting/): Pinned profile matrix, classic Anvil limits, and error diagnosis.
+- [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases): Official Windows x64 release ZIP containing `nbtcli.exe` and its dependencies.
 
----
+## Core Invariants
 
-## 2. Hard Protocol & Safety Invariants (NEVER VIOLATE)
+1. **Single-Line JSON Contract (`stdout`)**
+   - Every invocation writes exactly one newline-delimited UTF-8 JSON object to `stdout`:
 
-1. **Single-Line JSON Contract (`stdout`)**:
-   Every invocation writes exactly ONE newline-delimited UTF-8 JSON object to `stdout`:
-   `{ "schemaFamily": "nbtcli.cli", "schemaVersion": 1, "success": bool, "command": string, "outcome": string, "data": object|null, "error": { "code", "message", "details" }|null }`
-   Always check BOTH process exit code (`$LASTEXITCODE`) AND `response.success`.
-2. **Global UI Locale (`--ui-locale`)**:
-   Accepts `zh-TW` (default) or `en-US` anywhere in argv. Changes only human-readable `error.message` and help text; never changes JSON keys, `error.code`, or translation locales (`--source-language`, `--target-language`, `--lang`, `--original-lang`, `--target-lang`).
-3. **Subcommand Help Syntax**:
-   - Root command help: `nbtcli help <cmd>` (or `nbtcli <cmd> --help`).
-   - Subcommand help: `nbtcli translate <subcmd> --help` / `nbtcli agent <subcmd> --help`.
-   - `nbtcli help translate start` is INVALID and exits with code `2`.
-4. **External Path & Pre-Created Parent Directory Rule**:
-   - NEVER place `--output`, `--plan-output`, `--state-root`, or `--cache-root` inside `<world>`.
-   - ALWAYS ensure the parent directory of `--output` / `--plan-output` exists before calling export commands (PowerShell: `New-Item -ItemType Directory -Path <dir> -Force | Out-Null`).
-   - Standalone scan cache (`scan`, `extract`, `validate`): default `%LOCALAPPDATA%\nbtcli\scan\<world-id>`.
-   - World state root (edits, sessions, backups, journals): default `%LOCALAPPDATA%\nbtcli\worlds\<world-id>` (`cache/`, `sessions/`, `agent/`, `objects/`, `journals/`).
-   - Always pass the SAME `--state-root` across related `plan`, `apply`, `status`, `recover`, `backup`, `restore`, `translate`, and `agent` calls.
-5. **World-Write Authorization & Fail-Closed Recovery**:
-   - All world-modifying operations (`apply`, `recover`, or `--apply` on `set`, `batch`, `restore`, `convert`, `translate export-lang`, `translate create-pack`) REQUIRE `--world-offline` while Minecraft and all other editors are closed.
-   - Always prefer preview -> inspect plan -> `apply --plan <file> --world-offline` on a disposable world copy.
-   - On exit code `7` (`RECOVERY_REQUIRED`) or if `data.pendingPlanHash` is returned: DO NOT open the world or start new writes. Keep `.nbtcli-pending-write` and the state root intact, run `status`, then run `recover` (forward complete) or `recover --rollback` (exit `8`).
+```json
+{
+  "schemaFamily": "nbtcli.cli",
+  "schemaVersion": 1,
+  "success": true,
+  "command": "version",
+  "outcome": "Success",
+  "data": {},
+  "error": null
+}
+```
+
+   - Always check both process exit code (`$LASTEXITCODE`) and `response.success`.
+
+2. **Global UI Locale (`--ui-locale`)**
+   - Accepts `zh-TW` (default) or `en-US` anywhere in `argv`.
+   - Changes only human-readable `error.message` and help text; never changes JSON keys, `error.code`, or translation locales (`--source-language`, `--target-language`, `--lang`, `--original-lang`, `--target-lang`).
+
+3. **Subcommand Help Syntax**
+   - Root command help: `nbtcli help <cmd>` or `nbtcli <cmd> --help`.
+   - Subcommand help: `nbtcli translate <subcmd> --help` or `nbtcli agent <subcmd> --help`.
+   - `nbtcli help translate start` is invalid and exits with code `2`.
+
+4. **External Path & Parent Directory Rules**
+   - Never place `--output`, `--plan-output`, `--state-root`, or `--cache-root` inside `<world>`.
+   - Always ensure the parent directory of `--output` / `--plan-output` exists before calling export commands (`New-Item -ItemType Directory -Path <dir> -Force | Out-Null`).
+   - Default standalone scan cache (`scan`, `extract`, `validate`): `%LOCALAPPDATA%\nbtcli\scan\<world-id>`.
+   - Default world state root (`plan`, `apply`, `status`, `recover`, `backup`, `restore`, `translate`, `agent`): `%LOCALAPPDATA%\nbtcli\worlds\<world-id>` (`cache/`, `sessions/`, `agent/`, `objects/`, `journals/`).
+   - Reuse the identical `--state-root` across related operations on the same world.
+
+5. **World-Write Authorization & Fail-Closed Recovery**
+   - All world-modifying operations (`apply`, `recover`, or `--apply` on `set`, `batch`, `restore`, `convert`, `translate export-lang`, `translate create-pack`) require `--world-offline` while Minecraft and all other editors are closed.
+   - Prefer `preview -> inspect plan -> apply --plan <file> --world-offline` on a disposable world copy.
+   - On exit code `7` (`RECOVERY_REQUIRED`) or if `data.pendingPlanHash` is returned: do not open the world or start new writes. Keep `.nbtcli-pending-write` and the state root intact, run `status`, then run `recover` (forward complete, exit `0`) or `recover --rollback` (exit `8`).
    - On `translate export-lang` and `translate create-pack`: omitting `--output` defaults to inside `<world>` (`.nbtcli.language`, world root, or `resourcepacks/` depending on profile). Pass an explicit external `--output` to keep `<world>` untouched.
-6. **Hard Resource Limits (Exit Code `6`)**:
-   64 MiB output/artifact limit; 100,000-slot session / batch operation limit; 256-segment pointer depth limit; 100 ms regex timeout (`--match-pattern`). Narrow scope with `--dimension`, `--region`, `--path`, `--types`, or smaller `--page-size` / `--page-bytes`.
 
----
+6. **Hard Resource Limits (Exit Code `6`)**
+   - 64 MiB output/artifact limit; 100,000-slot session or batch operation limit; 256-segment pointer depth limit; 100 ms regex timeout (`--match-pattern`).
+   - Narrow scope with `--dimension`, `--region`, `--path`, `--types`, or lower `--page-size` / `--page-bytes`.
 
-## 3. Exit Code Decision Table
+## Exit Codes
 
 | Code | Outcome | Agent Action |
 | :--- | :--- | :--- |
-| `0` | `Success` | Proceed. (Includes 0-match search or verified no-op.) |
+| `0` | `Success` | Proceed (includes 0-match search or verified no-op). |
 | `1` | `InternalFailure` | Inspect `error.code` and `error.details`; do not blindly retry writes. |
 | `2` | `InvalidArguments` | Fix CLI syntax/flags via `help <cmd>` or `<cmd> <subcmd> --help`. Zero disk writes occurred. |
 | `3` | `Conflict` | World or session changed since plan/page creation, ambiguous address, or `operationId` reused with different payload. Re-read/re-plan, or for stale translation sessions (`repair: "start-new-session"`) start a new session and query `translate memory`. |
@@ -57,11 +74,10 @@
 | `8` | `RolledBack` | `recover --rollback` restored verified pre-edit bytes. Distinct from `0` so scripts never confuse rollback with forward commit. |
 | `130` | `Cancelled` | Cancelled receipt. If during write, check `status` and `recover`. |
 
----
-
-## 4. Standard Operating Procedures (SOPs)
+## Standard Workflows
 
 ### SOP A: World Discovery & Read-Only Inspection
+
 ```powershell
 .\nbtcli.exe capabilities --ui-locale en-US
 .\nbtcli.exe list 'D:\WorldCopy'
@@ -69,12 +85,15 @@
 .\nbtcli.exe validate 'D:\WorldCopy' --quick
 .\nbtcli.exe scan 'D:\WorldCopy' --summary
 ```
-- Use `--pointer` (RFC 6901, escape `~` -> `~0`, `/` -> `~1`) or `--segments '[{"kind":"key","key":"Data"}]'`.
+
+- Use `--pointer` (RFC 6901: escape `~` as `~0`, `/` as `~1`) or `--segments '[{"kind":"key","key":"Data"}]'`.
 - For `.mca` region files, pass `--path 'region/r.0.0.mca' --chunk x,z` (add `--dimension minecraft:overworld` for standalone `.mca` files).
 - For ZIP entries, target the `.zip` file and pass `--entry 'assets/.../en_us.json'`.
 
 ### SOP B: Single Typed NBT Edit (Preview -> Apply)
-NEVER pass a bare string to `set`. Always extract `data.value` (`nbtcli.typed-nbt`) from `get --types`, mutate only `data.root.value`, preview with `set`, then commit with `apply`:
+
+Never pass a bare string to `set`. Always extract `data.value` (`nbtcli.typed-nbt`) from `get --types`, mutate only `data.root.value`, preview with `set`, then commit with `apply`:
+
 ```powershell
 New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
 $r = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types | ConvertFrom-Json
@@ -87,40 +106,62 @@ $val | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\val.json'
 ```
 
 ### SOP C: Multi-Node Batch Edit (`plan` / `batch`)
-Build `nbtcli.operations` (1..100,000 unique `id` items; easiest way is combining `data.operations` from single-node previews on the same world):
+
+Build `nbtcli.operations` (1..100,000 unique `id` items; seed from `data.operations` of single-node previews on the same world):
+
 ```powershell
 .\nbtcli.exe plan 'D:\WorldCopy' --request 'D:\Plans\ops.json' --output 'D:\Plans\batch-plan.json'
 .\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Plans\batch-plan.json' --world-offline --output 'D:\Plans\batch-receipt.json'
 ```
 
-### SOP D: Paginated Adventure Map Translation Loop (Core AI Workflow)
+### SOP D: Paginated Adventure Map Translation Loop
+
 1. Start session (optionally scope with `--dimension`, `--region`, `--types`, `--path`, `--match-pattern`, or `--minecraft-version`):
-   ```powershell
-   $s = .\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30 | ConvertFrom-Json
-   $sid = $s.data.status.sessionId
-   ```
+
+```powershell
+$s = .\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30 | ConvertFrom-Json
+$sid = $s.data.status.sessionId
+```
+
 2. Loop until `pending == 0`:
-   - Export page `p`: `translate export 'D:\WorldCopy' --session-id $sid --page $p --output 'D:\Translate\page.txt'`
-   - Read `data.replyTemplate` (preserving `operationId`, `sessionId`, `revision`, `snapshotId`, `page`, `pageId`, `targetLocale`, every `slotId`, and every `sourceTextHash` unchanged!).
-   - For each slot in `slots`: set `"state": "translated"` + `"text": "<translation>"`, OR `"state": "unchanged"` + `"text": null`.
-   - Submit (and optionally fetch next page in one call via `advance`):
-     `translate advance 'D:\WorldCopy' --session-id $sid --reply 'D:\Translate\reply.json'`
-   - Note: Re-submitting an identical reply with the same `operationId` is idempotent. Each accepted reply increments `revision`.
-3. Generate plan once `pending == 0` (check exact `revision` via `translate status`):
+   - Export page `p`: `translate export 'D:\WorldCopy' --session-id $sid --page $p --output 'D:\Translate\page.txt'`.
+   - Start from `data.replyTemplate`, preserving `operationId`, `sessionId`, `revision`, `snapshotId`, `page`, `pageId`, `targetLocale`, every `slotId`, and every `sourceTextHash` unchanged.
+   - For every slot in `slots`: set `"state": "translated"` + `"text": "<translation>"`, or `"state": "unchanged"` + `"text": null`.
+   - Submit (and optionally fetch the next page in one call via `advance`):
+
+```powershell
+.\nbtcli.exe translate advance 'D:\WorldCopy' --session-id $sid --reply 'D:\Translate\reply.json'
+```
+
+   - Re-submitting an identical reply with the same `operationId` is idempotent. Each accepted reply increments `revision`.
+
+3. Generate plan once `pending == 0` (confirm exact `revision` via `translate status`):
    - Direct literal replacement:
-     `translate plan 'D:\WorldCopy' --session-id $sid --revision $rev --direct --operation-id $opId --output 'D:\Translate\plan.json'`
-     (Add `--synchronize-references` ONLY if intentionally translating identifying entity/armor-stand `CustomName` referenced by `@e[name=...]`; fails closed if ambiguous.)
+
+```powershell
+.\nbtcli.exe translate plan 'D:\WorldCopy' --session-id $sid --revision $rev --direct --operation-id $opId --output 'D:\Translate\plan.json'
+```
+
+     Add `--synchronize-references` only if intentionally translating identifying entity/armor-stand `CustomName` referenced by `@e[name=...]` (fails closed if ambiguous).
+
    - Translation keys + language file:
-     `translate plan 'D:\WorldCopy' --session-id $sid --revision $rev --keys --prefix map. --language-output 'resources.zip#assets/adventure/lang/zh_tw.json' --operation-id $opId --output 'D:\Translate\plan.json'`
-4. Apply offline & seal session using exact `revision`, `operationId`, and `planHash`:
-   ```powershell
-   .\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Translate\plan.json' --world-offline --output 'D:\Translate\receipt.json'
-   $planHash = (Get-Content -Raw 'D:\Translate\plan.json' | ConvertFrom-Json).data.planHash
-   .\nbtcli.exe translate seal 'D:\WorldCopy' --session-id $sid --revision $rev --operation-id $opId --plan-hash $planHash
-   ```
+
+```powershell
+.\nbtcli.exe translate plan 'D:\WorldCopy' --session-id $sid --revision $rev --keys --prefix map. --language-output 'resources.zip#assets/adventure/lang/zh_tw.json' --operation-id $opId --output 'D:\Translate\plan.json'
+```
+
+4. Apply offline and seal session using exact `revision`, `operationId`, and `planHash`:
+
+```powershell
+.\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Translate\plan.json' --world-offline --output 'D:\Translate\receipt.json'
+$planHash = (Get-Content -Raw 'D:\Translate\plan.json' | ConvertFrom-Json).data.planHash
+.\nbtcli.exe translate seal 'D:\WorldCopy' --session-id $sid --revision $rev --operation-id $opId --plan-hash $planHash
+```
 
 ### SOP E: Standalone Language Files or Resource Pack (No Gameplay NBT Edits)
-Does NOT edit gameplay NBT and does NOT seal the session. Always pass external `--output` + `--plan-output` (and `--pack-format` for external `create-pack`):
+
+Does not edit gameplay NBT and does not seal the session. Always pass external `--output` + `--plan-output` (and `--pack-format` for external `create-pack`):
+
 ```powershell
 New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
 .\nbtcli.exe translate create-pack 'D:\WorldCopy' --session-id $sid --revision $rev `
@@ -129,141 +170,232 @@ New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
   --merge 'D:\BaseAssets\base-pack.zip' `
   --output 'D:\Exports\Packs' --plan-output 'D:\Plans\pack-plan.json'
 ```
-- Add `--apply --world-offline` to write directly, OR apply the saved plan using the exact `commitArguments` returned by the preview JSON (important when the `--output` subdirectory did not yet exist at preview time).
+
+- Add `--apply --world-offline` to write directly, or apply the saved plan using the exact `commitArguments` returned by the preview JSON (required when the `--output` subdirectory did not yet exist at preview time).
 
 ### SOP F: Classic Anvil Worlds (No `DataVersion`, Storage Version `19133`)
+
 - Read-only inspection works automatically (`java-classic-anvil`).
-- For translation/direct edits on known classic versions, pass `--minecraft-version <1.2.5|1.5.2|1.6.4|1.8.1>` to `scan`, `extract`, `validate`, or `translate start` (retained by session & direct plan).
-- Limits & scope:
+- For translation or direct edits on known classic versions, pass `--minecraft-version <1.2.5|1.5.2|1.6.4|1.8.1>` to `scan`, `extract`, `validate`, or `translate start` (retained by session and direct plan).
+- Version limits and scope:
   - `1.2.5`: vanilla signs only (plain text, max 15 UTF-16 code units/line, no line breaks).
   - `1.5.2`, `1.6.4`: signs (15 units/line, no breaks), plain-text books (title <= 16, page <= 256), scoreboard display names (<= 32), team prefix/suffix (<= 16), display fields, recognized command text.
   - `1.8.1`: JSON signs/books, display fields, recognized command text.
-  - Keep entity selector identifier names unchanged. Use `--types` to skip bundled classic resource packs if out of scope.
+- Keep entity selector identifier names unchanged. Use `--types` to exclude bundled classic resource packs when out of scope.
 
 ### SOP G: Backup & Restore
+
 ```powershell
 New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
 .\nbtcli.exe backup 'D:\WorldCopy' --suffix before-edit --output 'D:\Backups\manifest.json'
-# Preview restore (whole world or single --path level.dat):
 .\nbtcli.exe restore 'D:\WorldCopy' --manifest-hash <sha256> --output 'D:\Backups\restore-plan.json'
 .\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Backups\restore-plan.json' --world-offline
 ```
-- The manifest JSON is only an index; actual file bytes live in `<stateRoot>\objects\`. Retain both `manifestHash` and `stateRoot`.
+
+- The manifest JSON is only an index; actual file bytes live in `<stateRoot>\objects\`. Retain both `manifestHash` and `stateRoot`. Add `--path level.dat` to `restore` for single-file restoration.
 
 ### SOP H: Interrupted Write Recovery (Exit Code `7`)
+
 ```powershell
-# 1. Keep Minecraft CLOSED. Check journal state with same world, planHash (or data.pendingPlanHash), and stateRoot:
+# 1. Keep Minecraft CLOSED. Inspect journal state with identical world, planHash (or data.pendingPlanHash), and stateRoot:
 .\nbtcli.exe status 'D:\WorldCopy' --plan-hash <sha256>
-# 2. Review phase, receipt, journalMayBeAbsent, receiptIsTerminal, and repair guidance.
-# 3a. Complete forward (exits 0):
+
+# 2a. Complete forward (exits 0):
 .\nbtcli.exe recover 'D:\WorldCopy' --plan-hash <sha256> --world-offline
-# 3b. OR roll back byte-for-byte to pre-edit state (exits 8):
+
+# 2b. OR roll back byte-for-byte to pre-edit state (exits 8):
 .\nbtcli.exe recover 'D:\WorldCopy' --plan-hash <sha256> --rollback --world-offline
 ```
+
+- Review `phase`, `receipt`, `journalMayBeAbsent`, `receiptIsTerminal`, and repair guidance before choosing forward recovery or rollback.
 - Never interpret `journalMayBeAbsent: true` or `receiptIsTerminal: false` as "nothing was written" without investigating first.
 - If a prior `Conflict` blocks new writes, restore the plan's verified preimages offline and re-run `recover --rollback` to clear the block.
 
----
-
-## 5. Complete Command Surface (`nbtcli.command-surface` v1)
+## Command Reference
 
 Global option on every command: `--ui-locale <zh-TW|en-US>`. Option alias: `-h` -> `--help`. Root aliases: `--help`/`-h` -> `help`, `--version`/`-v` -> `version`. Use `--` before paths starting with `-`.
 
 ### Inspection & Scanning (Read-Only)
-- `help [cmd]` — `--help --ui-locale`
-- `version` — `--help --ui-locale`
-- `capabilities` — `--help --ui-locale`
-- `get <target>` — `--path --pointer --segments --chunk --dimension --entry --compression --types --help --ui-locale`
-- `list <target>` — `--path --pointer --segments --chunk --dimension --entry --compression --types --limit --offset --help --ui-locale`
-- `search <target>` — `--path --pointer --segments --chunk --dimension --entry --compression --types --limit --offset --query --name --type --help --ui-locale`
-- `scan <world>` — `--path --dimension --region --types --limit --offset --summary --show-items --refresh --no-cache --cache-root --workers --verbose --debug --minecraft-version --help --ui-locale`
-- `extract <world>` — `--path --dimension --region --types --limit --offset --all --unique --match-pattern --output --refresh --no-cache --cache-root --workers --verbose --debug --minecraft-version --help --ui-locale`
-- `validate <world>` — `--path --dimension --region --types --limit --offset --quick --refresh --no-cache --cache-root --workers --verbose --debug --minecraft-version --help --ui-locale`
-- `status <world>` — `--plan-hash --state-root --output --help --ui-locale`
-- `backup <world>` — `--path --suffix --state-root --output --help --ui-locale`
+
+| Command | Supported Flags |
+| :--- | :--- |
+| `help [cmd]` | `--help --ui-locale` |
+| `version` | `--help --ui-locale` |
+| `capabilities` | `--help --ui-locale` |
+| `get <target>` | `--path --pointer --segments --chunk --dimension --entry --compression --types --help --ui-locale` |
+| `list <target>` | `--path --pointer --segments --chunk --dimension --entry --compression --types --limit --offset --help --ui-locale` |
+| `search <target>` | `--path --pointer --segments --chunk --dimension --entry --compression --types --limit --offset --query --name --type --help --ui-locale` |
+| `scan <world>` | `--path --dimension --region --types --limit --offset --summary --show-items --refresh --no-cache --cache-root --workers --verbose --debug --minecraft-version --help --ui-locale` |
+| `extract <world>` | `--path --dimension --region --types --limit --offset --all --unique --match-pattern --output --refresh --no-cache --cache-root --workers --verbose --debug --minecraft-version --help --ui-locale` |
+| `validate <world>` | `--path --dimension --region --types --limit --offset --quick --refresh --no-cache --cache-root --workers --verbose --debug --minecraft-version --help --ui-locale` |
+| `status <world>` | `--plan-hash --state-root --output --help --ui-locale` |
+| `backup <world>` | `--path --suffix --state-root --output --help --ui-locale` |
 
 ### Preview, Editing & Recovery
-- `set <world>` — `--path --pointer --segments --chunk --dimension --compression --value --value-file --operation-id --apply --world-offline --state-root --output --help --ui-locale`
-- `batch <ops.json|->` — `--world --apply --world-offline --state-root --output --help --ui-locale`
-- `plan <world>` — `--request --state-root --output --help --ui-locale`
-- `apply <world>` — `--plan --world-offline --state-root --output --help --ui-locale`
-- `recover <world>` — `--plan-hash --world-offline --rollback --state-root --output --help --ui-locale`
-- `restore <world>` — `--manifest-hash --path --apply --world-offline --state-root --output --help --ui-locale`
-- `convert <world>` — `--lang --prefix --keepdup --no-backup --language-output --apply --world-offline --state-root --output --path --dimension --region --types --match-pattern --workers --verbose --help --ui-locale`
+
+| Command | Supported Flags |
+| :--- | :--- |
+| `set <world>` | `--path --pointer --segments --chunk --dimension --compression --value --value-file --operation-id --apply --world-offline --state-root --output --help --ui-locale` |
+| `batch <ops.json\|->` | `--world --apply --world-offline --state-root --output --help --ui-locale` |
+| `plan <world>` | `--request --state-root --output --help --ui-locale` |
+| `apply <world>` | `--plan --world-offline --state-root --output --help --ui-locale` |
+| `recover <world>` | `--plan-hash --world-offline --rollback --state-root --output --help --ui-locale` |
+| `restore <world>` | `--manifest-hash --path --apply --world-offline --state-root --output --help --ui-locale` |
+| `convert <world>` | `--lang --prefix --keepdup --no-backup --language-output --apply --world-offline --state-root --output --path --dimension --region --types --match-pattern --workers --verbose --help --ui-locale` |
 
 ### `translate` Subcommands
-- `translate start <world>` — `--session-id --state-root --output --source-language --target-language --operation-id --page-size --page-bytes --match-pattern --types --path --dimension --region --standalone --no-group --minecraft-version --help --ui-locale`
-- `translate status <world>` — `--session-id --state-root --output --help --ui-locale`
-- `translate export <world>` — `--session-id --state-root --output --page --operation-id --no-group --help --ui-locale`
-- `translate advance <world>` — `--session-id --state-root --output --reply --no-group --help --ui-locale`
-- `translate submit <world>` — `--session-id --state-root --output --reply --no-group --help --ui-locale`
-- `translate get <world>` — `--session-id --state-root --output --slot-id --help --ui-locale`
-- `translate jump <world>` — `--session-id --state-root --output --request --help --ui-locale`
-- `translate note <world>` — `--session-id --state-root --output --request --limit --offset --help --ui-locale`
-- `translate glossary <world>` — `--session-id --state-root --output --request --limit --offset --help --ui-locale`
-- `translate reset <world>` — `--session-id --state-root --output --request --confirm --help --ui-locale`
-- `translate groups <world>` — `--session-id --state-root --output --limit --offset --help --ui-locale`
-- `translate memory <world>` — `--session-id --state-root --output --slot-id --source-sessions --glossary-version --limit --offset --help --ui-locale`
-- `translate plan <world>` — `--session-id --state-root --output --direct --keys --prefix --language-output --revision --operation-id --synchronize-references --help --ui-locale`
-- `translate export-lang <world>` — `--session-id --state-root --output --revision --original-lang --target-lang --prefix --plan-output --apply --world-offline --help --ui-locale`
-- `translate create-pack <world>` — `--session-id --state-root --output --revision --original-lang --target-lang --prefix --plan-output --apply --world-offline --name --format --merge --pack-format --help --ui-locale`
-- `translate seal <world>` — `--session-id --state-root --output --revision --operation-id --plan-hash --help --ui-locale`
-- `translate help` — `--help --ui-locale`
+
+| Subcommand | Supported Flags |
+| :--- | :--- |
+| `translate start <world>` | `--session-id --state-root --output --source-language --target-language --operation-id --page-size --page-bytes --match-pattern --types --path --dimension --region --standalone --no-group --minecraft-version --help --ui-locale` |
+| `translate status <world>` | `--session-id --state-root --output --help --ui-locale` |
+| `translate export <world>` | `--session-id --state-root --output --page --operation-id --no-group --help --ui-locale` |
+| `translate advance <world>` | `--session-id --state-root --output --reply --no-group --help --ui-locale` |
+| `translate submit <world>` | `--session-id --state-root --output --reply --no-group --help --ui-locale` |
+| `translate get <world>` | `--session-id --state-root --output --slot-id --help --ui-locale` |
+| `translate jump <world>` | `--session-id --state-root --output --request --help --ui-locale` |
+| `translate note <world>` | `--session-id --state-root --output --request --limit --offset --help --ui-locale` |
+| `translate glossary <world>` | `--session-id --state-root --output --request --limit --offset --help --ui-locale` |
+| `translate reset <world>` | `--session-id --state-root --output --request --confirm --help --ui-locale` |
+| `translate groups <world>` | `--session-id --state-root --output --limit --offset --help --ui-locale` |
+| `translate memory <world>` | `--session-id --state-root --output --slot-id --source-sessions --glossary-version --limit --offset --help --ui-locale` |
+| `translate plan <world>` | `--session-id --state-root --output --direct --keys --prefix --language-output --revision --operation-id --synchronize-references --help --ui-locale` |
+| `translate export-lang <world>` | `--session-id --state-root --output --revision --original-lang --target-lang --prefix --plan-output --apply --world-offline --help --ui-locale` |
+| `translate create-pack <world>` | `--session-id --state-root --output --revision --original-lang --target-lang --prefix --plan-output --apply --world-offline --name --format --merge --pack-format --help --ui-locale` |
+| `translate seal <world>` | `--session-id --state-root --output --revision --operation-id --plan-hash --help --ui-locale` |
+| `translate help` | `--help --ui-locale` |
 
 ### `agent` Subcommands (Local Preferences Only, No Network)
-- `agent setup <world>` — `--state-root --output --source-language --target-language --operation-id --help --ui-locale`
-- `agent submit <world>` — `--state-root --output --request --help --ui-locale`
-- `agent status <world>` — `--state-root --output --help --ui-locale`
-- `agent help` — `--help --ui-locale`
 
----
+| Subcommand | Supported Flags |
+| :--- | :--- |
+| `agent setup <world>` | `--state-root --output --source-language --target-language --operation-id --help --ui-locale` |
+| `agent submit <world>` | `--state-root --output --request --help --ui-locale` |
+| `agent status <world>` | `--state-root --output --help --ui-locale` |
+| `agent help` | `--help --ui-locale` |
 
-## 6. Input JSON Schema Families (`schemaVersion: 1`)
+## Input JSON Schemas
 
 All JSON inputs accept a file path or `-` for `stdin`. Exact `schemaFamily` and `schemaVersion: 1` are enforced.
 
-1. **`nbtcli.typed-nbt`** (`set --value` / `--value-file`):
-   `{ "schemaFamily": "nbtcli.typed-nbt", "schemaVersion": 1, "data": { "name": "", "root": { "tag": "string", "value": "New Title" } } }`
-   (Always obtain from `get --types` -> `data.value` to preserve exact numeric widths & raw float bits.)
-2. **`nbtcli.operations`** (`plan --request` / `batch <file>`):
-   `{ "schemaFamily": "nbtcli.operations", "schemaVersion": 1, "data": { "operations": [ ... ] } }`
-   (1..100,000 operations with unique `id`; seed from `data.operations` of a `set` preview.)
-3. **`nbtcli.patch-plan`** (`apply --plan`):
-   Immutable plan generated by `set`, `plan`, `batch`, `restore`, `convert`, `translate plan`, `translate export-lang --plan-output`, `translate create-pack --plan-output`. Never hand-edit.
-4. **`nbtcli.session-reply`** (`translate submit --reply` / `translate advance --reply`):
-   `{ "schemaFamily": "nbtcli.session-reply", "schemaVersion": 1, "data": { "operationId": "<guid>", "sessionId": "<guid>", "revision": 0, "snapshotId": "<sha256>", "page": 0, "pageId": "<sha256>", "targetLocale": "zh_tw", "slots": [{ "slotId": "<sha256>", "sourceTextHash": "<sha256>", "state": "translated", "text": "..." }] } }`
-   (Always start from `data.replyTemplate` returned by `translate export`. Keep all slots; use `"state": "unchanged", "text": null` to keep original text.)
-5. **`nbtcli.session-command`** (`translate jump|note|glossary|reset --request`):
-   `{ "schemaFamily": "nbtcli.session-command", "schemaVersion": 1, "data": { "operationId": "<guid>", "sessionId": "<guid>", "revision": 1, "kind": "glossary", "page": null, "slotId": null, "text": "...", "source": "...", "origin": "translator", "confirmed": false, "resetSlots": [] } }`
-6. **`nbtcli.agent-questionnaire`** (`agent submit --request`):
-   Generate with `agent setup <world> --output <file>`, fill `configuration.agentName` and preferences, retain world ID / revision / operationId, then submit.
+### 1. `nbtcli.typed-nbt` (`set --value` / `--value-file`)
 
----
+Always obtain from `get --types` -> `data.value` to preserve exact numeric widths and raw float bits:
 
-## 7. Supported Profiles & 21 World Text Roles
+```json
+{
+  "schemaFamily": "nbtcli.typed-nbt",
+  "schemaVersion": 1,
+  "data": {
+    "name": "",
+    "root": {
+      "tag": "string",
+      "value": "New Title"
+    }
+  }
+}
+```
+
+### 2. `nbtcli.operations` (`plan --request` / `batch <file>`)
+
+1..100,000 operations with unique `id`; seed from `data.operations` of a `set` preview:
+
+```json
+{
+  "schemaFamily": "nbtcli.operations",
+  "schemaVersion": 1,
+  "data": {
+    "operations": []
+  }
+}
+```
+
+### 3. `nbtcli.patch-plan` (`apply --plan`)
+
+Immutable plan generated by `set`, `plan`, `batch`, `restore`, `convert`, `translate plan`, `translate export-lang --plan-output`, or `translate create-pack --plan-output`. Never hand-edit.
+
+### 4. `nbtcli.session-reply` (`translate submit --reply` / `translate advance --reply`)
+
+Always start from `data.replyTemplate` returned by `translate export`. Keep every slot; use `"state": "unchanged", "text": null` to preserve original text:
+
+```json
+{
+  "schemaFamily": "nbtcli.session-reply",
+  "schemaVersion": 1,
+  "data": {
+    "operationId": "<guid>",
+    "sessionId": "<guid>",
+    "revision": 0,
+    "snapshotId": "<sha256>",
+    "page": 0,
+    "pageId": "<sha256>",
+    "targetLocale": "zh_tw",
+    "slots": [
+      {
+        "slotId": "<sha256>",
+        "sourceTextHash": "<sha256>",
+        "state": "translated",
+        "text": "..."
+      }
+    ]
+  }
+}
+```
+
+### 5. `nbtcli.session-command` (`translate jump|note|glossary|reset --request`)
+
+```json
+{
+  "schemaFamily": "nbtcli.session-command",
+  "schemaVersion": 1,
+  "data": {
+    "operationId": "<guid>",
+    "sessionId": "<guid>",
+    "revision": 1,
+    "kind": "glossary",
+    "page": null,
+    "slotId": null,
+    "text": "...",
+    "source": "...",
+    "origin": "translator",
+    "confirmed": false,
+    "resetSlots": []
+  }
+}
+```
+
+### 6. `nbtcli.agent-questionnaire` (`agent submit --request`)
+
+Generate with `agent setup <world> --output <file>`, fill `configuration.agentName` and preferences, retain world ID / revision / operationId, then submit.
+
+## Supported Versions & Text Roles
 
 ### Pinned Modern Profiles (`capabilities`)
-- `java-1.20.4`: `DataVersion 3700` | resource `pack_format 22` | datapack `26` | `java-text-json (v1)` | `java-pack-plural`
-- `java-1.21`: `DataVersion 3953` | resource `pack_format 34` | datapack `48` | `java-text-json (v1)` | `java-pack-singular`
-- `java-1.21.5`: `DataVersion 4325` | resource `pack_format 55` | datapack `71` | `java-text-nbt (v1)` | `java-pack-singular`
-- `java-1.21.11`: `DataVersion 4671` | resource `pack_format 75` | datapack `94.1` | `java-text-nbt (v2)` | `java-pack-singular`
-- `java-26.1-snapshot-6`: `DataVersion 4774` | resource `pack_format 80` | datapack `99` | `java-text-nbt (v2)` | `java-dimensions-namespaced`
+
+| Profile | `DataVersion` | Resource `pack_format` | Datapack Format | Text Schema | Pack / Layout |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `java-1.20.1` | `3465` | `15` | `15` | `java-text-json (v1)` | `java-pack-plural` |
+| `java-1.20.4` | `3700` | `22` | `26` | `java-text-json (v1)` | `java-pack-plural` |
+| `java-1.21` | `3953` | `34` | `48` | `java-text-json (v1)` | `java-pack-singular` |
+| `java-1.21.5` | `4325` | `55` | `71` | `java-text-nbt (v1)` | `java-pack-singular` |
+| `java-1.21.11` | `4671` | `75` | `94.1` | `java-text-nbt (v2)` | `java-pack-singular` |
+| `java-26.1-snapshot-6` | `4774` | `80` | `99` | `java-text-nbt (v2)` | `java-dimensions-namespaced` |
 
 ### Classic Anvil Profiles (No `DataVersion`, Storage `19133`)
+
 - `java-classic-anvil` (read-only automatic)
 - `--minecraft-version`: `1.2.5` (signs), `1.5.2`, `1.6.4`, `1.8.1` (signs, books, display fields, recognized command text)
 
 ### 21 Text Role Names (`--types`)
+
 `Sign`, `HangingSign`, `ContainerName`, `CommandBlock`, `Book`, `LecternBook`, `Title`, `Author`, `ItemName`, `ItemLore`, `ArmorStand`, `EntityName`, `TextDisplay`, `BossBar`, `ScoreboardTeam`, `ScoreboardObjective`, `McFunction`, `Advancement`, `CommandStorage`, `LangKey`, `TranslationKey`
 
----
+## Common Pitfalls
 
-## 8. Common Agent Pitfalls Checklist
-
-- Do NOT run `nbtcli help translate start` -> use `nbtcli translate start --help`.
-- Do NOT write `--output` inside `<world>` or into a non-existent parent directory.
-- Do NOT hand-construct `set` values without `nbtcli.typed-nbt` envelope from `get --types`.
-- Do NOT omit `--output` on `translate export-lang` / `create-pack` if you expect `<world>` to remain untouched.
-- Do NOT drop unchanged slots from `nbtcli.session-reply` — every slot in the exported page must be present (`"translated"` or `"unchanged"`).
-- Do NOT assume readable == writable or that CLI validation replaces testing in the matching Minecraft client.
-- Do NOT modify identifying entity/armor-stand `CustomName` without checking command selector references (`--synchronize-references` in `translate plan --direct`).
+- Do not run `nbtcli help translate start`; use `nbtcli translate start --help`.
+- Do not write `--output` inside `<world>` or into a non-existent parent directory.
+- Do not hand-construct `set` values without the `nbtcli.typed-nbt` envelope from `get --types`.
+- Do not omit `--output` on `translate export-lang` or `create-pack` if `<world>` must remain untouched.
+- Do not drop unchanged slots from `nbtcli.session-reply`; every slot in the exported page must be present (`"translated"` or `"unchanged"`).
+- Do not assume readable implies writable, or that CLI validation replaces testing in the matching Minecraft client.
+- Do not modify identifying entity/armor-stand `CustomName` without checking command selector references (`--synchronize-references` in `translate plan --direct`).

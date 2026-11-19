@@ -1,18 +1,56 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 108 108" fill="none" role="img" aria-label="NBTExplorerCLI Grass-to-Digital Voxel Logo">
+  <style>
+    .badge-bg { fill: url(#c1-bg); }
+    .badge-border { stroke: #1E293B; }
+    .face-left { fill: url(#c1-left); }
+    .face-right { fill: url(#c1-right); }
+    .glyph-gt { stroke: #F8FAFC; }
+    .glyph-underscore { stroke: #6AA04C; }
+    .glyph-brace { stroke: #38BDF8; }
+    .glyph-colon { fill: #7DD3FC; }
+    .glyph-key { stroke: #6AA04C; }
+    .glyph-val { stroke: #E2E8F0; }
+    @media (prefers-color-scheme: light) {
+      .badge-bg { fill: url(#c1-bg-light); }
+      .badge-border { stroke: #CBD5E1; }
+      .face-left { fill: url(#c1-left-light); }
+      .face-right { fill: url(#c1-right-light); }
+      .glyph-gt { stroke: #0F172A; }
+      .glyph-underscore { stroke: #4A7734; }
+      .glyph-brace { stroke: #0284C7; }
+      .glyph-colon { fill: #0369A1; }
+      .glyph-key { stroke: #4A7734; }
+      .glyph-val { stroke: #334155; }
+    }
+  </style>
   <defs>
     <linearGradient id="c1-bg" x1="16" y1="8" x2="112" y2="120" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#0F172A"/>
       <stop offset="100%" stop-color="#080C12"/>
+    </linearGradient>
+    <linearGradient id="c1-bg-light" x1="16" y1="8" x2="112" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F1F5F9"/>
     </linearGradient>
     <linearGradient id="c1-left" x1="22" y1="40" x2="64" y2="112" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#142235"/>
       <stop offset="45%" stop-color="#0E1929"/>
       <stop offset="100%" stop-color="#080F1A"/>
     </linearGradient>
+    <linearGradient id="c1-left-light" x1="22" y1="40" x2="64" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F8FAFC"/>
+      <stop offset="52%" stop-color="#EFF6FF"/>
+      <stop offset="100%" stop-color="#DBEAFE"/>
+    </linearGradient>
     <linearGradient id="c1-right" x1="64" y1="40" x2="106" y2="112" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#111D2E"/>
       <stop offset="45%" stop-color="#0C1523"/>
       <stop offset="100%" stop-color="#070C15"/>
+    </linearGradient>
+    <linearGradient id="c1-right-light" x1="64" y1="40" x2="106" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F1F5F9"/>
+      <stop offset="52%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#BAE6FD"/>
     </linearGradient>
     <!-- Top-to-Bottom Grid Fade (?潛??曹??唬?瞍詨惜瞍貊) -->
     <linearGradient id="top-grid-fade" x1="0" y1="0" x2="12" y2="12" gradientUnits="userSpaceOnUse">
@@ -59,12 +97,12 @@
   </defs>
 
   <!-- Outer Precision Badge (No Corner Brackets, No Floating Background Particles) -->
-  <rect x="11" y="11" width="106" height="106" rx="18" fill="url(#c1-bg)"/>
-  <rect x="12" y="12" width="104" height="104" rx="17" stroke="#1E293B" stroke-width="1.4"/>
+  <rect class="badge-bg" x="11" y="11" width="106" height="106" rx="18"/>
+  <rect class="badge-border" x="12" y="12" width="104" height="104" rx="17" stroke-width="1.4"/>
 
-  <!-- 1. Left & Right Digital Obsidian Base Faces -->
-  <path d="M22 40L64 64V112L22 88V40Z" fill="url(#c1-left)"/>
-  <path d="M64 64L106 40V88L64 112V64Z" fill="url(#c1-right)"/>
+  <!-- 1. Left & Right Digital Obsidian / Light Slate Base Faces -->
+  <path class="face-left" d="M22 40L64 64V112L22 88V40Z"/>
+  <path class="face-right" d="M64 64L106 40V88L64 112V64Z"/>
 
   <!-- 2. Left & Right Voxel Grass Overhang + Dissolving Earth + Conversion Particles -->
   <g clip-path="url(#left-clip)">
@@ -370,19 +408,19 @@
   </g>
 
   <!-- 4. Lower-Left CLI Prompt >_ -->
-  <path d="M30.92 68.5L38.63 81.42L30.92 85.5" stroke="#F8FAFC" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M43 92.4L54.9 99.2" stroke="#6AA04C" stroke-width="3.5" stroke-linecap="round"/>
+  <path class="glyph-gt" d="M30.92 68.5L38.63 81.42L30.92 85.5" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="glyph-underscore" d="M43 92.4L54.9 99.2" stroke-width="3.5" stroke-linecap="round"/>
 
   <!-- 5. Lower-Right JSON Structured Output { : } -->
   <g>
-    <path d="M75.72 80.5L73.56 81.74Q72.58 82.3 72.58 83.42L72.58 87.62L70.13 92.7L72.58 94.98L72.58 99.35Q72.58 100.3 73.56 99.74L75.72 98.5" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M94.28 87.9L96.44 86.66Q97.43 86.1 97.43 84.98L97.43 80.78L99.88 75.7L97.43 73.42L97.43 69.05Q97.43 68.1 96.44 68.66L94.28 69.9" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="glyph-brace" d="M75.72 80.5L73.56 81.74Q72.58 82.3 72.58 83.42L72.58 87.62L70.13 92.7L72.58 94.98L72.58 99.35Q72.58 100.3 73.56 99.74L75.72 98.5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="glyph-brace" d="M94.28 87.9L96.44 86.66Q97.43 86.1 97.43 84.98L97.43 80.78L99.88 75.7L97.43 73.42L97.43 69.05Q97.43 68.1 96.44 68.66L94.28 69.9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     <g transform="matrix(0.875, -0.5, 0, 1, 64, 64)">
-      <circle cx="18.6" cy="29.4" r="1.75" fill="#7DD3FC"/>
-      <circle cx="18.6" cy="35.0" r="1.75" fill="#7DD3FC"/>
+      <circle class="glyph-colon" cx="18.6" cy="29.4" r="1.75"/>
+      <circle class="glyph-colon" cx="18.6" cy="35.0" r="1.75"/>
     </g>
-    <path d="M84.83 81.5L91.47 77.7" stroke="#6AA04C" stroke-width="2.4" stroke-linecap="round"/>
-    <path d="M84.83 87.1L89.55 84.4" stroke="#E2E8F0" stroke-width="2.4" stroke-linecap="round"/>
+    <path class="glyph-key" d="M84.83 81.5L91.47 77.7" stroke-width="2.4" stroke-linecap="round"/>
+    <path class="glyph-val" d="M84.83 87.1L89.55 84.4" stroke-width="2.4" stroke-linecap="round"/>
   </g>
 
   <!-- 6. Continuous Unbroken Inner Y-Spine & Outer Hexagonal Frame (Zero Line-Start Trace) -->

@@ -50,9 +50,9 @@
 
 ### 1. Download and Unzip
 
-1. Open [GitHub Releases][releases-url] and download **`nbtcli-win-x64.zip`**.
+1. Open [GitHub Releases][releases-url] and download the latest release **`.zip`** (packaged as a `.zip` so browsers like Chrome do not block direct `.exe` downloads).
 2. Right-click the ZIP file and select **Extract All...** to a folder such as `C:\Tools\nbtcli`.
-3. Keep `nbtcli.exe` together with all extracted `.dll` and `.json` files in that same folder (do not move `nbtcli.exe` out by itself).
+3. Run `nbtcli.exe` from the extracted folder and keep its bundled files together. The ZIP includes the .NET runtime.
 
 ### 2. Open PowerShell in That Folder
 
@@ -141,9 +141,9 @@ Looking for ready-to-copy recipes? See **[Common Tasks (Recipes)][doc-recipes]**
 
 ## Using with AI Agents
 
-`nbtcli.exe` is designed to work seamlessly with AI assistants (Claude, ChatGPT, Codex, Cursor, etc.). Instead of reading the beginner guides, point your AI agent directly to our complete, high-density machine-friendly manual:
+`nbtcli.exe` is designed to work seamlessly with AI assistants (Claude, ChatGPT, Codex, Cursor, etc.). Instead of reading through every user guide, point your AI agent directly to our complete, high-density machine-friendly manual:
 
-- **Online Agent Manual (`llms.txt`)**: [https://nbtcli.evanlau1798.com/llms.txt][llms-url]
+- **Online Agent Manual (`llms.txt`)**: [https://nbtcli.evanlau1798.com/llms.txt][llms-url] (structured Markdown mirror: [https://nbtcli.evanlau1798.com/llms-full.md][llms-md-url])
 - **In-Repository File**: [`docs/public/llms.txt`](docs/public/llms.txt)
 - **Web Guide & Copy-Paste Prompts**: **[AI Agent Quickstart][doc-ai-agents]**
 
@@ -160,7 +160,7 @@ All guides are available in **English** and **Traditional Chinese (繁體中文)
 | Overview | [Documentation Overview][docs-en] | [工具總覽][docs-zh] |
 | Install & First Run | [Install & First Run][doc-getting-started] | [下載安裝與初次使用][doc-zh-getting-started] |
 | Common Tasks | [Common Tasks (Recipes)][doc-recipes] | [常見任務速查][doc-zh-recipes] |
-| FAQ & Glossary | [FAQ & Plain-Language Glossary][doc-faq] | [常見問題與名詞白話詞典][doc-zh-faq] |
+| FAQ & Glossary | [FAQ & Glossary][doc-faq] | [常見問題與名詞詞典][doc-zh-faq] |
 | Map Translation | [Map Translation Guide][doc-translation] | [冒險地圖翻譯教學][doc-zh-translation] |
 | Resource Packs | [Resource Packs & Language Files][doc-resources] | [資源包與語言檔輸出][doc-zh-resources] |
 | Editing & Recovery | [Editing Worlds & Crash Recovery][doc-safe-editing] | [安全修改存檔與中斷復原][doc-zh-safe-editing] |
@@ -191,6 +191,7 @@ Released under the [MIT License](LICENSE). Bundled third-party components retain
 [docs-en]: https://nbtcli.evanlau1798.com/docs/
 [docs-zh]: https://nbtcli.evanlau1798.com/zh-tw/docs/
 [llms-url]: https://nbtcli.evanlau1798.com/llms.txt
+[llms-md-url]: https://nbtcli.evanlau1798.com/llms-full.md
 [doc-getting-started]: https://nbtcli.evanlau1798.com/docs/getting-started/
 [doc-recipes]: https://nbtcli.evanlau1798.com/docs/recipes/
 [doc-faq]: https://nbtcli.evanlau1798.com/docs/faq/

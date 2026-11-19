@@ -11,8 +11,6 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 ## 任務 1：查這張地圖是哪一個 Minecraft 版本
 
-<SafetyBanner tier="safe" lang="zh-tw" />
-
 ```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 ```
@@ -67,8 +65,6 @@ $replacement | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\n
 
 ## 任務 3：看清楚整張冒險地圖裡有哪些文字
 
-<SafetyBanner tier="safe" lang="zh-tw" />
-
 動手翻譯前，可以先快速盤點所有告示牌、書本、物品名稱、對話與計分板文字：
 
 ```powershell title="PowerShell"
@@ -85,8 +81,6 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 ---
 
 ## 任務 4：把英文冒險地圖翻成繁體中文
-
-<SafetyBanner tier="preview" lang="zh-tw" />
 
 以下是把英文地圖（`en_us`）翻成繁體中文（`zh_tw`）的標準起手式：
 
@@ -117,8 +111,6 @@ $page.data.replyTemplate | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8
 
 ## 任務 5：不改地圖，只匯出客戶端 `.zip` 資源包
 
-<SafetyBanner tier="preview" lang="zh-tw" />
-
 翻譯進度全部完成（`pending: 0`）後，可以把譯文打包成獨立的 `.zip` 資源包（請將 `--pack-format 34` 換成符合你 Minecraft 版本的數值，見 [支援版本](../support-and-troubleshooting/)）：
 
 ```powershell title="PowerShell"
@@ -143,8 +135,6 @@ New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-N
 ---
 
 ## 任務 6：修改前先備份世界，出事隨時還原
-
-<SafetyBanner tier="safe" lang="zh-tw" />
 
 ```powershell title="PowerShell"
 # 在世界資料夾外建立完整備份
@@ -172,8 +162,6 @@ New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
 ---
 
 ## 任務 7：檢查地圖有沒有損壞的區塊或語法錯誤的資料包
-
-<SafetyBanner tier="safe" lang="zh-tw" />
 
 ```powershell title="PowerShell"
 # 快速檢查基本結構

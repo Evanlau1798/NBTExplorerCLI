@@ -28,45 +28,47 @@ const headers =
       };
 ---
 
-<table>
-  <thead>
-    <tr>
-      <th>{headers.profile}</th>
-      <th>{headers.dv}</th>
-      <th>{headers.packFormat}</th>
-      <th>{headers.layout}</th>
-      <th>{headers.items}</th>
-      <th>{headers.text}</th>
-      <th>{headers.pack}</th>
-    </tr>
-  </thead>
-  <tbody>
-    {
-      SUPPORTED_PROFILES.map((row) => (
-        <tr>
-          <td>
-            <code>{row.profile}</code>
-          </td>
-          <td>
-            <code>{row.dataVersion}</code>
-          </td>
-          <td>
-            <code>{row.packFormat}</code>
-          </td>
-          <td>
-            <code>{row.layout}</code>
-          </td>
-          <td>
-            <code>{row.itemSchema}</code>
-          </td>
-          <td>
-            <code>{row.textSchema}</code>
-          </td>
-          <td>
-            <code>{row.packLayout}</code>
-          </td>
-        </tr>
-      ))
-    }
-  </tbody>
-</table>
+<div class="nbt-table-wrap nbt-table-profile">
+  <table>
+    <thead>
+      <tr>
+        <th>{headers.profile}</th>
+        <th>{headers.dv}</th>
+        <th>{headers.packFormat}</th>
+        <th>{headers.layout}</th>
+        <th>{headers.items}</th>
+        <th>{headers.text}</th>
+        <th>{headers.pack}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        SUPPORTED_PROFILES.map((row) => (
+          <tr>
+            <td>
+              <code>{row.profile}</code>
+            </td>
+            <td>
+              <code>{row.dataVersion}</code>
+            </td>
+            <td>
+              <code>{row.packFormat}</code>
+            </td>
+            <td>
+              <code>{row.layout}</code>
+            </td>
+            <td>
+              <code>{row.itemSchema}</code>
+            </td>
+            <td>
+              <code>{row.textSchema}</code>
+            </td>
+            <td>
+              <code>{row.packLayout}</code>
+            </td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

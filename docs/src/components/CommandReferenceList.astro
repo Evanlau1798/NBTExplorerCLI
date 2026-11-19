@@ -22,22 +22,19 @@ const subcommands = contract.entries.filter((entry) => entry.command === subcomm
 
 const ui = {
   en: {
-    required: 'Required Inputs',
-    next: 'Result and Next Step',
-    options: 'Accepted Options',
-    subcommandHeader: 'Subcommand',
+    required: 'Inputs',
+    next: 'Result',
+    options: 'Options',
   },
   'zh-tw': {
-    required: '必要輸入參數',
-    next: '執行結果與下一步',
-    options: '支援的參數選項',
-    subcommandHeader: '子命令',
+    required: '必要輸入',
+    next: '輸出與下一步',
+    options: '支援選項',
   },
 }[lang] ?? {
-  required: 'Required Inputs',
-  next: 'Result and Next Step',
-  options: 'Accepted Options',
-  subcommandHeader: 'Subcommand',
+  required: 'Inputs',
+  next: 'Result',
+  options: 'Options',
 };
 
 const filteredCommands =
@@ -51,36 +48,43 @@ const filteredCommands =
 {
   !subcommandGroup && (
     <div class="nbt-cmd-list not-content">
-      {filteredCommands.map((cmd) => (
-        <div class="nbt-cmd-card" id={`cmd-${cmd.id}`}>
-          <div class="nbt-cmd-card-top">
-            <code class="nbt-cmd-syntax">{cmd.syntax}</code>
-            <span class="nbt-pill" data-tier={cmd.tier}>
-              <span class="nbt-safety-dot" aria-hidden="true" />
-              {labels[cmd.tier].badge}
-            </span>
-          </div>
-          <p class="nbt-cmd-summary">{cmd.summary[lang] ?? cmd.summary.en}</p>
-          <div class="nbt-cmd-meta">
-            <div>
-              <span class="nbt-cmd-meta-label">{ui.required}</span>
-              <span>{cmd.requiredArgs[lang] ?? cmd.requiredArgs.en}</span>
+      {filteredCommands.map((cmd) => {
+        const flags = options(cmd.id);
+        const summary = cmd.summary[lang] ?? cmd.summary.en;
+        const searchIndex = [cmd.syntax, summary, ...flags].join(' ').toLowerCase();
+        return (
+          <div class="nbt-cmd-card" id={`cmd-${cmd.id}`} data-cmd-card data-tier={cmd.tier} data-search={searchIndex}>
+            <div class="nbt-cmd-card-top">
+              <code class="nbt-cmd-syntax">{cmd.syntax}</code>
+              <span class="nbt-pill" data-tier={cmd.tier}>
+                <span class="nbt-safety-dot" aria-hidden="true" />
+                {labels[cmd.tier].badge}
+              </span>
             </div>
-            <div>
-              <span class="nbt-cmd-meta-label">{ui.next}</span>
-              <span>{cmd.resultAndNext[lang] ?? cmd.resultAndNext.en}</span>
+            <p class="nbt-cmd-summary">{summary}</p>
+            <div class="nbt-cmd-meta">
+              <div>
+                <span class="nbt-cmd-meta-label">{ui.required}</span>
+                <span>{cmd.requiredArgs[lang] ?? cmd.requiredArgs.en}</span>
+              </div>
+              <div>
+                <span class="nbt-cmd-meta-label">{ui.next}</span>
+                <span>{cmd.resultAndNext[lang] ?? cmd.resultAndNext.en}</span>
+              </div>
             </div>
+            {flags.length > 0 && (
+              <div style="margin-top: 0.6rem;">
+                <span class="nbt-cmd-meta-label">{ui.options}</span>
+                <div class="nbt-flag-list">
+                  {flags.map((flag) => (
+                    <code class="nbt-flag-chip">{flag}</code>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <div style="margin-top: 0.65rem;">
-            <span class="nbt-cmd-meta-label">{ui.options}</span>
-            <div class="nbt-flag-list">
-              {options(cmd.id).map((flag) => (
-                <code class="nbt-flag-chip">{flag}</code>
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   )
 }
@@ -89,26 +93,42 @@ const filteredCommands =
   subcommandGroup && (
     <div class="nbt-cmd-list not-content">
       {subcommands.map((sub) => {
-        const detail = subcommandGroup === 'translate' ? TRANSLATE_SUBCOMMANDS.find((entry) => entry.subcommand === sub.subcommand) : undefined;
+        const detail =
+          subcommandGroup === 'translate'
+            ? TRANSLATE_SUBCOMMANDS.find((entry) => entry.subcommand === sub.subcommand)
+            : undefined;
         const tier = detail?.tier ?? (sub.subcommand === 'setup' || sub.subcommand === 'submit' ? 'preview' : 'safe');
-        return <div class="nbt-cmd-card" id={`${subcommandGroup}-${sub.subcommand}`}>
-          <div class="nbt-cmd-card-top">
-            <code class="nbt-cmd-syntax">nbtcli {subcommandGroup} {sub.subcommand}{sub.subcommand === 'help' ? '' : ' <world>'}</code>
-            <span class="nbt-pill" data-tier={tier}>
-              <span class="nbt-safety-dot" aria-hidden="true" />
-              {labels[tier].badge}
-            </span>
-          </div>
-          {detail && <p class="nbt-cmd-summary">{detail.summary[lang] ?? detail.summary.en}</p>}
-          <div>
-            <span class="nbt-cmd-meta-label">{ui.options}</span>
-            <div class="nbt-flag-list">
-              {sub.options.map((flag) => (
-                <code class="nbt-flag-chip">{flag}</code>
-              ))}
+        const syntax = `nbtcli ${subcommandGroup} ${sub.subcommand}${sub.subcommand === 'help' ? '' : ' <world>'}`;
+        const summary = detail ? (detail.summary[lang] ?? detail.summary.en) : '';
+        const searchIndex = [syntax, summary, ...sub.options].join(' ').toLowerCase();
+        return (
+          <div
+            class="nbt-cmd-card"
+            id={`${subcommandGroup}-${sub.subcommand}`}
+            data-cmd-card
+            data-tier={tier}
+            data-search={searchIndex}
+          >
+            <div class="nbt-cmd-card-top">
+              <code class="nbt-cmd-syntax">{syntax}</code>
+              <span class="nbt-pill" data-tier={tier}>
+                <span class="nbt-safety-dot" aria-hidden="true" />
+                {labels[tier].badge}
+              </span>
             </div>
+            {summary && <p class="nbt-cmd-summary">{summary}</p>}
+            {sub.options.length > 0 && (
+              <div>
+                <span class="nbt-cmd-meta-label">{ui.options}</span>
+                <div class="nbt-flag-list">
+                  {sub.options.map((flag) => (
+                    <code class="nbt-flag-chip">{flag}</code>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>;
+        );
       })}
     </div>
   )

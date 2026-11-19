@@ -4,31 +4,26 @@ description: 一步一步帶你在 Windows 上下載解壓縮、打開 PowerShel
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
-import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
-<SafetyBanner tier="safe" lang="zh-tw" />
-
-即使你平常很少碰命令列（PowerShell），跟著這篇從頭做到尾，大約 3 分鐘就能完成安裝並安全查閱你的第一個 Minecraft Java 版世界。
+本頁介紹工具下載、解壓縮與 PowerShell 啟動步驟，並在世界副本上執行第一次唯讀檢查。
 
 ## 第一部分：下載與準備（約 1 分鐘）
 
 <Steps>
 
-1. **從 GitHub Releases 下載 Windows 壓縮檔**
+1. **從 GitHub Releases 下載 `.zip` 壓縮檔**
 
-   打開官方 **[GitHub Releases 頁面](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**，在最新版本下載 **`nbtcli-win-x64.zip`**。
+   打開官方 **[GitHub Releases 頁面](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**，下載最新版的 **`.zip`** 壓縮檔（以 `.zip` 封裝可避免 Chrome 等瀏覽器直接阻擋 `.exe` 下載）。
 
    :::tip[不需要另外安裝 .NET 或 Java]
-   所有執行需要的元件都已經包在這個壓縮檔裡面，下載解壓縮就能直接用。
+   ZIP 已包含 .NET 執行環境。執行 `nbtcli.exe` 免另裝 .NET 或 Java。
    :::
 
-2. **把整個壓縮檔解壓縮到同一個資料夾**
+2. **解壓完整 ZIP**
 
-   在檔案總管裡對 `nbtcli-win-x64.zip` 按右鍵選「**解壓縮全部...**」，建議放到路徑簡單、沒有特殊符號的資料夾，例如 `C:\Tools\nbtcli`。
+   在檔案總管裡對下載的 `.zip` 按右鍵選「**解壓縮全部...**」，放到路徑簡單、沒有特殊符號的資料夾，例如 `C:\Tools\nbtcli`。
 
-   :::caution[不要把 `nbtcli.exe` 單獨拉出來]
-   請讓 `nbtcli.exe` 和同資料夾裡的所有 `.dll`、`.json` 檔案保持在一起。如果只把 `.exe` 搬走，程式會無法啟動。
-   :::
+   將 `nbtcli.exe` 與所有隨附檔案保留在該資料夾。
 
 3. **在這個資料夾裡打開 PowerShell**
 
@@ -109,8 +104,8 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName
 ```
 
-各參數白話說明：
-- `'D:\WorldCopy'`：你的世界副本路徑（用單引號 `'...'` 包起來，路徑裡有空格也不會出錯）。
+參數說明：
+- `'D:\WorldCopy'`：世界副本路徑（以單引號 `'...'` 包裹可避免路徑含空白時解析錯誤）。
 - `--path level.dat`：要打開世界裡的哪一個檔案。
 - `--pointer /Data/DataVersion`：要讀檔案裡的哪一個欄位（跟資料夾路徑一樣用 `/` 往下找：`Data` 底下的 `DataVersion`）。
 

@@ -1,0 +1,256 @@
+/* ==========================================================================
+   Visual Docs Overview Hub (4-Card Grid + Compact Quick Strip)
+   ========================================================================== */
+.nbt-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 1.25rem;
+}
+
+.nbt-hub-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.35rem;
+  border-radius: 14px;
+  border: 1px solid var(--sl-color-gray-5);
+  background: linear-gradient(160deg, rgba(16, 26, 42, 0.8), rgba(9, 15, 25, 0.92));
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  transition:
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.24s ease,
+    box-shadow 0.24s ease;
+}
+
+:root[data-theme='light'] .nbt-hub-card {
+  background: #ffffff;
+}
+
+.nbt-hub-card::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--nbt-grass), var(--nbt-cyan));
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+.nbt-hub-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 18px 36px -22px rgba(0, 0, 0, 0.78);
+}
+
+.nbt-hub-card:hover::after {
+  opacity: 1;
+}
+
+.nbt-hub-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.26);
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.14), rgba(56, 189, 248, 0.14));
+  color: var(--sl-color-accent-high);
+}
+
+.nbt-hub-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.nbt-hub-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--sl-color-white);
+}
+
+.nbt-hub-arrow {
+  width: 16px;
+  height: 16px;
+  color: var(--sl-color-accent);
+  transition: transform 0.2s ease;
+}
+
+.nbt-hub-card:hover .nbt-hub-arrow {
+  transform: translateX(4px);
+}
+
+.nbt-hub-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--sl-color-gray-2);
+}
+
+.nbt-quick-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 1.75rem;
+}
+
+.nbt-quick-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--sl-color-gray-5);
+  background: rgba(13, 21, 34, 0.6);
+  color: var(--sl-color-gray-1);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+:root[data-theme='light'] .nbt-quick-pill {
+  background: #ffffff;
+}
+
+.nbt-quick-pill:hover {
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-accent-high);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+  .nbt-hub-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ==========================================================================
+   Streamlined Single-Line Safety Callout (Used Only For World Writes)
+   ========================================================================== */
+.nbt-safety-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  margin: 1rem 0 1.35rem;
+  border-radius: var(--nbt-radius);
+  border: 1px solid var(--sl-color-gray-5);
+  background: rgba(13, 21, 34, 0.72);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+:root[data-theme='light'] .nbt-safety-banner {
+  background: #ffffff;
+}
+
+.nbt-safety-banner[data-tier='safe'] {
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.nbt-safety-banner[data-tier='preview'] {
+  border-color: rgba(251, 191, 36, 0.34);
+}
+
+.nbt-safety-banner[data-tier='write'] {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.12), rgba(13, 21, 34, 0.75) 55%);
+}
+
+:root[data-theme='light'] .nbt-safety-banner[data-tier='write'] {
+  background: #fef2f2;
+}
+
+.nbt-safety-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  display: inline-block;
+  border-radius: 50%;
+}
+
+.nbt-safety-banner[data-tier='safe'] .nbt-safety-dot,
+.nbt-pill[data-tier='safe'] .nbt-safety-dot {
+  background-color: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.65);
+}
+
+.nbt-safety-banner[data-tier='preview'] .nbt-safety-dot,
+.nbt-pill[data-tier='preview'] .nbt-safety-dot {
+  background-color: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.55);
+}
+
+.nbt-safety-banner[data-tier='write'] .nbt-safety-dot,
+.nbt-pill[data-tier='write'] .nbt-safety-dot {
+  background-color: #f87171;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.65);
+}
+
+.nbt-safety-text {
+  color: var(--sl-color-gray-1);
+}
+
+.nbt-safety-text strong {
+  color: var(--sl-color-white);
+  margin-right: 0.4rem;
+}
+
+/* Inline safety indicator in Command Reference */
+.nbt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.18rem 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  font-family: var(--sl-font-mono);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.nbt-pill[data-tier='safe'] {
+  color: #86efac;
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.28);
+}
+
+.nbt-pill[data-tier='preview'] {
+  color: #fde68a;
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.nbt-pill[data-tier='write'] {
+  color: #fca5a5;
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.32);
+}
+
+:root[data-theme='light'] .nbt-pill[data-tier='safe'] {
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+:root[data-theme='light'] .nbt-pill[data-tier='preview'] {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+:root[data-theme='light'] .nbt-pill[data-tier='write'] {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}

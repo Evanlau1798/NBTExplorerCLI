@@ -1,94 +1,22 @@
 ---
 title: 工具總覽
-description: 用白話帶你認識 NBTExplorerCLI：在 Windows 上安全查閱、翻譯與離線編輯 Minecraft Java Edition 世界存檔。
+description: NBTExplorerCLI 線上文件：查閱、翻譯與離線安全編輯 Minecraft Java Edition 世界存檔。
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
-import SafetyBanner from '../../../../components/SafetyBanner.astro';
+import DocsHub from '../../../../components/DocsHub.astro';
 
-**NBTExplorerCLI**（`nbtcli.exe`，版本 `1.0.0`）是一款免費、解壓縮就能直接使用的 Windows 命令列工具，專為 **Minecraft Java Edition** 世界存檔打造。**不需要另外安裝 .NET 或 Java**——只要從 GitHub Releases 下載壓縮檔、解壓縮，就能在 PowerShell 中開始使用。
+**NBTExplorerCLI**（`nbtcli.exe`，v1.0.0）是專為 **Minecraft Java Edition** 存檔設計的 CLI。解壓完整的發行 ZIP 後，在資料夾內執行 `nbtcli.exe`。ZIP 已包含 .NET 執行環境。
 
-不管你是想查看存檔裡藏了什麼資料、把整張英文冒險地圖翻成繁體中文、匯出資源包，或是交給 AI 助手幫你自動處理地圖文字，這份網站都會用最白話、一步一步的方式帶你上手。
+<DocsHub lang="zh-tw" />
 
-<SafetyBanner tier="safe" lang="zh-tw" />
+:::note[修改存檔前的兩個原則]
+永遠先在**世界副本**（例如 `D:\WorldCopy`）上測試，並在執行 `apply` 或 `--apply` 前**完全關閉 Minecraft**。所有純讀取與預覽指令都不會更動你的世界資料夾。
+:::
 
-## 這個工具適合誰使用？
+<details>
+<summary>指令 JSON 輸出格式與提示語言切換（--ui-locale）</summary>
 
-<CardGrid>
-  <Card title="非常適合用於">
-    - **冒險地圖翻譯者與一般玩家**：自動收集告示牌、書本、物品、實體、計分板、Boss 血條、指令方塊與資料包文字，整理成好讀的一頁一頁，自己翻或交給 AI 翻都超方便。
-    - **地圖作者與伺服器管理員**：在關閉 Minecraft 的離線狀態下查閱或修改 `level.dat`、區塊（`.mca`）、實體與資料包，內建寫前預覽與自動備份保護。
-    - **AI 助手與自動化腳本**：每個指令都輸出乾淨統一的 JSON 格式，讓 Claude、ChatGPT、Codex、Cursor 或 PowerShell 腳本都能精準安全地操作存檔。
-  </Card>
-  <Card title="不適用於">
-    - **開著 Minecraft 即時修改**：所有會修改存檔的操作都必須先關閉 Minecraft 與其他編輯器，避免遊戲同時讀寫導致存檔損壞。
-    - **3D 視覺化蓋房子或方塊檢視**：這是純文字的命令列工具，不包含 3D 地圖預覽畫面。
-    - **Minecraft 基岩版（Bedrock Edition）存檔**：僅支援 **Minecraft Java Edition**。隨時可執行 `.\nbtcli.exe capabilities` 查詢確切支援版本。
-  </Card>
-</CardGrid>
-
-## 看懂本網站的三種安全標籤
-
-網站中每篇教學與每個指令都會標示三種顏色的安全等級，讓你在按 Enter 之前一眼確認會不會改到原存檔：
-
-| 安全標籤 | 對你的 Minecraft 世界資料夾有什麼影響 |
-| --- | --- |
-| **純讀取：不改存檔** | 只讀取資料或檢查紀錄，絕不會改動你的世界資料夾。 |
-| **僅預覽：先出計畫** | 只會在世界資料夾外建立預覽計畫或儲存翻譯進度，原世界檔案完全不動。 |
-| **會修改存檔：先關遊戲** | 會實際寫入指定的世界資料夾。請務必先複製一份世界測試、關閉 Minecraft，並加上 `--world-offline`。 |
-
-## 我應該從哪一頁開始看？
-
-依照你現在最想做的事情挑選入口：
-
-<CardGrid>
-  <Card title="1. 下載安裝與初次使用">
-    從 GitHub 下載壓縮檔、解壓縮、在資料夾開 PowerShell、安全複製一份 Minecraft 世界，再跑完第一次純讀取指令。
-
-    [從這裡開始 ->](./getting-started/)
-  </Card>
-  <Card title="2. 常見任務速查">
-    想直接查版本、改地圖名稱、看地圖裡所有文字、翻地圖或做備份？這裡有可以直接照抄的短步驟範例。
-
-    [瀏覽常見任務 ->](./recipes/)
-  </Card>
-  <Card title="3. 常見問題與名詞白話詞典">
-    很少用 PowerShell，或看不懂 NBT、`level.dat`、JSON Pointer、Patch Plan 是什麼？這裡全部用白話解釋給你聽。
-
-    [看常見問題與詞典 ->](./faq/)
-  </Card>
-  <Card title="4. 冒險地圖翻譯教學">
-    一步一步帶你翻譯整張冒險地圖：開啟翻譯進度、分頁匯出與提交譯文，最後乾淨套用到地圖上。
-
-    [閱讀地圖翻譯教學 ->](./translation-workflow/)
-  </Card>
-  <Card title="5. 資源包與語言檔輸出">
-    比較「直接把譯文寫進地圖」、「轉成多語言翻譯鍵」與「匯出獨立 `.zip` 資源包」，幫你選最適合的發布方式。
-
-    [了解資源包與語言檔 ->](./resources-and-packs/)
-  </Card>
-  <Card title="6. 安全修改存檔與中斷復原">
-    學會「先預覽、後套用」兩步驟安全編輯法，以及萬一寫到一半視窗關掉時如何安心復原或一鍵還原。
-
-    [閱讀安全編輯教學 ->](./safe-editing/)
-  </Card>
-  <Card title="7. 備份還原與檔案存放位置">
-    修改前先幫世界建備份、出事時還原整張地圖或單一壞檔，並看懂暫存檔與備份分別存在電腦哪裡。
-
-    [閱讀備份與檔案位置 ->](./backups-and-state/)
-  </Card>
-  <Card title="8. AI Agent 快速整合指南">
-    想讓 Claude、ChatGPT、Codex 或 Cursor 直接幫你跑工具？這裡有現成提示詞與高密度 [`llms.txt`](../../llms.txt) 說明書。
-
-    [前往 AI 整合專區 ->](./ai-agents/)
-  </Card>
-</CardGrid>
-
-想查所有參數清單或解決錯誤代碼？可直接前往 **[完整命令參考](./command-reference/)** 或 **[支援版本與疑難排解](./support-and-troubleshooting/)**。
-
-## 10 秒看懂指令輸出
-
-每個指令執行後都會印出一段結構化的 JSON 文字。一般使用時只要看懂**三個欄位**就夠了：
+每個指令都會輸出一行結構化 JSON，日常使用看這三個欄位即可：
 
 ```json title="輸出範例"
 {
@@ -97,28 +25,28 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
   "success": true,
   "command": "version",
   "outcome": "Success",
-  "data": {
-    "product": "nbtcli",
-    "version": "1.0.0"
-  },
+  "data": { "product": "nbtcli", "version": "1.0.0" },
   "error": null
 }
 ```
 
-1. **`success`**：`true` 代表成功；`false` 代表遇到問題而中止。
-2. **`data`**：這次指令查到或產生的結果（例如地圖名稱、版本號碼或翻譯進度）。
-3. **`error`**：當 `success` 為 `false` 時，直接看 `error.message` 就能知道發生了什麼事。
+- **`success`**：`true` 代表成功；`false` 代表遇到問題而中止。
+- **`data`**：查到的數值、掃描統計或計畫資訊。
+- **`error`**：當 `success` 為 `false` 時，看 `error.message` 即可知道原因。
 
-### 切換提示訊息語言（`--ui-locale`）
+在任何指令加上 `--ui-locale zh-TW`（預設）或 `--ui-locale en-US` 可切換錯誤與說明文字的語言，不會影響地圖翻譯語言設定。
 
-在任何指令加上 `--ui-locale zh-TW`（繁體中文，預設）或 `--ui-locale en-US`（英文），即可切換錯誤訊息與說明文字的語言。這只會改變工具自己的提示語言，不會影響你的地圖翻譯語言設定（`--source-language` / `--target-language`）。
+</details>
 
-## 授權條款與第三方聲明
+<details>
+<summary>授權條款與第三方聲明</summary>
 
-NBTExplorerCLI 採用 **MIT 授權條款**（`LICENSE`）。隨附第三方元件保留各自授權與聲明：
+NBTExplorerCLI 採用 **MIT 授權條款**（`LICENSE`）。Windows 發行包的 `licenses/` 資料夾包含所有第三方聲明：
 
 - **SharpZipLib**（`licenses/SharpZipLib.md`）
 - **Unicode Character Database**（`licenses/Unicode.md`）
-- **.NET Runtime 授權與第三方聲明**（包含於 Windows x64 發行包的 `licenses/` 資料夾中）
+- **.NET Runtime 授權與第三方聲明**
 
 Minecraft 遊戲資產與玩家創作的地圖歸其各自權利人所有。
+
+</details>

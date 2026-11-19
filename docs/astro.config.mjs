@@ -1,11 +1,39 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+function wrapMarkdownTablesIntegration() {
+  return {
+    name: 'nbt-wrap-markdown-tables',
+    hooks: {
+      'astro:config:setup': ({ config }) => {
+        const hastPlugins = config.markdown?.processor?.options?.hastPlugins;
+        if (Array.isArray(hastPlugins)) {
+          hastPlugins.push({
+            name: 'nbt-wrap-tables',
+            element: {
+              filter: ['table'],
+              visit(node) {
+                return {
+                  type: 'element',
+                  tagName: 'div',
+                  properties: { class: 'nbt-table-wrap' },
+                  children: [node],
+                };
+              },
+            },
+          });
+        }
+      },
+    },
+  };
+}
+
 export default defineConfig({
   site: process.env.PAGES_ORIGIN?.replace(/^http:/, 'https:') || 'https://nbtcli.evanlau1798.com',
   base: process.env.PAGES_BASE_PATH || '/',
   trailingSlash: 'always',
   integrations: [
+    wrapMarkdownTablesIntegration(),
     starlight({
       title: {
         en: 'NBTExplorerCLI',
@@ -14,7 +42,8 @@ export default defineConfig({
       description: 'Windows x64 tool for inspecting, translating, and safely editing Minecraft Java Edition worlds.',
       favicon: '/favicon.svg',
       logo: {
-        src: './src/assets/logo.svg',
+        light: './src/assets/logo-light.svg',
+        dark: './src/assets/logo.svg',
         replacesTitle: false,
       },
       defaultLocale: 'root',
@@ -30,6 +59,15 @@ export default defineConfig({
       },
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Evanlau1798/NBTExplorerCLI' }],
       customCss: ['./src/styles/custom.css'],
+      expressiveCode: {
+        styleOverrides: {
+          borderRadius: '0.625rem',
+          borderWidth: '1px',
+          frames: {
+            editorTabBorderRadius: '0.5rem',
+          },
+        },
+      },
       sidebar: [
         {
           label: 'Start Here',
@@ -52,7 +90,7 @@ export default defineConfig({
             },
             {
               label: 'FAQ & Glossary',
-              translations: { 'zh-TW': '常見問題與名詞白話詞典' },
+              translations: { 'zh-TW': '常見問題與名詞詞典' },
               slug: 'docs/faq',
             },
           ],

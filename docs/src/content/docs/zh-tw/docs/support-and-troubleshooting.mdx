@@ -6,9 +6,6 @@ description: 查看支援的 Minecraft Java 版範圍、一步步解決常見問
 import { Steps } from '@astrojs/starlight/components';
 import ExitCodeTable from '../../../../components/ExitCodeTable.astro';
 import ProfileTable from '../../../../components/ProfileTable.astro';
-import SafetyBanner from '../../../../components/SafetyBanner.astro';
-
-<SafetyBanner tier="safe" lang="zh-tw" />
 
 不確定自己的地圖版本有沒有支援，或遇到錯誤訊息不知道怎麼處理？這頁幫你快速核對支援清單，並提供常見狀況的排除步驟。
 
@@ -58,14 +55,14 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 ### 狀況 1：PowerShell 說找不到 `nbtcli.exe` 或無法執行
 
-**原因**：指令前面忘了打 `.\`、PowerShell 開在錯的資料夾，或是把 `nbtcli.exe` 單獨移出資料夾了。
+**原因**：指令前面忘了打 `.\`、PowerShell 開在錯的資料夾，或是尚未把 `nbtcli.exe` 從 `.zip` 壓縮檔解壓縮出來。
 
 <Steps>
 
-1. 確認已把 `nbtcli-win-x64.zip` 裡的**全部檔案**都解壓縮在同一個資料夾（`.dll` 與 `.json` 要跟 `nbtcli.exe` 在一起）。
-2. 在**那個資料夾裡**打開 PowerShell（點檔案總管網址列 -> 輸入 `powershell` -> 按 **Enter**）。
-3. 執行時前面記得加 **`.\`**：`.\nbtcli.exe --version`。
-4. 如果第一次執行跳出 Windows SmartScreen 藍畫面，點「**其他資訊**」->「**仍要執行**」。
+1. 將完整發行 ZIP 解壓到一般資料夾（例如 `C:\Tools\nbtcli`），並將 `nbtcli.exe` 與隨附檔案保留在一起。
+2. 在**該資料夾中**打開 PowerShell（點檔案總管網址列 -> 輸入 `powershell` -> 按 **Enter**）。
+3. 執行時前面加上 **`.\`**：`.\nbtcli.exe --version`。
+4. 如果第一次執行跳出 Windows SmartScreen 提示，點「**其他資訊**」->「**仍要執行**」。
 
 </Steps>
 

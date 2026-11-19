@@ -6,9 +6,6 @@ description: Which Minecraft Java Edition versions are supported, how to solve c
 import { Steps } from '@astrojs/starlight/components';
 import ExitCodeTable from '../../../components/ExitCodeTable.astro';
 import ProfileTable from '../../../components/ProfileTable.astro';
-import SafetyBanner from '../../../components/SafetyBanner.astro';
-
-<SafetyBanner tier="safe" lang="en" />
 
 Not sure whether your Minecraft version is supported, or ran into an error message? Start here to check version support and fix the most common issues step by step.
 
@@ -58,11 +55,11 @@ Passing `validate`, `scan`, or `apply` confirms that the save files are structur
 
 ### Problem 1: PowerShell Says `nbtcli.exe` Is Not Recognized or Will Not Run
 
-**What happened**: You typed `nbtcli` without `.\`, opened PowerShell in the wrong folder, or moved `nbtcli.exe` away from its `.dll` files.
+**What happened**: You typed `nbtcli` without `.\`, opened PowerShell in the wrong folder, or tried running it inside the compressed `.zip` preview without extracting first.
 
 <Steps>
 
-1. Make sure you extracted **all** files from `nbtcli-win-x64.zip` into the same folder (keep the `.dll` and `.json` files next to `nbtcli.exe`).
+1. Extract the full release ZIP into a folder such as `C:\Tools\nbtcli`. Keep `nbtcli.exe` with its bundled files.
 2. Open PowerShell **inside that exact folder** (click File Explorer's address bar -> type `powershell` -> press **Enter**).
 3. Put **`.\`** in front of the command: `.\nbtcli.exe --version`.
 4. If Windows SmartScreen pops up on first launch, click **More info** -> **Run anyway**.

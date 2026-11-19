@@ -13,9 +13,8 @@ const item = labels[tier];
 ---
 
 <div class="nbt-safety-banner not-content" data-tier={tier}>
-  <div class="nbt-safety-header">
-    <span class="nbt-safety-dot" aria-hidden="true"></span>
-    <span>{item.title}</span>
-  </div>
-  <p class="nbt-safety-desc">{customDescription ?? item.description}</p>
+  <span class="nbt-safety-dot" aria-hidden="true"></span>
+  <span class="nbt-safety-text">
+    <strong>{item.badge}</strong>{customDescription ?? item.description}
+  </span>
 </div>

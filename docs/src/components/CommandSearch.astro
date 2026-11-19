@@ -1,0 +1,133 @@
+---
+import type { LocaleKey } from '../data/cli-surface';
+
+interface Props {
+  lang?: LocaleKey;
+}
+
+const { lang = 'en' } = Astro.props;
+const ui =
+  lang === 'zh-tw'
+    ? {
+        placeholder: '篩選指令或參數（例如 translate、--merge、recover）...',
+        filterLabel: '依安全等級篩選',
+        all: '全部',
+        safe: '純讀取',
+        preview: '僅預覽',
+        write: '會修改存檔',
+        empty: '找不到符合條件的指令，請嘗試其他關鍵字。',
+      }
+    : {
+        placeholder: 'Filter commands or flags (e.g. translate, --merge, recover)...',
+        filterLabel: 'Filter by safety tier',
+        all: 'All',
+        safe: 'Read Only',
+        preview: 'Preview',
+        write: 'Modifies World',
+        empty: 'No matching commands found. Try another keyword.',
+      };
+---
+
+<div class="nbt-cmd-toolbar not-content" data-cmd-filter-root>
+  <input
+    type="search"
+    class="nbt-cmd-search"
+    data-cmd-search
+    placeholder={ui.placeholder}
+    aria-label={ui.placeholder}
+  />
+  <div class="nbt-tier-filters" role="group" aria-label={ui.filterLabel}>
+    <button type="button" class="nbt-tier-btn is-active" data-filter-tier="all" aria-pressed="true">{ui.all}</button>
+    <button type="button" class="nbt-tier-btn" data-filter-tier="safe" aria-pressed="false">{ui.safe}</button>
+    <button type="button" class="nbt-tier-btn" data-filter-tier="preview" aria-pressed="false">{ui.preview}</button>
+    <button type="button" class="nbt-tier-btn" data-filter-tier="write" aria-pressed="false">{ui.write}</button>
+  </div>
+</div>
+<p class="nbt-cmd-empty not-content" data-cmd-empty hidden>{ui.empty}</p>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-cmd-filter-root]');
+  const input = root?.querySelector<HTMLInputElement>('[data-cmd-search]');
+  const tierButtons = root ? [...root.querySelectorAll<HTMLButtonElement>('[data-filter-tier]')] : [];
+  const cards = [...document.querySelectorAll<HTMLElement>('[data-cmd-card]')];
+  const lists = [...document.querySelectorAll<HTMLElement>('.nbt-cmd-list')];
+  const emptyMsg = document.querySelector<HTMLElement>('[data-cmd-empty]');
+
+  if (root && input && cards.length) {
+    let activeTier = 'all';
+
+    // Map each section heading (h2) to its following intro paragraph(s) and command list(s)
+    type SectionGroup = {
+      heading: HTMLElement;
+      intros: HTMLElement[];
+      lists: HTMLElement[];
+    };
+    const sections: SectionGroup[] = [];
+    const seenHeadings = new Set<HTMLElement>();
+    lists.forEach((list) => {
+      let prev = list.previousElementSibling as HTMLElement | null;
+      const intros: HTMLElement[] = [];
+      let heading: HTMLElement | null = null;
+      while (prev) {
+        if (prev.matches('.sl-heading-wrapper, h2')) {
+          heading = prev;
+          break;
+        }
+        if (prev.matches('p')) {
+          intros.push(prev);
+        } else if (prev.matches('.nbt-cmd-list')) {
+          // Adjacent list under the same heading
+        } else {
+          break;
+        }
+        prev = prev.previousElementSibling as HTMLElement | null;
+      }
+      if (heading) {
+        const existing = sections.find((s) => s.heading === heading);
+        if (existing) {
+          existing.lists.push(list);
+        } else if (!seenHeadings.has(heading)) {
+          seenHeadings.add(heading);
+          sections.push({ heading, intros, lists: [list] });
+        }
+      }
+    });
+
+    const applyFilter = () => {
+      const q = input.value.trim().toLowerCase();
+      let visible = 0;
+      cards.forEach((card) => {
+        const tierOk = activeTier === 'all' || card.dataset.tier === activeTier;
+        const textOk = !q || (card.dataset.search ?? '').includes(q);
+        const show = tierOk && textOk;
+        card.hidden = !show;
+        if (show) visible += 1;
+      });
+      lists.forEach((list) => {
+        const anyVisible = [...list.querySelectorAll<HTMLElement>('[data-cmd-card]')].some((c) => !c.hidden);
+        list.hidden = !anyVisible;
+      });
+      sections.forEach((section) => {
+        const anyListVisible = section.lists.some((l) => !l.hidden);
+        section.heading.hidden = !anyListVisible;
+        section.intros.forEach((p) => {
+          p.hidden = !anyListVisible;
+        });
+      });
+      if (emptyMsg) emptyMsg.hidden = visible > 0;
+    };
+
+    input.addEventListener('input', applyFilter);
+    tierButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeTier = btn.dataset.filterTier ?? 'all';
+        tierButtons.forEach((b) => {
+          const active = b === btn;
+          b.classList.toggle('is-active', active);
+          b.setAttribute('aria-pressed', String(active));
+        });
+        applyFilter();
+      });
+    });
+  }
+</script>
