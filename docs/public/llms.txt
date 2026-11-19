@@ -374,6 +374,8 @@ Generate with `agent setup <world> --output <file>`, fill `configuration.agentNa
 
 Check `minimumDataVersion` and `maximumDataVersion` for each family's inclusive bounds. This table lists the representative versions and their pack formats. With `create-pack`, specify `--pack-format` if the world's default resource pack format cannot be verified.
 
+The scanner reads supported Anvil layouts, including Java 1.14.4-era `Level`-wrapped chunks retained within newer worlds. Use the full scan result to check coverage for a particular save.
+
 | Profile | `DataVersion` | Resource `pack_format` | Datapack Format | Text Schema | Pack / Layout |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `java-1.20.1` | `3465` | `15` | `15` | `java-text-json (v1)` | `java-pack-plural` |

@@ -11,7 +11,7 @@ public static class NbtTextExtractor
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(document);
         limits ??= DecodeLimits.Default; _ = BinaryNbt.MeasureDocument(document, limits);
-        var profile = Profile(source, document, layoutProfile);
+        var profile = Profile(source, document, out var dataVersion, layoutProfile);
         var binding = new SourceAddress(source.Artifact, TypedPath.Root, "source.document", source.Dimension, chunk);
         var output = new TextExtractionCollector(binding, false, limits, scope) { ComponentRoot = componentRoot };
         var reader = new NbtTextReader(binding, profile, layoutProfile ?? profile, output, limits);
@@ -20,7 +20,7 @@ public static class NbtTextExtractor
             case WorldSourceRole.Player:
                 if (profile != MinecraftProfiles.Java125) reader.Player(document.Root, TypedPath.Root);
                 break;
-            case WorldSourceRole.Terrain: reader.Terrain(document.Root); break;
+            case WorldSourceRole.Terrain: reader.Terrain(document.Root, dataVersion); break;
             case WorldSourceRole.Entities: reader.Entities(document.Root); break;
             case WorldSourceRole.Level: reader.Level(document.Root); break;
             case WorldSourceRole.SavedData: reader.SavedData(document.Root, source.Artifact.RelativePath, storageRules); break;

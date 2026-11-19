@@ -7,7 +7,7 @@ public static class MinecraftProfiles
 {
     public static CapabilityProfile? ForId(string id) => id switch
     {
-        "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-1.20.5" => Java1205, "java-1.21" => Java121, "java-1.21.5" => Java1215,
+        "java-1.14.4" => HistoricalJson, "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-1.20.5" => Java1205, "java-1.21" => Java121, "java-1.21.5" => Java1215,
         "java-1.21.11" => Java12111, "java-26.1-snapshot-6" => Snapshot2616, "java-classic-anvil" => ClassicAnvil,
         _ => ClassicProfiles.Values.FirstOrDefault(profile => profile.Id == id)
     };
@@ -43,6 +43,7 @@ public static class MinecraftProfiles
             _ => null
         };
     }
+    private static readonly CapabilityProfile HistoricalJson = Create("java-1.14.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1201 = Create("java-1.20.1", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1204 = Create("java-1.20.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.4", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1205 = Create("java-1.20.5", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.21", LogicalListEncoding.Homogeneous, "java-pack-plural");
@@ -70,6 +71,7 @@ public static class MinecraftProfiles
 
     public static ImmutableArray<(int DataVersion, int Minimum, int Maximum, CapabilityProfile Profile)> DataVersionRanges { get; } =
     [
+        (1976, 1976, 3462, HistoricalJson),
         (3465, 3463, 3689, Java1201),
         (3700, 3690, 3818, Java1204),
         // 24w09a introduced item components. 24w21a renamed datapack directories.

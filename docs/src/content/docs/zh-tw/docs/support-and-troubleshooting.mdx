@@ -21,6 +21,8 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
 
 <ProfileTable lang="zh-tw" />
 
+Java 1.14.4 至 1.19.x 的世界可能含有把方塊與實體資料存放在 `Level` 底下的 Anvil 區塊。掃描器依照實際區塊結構讀取，也能辨識較新世界中保留的這類區塊。
+
 ### 經典舊版 Anvil 存檔（`1.2.5`、`1.5.2`、`1.6.4`、`1.8.1`）
 
 在 Minecraft 導入 `DataVersion` 之前的舊版 Anvil 存檔（儲存版本 `19133`）裡，檔案本身沒有標記確切的遊戲版本：
@@ -105,7 +107,7 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
 
 ### 狀況 5：遇到損壞的區塊檔或未支援格式（退出碼 `4` 或 `5`）
 
-**現象**：`scan` 或 `validate` 回報 `coverageComplete: false`，伴隨退出碼 `4`（格式尚未支援）或 `5`（檔案損壞，例如 0 位元組 `.mca` 檔或語法錯誤的資料包 JSON）。
+**現象**：`scan` 或 `validate` 回報 `coverageComplete: false`，伴隨退出碼 `4`（格式尚未支援）或 `5`（檔案損壞，例如被截斷的 `.mca` 檔或語法錯誤的資料包 JSON）。原版可能留下空白的實體或興趣點區域檔，掃描器會將這些檔案標為 `EmptyRegion`。
 
 <Steps>
 

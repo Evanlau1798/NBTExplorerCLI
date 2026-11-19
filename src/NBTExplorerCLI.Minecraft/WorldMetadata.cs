@@ -6,13 +6,15 @@ namespace NBTExplorerCLI.Minecraft;
 public sealed record WorldMetadata(CapabilityProfile Profile, int? DataVersion, int? WorldGenDataVersion, ImmutableDictionary<string, string> DimensionDirectories)
 {
     public const int ClassicAnvilStorageVersion = 19133;
+    private static readonly ImmutableDictionary<string, string> BuiltInDirectoryDimensions =
+        ImmutableDictionary.CreateRange(StringComparer.Ordinal, new Dictionary<string, string>
+        { [""] = "minecraft:overworld", ["DIM-1"] = "minecraft:the_nether", ["DIM1"] = "minecraft:the_end" });
 
     public static WorldMetadata Read(NbtDocument level, NbtDocument? separateWorldGen = null)
     {
         ArgumentNullException.ThrowIfNull(level);
         if (separateWorldGen is null && IsClassicAnvil(level))
-            return new(MinecraftProfiles.ClassicAnvil, null, null, ImmutableDictionary.CreateRange(StringComparer.Ordinal, new Dictionary<string, string>
-            { [""] = "minecraft:overworld", ["DIM-1"] = "minecraft:the_nether", ["DIM1"] = "minecraft:the_end" }));
+            return new(MinecraftProfiles.ClassicAnvil, null, null, BuiltInDirectoryDimensions);
         var version = Version(At(level.Root, "Data", "DataVersion"));
         var profile = MinecraftProfiles.ForDataVersion(version) ?? throw Unsupported("Unknown world DataVersion");
         var claim = At(level.Root, "Data", "Version", "Id");
@@ -23,7 +25,13 @@ public sealed record WorldMetadata(CapabilityProfile Profile, int? DataVersion, 
         var directoryLayout = profile.Features[ProfileFacet.Layout].Schema == "java-dimensions-directory";
         var registryVersion = version;
         NbtValue? registry;
-        if (directoryLayout) registry = At(level.Root, "Data", "WorldGenSettings", "dimensions");
+        if (directoryLayout)
+        {
+            var worldGen = At(level.Root, "Data", "WorldGenSettings");
+            if (worldGen is null && separateWorldGen is null && version < 2566 && HasAnvilSeed(level))
+                return new(profile, version, null, BuiltInDirectoryDimensions);
+            registry = At(level.Root, "Data", "WorldGenSettings", "dimensions");
+        }
         else
         {
             if (separateWorldGen is null) throw Unsupported("Missing separately stored dimension registry");
@@ -56,7 +64,10 @@ public sealed record WorldMetadata(CapabilityProfile Profile, int? DataVersion, 
     public static bool IsClassicAnvil(NbtDocument level)
         => At(level.Root, "Data", "DataVersion") is null
             && At(level.Root, "Data", "Version") is null && At(level.Root, "Data", "WorldGenSettings") is null
-            && At(level.Root, "Data", "version") is NbtInt { Value: ClassicAnvilStorageVersion }
+            && HasAnvilSeed(level);
+
+    private static bool HasAnvilSeed(NbtDocument level)
+        => At(level.Root, "Data", "version") is NbtInt { Value: ClassicAnvilStorageVersion }
             && At(level.Root, "Data", "RandomSeed") is NbtLong
             && At(level.Root, "Data", "SpawnX") is NbtInt && At(level.Root, "Data", "SpawnZ") is NbtInt;
 

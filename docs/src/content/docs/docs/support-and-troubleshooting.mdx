@@ -21,6 +21,8 @@ Not sure whether your Minecraft version is supported, or ran into an error messa
 
 <ProfileTable lang="en" />
 
+Worlds from Java 1.14.4 through 1.19.x can contain older Anvil chunks where blocks and entities live under `Level`. The scanner reads the stored chunk layout, including older chunks retained in a newer world.
+
 ### Classic Older Anvil Worlds (`1.2.5`, `1.5.2`, `1.6.4`, `1.8.1`)
 
 Older Minecraft Java Edition Anvil saves (storage version `19133`, before Minecraft added `DataVersion`) do not store an exact version number inside `level.dat`:
@@ -105,7 +107,7 @@ Passing `validate`, `scan`, or `apply` confirms that the save files are structur
 
 ### Problem 5: Corrupted File or Unsupported Format (Exit Code `4` or `5`)
 
-**What happened**: `scan` or `validate` reported `coverageComplete: false` with exit code `4` (unsupported format) or `5` (damaged file, such as an empty `.mca` chunk file or broken datapack JSON).
+**What happened**: `scan` or `validate` reported `coverageComplete: false` with exit code `4` (unsupported format) or `5` (damaged file, such as a truncated `.mca` file or broken datapack JSON). Vanilla can leave empty entity and point-of-interest region files. The scanner reports these as `EmptyRegion`.
 
 <Steps>
 

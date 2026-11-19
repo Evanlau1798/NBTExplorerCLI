@@ -12,22 +12,30 @@ internal sealed partial class NbtTextReader
         foreach (var (entity, path) in Sequence(Field(root, "entities", TypedPath.Root), At(TypedPath.Root, "entities")))
             if (Field(entity, "nbt", path) is { } data) Entity(data, At(path, "nbt"));
     }
-    internal void Terrain(NbtValue root)
+    private const int FirstFlatTerrainDataVersion = 2844; // 21w43a moved Level contents to the chunk root.
+
+    internal void Terrain(NbtValue root, int? dataVersion)
     {
         var path = TypedPath.Root;
-        if (classic)
+        var nested = Field(root, "Level", path);
+        var wrapped = classic || dataVersion is < FirstFlatTerrainDataVersion;
+        if (wrapped)
         {
             path = At(path, "Level");
-            if (Field(root, "Level", TypedPath.Root) is not NbtCompound level
+            if (nested is not NbtCompound level
                 || Field(level, "xPos", path) is not NbtInt x || Field(level, "zPos", path) is not NbtInt z
-                || binding.Chunk is { } chunk && (x.Value != chunk.X || z.Value != chunk.Z))
-            { output.Diagnostic(path, "InvalidClassicAnvilChunk"); return; }
+                || binding.Chunk is { } chunk && (x.Value != chunk.X || z.Value != chunk.Z)
+                || Field(root, "block_entities", TypedPath.Root) is not null || Field(root, "entities", TypedPath.Root) is not null)
+            { output.Diagnostic(path, classic ? "InvalidClassicAnvilChunk" : "InvalidWrappedAnvilChunk"); return; }
             root = level;
         }
-        var blocks = classic ? "TileEntities" : "block_entities";
+        else if (nested is not null)
+        { output.Diagnostic(path, "InvalidFlatAnvilChunk"); return; }
+        var blocks = wrapped ? "TileEntities" : "block_entities";
         foreach (var (block, blockPath) in Sequence(Field(root, blocks, path), At(path, blocks))) BlockEntity(block, blockPath);
-        if (classic && profile != MinecraftProfiles.Java125)
-            foreach (var (entity, entityPath) in Sequence(Field(root, "Entities", path), At(path, "Entities"))) Entity(entity, entityPath);
+        var entities = wrapped ? "Entities" : "entities";
+        if (profile != MinecraftProfiles.Java125)
+            foreach (var (entity, entityPath) in Sequence(Field(root, entities, path), At(path, entities))) Entity(entity, entityPath);
     }
     internal void Entities(NbtValue root)
     {

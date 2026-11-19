@@ -20,10 +20,16 @@ internal static class WorldDiscoveryCorpusTests
             Require(result.Metadata?.DataVersion == version && result.DiagnosticCode is null, $"{directory}: actual known version and complete enumeration");
             var outer = result.Sources.Where(source => source.Location.Artifact.ContainerEntry is null && source.Chunk is null).ToArray();
             Require(outer.Select(source => source.Location.Artifact.RelativePath).Order(StringComparer.Ordinal).SequenceEqual(physical.Entries.Select(entry => entry.RelativePath).Order(StringComparer.Ordinal)), "each real literal artifact has a catalog result");
-            foreach (var source in result.Sources.Where(source => source.Outcome is SourceOutcome.Failed or SourceOutcome.Unsupported))
-                Require(directory == "GoldenTestWorld-1.21" && source.Location.Role == WorldSourceRole.PointOfInterest
-                    && source.Location.Artifact.RelativePath is "poi/r.-1.0.mca" or "poi/r.0.-1.mca" && source.DiagnosticCode == "InvalidRegion", $"unexpected real-source outcome: {source.Location.Artifact.RelativePath}/{source.DiagnosticCode}");
-            Require(result.Complete == (version == 4774), "zero-byte POI remains incomplete while snapshot6 catalog completes");
+            Require(result.Complete, $"{directory}: the complete catalog includes empty vanilla POI region files");
+            if (version == 3953)
+            {
+                var emptyPoi = outer.Where(source => source.Location.Role == WorldSourceRole.PointOfInterest
+                    && source.Outcome == SourceOutcome.Irrelevant && source.DiagnosticCode == "EmptyRegion").ToArray();
+                Require(emptyPoi.Select(source => source.Location.Artifact.RelativePath).Order(StringComparer.Ordinal)
+                    .SequenceEqual(new[] { "poi/r.-1.0.mca", "poi/r.0.-1.mca" })
+                    && emptyPoi.All(source => source.ContentHash == Hash256.Compute([])),
+                    "both zero-byte POI placeholders retain their exact paths and empty SHA-256");
+            }
             totalChunks += result.Sources.Count(source => source.Chunk is not null);
             totalRegions += outer.Count(source => source.Location.Role is WorldSourceRole.Terrain or WorldSourceRole.Entities or WorldSourceRole.PointOfInterest);
             totalFiles += physical.Entries.Length;

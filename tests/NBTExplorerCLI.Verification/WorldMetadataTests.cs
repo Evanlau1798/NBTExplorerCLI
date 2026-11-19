@@ -24,6 +24,14 @@ internal static class WorldMetadataTests
             new("SpawnX", new NbtInt(0)), new("SpawnZ", new NbtInt(0)), .. extra]))]));
     public static void RegistryBackedDimensionRoots()
     {
+        foreach (var version in new[] { 1976, 2565 })
+        {
+            var old = WorldMetadata.Read(Classic(new NbtEntry("DataVersion", new NbtInt(version))));
+            Require(old.DataVersion == version && old.DimensionDirectories.Count == 3 &&
+                old.DimensionDirectories["DIM-1"] == "minecraft:the_nether", "pre-worldgen worlds use the game's three built-in dimensions");
+        }
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(1976)));
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Classic(new NbtEntry("DataVersion", new NbtInt(2566)))));
         var directoryView = WorldMetadata.Read(Level(3953, Dimensions));
         Require(directoryView.Profile.Id == "java-1.21" && directoryView.DimensionDirectories[""] == "minecraft:overworld"
             && directoryView.DimensionDirectories["DIM-1"] == "minecraft:the_nether" && directoryView.DimensionDirectories["DIM1"] == "minecraft:the_end"

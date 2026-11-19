@@ -11,6 +11,28 @@ internal static class NbtWorldTextTests
         entities ? WorldSourceRole.Entities : WorldSourceRole.Terrain, "minecraft:the_nether", -1, 0);
     public static void SignsLecternsAndExactChunk()
     {
+        foreach (var (version, wrapped) in new[] { (1976, true), (2580, true), (2843, true), (2844, false), (3105, false), (3337, false) })
+        {
+            var sign = C(E("id", S("minecraft:sign")), E("Text1", Text("Historical sign", false)));
+            var sheep = C(E("id", S("minecraft:sheep")), E("CustomName", Text("Historical animal", false)));
+            var payload = C(E("xPos", new NbtInt(-32)), E("zPos", new NbtInt(0)), E(wrapped ? "TileEntities" : "block_entities", L(sign)),
+                E(wrapped ? "Entities" : "entities", L(sheep)));
+            var root = C([E("DataVersion", new NbtInt(version)), .. (wrapped ? [E("Level", payload)] : payload.Entries)]);
+            var extracted = NbtTextExtractor.Extract(Region(), new("", root), new(-32, 0));
+            var prefix = wrapped ? "/Level" : "";
+            Require(extracted.Complete && extracted.Occurrences.Select(Row).SequenceEqual(new[] {
+                prefix + (wrapped ? "/TileEntities" : "/block_entities") + "/0/Text1|/text|sign.front.line|Historical sign",
+                prefix + (wrapped ? "/Entities" : "/entities") + "/0/CustomName|/text|entity.name|Historical animal"
+            }), $"historical chunk {version} exposes block and entity text at physical paths");
+            if (wrapped)
+            {
+                var wrongVersion = C(E("DataVersion", new NbtInt(3953)), E("Level", payload));
+                Require(!NbtTextExtractor.Extract(Region(), new("", wrongVersion), new(-32, 0)).Complete,
+                    "a new DataVersion cannot silently authorize the old wrapped terrain schema");
+                Require(!NbtTextExtractor.Extract(Region(), new("", root), new(-31, 0)).Complete,
+                    "embedded terrain coordinates must match the selected region chunk");
+            }
+        }
         foreach (var (version, modern) in new[] { (3953, false), (4774, true) })
         {
             var sign = C(E("id", S("minecraft:sign")), E("front_text", C(E("messages", L(Text("Front", modern))), E("color", S("red")))),

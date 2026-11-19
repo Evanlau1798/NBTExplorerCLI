@@ -222,6 +222,13 @@ internal static class CliScanTests
                 if (result.Exit != exit || code != expected || outcome != (exit == 4 ? "Unsupported" : "Failed")) failures.Add($"expected={expected}/{exit}, actual={code}/{result.Exit}/{outcome}");
             }
             var region = Path.Combine(root, "region", "r.0.0.mca"); Put(root, "region/r.0.0.mca", [0]); Check("MALFORMED_SOURCE", 5); File.Delete(region);
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(4189, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            Put(root, "entities/r.0.0.mca", []); Put(root, "poi/r.0.0.mca", []);
+            using (var empty = Success(Run(root, "validate", root, "--quick")))
+                Require(empty.RootElement.GetProperty("data").GetProperty("sources").EnumerateArray().Count(item =>
+                    item.GetProperty("diagnosticCode").GetString() == "EmptyRegion") == 2, "zero-byte vanilla entity and POI regions contain no chunks");
+            Put(root, "poi/r.0.0.mca", [0]); Check("MALFORMED_SOURCE", 5);
+            File.Delete(Path.Combine(root, "poi", "r.0.0.mca"));
             using (var locked = File.Open(Path.Combine(root, "level.dat"), FileMode.Open, FileAccess.ReadWrite, FileShare.None)) Check("READ_ERROR", 5);
             Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(9999, WorldMetadataTests.Dimensions), NbtCompression.GZip)); Check("UNSUPPORTED_SOURCE", 4);
             Level(root, false); var huge = Path.Combine(root, "data", "huge.dat"); Directory.CreateDirectory(Path.GetDirectoryName(huge)!);
