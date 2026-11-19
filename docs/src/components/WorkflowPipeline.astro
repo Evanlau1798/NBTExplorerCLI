@@ -18,30 +18,30 @@ const { kind, lang = 'en' } = Astro.props;
 const pipelines: Record<'edit' | 'translate', Record<LocaleKey, Step[]>> = {
   edit: {
     en: [
-      { step: '01', title: 'Inspect Node', cmd: 'get --types', tier: 'safe' },
-      { step: '02', title: 'Preview Plan', cmd: 'set / plan / batch', tier: 'preview' },
+      { step: '01', title: 'Read Value', cmd: 'get --types', tier: 'safe' },
+      { step: '02', title: 'Preview Plan', cmd: 'set / plan', tier: 'preview' },
       { step: '03', title: 'Apply Offline', cmd: 'apply --world-offline', tier: 'write' },
-      { step: '04', title: 'Verify or Recover', cmd: 'status / recover', tier: 'safe' },
+      { step: '04', title: 'Check or Undo', cmd: 'status / recover', tier: 'safe' },
     ],
     'zh-tw': [
-      { step: '01', title: '讀取節點型別', cmd: 'get --types', tier: 'safe' },
-      { step: '02', title: '產生預覽計畫', cmd: 'set / plan / batch', tier: 'preview' },
-      { step: '03', title: '離線套用變更', cmd: 'apply --world-offline', tier: 'write' },
-      { step: '04', title: '驗證或中斷復原', cmd: 'status / recover', tier: 'safe' },
+      { step: '01', title: '先讀原數值', cmd: 'get --types', tier: 'safe' },
+      { step: '02', title: '產出預覽計畫', cmd: 'set / plan', tier: 'preview' },
+      { step: '03', title: '關遊戲後套用', cmd: 'apply --world-offline', tier: 'write' },
+      { step: '04', title: '檢查或復原', cmd: 'status / recover', tier: 'safe' },
     ],
   },
   translate: {
     en: [
-      { step: '01', title: 'Start Session', cmd: 'translate start', tier: 'preview' },
-      { step: '02', title: 'Export & Submit', cmd: 'export / submit', tier: 'preview' },
+      { step: '01', title: 'Start Project', cmd: 'translate start', tier: 'preview' },
+      { step: '02', title: 'Translate Pages', cmd: 'export -> submit', tier: 'preview' },
       { step: '03', title: 'Build Plan', cmd: 'translate plan', tier: 'preview' },
-      { step: '04', title: 'Apply & Seal', cmd: 'apply -> translate seal', tier: 'write' },
+      { step: '04', title: 'Apply & Finish', cmd: 'apply -> seal', tier: 'write' },
     ],
     'zh-tw': [
-      { step: '01', title: '建立工作階段', cmd: 'translate start', tier: 'preview' },
-      { step: '02', title: '匯出與提交譯文', cmd: 'export / submit', tier: 'preview' },
-      { step: '03', title: '產生修補計畫', cmd: 'translate plan', tier: 'preview' },
-      { step: '04', title: '離線寫入並封存', cmd: 'apply -> translate seal', tier: 'write' },
+      { step: '01', title: '開啟翻譯進度', cmd: 'translate start', tier: 'preview' },
+      { step: '02', title: '分頁匯出與提交', cmd: 'export -> submit', tier: 'preview' },
+      { step: '03', title: '打包更新計畫', cmd: 'translate plan', tier: 'preview' },
+      { step: '04', title: '套用並標記完成', cmd: 'apply -> seal', tier: 'write' },
     ],
   },
 };

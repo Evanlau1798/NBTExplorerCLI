@@ -1,6 +1,6 @@
 ---
-title: Safe Editing and Recovery
-description: Preview typed NBT edits, apply verified patch plans while offline, and recover or roll back interrupted writes.
+title: Editing Worlds & Crash Recovery
+description: How NBTExplorerCLI's two-step preview-and-apply editing keeps your Minecraft save safe, and how to recover or undo if a write is ever interrupted.
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -9,57 +9,42 @@ import WorkflowPipeline from '../../../components/WorkflowPipeline.astro';
 
 <SafetyBanner tier="write" lang="en" />
 
-**NBTExplorerCLI** is designed so that you never overwrite a Minecraft world blindly. Every modification follows a strict **Preview -> Plan -> Offline Apply -> Verify** workflow, backed by automatic pre-write backups and a crash recovery journal stored outside your world folder.
+**NBTExplorerCLI** never blindly overwrites your Minecraft world. Every edit follows a simple **Preview first, Apply second** workflow — think of it like reviewing your shopping cart before clicking Pay. Before anything is written to disk, the tool automatically backs up the original files outside your world folder so you can recover or undo cleanly if anything interrupts the write.
 
 <WorkflowPipeline kind="edit" lang="en" />
 
-## 1. Golden Rules Before Editing
+## 1. Three Simple Safety Rules
 
-1. **Always test on a world copy** (`D:\WorldCopy`) before modifying an important save.
-2. **Close Minecraft and any other external tools** (such as map editors or server processes) before running any command with `--apply` or `apply`.
-3. **Never place `--state-root` or `--output` files inside the world folder.** Keep plans, receipts, and state folders in a separate directory such as `D:\Plans` or `D:\NbtState`.
+1. **Always test on a copy** (like `D:\WorldCopy`) before editing your real save.
+2. **Close Minecraft completely** (and any other map editors) before running `apply` or `--apply`.
+3. **Keep plan and output files outside your world folder** (for example, in `D:\Plans`), never inside `D:\WorldCopy`.
 
 ---
 
-## 2. Selecting Nodes and Using Explicit Typed NBT
+## 2. Why Editing Uses `get --types` First
 
-To prevent accidental data corruption (such as turning a `Byte` or `Short` tag into an `Int` or `String`), `set` does not guess NBT types from plain strings. Instead, extract the exact `nbtcli.typed-nbt` document from `data.value` returned by `get --types` and pass it via `--value` or `--value-file`:
+Minecraft save files are picky about data types — for example, a number might specifically need to be a `Byte` (`0`/`1`), `Short`, `Int`, or `String`. Guessing the wrong type can corrupt a save.
 
-```powershell title="PowerShell"
-.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
-```
+Instead of making you guess, `nbtcli` lets you read the existing value with `--types`, change just the value inside it, and pass it straight back to `set`. That way the exact Minecraft tag type is preserved automatically!
 
-```json title="Extracted data.value (D:\Plans\new-level-name.json)"
-{
-  "schemaFamily": "nbtcli.typed-nbt",
-  "schemaVersion": 1,
-  "data": {
-    "name": "",
-    "root": {
-      "tag": "string",
-      "value": "Updated Map Name"
-    }
-  }
-}
-```
+### Picking What to Edit (`--pointer`)
 
-### Choosing a Node Selector
-
-When targeting a node inside an NBT or JSON file, provide **one** selector format:
+Point to a field inside an NBT or JSON file just like a folder path using `--pointer` (separate each level with `/`):
 
 <Tabs syncKey="selector-kind">
-  <TabItem label="JSON Pointer (--pointer)">
-
-Standard RFC 6901 JSON Pointer syntax (`/` separates keys; escape `~` as `~0` and `/` as `~1`):
+  <TabItem label="Normal Path (--pointer)">
 
 ```powershell title="PowerShell"
+# Example: read the first item ID in the player's inventory inside level.dat
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/Player/Inventory/0/id --types
 ```
 
-  </TabItem>
-  <TabItem label="Explicit Segments (--segments)">
+*(If a field name contains `~`, write `~0`; if it contains `/`, write `~1`.)*
 
-Structured JSON array of up to 256 key/index objects for tag names containing slashes, dots, or special characters:
+  </TabItem>
+  <TabItem label="Special Key Names (--segments)">
+
+If a tag name contains dots, slashes, or unusual punctuation, pass an explicit JSON array of key/index steps with `--segments`:
 
 ```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' `
@@ -71,27 +56,33 @@ Structured JSON array of up to 256 key/index objects for tag names containing sl
   </TabItem>
 </Tabs>
 
-For region files (`.mca`), also specify `--chunk <x,z>` (global chunk coordinates) and, when querying standalone region files, `--dimension <namespace:id>`.
+*(When editing a region chunk `.mca`, also add `--chunk x,z` and `--dimension minecraft:overworld` if targeting a standalone `.mca` file.)*
 
 ---
 
-## 3. Previewing an Edit (No World Files Modified)
+## 3. Step-by-Step: Preview and Apply an Edit
 
 <SafetyBanner tier="preview" lang="en" />
 
+Let's walk through changing a world's display name (`LevelName`) inside `level.dat`. Notice how every line is clearly labeled:
+
 <Tabs syncKey="plan-mode">
-  <TabItem label="Single Node Edit (set)">
+  <TabItem label="Single Value Edit (set)">
 
-Save the `data.value` returned by `get --types`, modify only `data.root.value`, write it to an existing directory outside the world (`D:\Plans\new-level-name.json`), and then run `set` **without** `--apply` to generate a preview plan:
-
-```powershell title="PowerShell"
+```powershell title="Step 1: Preview the change (world stays untouched)"
+# 1. Make an external folder for our plan files
 New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
+
+# 2. Read the current LevelName along with its exact NBT type
 $read = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types | ConvertFrom-Json
 if (-not $read.success) { throw $read.error.message }
+
+# 3. Put your new title into the value field and save it to a file
 $replacement = $read.data.value
 $replacement.data.root.value = 'Updated Map Name'
 $replacement | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\new-level-name.json'
 
+# 4. Build the preview plan (no --apply means your world is NOT touched!)
 .\nbtcli.exe set 'D:\WorldCopy' `
   --path level.dat `
   --pointer /Data/LevelName `
@@ -99,17 +90,14 @@ $replacement | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\n
   --output 'D:\Plans\level-name-plan.json'
 ```
 
-Because `--apply` was omitted, your world folder is completely untouched. The CLI outputs a preview envelope (`"preview": true`) and writes the immutable `nbtcli.patch-plan` file to `D:\Plans\level-name-plan.json`.
-
   </TabItem>
-  <TabItem label="Multi-Node Batch Plan (plan / batch)">
+  <TabItem label="Multiple Edits at Once (plan / batch)">
 
-For multi-node edits, create a `nbtcli.operations` JSON file (containing 1 to 100,000 operations with distinct `id` values) and pass it to `plan` or `batch`:
-
-Use the [operation-set example](../command-reference/) to generate `D:\Plans\ops.json` from the single-node preview shown above.
+To bundle multiple edits (up to 100,000) into one atomic plan, create an `nbtcli.operations` file (see the copy-paste helper in **[Command Reference](../command-reference/)**) and preview it with `plan`:
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
+
 .\nbtcli.exe plan 'D:\WorldCopy' `
   --request 'D:\Plans\ops.json' `
   --output 'D:\Plans\batch-plan.json'
@@ -118,136 +106,110 @@ New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
   </TabItem>
 </Tabs>
 
----
+Now that the plan is ready, **make sure Minecraft is closed**, then apply it:
 
-## 4. Applying the Plan Offline
-
-Once you have reviewed the plan and confirmed that Minecraft is closed, commit the plan with `apply` and `--world-offline`:
-
-```powershell title="PowerShell"
+```powershell title="Step 2: Apply the reviewed plan offline"
 .\nbtcli.exe apply 'D:\WorldCopy' `
   --plan 'D:\Plans\level-name-plan.json' `
   --world-offline `
   --output 'D:\Plans\level-name-receipt.json'
 ```
 
-During `apply`, the engine performs four safety steps in order:
-
-<Steps>
-
-1. **Precondition & Hash Verification**
-
-   Confirms that the target files in `D:\WorldCopy` still match the exact SHA-256 hashes recorded when the plan was created. If a file was modified externally, `apply` stops with exit code `3` (`Conflict`) before writing anything.
-
-2. **Preimage Backup & Candidate Staging**
-
-   Stores the original file bytes in the external `objects/` repository and writes the updated data to temporary staged candidate files.
-
-3. **Journal Publication & Atomic Replace**
-
-   Records the transaction in the external `journals/` directory and replaces the target world files.
-
-4. **Readback Verification**
-
-   Re-reads the written files to prove their hashes match the planned postimages, then marks the receipt terminal (`"receiptIsTerminal": true`).
-
-</Steps>
-
-### Understanding the Nine Operation Outcomes
-
-Every apply receipt accounts for all requested operations across nine mutually exclusive outcome counters:
-
-| Outcome Field | Plain-Language Meaning |
-| --- | --- |
-| `applied` | The change was written and verified on disk. |
-| `unchanged` | The target already had the requested value; verified with no physical write needed. |
-| `skipped` | Pre-commit validation rejected the plan before any world file was touched. |
-| `failed` | An operation failed during preparation or execution. |
-| `conflict` | The target file or node changed since the plan was created, or had a competing edit. |
-| `unsupported` | The operation targets a format or structure that is not supported for writing. |
-| `cancelled` | The operation was recorded as cancelled (exit code `130`). |
-| `recoveryRequired` | The write was interrupted mid-commit; run `status` and `recover` (exit code `7`). |
-| `rolledBack` | Recovery restored the world to its verified pre-edit state (exit code `8`). |
+What happens automatically behind the scenes during `apply`:
+1. **Checks nothing changed** since you created the plan (if Minecraft or another tool edited the world meanwhile, `apply` stops safely before writing anything).
+2. **Saves an automatic backup** of the original files outside your world folder.
+3. **Writes the updated files and verifies** every written byte matches the plan.
 
 ---
 
-## 5. How to Judge and Recover After an Interrupted Write
+## 4. What If a Write Stops Halfway? (Crash Recovery)
 
-If the CLI returns exit code **`7` (`RECOVERY_REQUIRED`)**, keep the game closed and inspect the journal before retrying. A process that is terminated may produce no response. Use the saved plan hash and the same state root in either case. Recovery has been tested after process termination on Windows NTFS. Recovery after power loss has not been verified.
+If your terminal closes unexpectedly during `apply`, or you ever see **exit code `7` (`RECOVERY_REQUIRED`)**, do not panic! Your original files were backed up automatically before writing began.
 
-If the response contains `data.pendingPlanHash`, a different write is waiting for recovery on the same world. Use that hash with `recover` and the state root from the interrupted command. The world may contain `.nbtcli-pending-write` while recovery is pending. Keep this marker and the external state together until recovery finishes.
-
-A `Conflict` preserves external changes and keeps new writes blocked. If you restore the entire plan's verified preimages offline, rerun `recover --rollback`. The CLI verifies those images before releasing the block and preserves the original `Conflict` receipt.
-
-```json title="stdout (RecoveryRequired)"
-{
-  "schemaFamily": "nbtcli.cli",
-  "schemaVersion": 1,
-  "success": false,
-  "command": "apply",
-  "outcome": "RecoveryRequired",
-  "data": {
-    "planHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-    "recovery": {
-      "world": "D:\\WorldCopy",
-      "stateRoot": "C:\\Users\\Player\\AppData\\Local\\nbtcli\\worlds\\4a8b9c..."
-    }
-  },
-  "error": {
-    "code": "RECOVERY_REQUIRED",
-    "message": "World write requires recovery before further use."
-  }
-}
-```
+Follow these three calm steps:
 
 <Steps>
 
-1. **Keep the World Closed in Minecraft**
+1. **Keep Minecraft Closed!**
 
-   Opening a partially updated world in Minecraft can overwrite chunk timestamps and prevent clean recovery. Keep the game closed.
+   Do **not** launch the world in Minecraft while recovery is pending — opening the world could change chunk files and make automatic recovery harder.
 
-2. **Inspect the Journal State with `status`**
+2. **Check the Status (`status`)**
 
-   Run `status` with the exact same world path, `--plan-hash`, and `--state-root` (if you used a custom state root):
+   Grab the `planHash` (or `data.pendingPlanHash` if shown) from the output — or from your saved `plan.json` — and check what happened:
 
    ```powershell title="PowerShell"
    .\nbtcli.exe status 'D:\WorldCopy' `
-     --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+     --plan-hash '<YOUR-PLAN-HASH>'
    ```
 
-   Inspect the exit code, journal `phase`, `receipt`, and `repair` guidance together—do **not** assume an unconfirmed journal means nothing was written:
-   - **`journalMayBeAbsent: true`** means the CLI did not receive a receipt and could not confirm the journal (for example, due to a journal read or parse error even when the original journal was already published and some files were replaced).
-   - **`receiptIsTerminal: false`** can likewise appear when a journal is missing or unreadable, leaving the outcome unresolved.
-   - Keep Minecraft closed and preserve your original plan, backup, and state root. If a journal is missing or unreadable, investigate before proceeding, and run `recover` (forward complete or `--rollback`) only after confirming the original journal and plan identity.
+   *(If you passed a custom `--state-root` earlier, pass that exact same `--state-root` here too.)*
 
-3. **Run `recover` (Forward Complete or Roll Back)**
+3. **Choose: Finish the Edit OR Undo Everything (`recover`)**
 
    <Tabs syncKey="recover-mode">
-     <TabItem label="Complete Forward (Default)">
+     <TabItem label="Finish Applying the Edit (Default)">
 
-   Finish applying the staged postimages recorded in the journal:
+   Completes the planned changes cleanly:
 
    ```powershell title="PowerShell"
    .\nbtcli.exe recover 'D:\WorldCopy' `
-     --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 `
+     --plan-hash '<YOUR-PLAN-HASH>' `
      --world-offline
    ```
 
-     </TabItem>
-     <TabItem label="Roll Back to Pre-Edit State (--rollback)">
+   Returns exit code **`0`** when finished.
 
-   Restore the exact original world files byte-for-byte from the verified preimage backups stored before the write began:
+     </TabItem>
+     <TabItem label="Undo & Restore Original World (--rollback)">
+
+   Restores your world byte-for-byte back to how it was before `apply` started:
 
    ```powershell title="PowerShell"
    .\nbtcli.exe recover 'D:\WorldCopy' `
-     --plan-hash 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 `
+     --plan-hash '<YOUR-PLAN-HASH>' `
      --rollback `
      --world-offline
    ```
 
-   A successful rollback returns **exit code `8` (`RolledBack`)** so automated scripts never mistake a rollback for a forward edit.
+   Returns exit code **`8` (`RolledBack`)** so you (and any scripts) can clearly tell it was rolled back rather than applied forward.
 
      </TabItem>
    </Tabs>
 
 </Steps>
+
+---
+
+<details>
+<summary>Advanced Technical Details: Commit Phases, 9 Receipt Counters, and Edge-Case Recovery</summary>
+
+### Internal Four-Stage Commit Pipeline
+
+1. **Precondition & Hash Verification**: Confirms target files still match the SHA-256 hashes recorded in `plan.json` (fails with exit code `3` / `Conflict` if altered).
+2. **Preimage Backup & Staging**: Copies original bytes into `<stateRoot>\objects\` and writes staged candidate files.
+3. **Journal Publication & Atomic Replace**: Writes the recovery journal in `<stateRoot>\journals\` and replaces target files.
+4. **Readback Verification**: Re-reads every target file to prove hashes match planned postimages, then marks `"receiptIsTerminal": true`.
+
+### Nine Receipt Outcome Counters
+
+| Field | Meaning |
+| --- | --- |
+| `applied` | Written and verified on disk. |
+| `unchanged` | Target already matched the requested value; no write needed. |
+| `skipped` | Pre-commit validation rejected the plan before any world file was touched. |
+| `failed` | Operation failed during preparation or execution. |
+| `conflict` | Target file or node changed since preview, or had a competing edit. |
+| `unsupported` | Target format/structure is not supported for writing. |
+| `cancelled` | Recorded as cancelled (exit code `130`). |
+| `recoveryRequired` | Interrupted mid-commit; run `status` and `recover` (exit code `7`). |
+| `rolledBack` | `recover --rollback` restored the verified pre-edit bytes (exit code `8`). |
+
+### Edge-Case Recovery Notes
+
+- **Scope of testing**: Recovery is verified after process termination on Windows NTFS; sudden hardware power loss has not been verified.
+- **`.nbtcli-pending-write` marker**: While a write is pending recovery, the world folder may contain a `.nbtcli-pending-write` marker and block new writes (`data.pendingPlanHash`). Keep that marker and your external state directory together until `recover` finishes.
+- **Unconfirmed journals (`journalMayBeAbsent: true` or `receiptIsTerminal: false`)**: Do **not** assume nothing was written if `status` cannot confirm the journal (for example, due to a read/parse error). Keep Minecraft closed, preserve your plan, backup, and state root, and confirm the original journal identity before running `recover`.
+- **Clearing a `Conflict` block**: A `Conflict` preserves external changes and keeps new writes blocked. If you manually restore the plan's verified preimages offline, re-run `recover --rollback` to verify them and release the write block (preserving the original `Conflict` receipt).
+
+</details>

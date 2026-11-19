@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://nbtcli.evanlau1798.com/banner-dark.svg" />
     <source media="(prefers-color-scheme: light)" srcset="https://nbtcli.evanlau1798.com/banner-light.svg" />
-    <img alt="NBTExplorerCLI — Minecraft Java Edition 專用 NBT 安全查閱、地圖翻譯與具備中斷復原能力之命令列工具" src="https://nbtcli.evanlau1798.com/banner-dark.svg" width="900" />
+    <img alt="NBTExplorerCLI — Windows 專用 Minecraft Java Edition 存檔查閱、地圖翻譯與安全離線編輯工具" src="https://nbtcli.evanlau1798.com/banner-dark.svg" width="900" />
   </picture>
 
   <br />
@@ -15,278 +15,169 @@
   [![MIT License][license-badge]][license-url]
 
   <p>
-    <b>專為 Minecraft Java Edition 世界設計的 Windows x64 獨立封裝命令列工具，提供 NBT 結構查閱、世界文字掃描、分頁式地圖翻譯、資源包生成，以及具備寫前備份與中斷復原日誌保護的安全離線編輯。</b>
+    <b>免費、解壓縮即用的 Windows 工具，幫你查閱 Minecraft Java Edition 存檔資料、翻譯整張冒險地圖、打包資源包，以及安全修改世界存檔——適合一般玩家、地圖作者、翻譯團隊與 AI 助手使用。</b>
   </p>
 
   <p>
-    <a href="#核心亮點">核心亮點</a> |
-    <a href="#快速開始">快速開始</a> |
-    <a href="#核心工作流範例">工作流範例</a> |
-    <a href="#命令速查表">命令速查表</a> |
-    <a href="#二進位發行包驗證">發行包驗證</a> |
-    <a href="https://nbtcli.evanlau1798.com/zh-tw/docs/">線上文檔</a>
+    <a href="#這個工具可以幫你做什麼">功能介紹</a> |
+    <a href="#三步驟快速開始">快速開始</a> |
+    <a href="#常見任務速查">常見任務</a> |
+    <a href="#給-ai-agent-與自動化工具使用">給 AI Agent</a> |
+    <a href="https://nbtcli.evanlau1798.com/zh-tw/docs/">完整線上文檔</a>
   </p>
 
   <p>
-    <a href="README.md">English</a> | <b>繁體中文</b> | <a href="https://nbtcli.evanlau1798.com/zh-tw/">工具介紹首頁</a> | <a href="https://github.com/Evanlau1798/NBTExplorerCLI/blob/main/CONTRIBUTING.md">Contributing (English)</a>
+    <a href="README.md">English</a> | <b>繁體中文</b> | <a href="https://nbtcli.evanlau1798.com/zh-tw/">工具首頁</a> | <a href="https://nbtcli.evanlau1798.com/llms.txt">AI Agent 完整說明書 (llms.txt)</a>
   </p>
 </div>
 
 ---
 
-## 核心亮點
+## 這個工具可以幫你做什麼
 
-- **單行可預測 JSON 輸出協定**：每次執行皆向標準輸出（`stdout`）寫入單行 UTF-8 JSON 物件（`schemaFamily: "nbtcli.cli"`、`schemaVersion: 1`），讓 PowerShell 腳本、CI 流程與 AI 輔助工具可直接解析結構化欄位，無須依賴脆弱的文字擷取。
-- **安全唯讀 NBT 與區塊查閱**：支援使用標準 JSON Pointer（`--pointer`）或結構化路徑區段（`--segments`）讀取 `level.dat`、`.mca` 地形與實體區塊、資料包 JSON 與 ZIP 壓縮包，並支援易讀顯示模式（`display-json`）與完整保留 NBT 數值型別的可逆模式（`--types`）。
-- **涵蓋 21 種來源的世界文字掃描**：自動索引並驗證告示牌、懸掛式告示牌、書本、物品、實體、容器、指令方塊、函數、計分板、Boss 血條、進度與語言檔中的文字，並於世界資料夾外維護可隨時重建的掃描快取。
-- **分頁式冒險地圖翻譯工作流**：將大型地圖翻譯切分為可驗證的分頁與槽位（`translate`），內建術語表與譯者備註管理，並於確認世界寫入完成後封存工作階段（`seal`）。
-- **資源包與翻譯鍵轉換管線**：支援將世界內的純文字轉為翻譯鍵（`convert` 或 `translate plan --keys`）、匯出獨立語言 JSON 檔（`export-lang`），或建立並與既有資源包安全合併（`create-pack`）。
-- **具備中斷復原能力的安全離線編輯**：所有修改皆先產出不可變的預覽計畫（`nbtcli.patch-plan`）。離線寫入（`--world-offline`）時自動在世界目錄外保存寫前備份與交易日誌，若遇中斷可透過 `status` 與 `recover` 選擇繼續完成或完整回滾（`recover --rollback`）。
+- **零風險查閱存檔**：以唯讀方式查看 `level.dat`、地圖區塊（`.mca`）、資料包與資源包壓縮檔，完全不會動到原存檔。
+- **輕鬆翻譯整張冒險地圖**：自動掃描告示牌、書本、物品、實體、計分板、Boss 血條、指令方塊與資料包文字，分成一頁一頁慢慢翻，還能搭配術語表保持譯名一致。
+- **彈性輸出語言檔與資源包**：可以把翻譯直接寫回地圖、轉成多語言翻譯鍵，或單獨打包／合併成客戶端 `.zip` 資源包，不改動地圖本身。
+- **內建安全防呆機制**：所有修改都會先產生「預覽計畫」再寫入，寫入前自動在世界資料夾外建立備份；萬一中途當機也能安全續寫或一鍵還原。
+- **對 AI 助手與腳本超級友善**：每個指令都輸出乾淨統一的 JSON 格式，可以直接交給 Claude、ChatGPT、Codex、Cursor 或 PowerShell 腳本自動化操作。
 
-### 適用場景與設計邊界
-
-**NBTExplorerCLI 非常適合用於：**
-
-- **冒險地圖翻譯與本地化團隊**：將散落於數千個告示牌、書本、對話框與資料包的文字整理為結構化分頁，搭配術語表翻譯後直接寫入世界或打包為客戶端資源包。
-- **技術型玩家、地圖作者與伺服器管理員**：在離線狀態下精確查閱或批次修改 `level.dat`、`.mca` 區塊、實體與資料包，並享有雜湊前置檢查與自動寫前備份保護。
-- **PowerShell 自動化腳本與 AI Agent 整合**：透過嚴格驗證的 JSON Schema 與明確的結束代碼（`0` 至 `8` 及 `130`）串接自動化檢查與翻譯流程。
-
-**NBTExplorerCLI 不適用於：**
-
-- **遊戲執行期間的即時連線修改**：所有會修改存檔的命令皆要求先關閉 Minecraft 與其他編輯器（並加上 `--world-offline`），以防止區塊與存檔發生讀寫衝突。
-- **3D 地形視覺化預覽或圖形化方塊編輯**：本工具為專注於資料精確度與自動化管線的命令列引擎，不包含 3D 視窗介面。
-- **Minecraft 基岩版（Bedrock Edition）存檔**：資料格式與剖析器專為 **Minecraft Java Edition** 設計。請用 `nbtcli capabilities` 查詢各遊戲版本及操作的支援範圍。
+> [!NOTE]
+> **適用環境：Windows 64 位元 + Minecraft Java Edition 存檔。** 解壓縮就能執行，**不需要另外安裝 .NET**。要修改存檔前，請務必先關閉 Minecraft 並用「世界副本」測試。不支援基岩版（Bedrock Edition）存檔，也沒有 3D 畫面編輯功能。
 
 ---
 
-## 快速開始
+## 三步驟快速開始
 
-請從 [GitHub Releases][releases-url] 或通過驗證的 [GitHub Actions 候選建置][windows-ci-url] 下載 `nbtcli-win-x64.zip` 與 `SHA256SUMS.txt`。壓縮包已內建固定的 .NET 執行環境（`10.0.15`）與所需函式庫，解壓縮後請將所有 `.dll` 與 `nbtcli.exe` 保留在同一個資料夾內。
+### 步驟 1：下載並解壓縮
+
+1. 前往 [GitHub Releases][releases-url]，下載最新版的 **`nbtcli-win-x64.zip`**。
+2. 對壓縮檔按右鍵選「**解壓縮全部...**」，解到一個固定的資料夾（例如 `C:\Tools\nbtcli`）。
+3. **請讓資料夾內的所有檔案待在一起**：不要把 `nbtcli.exe` 單獨拉出來，它需要旁邊的 `.dll` 和 `.json` 檔案才能啟動。
+
+### 步驟 2：在這個資料夾裡打開 PowerShell
+
+打開解壓縮後的資料夾，點一下檔案總管最上方的「路徑網址列」，輸入 `powershell` 後按 **Enter**（或按住 **Shift** 鍵在空白處點右鍵選「在終端機中開啟」）。接著輸入：
 
 ```powershell
-# 1. 解壓縮前，先與 SHA256SUMS.txt 比對 ZIP 雜湊
-Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256
-Get-Content .\SHA256SUMS.txt
-# 確認雜湊一致後再解壓縮
-Expand-Archive -Path .\nbtcli-win-x64.zip -DestinationPath .\nbtcli
-
-# 2. 檢查執行檔版本與命令總覽
-.\nbtcli\nbtcli.exe --version
-.\nbtcli\nbtcli.exe --help
-
-# 3. 在測試用世界副本上執行第一次唯讀查閱
-.\nbtcli\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+.\nbtcli.exe --version
 ```
 
-```json
-{
-  "schemaFamily": "nbtcli.cli",
-  "schemaVersion": 1,
-  "success": true,
-  "command": "get",
-  "outcome": "Success",
-  "data": {
-    "representation": "display-json",
-    "tagType": "Int",
-    "value": 3953
-  },
-  "error": null
-}
+只要看到 `"success": true` 和 `"version": "1.0.0"`，就代表準備就緒了。
+
+### 步驟 3：對世界副本做第一次唯讀檢查
+
+先關閉 Minecraft，把你的存檔資料夾從 `%APPDATA%\.minecraft\saves\` **複製一份**出來（例如複製成 `D:\WorldCopy`），再試跑這兩個完全不改檔的指令：
+
+```powershell
+# 查看這個世界的 Minecraft 資料版本編號（純讀取）
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+
+# 統計整張地圖裡有多少可翻譯的文字（純讀取）
+.\nbtcli.exe scan 'D:\WorldCopy' --summary
 ```
 
-> [!IMPORTANT]
-> 請務必先在測試用的世界副本（例如 `D:\WorldCopy`）上驗證操作流程；修改存檔前請先檢視預覽計畫，並確認關閉 Minecraft 與其他編輯工具後再加上 `--world-offline`。任何命令皆可加上 `--ui-locale zh-TW` 或 `--ui-locale en-US` 切換 CLI 訊息語言（不影響地圖翻譯語言設定）。
-
-完整步驟請參閱線上文檔的 [安裝驗證與安全查閱][doc-getting-started]。
+如果你平常很少用 PowerShell，或想看找存檔、處理 Windows 安全提示、看懂輸出內容的完整圖文級步驟，請直接看 **[下載安裝與初次使用指南][doc-zh-getting-started]** 與 **[常見問題與名詞白話詞典][doc-zh-faq]**。
 
 ---
 
-## 核心工作流範例
+## 日常最常用範例
 
-請在解壓縮後含有 `nbtcli.exe` 的資料夾內執行以下範例。
+以下指令皆在解壓縮後的 `nbtcli` 資料夾中執行：
 
-### 1. 唯讀查閱 NBT 節點、區塊與世界文字
-
-在不改動任何存檔檔案的前提下，快速探索維度結構、區塊資料與可翻譯文字：
+### 探索世界並匯出全部文字
 
 ```powershell
-# 列出世界宣告的維度清單與區塊檔數量
+# 列出世界有哪些維度與區塊檔案
 .\nbtcli.exe list 'D:\WorldCopy'
 
-# 讀取節點並保留完整可逆的 NBT 型別標籤 (--types)
-.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
-
-# 掃描世界內全部 21 種文字來源並輸出統計摘要
-.\nbtcli.exe scan 'D:\WorldCopy' --summary
-
-# 抽取去重後的世界文字與來源座標至既有的外部目錄
+# 把地圖內所有不重複的文字匯出到外部檔案查看
 New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 .\nbtcli.exe extract 'D:\WorldCopy' --unique --output 'D:\Exports\world-text.json'
 ```
 
-詳見 [安裝驗證與安全查閱指南][doc-getting-started]。
-
-### 2. 預覽編輯計畫、離線套用與中斷復原
-
-所有修改皆遵循「先預覽計畫、後離線寫入」的安全保護機制：
+### 開始翻譯一張冒險地圖
 
 ```powershell
-# 步驟 1：產生不可變的修改預覽計畫（完全不改動世界存檔）
-New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
-$read = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types | ConvertFrom-Json
-if (-not $read.success) { throw $read.error.message }
-$replacement = $read.data.value
-$replacement.data.root.value = 'Translated Map Name'
-$replacement | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\new-level-name.json'
-.\nbtcli.exe set 'D:\WorldCopy' `
-  --path level.dat `
-  --pointer /Data/LevelName `
-  --value-file 'D:\Plans\new-level-name.json' `
-  --output 'D:\Plans\level-name-plan.json'
-
-# 步驟 2：確認已關閉 Minecraft 後，離線套用計畫並驗證讀回雜湊
-.\nbtcli.exe apply 'D:\WorldCopy' `
-  --plan 'D:\Plans\level-name-plan.json' `
-  --world-offline `
-  --output 'D:\Plans\level-name-receipt.json'
+# 建立翻譯進度（完全不會修改世界檔案）
+.\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30
 ```
 
-寫入中斷或收到 `RECOVERY_REQUIRED`（退出碼 `7`）時，請保持 Minecraft 關閉，用相同的世界路徑、計畫雜湊及 state root 執行 `status`。確認日誌並核對復原指引後，再執行 `recover`。
+詳細的「匯出分頁 -> 填寫譯文 -> 套用到地圖或打包資源包」流程，請參閱 **[冒險地圖翻譯教學][doc-zh-translation]**。
 
-詳見 [安全編輯與中斷復原指南][doc-safe-editing]。
-
-### 3. 分頁式冒險地圖翻譯工作流
-
-將大型地圖文字切分為可追蹤進度的分頁，完成翻譯後寫回世界或匯出資源包：
+### 修改前先幫世界做一份備份
 
 ```powershell
-$session = .\nbtcli.exe translate start 'D:\WorldCopy' `
-  --source-language en_us `
-  --target-language zh_tw `
-  --page-size 30 | ConvertFrom-Json
-if (-not $session.success) { throw $session.error.message }
-
-New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
-$page = .\nbtcli.exe translate export 'D:\WorldCopy' `
-  --session-id $session.data.status.sessionId --page 0 `
-  --output 'D:\Translate\page-0.txt' | ConvertFrom-Json
-if (-not $page.success) { throw $page.error.message }
-$page.data.replyTemplate | ConvertTo-Json -Depth 50 |
-  Set-Content -Encoding utf8 'D:\Translate\reply-0.json'
+# 在世界資料夾外建立完整備份
+.\nbtcli.exe backup 'D:\WorldCopy' --suffix before-edit
 ```
 
-此範例會建立工作階段並保存實際的回覆範本。請依指南填寫和提交回覆。
-
-詳見 [地圖翻譯工作流指南][doc-translation] 與 [資源包、語言檔與引用指南][doc-resources]。
+想了解備份存在哪裡、出事怎麼還原整張地圖或單一檔案，請看 **[備份還原與檔案存放位置][doc-zh-backups]**。
 
 ---
 
-## 命令速查表
+## 常見任務速查
 
-下表說明各命令會讀取或寫入哪些檔案。
+每個指令都標有清楚的安全等級，執行前一眼就知道會不會改到存檔：
+- **純讀取**：只看不改，世界存檔完全不會動。
+- **僅預覽**：只會在世界資料夾外產生計畫檔或翻譯紀錄，原存檔保持不動。
+- **會修改存檔**：實際寫入世界（請先關閉 Minecraft 並加上 `--world-offline`）。
 
-- **安全查閱：不改存檔**：讀取世界資料或狀態。部分命令也會在世界資料夾外保存快取或匯出檔案。
-- **預覽模式：僅產出計畫**：僅在世界資料夾外產出變更計畫或更新工作階段，世界存檔保持原狀。
-- **寫入外部備份**：將世界資料保存至外部備份儲存庫。
-- **修改存檔：請先關遊戲並備份**：實際寫入世界資料夾。執行前請先關閉 Minecraft 並加上 `--world-offline`。
-
-| 任務目標 | 執行命令 | 安全等級 |
+| 你想做的事 | 執行指令 | 安全等級 |
 | :--- | :--- | :--- |
-| 查詢版本或特定命令的參數說明 | `nbtcli --version` / `nbtcli help <命令>` | **安全查閱：不改存檔** |
-| 讀取單一 NBT 標籤、區塊或 JSON 節點 | `nbtcli get <目標> --path <相對路徑> --pointer <指標>` | **安全查閱：不改存檔** |
-| 列出世界維度或 `.mca` 區塊座標清單 | `nbtcli list <目標> [--path <相對路徑>]` | **安全查閱：不改存檔** |
-| 依文字內容、標籤名稱或型別搜尋節點 | `nbtcli search <目標> [--query <文字>] [--name <名稱>]` | **安全查閱：不改存檔** |
-| 掃描世界內 21 種文字來源並建立外部快取 | `nbtcli scan <世界目錄> [--summary] [--show-items]` | **安全查閱：不改存檔** |
-| 抽取世界文字與來源位置至外部檔案 | `nbtcli extract <世界目錄> [--unique] --output <檔案>` | **安全查閱：不改存檔** |
-| 驗證世界文字與容器結構完整性 | `nbtcli validate <世界目錄>` | **安全查閱：不改存檔** |
-| 查詢支援的 Minecraft `DataVersion` 範圍 | `nbtcli capabilities` | **安全查閱：不改存檔** |
-| 預覽單一節點的型別安全修改計畫 | `nbtcli set <目標> --pointer <指標> --value-file <檔案> --output <計畫>` | **預覽模式：僅產出計畫** |
-| 預覽多筆操作的批次修改計畫 | `nbtcli plan <世界目錄> --request <ops.json> --output <計畫>` | **預覽模式：僅產出計畫** |
-| 預覽將世界文字轉為翻譯鍵的計畫 | `nbtcli convert <世界目錄> --lang <語言代碼> --output <計畫>` | **預覽模式：僅產出計畫** |
-| 管理分頁式地圖翻譯工作階段 | `nbtcli translate <start\|status\|export\|submit\|advance\|plan\|...>` | **預覽模式：僅產出計畫** |
-| 匯出語言 JSON 檔或建立客戶端資源包 | `nbtcli translate <export-lang\|create-pack> <世界目錄> --output <路徑>` | **預覽模式：僅產出計畫** |
-| 設定外部 AI 翻譯輔助偏好問卷 | `nbtcli agent <setup\|submit\|status\|help> <世界目錄>` | **預覽模式：僅產出計畫** |
-| 離線套用已驗證的修改計畫 | `nbtcli apply <世界目錄> --plan <plan.json> --world-offline` | **修改存檔：請先關遊戲並備份** |
-| 檢查中斷的寫入 | `nbtcli status <世界目錄> --plan-hash <雜湊>` | **安全查閱：不改存檔** |
-| 繼續或回退中斷的寫入 | `nbtcli recover <世界目錄> --plan-hash <雜湊> --world-offline [--rollback]` | **修改存檔：請先關遊戲並備份** |
-| 建立內容定址備份 | `nbtcli backup <世界目錄> [--suffix <名稱>]` | **寫入外部備份** |
-| 預覽還原計畫 | `nbtcli restore <世界目錄> --manifest-hash <雜湊> --output <計畫>` | **預覽模式：僅產出計畫** |
+| 查看版本或指令說明 | `.\nbtcli.exe --version` / `.\nbtcli.exe help <指令>` | 純讀取 |
+| 切換提示訊息為中文或英文 | 在任意指令加上 `--ui-locale zh-TW` 或 `--ui-locale en-US` | 純讀取 |
+| 列出世界的維度或區塊清單 | `.\nbtcli.exe list 'D:\WorldCopy'` | 純讀取 |
+| 讀取單一數值（例如地圖名稱或版本） | `.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName` | 純讀取 |
+| 依名稱或內容搜尋存檔欄位 | `.\nbtcli.exe search 'D:\WorldCopy' --path level.dat --name Spawn` | 純讀取 |
+| 統計整張地圖有多少文字可翻譯 | `.\nbtcli.exe scan 'D:\WorldCopy' --summary` | 純讀取 |
+| 檢查存檔有沒有損壞或未支援的檔案 | `.\nbtcli.exe validate 'D:\WorldCopy'` | 純讀取 |
+| 開始一份地圖翻譯進度 | `.\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw` | 僅預覽 |
+| 在修改前先備份世界 | `.\nbtcli.exe backup 'D:\WorldCopy' --suffix before-edit` | 純讀取 |
+| 套用已經檢查過的修改／翻譯計畫 | `.\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Plans\plan.json' --world-offline` | 會修改存檔 |
 
-完整旗標與輸入 JSON Schema 範本請參閱 [CLI 命令完整參考][doc-reference]。
+想要直接複製貼上的完整步驟，請看 **[常見任務速查][doc-zh-recipes]** 或 **[完整命令參考][doc-zh-reference]**。
 
 ---
 
-## 二進位發行包驗證
+## 給 AI Agent 與自動化工具使用
 
-每個 Windows x64 發行壓縮包（`nbtcli-win-x64.zip`）皆附帶外部 `SHA256SUMS.txt` 以及壓縮包內的 `candidate.json` 建置溯源清單。
+`nbtcli.exe` 非常適合交給 AI 助手（Claude、ChatGPT、Codex、Cursor 等）幫你查存檔、修資料或翻譯整張地圖。我們專門準備了一份**高資訊密度、免讀廢話的 AI Agent 快速完整說明書**：
 
-1. **解壓縮前核對 ZIP 的 SHA-256 雜湊值：**
+- **線上直讀版（推薦直接貼給 AI）**：[https://nbtcli.evanlau1798.com/llms.txt][llms-url]
+- **本儲存庫檔案位置**：[`docs/public/llms.txt`](docs/public/llms.txt)
+- **網頁版指南與直接可用的提示詞範本**：**[AI Agent 快速整合指南][doc-zh-ai-agents]**
 
-   ```powershell
-   $zipHash = (Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
-   $expected = (Get-Content .\SHA256SUMS.txt | Select-Object -First 1).Split(' ')[0].Trim().ToLowerInvariant()
-   if ($zipHash -ne $expected) { throw "SHA-256 雜湊不符！" } else { "驗證成功: $zipHash" }
-   ```
-
-2. **檢視壓縮包內的 `candidate.json` 建置溯源清單：**
-
-   ```powershell
-   Get-Content .\nbtcli\candidate.json | ConvertFrom-Json | Select-Object product, version, commit, sdkVersion, runtimeVersion
-   ```
-
-   `candidate.json` 記錄了確切的 Git Commit 雜湊、固定的 .NET SDK（`10.0.404`）、內建的 .NET Runtime（`10.0.15`）、第三方相依套件版本，以及發行包內每一個檔案各自的 SHA-256 雜湊值。
+這份 `llms.txt` 完整收錄了全部指令與旗標、6 種輸入 JSON Schema、退出碼判斷規則、編輯／翻譯／復原標準 SOP 與常見踩坑清單，讓 AI 讀完就能精準安全地操作。
 
 ---
 
-## 完整線上文檔
+## 完整線上文檔導覽
 
-完整教學指南、操作安全等級說明、可複製的 JSON Schema 範本與疑難排解清單皆已發布於文檔網站：
+線上文檔提供完整的**繁體中文**與**英文**雙語教學：
 
-- **繁體中文文檔**：[https://nbtcli.evanlau1798.com/zh-tw/docs/][docs-zh]
-  - [安裝驗證與安全查閱][doc-getting-started]
-  - [安全編輯與中斷復原][doc-safe-editing]
-  - [地圖翻譯工作流][doc-translation]
-  - [資源包、語言檔與引用][doc-resources]
-  - [備份與狀態檔管理][doc-backups]
-  - [CLI 命令完整參考][doc-reference]
-  - [支援範圍與疑難排解][doc-support]
-- **English Documentation**：[https://nbtcli.evanlau1798.com/docs/][docs-en]
-- **LLM 與自動化工具結構索引**：[https://nbtcli.evanlau1798.com/llms.txt][llms-url]（`docs/public/llms.txt`）
-
----
-
-## 建置與驗證說明
-
-請使用 `global.json` 指定的 .NET SDK（`10.0.404`），並將套件還原、Release 建置與驗證套件分開執行：
-
-```powershell
-dotnet restore NBTExplorerCLI.slnx --configfile NuGet.Config --locked-mode
-dotnet build NBTExplorerCLI.slnx -c Release --no-restore
-dotnet tests/NBTExplorerCLI.Verification/bin/Release/net10.0/NBTExplorerCLI.Verification.dll --suite all --timeout-ms 120000
-```
-
-使用 Node.js `22.23.5` 可在本機安裝相依套件、建置或預覽 `docs/` 目錄下的 Astro Starlight 文檔網站：
-
-```powershell
-Set-Location .\docs
-npm ci
-npm run build
-npm run preview
-```
+| 主題 | 繁體中文 | English |
+| :--- | :--- | :--- |
+| 工具總覽 | [工具總覽][docs-zh] | [Documentation Overview][docs-en] |
+| 下載與入門 | [下載安裝與初次使用][doc-zh-getting-started] | [Install & First Run][doc-getting-started] |
+| 常見任務 | [常見任務速查][doc-zh-recipes] | [Common Tasks (Recipes)][doc-recipes] |
+| 新手必看 | [常見問題與名詞白話詞典][doc-zh-faq] | [FAQ & Plain-Language Glossary][doc-faq] |
+| 地圖翻譯 | [冒險地圖翻譯教學][doc-zh-translation] | [Map Translation Guide][doc-translation] |
+| 資源包與語言檔 | [資源包與語言檔輸出][doc-zh-resources] | [Resource Packs & Language Files][doc-resources] |
+| 安全編輯與復原 | [安全修改存檔與中斷復原][doc-zh-safe-editing] | [Editing Worlds & Crash Recovery][doc-safe-editing] |
+| 備份與檔案位置 | [備份還原與檔案存放位置][doc-zh-backups] | [Backups & Where Files Live][doc-backups] |
+| AI 整合專區 | [AI Agent 快速整合指南][doc-zh-ai-agents] | [AI Agent Quickstart][doc-ai-agents] |
+| 完整參考 | [完整命令參考][doc-zh-reference] | [Command Reference][doc-reference] |
+| 支援與排解 | [支援版本與疑難排解][doc-zh-support] | [Supported Versions & Troubleshooting][doc-support] |
 
 ---
 
-## 參與貢獻（Contributing）
+## 從原始碼建置與參與貢獻
 
-NBTExplorerCLI 由 [@Evanlau1798](https://github.com/Evanlau1798) 建立與維護。我們歡迎聚焦且易於驗證的外部貢獻，例如獨立的錯誤修正、確定性回歸測試、文檔強化與多語言文檔翻譯。
-
-在提交 Issue 或 Pull Request 之前，請先詳閱英文版貢獻規範 [CONTRIBUTING.md](https://github.com/Evanlau1798/NBTExplorerCLI/blob/main/CONTRIBUTING.md)，了解專案邊界、存檔安全不變量與提交前的必要驗證步驟。
-
----
+如果你想自行編譯程式、跑驗證測試套件，或是提交錯誤修正與文檔改進，請參閱 **[CONTRIBUTING.md](CONTRIBUTING.md)**（英文），裡面有完整的 .NET SDK（`10.0.404`）建置指令、文檔網站建置方式（`docs/`）與貢獻規範。
 
 ## 授權條款
 
-本專案採用 [MIT 授權條款](LICENSE) 釋出。隨附的第三方元件依其各自之授權與聲明散布，詳見 [SharpZipLib](licenses/SharpZipLib.md) 與 [Unicode](licenses/Unicode.md)。Windows x64 發行包亦隨附 .NET Runtime 授權條款與第三方聲明。
+本專案採用 [MIT 授權條款](LICENSE) 釋出。隨附第三方元件保留其各自授權與聲明，詳見 [SharpZipLib](licenses/SharpZipLib.md) 與 [Unicode](licenses/Unicode.md)。本工具非 Minecraft、Mojang 或 Microsoft 官方產品。
 
 [windows-ci-badge]: https://github.com/Evanlau1798/NBTExplorerCLI/actions/workflows/windows.yml/badge.svg
 [windows-ci-url]: https://github.com/Evanlau1798/NBTExplorerCLI/actions/workflows/windows.yml
@@ -300,10 +191,23 @@ NBTExplorerCLI 由 [@Evanlau1798](https://github.com/Evanlau1798) 建立與維�
 [docs-en]: https://nbtcli.evanlau1798.com/docs/
 [docs-zh]: https://nbtcli.evanlau1798.com/zh-tw/docs/
 [llms-url]: https://nbtcli.evanlau1798.com/llms.txt
-[doc-getting-started]: https://nbtcli.evanlau1798.com/zh-tw/docs/getting-started/
-[doc-safe-editing]: https://nbtcli.evanlau1798.com/zh-tw/docs/safe-editing/
-[doc-translation]: https://nbtcli.evanlau1798.com/zh-tw/docs/translation-workflow/
-[doc-resources]: https://nbtcli.evanlau1798.com/zh-tw/docs/resources-and-packs/
-[doc-backups]: https://nbtcli.evanlau1798.com/zh-tw/docs/backups-and-state/
-[doc-reference]: https://nbtcli.evanlau1798.com/zh-tw/docs/command-reference/
-[doc-support]: https://nbtcli.evanlau1798.com/zh-tw/docs/support-and-troubleshooting/
+[doc-getting-started]: https://nbtcli.evanlau1798.com/docs/getting-started/
+[doc-recipes]: https://nbtcli.evanlau1798.com/docs/recipes/
+[doc-faq]: https://nbtcli.evanlau1798.com/docs/faq/
+[doc-safe-editing]: https://nbtcli.evanlau1798.com/docs/safe-editing/
+[doc-translation]: https://nbtcli.evanlau1798.com/docs/translation-workflow/
+[doc-resources]: https://nbtcli.evanlau1798.com/docs/resources-and-packs/
+[doc-backups]: https://nbtcli.evanlau1798.com/docs/backups-and-state/
+[doc-ai-agents]: https://nbtcli.evanlau1798.com/docs/ai-agents/
+[doc-reference]: https://nbtcli.evanlau1798.com/docs/command-reference/
+[doc-support]: https://nbtcli.evanlau1798.com/docs/support-and-troubleshooting/
+[doc-zh-getting-started]: https://nbtcli.evanlau1798.com/zh-tw/docs/getting-started/
+[doc-zh-recipes]: https://nbtcli.evanlau1798.com/zh-tw/docs/recipes/
+[doc-zh-faq]: https://nbtcli.evanlau1798.com/zh-tw/docs/faq/
+[doc-zh-safe-editing]: https://nbtcli.evanlau1798.com/zh-tw/docs/safe-editing/
+[doc-zh-translation]: https://nbtcli.evanlau1798.com/zh-tw/docs/translation-workflow/
+[doc-zh-resources]: https://nbtcli.evanlau1798.com/zh-tw/docs/resources-and-packs/
+[doc-zh-backups]: https://nbtcli.evanlau1798.com/zh-tw/docs/backups-and-state/
+[doc-zh-ai-agents]: https://nbtcli.evanlau1798.com/zh-tw/docs/ai-agents/
+[doc-zh-reference]: https://nbtcli.evanlau1798.com/zh-tw/docs/command-reference/
+[doc-zh-support]: https://nbtcli.evanlau1798.com/zh-tw/docs/support-and-troubleshooting/

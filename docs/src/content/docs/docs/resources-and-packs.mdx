@@ -1,6 +1,6 @@
 ---
-title: Resource Packs, Language Files, and References
-description: Compare in-world text replacement, translation key conversion, standalone resource packs, and bounded reference synchronization.
+title: Resource Packs & Language Files
+description: Choose between putting translations directly inside a map, converting text to translation keys, or exporting a standalone Minecraft resource pack.
 ---
 
 import { FileTree, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -8,28 +8,29 @@ import SafetyBanner from '../../../components/SafetyBanner.astro';
 
 <SafetyBanner tier="preview" lang="en" />
 
-When localizing or converting text in a Minecraft Java Edition world, **NBTExplorerCLI** supports both **in-world gameplay edits** and **standalone resource pack outputs**. Understanding the distinction between these workflows helps you pick the right approach for your map.
+When you finish translating a Minecraft Java Edition map, you can deliver the result in several different ways depending on how players will play your map. This page helps you pick the best option and walks through each one.
 
-## 1. Choosing Between In-World Replacement, Translation Keys, and Standalone Packs
+## 1. Which Output Style Should I Choose?
 
-| Workflow | Command | Changes Gameplay NBT/JSON? | Outputs Language / Resource Pack? | Best Used When |
+| Option | Command | Modifies Map Save? | Creates Resource Pack / Lang File? | Best For |
 | --- | --- | --- | --- | --- |
-| **Direct In-World Replacement** | `translate plan --direct` -> `apply` | Yes (replaces literal text in-place) | No | You want a single translated world save that works without loading a resource pack. |
-| **Session Key Conversion** | `translate plan --keys` -> `apply` | Yes (replaces literals with `translate` keys) | Yes (writes/merges the required `.json` language file) | You want the world to use translation keys (`map.<digest>`) backed by an embedded or directory resource pack. |
-| **One-Shot Key Conversion** | `convert <world> --lang <locale>` | Yes (when `--apply` is used) | Yes (`resources.zip#assets/nbt/lang/<locale>.json` by default) | You want to extract existing in-world text into translation keys and a language file in a single step without a translation session. |
-| **Standalone Language Export** | `translate export-lang` | No gameplay NBT (writes inside world if `--output` is omitted) | Yes (writes original & target `.json` language files) | You only want language files from a completed session without changing gameplay NBT. |
-| **Standalone Resource Pack** | `translate create-pack` | No gameplay NBT (writes inside world if `--output` is omitted) | Yes (creates or merges a ZIP or folder resource pack) | You want to build or merge a client resource pack from a session's frozen translations without changing gameplay NBT. |
+| **Put Text Directly in the Map** | `translate plan --direct` -> `apply` | Yes | No | **Simplest for players.** Just open the map in Minecraft — no resource pack needed. |
+| **Multi-Language Map (Keys + Pack)** | `translate plan --keys` -> `apply` | Yes | Yes | Players can switch languages by switching Minecraft's language setting with the map's resource pack. |
+| **Standalone Resource Pack Only** | `translate create-pack` | No (if you pass external `--output`) | Yes (`.zip` or folder) | Creating or merging a client resource pack from a finished session without editing map NBT. |
+| **Standalone Language JSON Only** | `translate export-lang` | No (if you pass external `--output`) | Yes (`en_us.json`, `zh_tw.json`) | Exporting raw `.json` language files to hand to translators or pack builders. |
+| **One-Shot Convert Without Translating** | `convert <world> --lang <locale>` | Yes (when `--apply` is used) | Yes | Extracting an existing map's literal text into translation keys in one step. |
 
 ---
 
-## 2. Session Key Plans (`translate plan --keys`)
+## 2. Converting a Translated Map to Translation Keys (`translate plan --keys`)
 
-When you generate a session plan with `--keys`, every translated slot is converted from a literal text string into a Minecraft `translate` component key (such as `map.<slot-digest>`), and the corresponding language file is staged and verified as part of the **same** atomic plan (create external output folders such as `D:\Translate` first):
+Instead of overwriting text with one fixed language, `--keys` turns every translated text slot into a Minecraft translation key (like `map.<id>`) and builds the matching `.json` language file in the **same** plan:
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+
 .\nbtcli.exe translate plan 'D:\WorldCopy' `
-  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
   --revision 2 `
   --keys `
   --prefix map. `
@@ -37,59 +38,50 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
   --output 'D:\Translate\keys-plan.json'
 ```
 
-### Supported `--language-output` Targets and Pack Layout
+Then close Minecraft and run `nbtcli apply 'D:\WorldCopy' --plan 'D:\Translate\keys-plan.json' --world-offline`.
 
-`--language-output` specifies a world-relative language file or archive entry:
+### Where `--language-output` Writes the Language File
 
-- **`generated.zip#assets/example/lang/zh_tw.json`**: Creates a new resource pack ZIP if it does not exist yet.
-- **`resources.zip#assets/example/lang/zh_tw.json`**: Safely merges the language entry into an existing resource pack ZIP while preserving all other ZIP entries and `pack.png`.
-- **`resourcepacks/client/assets/example/lang/zh_tw.json`**: Writes or merges the language file inside an existing directory resource pack.
+`--language-output` accepts three convenient formats inside your world folder:
+
+- **`generated.zip#assets/example/lang/zh_tw.json`** — Creates a brand-new `.zip` resource pack if it does not exist yet.
+- **`resources.zip#assets/example/lang/zh_tw.json`** — Safely merges your language file into the map's existing `resources.zip` while keeping all existing textures, sounds, and `pack.png`.
+- **`resourcepacks/client/assets/example/lang/zh_tw.json`** — Writes or merges into an unpacked folder resource pack.
 
 <FileTree>
 - D:\Exports\Packs\adventure-pack.zip
   - pack.mcmeta
-  - pack.png (preserved when merging)
+  - pack.png (kept intact when merging)
   - assets/
     - adventure/
       - lang/
-        - **en_us.json** (original source strings)
-        - **zh_tw.json** (translated target strings)
+        - **en_us.json** (original text)
+        - **zh_tw.json** (your translations)
 </FileTree>
 
-> [!IMPORTANT]
-> The locale in the `--language-output` path (such as `zh_tw.json`) must match the session's target language, and existing resource pack metadata (`pack.mcmeta`) must be compatible with the world's `DataVersion` profile.
+:::note[Language Code Must Match]
+The filename in `--language-output` (for example `zh_tw.json`) must match your session's target language, and an existing pack's `pack.mcmeta` must match your world's Minecraft version.
+:::
 
 ---
 
-## 3. Standalone Language Files and Resource Packs (`export-lang` and `create-pack`)
+## 3. Exporting Standalone Language Files or Resource Packs (`export-lang` & `create-pack`)
 
-When all slots are translated or marked unchanged, these commands preview the resource files. With `--apply --world-offline`, they write resource files without editing gameplay NBT or sealing the session. When `--output` is omitted, `export-lang` defaults to `.nbtcli.language` inside the world directory, and `create-pack` defaults to the world root or `resourcepacks/` depending on the world profile (`resourcepacks/` for `java-dimensions-namespaced`). Pass an explicit external `--output` to keep exported files outside your world directory, and create external parent folders (`D:\Exports`, `D:\Plans`) before exporting plans.
+Once all slots in your translation session are finished (`pending: 0`), you can export standalone `.json` language files or a full `.zip`/folder client resource pack **without modifying any map gameplay data**.
+
+:::caution[Always Pass an External `--output` Folder to Keep Your World Untouched]
+If you leave out `--output`, `export-lang` defaults to writing inside `<world>\.nbtcli.language` and `create-pack` defaults to writing inside the world root or `<world>\resourcepacks`. Passing an explicit external folder like `--output 'D:\Exports\Packs'` guarantees your world folder stays completely untouched!
+:::
 
 <Tabs syncKey="pack-export-mode">
-  <TabItem label="Standalone Language Files (export-lang)">
+  <TabItem label="Build or Merge a Resource Pack (create-pack)">
 
 ```powershell title="PowerShell"
-New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
-# Preview standalone language export and save the canonical plan
-.\nbtcli.exe translate export-lang 'D:\WorldCopy' `
-  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
-  --revision 2 `
-  --original-lang en_us `
-  --target-lang zh_tw `
-  --prefix map. `
-  --output 'D:\Exports\LangFiles' `
-  --plan-output 'D:\Plans\export-lang-plan.json'
-```
+New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-Null
 
-To write the files immediately, add `--apply --world-offline` (or apply the saved `--plan-output` file using `nbtcli apply`).
-
-  </TabItem>
-  <TabItem label="Resource Pack Archive / Folder (create-pack)">
-
-```powershell title="PowerShell"
-New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
+# Preview first (omit --apply to preview, or add --apply --world-offline to write right away)
 .\nbtcli.exe translate create-pack 'D:\WorldCopy' `
-  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
   --revision 2 `
   --original-lang en_us `
   --target-lang zh_tw `
@@ -103,25 +95,49 @@ New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
 ```
 
   </TabItem>
+  <TabItem label="Export Raw Language JSON Files (export-lang)">
+
+```powershell title="PowerShell"
+New-Item -ItemType Directory -Path 'D:\Exports\LangFiles', 'D:\Plans' -Force | Out-Null
+
+# Preview standalone language file export
+.\nbtcli.exe translate export-lang 'D:\WorldCopy' `
+  --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
+  --revision 2 `
+  --original-lang en_us `
+  --target-lang zh_tw `
+  --prefix map. `
+  --output 'D:\Exports\LangFiles' `
+  --plan-output 'D:\Plans\export-lang-plan.json'
+```
+
+  </TabItem>
 </Tabs>
 
-Key options for `create-pack`:
+### Important Options Explained Simply
 
-- **`--output <DIR>` vs. `--plan-output <FILE>`**: In `export-lang` and `create-pack`, `--output` selects the target directory where resource files will be placed, while `--plan-output` exports the `nbtcli.patch-plan` file.
-- **`--format zip|directory`**: Chooses whether to produce a `.zip` archive or an unpacked resource pack folder.
-- **`--pack-format <major[.minor]>`**: Explicitly sets the Minecraft `pack_format` in `pack.mcmeta` (required when exporting to an external directory without relying on live world metadata).
-- **`--merge <PATH>`**: Merges your generated language files into an existing ZIP or directory resource pack. Existing assets and `pack.png` are preserved; conflicting language keys or differing file bytes are reported as a conflict before any file is written.
-- **Applying a Retained Resource Plan**: When a target `--output` directory does not exist yet during preview, the plan binds to its nearest existing parent (`physicalRoot`). Always use the `commitArguments` returned in the preview JSON when running `apply` on a saved resource plan.
+- **`--output <folder>` vs. `--plan-output <file>`**: `--output` is where your generated `.zip` or `.json` files go; `--plan-output` is where the optional preview plan file is saved.
+- **`--format zip|directory`**: Choose a `.zip` file (ready to drop into Minecraft's `resourcepacks` folder) or an unzipped folder.
+- **`--pack-format <number>`**: Required when exporting outside the world so Minecraft recognizes the pack version (`22` for 1.20.4, `34` for 1.21, `55` for 1.21.5, `75` for 1.21.11, `80` for 26.1-snapshot-6).
+- **`--merge <path>`**: Optional! Merges your new language files into an existing resource pack while preserving all textures, audio, and `pack.png`. If a translation key conflicts with an existing file, `nbtcli` stops and tells you instead of silently overwriting.
+
+<details>
+<summary>Advanced: Applying a Saved Resource Plan Later</summary>
+
+To write immediately during `export-lang` or `create-pack`, simply add `--apply --world-offline`. If you preview first and run `nbtcli apply` later, use the exact `commitArguments` printed in the preview JSON (this matters when the target `--output` subfolder did not yet exist during preview).
+
+</details>
 
 ---
 
-## 4. One-Shot World Conversion (`convert`)
+## 4. One-Shot Key Conversion (`convert`)
 
-When you want to convert literal text in a world into translation keys without opening a multi-page translation session, use `convert`:
+Want to turn an English map's existing literal text straight into translation keys + `en_us.json` **without** creating a translation session? Use `convert`:
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
-# Preview conversion and export the plan
+
+# Preview the conversion plan first
 .\nbtcli.exe convert 'D:\WorldCopy' `
   --lang en_us `
   --prefix nbt. `
@@ -129,27 +145,26 @@ New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
   --output 'D:\Plans\convert-plan.json'
 ```
 
-- By default, `convert` shares a single translation key across occurrences that have identical text, role, profile, context, and placeholder signature. Pass **`--keepdup`** if you want every physical occurrence to receive a distinct key.
-- When committing (`--apply --world-offline`), `convert` automatically creates a full-world convenience backup first and reports `convenienceBackupHash` (pass `--no-backup` to omit only that extra convenience copy; mandatory preimage staging and recovery journals remain active at all times).
+- By default, identical text appearing in multiple places shares one translation key. Add **`--keepdup`** if you want every individual location to get its own separate key.
+- When you apply `convert` (`--apply --world-offline`), it automatically takes a full-world convenience backup first (pass `--no-backup` only if you want to skip that extra convenience copy; crash-recovery backups remain active either way).
 
 ---
 
-## 5. Custom Entity Names and Reference Synchronization (`--synchronize-references`)
+## 5. Keeping Command Blocks Safe When Translating Entity Names
 
-In Minecraft adventure maps, commands (such as `@e[name=...]`) sometimes reference entities or armor stands by their custom name (`CustomName`). Changing an entity's `CustomName` without updating the commands that look for it can break map mechanics.
+In many adventure maps, command blocks look for specific armor stands or NPCs by their custom name — for example, `@e[name="QuestGuide"]`. If you translate `"QuestGuide"` without updating the command blocks that target it, quests and cutscenes can break!
 
-To protect your map:
-
-1. **Default Safe Refusal**: In ordinary `translate plan --direct`, `translate plan --keys`, and `convert`, changing an identifying entity or armor-stand name is refused by default so you never accidentally break `@e[name=...]` selectors.
-2. **Bounded Reference Synchronization (`--synchronize-references`)**: In `translate plan --direct`, if you intentionally translated an identifying entity name and want NBTExplorerCLI to synchronize proven matching command references in the same scope, pass `--synchronize-references`:
+To keep your map working properly:
+1. **Protected by default**: Normally, if you try to translate an entity or armor-stand name used as an identifier, `translate plan` and `convert` refuse safely so you do not break map mechanics by accident.
+2. **Automatic safe syncing (`--synchronize-references`)**: If you are using `translate plan --direct` and genuinely want to translate an entity name **and** automatically update every matching command reference in scope, add `--synchronize-references`:
 
 ```powershell title="PowerShell"
 .\nbtcli.exe translate plan 'D:\WorldCopy' `
-  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
   --revision 2 `
   --direct `
   --synchronize-references `
   --output 'D:\Translate\direct-sync-plan.json'
 ```
 
-If any command reference in the selected scope is ambiguous, dynamic, or cannot be proven safe to rewrite, planning fails closed before modifying the world.
+If any command reference is dynamic or ambiguous (meaning it cannot be guaranteed safe to rewrite), planning stops before touching your world.

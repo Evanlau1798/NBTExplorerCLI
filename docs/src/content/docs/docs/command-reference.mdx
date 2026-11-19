@@ -1,30 +1,73 @@
 ---
 title: Command Reference
-description: Complete reference for all NBTExplorerCLI commands, subcommands, accepted flags, input schemas, and safety levels.
+description: Complete lookup of every NBTExplorerCLI command, subcommand, accepted flag, safety level, and JSON input template.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 import CommandReferenceList from '../../../components/CommandReferenceList.astro';
 
-This page lists every registered command and subcommand in **NBTExplorerCLI** (`nbtcli.exe`), aligned with the verified command surface contract (`nbtcli.command-surface`, version `1`).
+This page is the full lookup table for every command and flag in **NBTExplorerCLI** (`nbtcli.exe`), directly aligned with the CLI's verified command contract (`nbtcli.command-surface`, v1).
 
-## Global CLI Rules
+:::tip[Looking for Step-by-Step Guides Instead?]
+If you want practical examples rather than a full flag dictionary, start with **[Common Tasks (Recipes)](../recipes/)** or **[Install & First Run](../getting-started/)**. For AI assistants, use **[`llms.txt`](../../llms.txt)**.
+:::
 
-For subcommand help (such as `translate start` or `agent setup`), append `--help` to the subcommand itself—for example `nbtcli translate start --help` (passing subcommands to `help`, such as `nbtcli help translate start`, exits with code `2`).
+## Quick CLI Syntax Rules
 
-- **Single JSON Output**: Every command writes exactly one newline-delimited UTF-8 JSON envelope (`schemaFamily: "nbtcli.cli"`, `schemaVersion: 1`) to `stdout`.
-- **Global Display Locale (`--ui-locale`)**: Pass `--ui-locale zh-TW` (default) or `--ui-locale en-US` before or after any command to select the language of error and help messages. It does not affect translation source/target locales (`--source-language`, `--target-language`, `--lang`, `--original-lang`, `--target-lang`).
-- **Option Syntax**: Value options accept `--option value` or `--option=value`. Boolean flags take no value. Use `--` to end option parsing when a path begins with a hyphen.
-- **Root and Option Aliases**:
-  - Root `--help` and `-h` invoke `help`.
-  - Root `--version` and `-v` invoke `version`.
-  - `-h` is accepted as `--help` on any command.
+- **Getting Help**: Run `.\nbtcli.exe help <command>` for root commands, or `.\nbtcli.exe <command> <subcommand> --help` for subcommands (for example, `.\nbtcli.exe translate start --help`). Running `nbtcli help translate start` exits with code `2`.
+- **Shortcuts**: `--help` / `-h` works on any command; `--version` / `-v` prints the version.
+- **Switching Message Language**: Add `--ui-locale en-US` or `--ui-locale zh-TW` anywhere in a command to change help and error text without affecting JSON keys or map translation languages.
+- **Option Format**: Options with values accept `--option value` or `--option=value`. Use `--` before a path that starts with `-`.
+- **Consistent JSON Output**: Every command prints exactly one single-line UTF-8 JSON object (`schemaFamily: "nbtcli.cli"`, `schemaVersion: 1`) to `stdout`.
 
 ---
 
-## File and Standard Input (`-`) Schemas
+## Inspection and Search Commands (Read Only)
 
-Commands that read structured JSON from a file or standard input (`-`) validate the exact `schemaFamily` and `schemaVersion` before executing:
+Check version, command help, NBT fields, region chunks, and datapack JSON without modifying your world.
+
+<CommandReferenceList lang="en" group="inspect" />
+
+## World Text Scanning and Validation Commands (Read Only)
+
+Index and export world text, check files for corruption, and list supported Minecraft versions.
+
+<CommandReferenceList lang="en" group="scan" />
+
+## Editing, Backup, and Recovery Commands
+
+Preview edits, apply verified plans offline, back up or restore worlds, and recover interrupted writes.
+
+<CommandReferenceList lang="en" group="edit" />
+
+## Translation, Conversion, and Agent Commands
+
+One-shot key conversion, paginated translation sessions, and optional local assistant preferences.
+
+<CommandReferenceList lang="en" group="translate" />
+
+<CommandReferenceList lang="en" group="agent" />
+
+---
+
+## `translate` Subcommands
+
+All `translate` subcommands (except `translate help`) take `<world>` and accept `--state-root`, `--output`, `--help`, and `--ui-locale`.
+
+<CommandReferenceList lang="en" group="translate-sub" />
+
+## `agent` Subcommands
+
+All `agent` subcommands (except `agent help`) take `<world>` and store local preferences outside your world folder without connecting to the internet.
+
+<CommandReferenceList lang="en" group="agent-sub" />
+
+---
+
+<details>
+<summary>Advanced: Structured JSON Input Templates & PowerShell Automation Pattern</summary>
+
+Commands that read structured JSON from a file (or `-` for standard input) check exact `schemaFamily` and `schemaVersion: 1` before running:
 
 | Input Schema Family | Accepted By |
 | --- | --- |
@@ -35,12 +78,12 @@ Commands that read structured JSON from a file or standard input (`-`) validate 
 | `nbtcli.session-command` | `translate jump`, `note`, `glossary`, or `reset` via `--request <file\|->` |
 | `nbtcli.agent-questionnaire` | `agent submit <dir> --request <file\|->` |
 
-### Copy-Paste JSON Schema Templates
+### Copy-Paste JSON Templates
 
 <Tabs syncKey="input-schema">
   <TabItem label="nbtcli.typed-nbt">
 
-Used by `set --value` or `set --value-file`. Tip: run `nbtcli get <world> --path <rel> --pointer <ptr> --types`, take `data.value`, and modify only `data.root.value`.
+Used by `set --value` or `set --value-file`. Always start from `data.value` returned by `nbtcli get <world> --path <rel> --pointer <ptr> --types` and modify only `data.root.value`:
 
 ```json title="value-typed-nbt.json"
 {
@@ -59,9 +102,7 @@ Used by `set --value` or `set --value-file`. Tip: run `nbtcli get <world> --path
   </TabItem>
   <TabItem label="nbtcli.operations">
 
-Used by `nbtcli plan <world> --request <file|->` and `nbtcli batch <file|-> --world <world>`. Accepts 1 to 100,000 operations with unique `id` values.
-
-To prepare a request for the simple string edit in the [editing guide](../safe-editing/), reuse the operations from its saved preview. For a batch, keep the source addresses for the same world and use distinct operation IDs.
+Used by `nbtcli plan <world> --request <file|->` and `nbtcli batch <file|-> --world <world>` (1 to 100,000 operations with unique `id` values). Reuse `data.operations` from a `set` preview to build a valid request quickly:
 
 ```powershell title="Build an operation set from a preview"
 $preview = Get-Content -Raw 'D:\Plans\level-name-plan.json' | ConvertFrom-Json
@@ -75,7 +116,7 @@ $preview = Get-Content -Raw 'D:\Plans\level-name-plan.json' | ConvertFrom-Json
   </TabItem>
   <TabItem label="nbtcli.session-reply">
 
-Used by `translate submit --reply` and `translate advance --reply`. Always start from the `data.replyTemplate` generated by `translate export` so `operationId`, `snapshotId`, `pageId`, `slotId`, and `sourceTextHash` match the active session page.
+Used by `translate submit --reply` and `translate advance --reply`. Always start from `data.replyTemplate` returned by `translate export`:
 
 ```json title="reply-page-0.json"
 {
@@ -104,7 +145,7 @@ Used by `translate submit --reply` and `translate advance --reply`. Always start
   </TabItem>
   <TabItem label="nbtcli.session-command">
 
-Used by `translate jump`, `translate note`, `translate glossary`, and `translate reset` via `--request <file|->`.
+Used by `translate jump`, `translate note`, `translate glossary`, and `translate reset` via `--request <file|->`:
 
 ```json title="session-command.json"
 {
@@ -129,9 +170,7 @@ Used by `translate jump`, `translate note`, `translate glossary`, and `translate
   </TabItem>
   <TabItem label="nbtcli.agent-questionnaire">
 
-Generated by `nbtcli agent setup <world> --output <file>` and submitted back via `nbtcli agent submit <world> --request <file|->`.
-
-Generate the questionnaire for the world you intend to use. Fill in `configuration.agentName`, check both language settings, and retain the world ID, revision, and operation ID before submitting it.
+Generated by `nbtcli agent setup <world> --output <file>`. Fill in `configuration.agentName`, check languages, retain IDs/revision, then submit via `nbtcli agent submit <world> --request <file|->`:
 
 ```powershell title="Export the questionnaire"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
@@ -142,11 +181,7 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
   </TabItem>
 </Tabs>
 
----
-
-## PowerShell Automation & Exit-Code Pattern
-
-When scripting `nbtcli.exe` in PowerShell or CI pipelines, parse the single-line JSON output with `ConvertFrom-Json` and check both `$LASTEXITCODE` and `$res.success`:
+### PowerShell Scripting Pattern
 
 ```powershell title="PowerShell"
 $raw = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion --ui-locale en-US
@@ -165,44 +200,4 @@ if ($exitCode -ne 0 -or -not $response.success) {
 Write-Output "Detected DataVersion: $($response.data.value)"
 ```
 
----
-
-## Inspection and Query Commands
-
-Read-only commands for checking version, command options, NBT tags, region chunks, and datapack JSON files.
-
-<CommandReferenceList lang="en" group="inspect" />
-
-## World Text Scanning and Validation Commands
-
-Read-only commands for indexing world text occurrences, extracting strings, validating world sources, and checking supported Minecraft profiles.
-
-<CommandReferenceList lang="en" group="scan" />
-
-## Editing, Backup, and Recovery Commands
-
-Commands for previewing changes, applying verified plans offline, managing backups, and recovering from interrupted writes.
-
-<CommandReferenceList lang="en" group="edit" />
-
-## Translation, Conversion, and Agent Commands
-
-Root commands for one-shot key conversion, paginated translation sessions, and external assistant preferences.
-
-<CommandReferenceList lang="en" group="translate" />
-
-<CommandReferenceList lang="en" group="agent" />
-
----
-
-## `translate` Subcommands Reference
-
-All `translate` subcommands (except `translate help`) take the target `<world>` path and accept `--state-root`, `--output`, `--help`, and `--ui-locale`.
-
-<CommandReferenceList lang="en" group="translate-sub" />
-
-## `agent` Subcommands Reference
-
-All `agent` subcommands (except `agent help`) take the target `<world>` path and store preferences inside the external state root without modifying the world folder.
-
-<CommandReferenceList lang="en" group="agent-sub" />
+</details>

@@ -1,0 +1,185 @@
+---
+title: Common Tasks (Recipes)
+description: Ready-to-copy step-by-step recipes for everyday Minecraft world inspection, renaming, map translation, resource packs, and backups.
+---
+
+import SafetyBanner from '../../../components/SafetyBanner.astro';
+
+Know what you want to accomplish and just want the shortest clear steps? Pick a recipe below. Run every command in PowerShell from your extracted `nbtcli` folder, and replace `D:\WorldCopy` with your own copied world folder.
+
+---
+
+## Recipe 1: Check What Minecraft Version a Save Uses
+
+<SafetyBanner tier="safe" lang="en" />
+
+```powershell title="PowerShell"
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+```
+
+Look at `data.value` in the output and match it against common versions:
+- `3700` = Java `1.20.4`
+- `3953` = Java `1.21`
+- `4325` = Java `1.21.5`
+- `4671` = Java `1.21.11`
+- `4774` = Java `26.1-snapshot-6`
+
+*(Older pre-1.9 Anvil saves have no `DataVersion` — see [Supported Versions](../support-and-troubleshooting/) for using `--minecraft-version`.)*
+
+---
+
+## Recipe 2: Safely Rename a Minecraft World (`LevelName`)
+
+<SafetyBanner tier="write" lang="en" />
+
+Make sure Minecraft is closed and you are testing on `D:\WorldCopy`.
+
+```powershell title="PowerShell"
+# 1. Create a folder outside your world to store the preview plan
+New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
+
+# 2. Read the current LevelName while keeping its exact Minecraft data type
+$read = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types | ConvertFrom-Json
+if (-not $read.success) { throw $read.error.message }
+
+# 3. Change only the text value and save it to a file
+$replacement = $read.data.value
+$replacement.data.root.value = 'My Awesome Adventure Map'
+$replacement | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\new-name.json'
+
+# 4. Preview the edit (world is NOT modified yet)
+.\nbtcli.exe set 'D:\WorldCopy' `
+  --path level.dat `
+  --pointer /Data/LevelName `
+  --value-file 'D:\Plans\new-name.json' `
+  --output 'D:\Plans\rename-plan.json'
+
+# 5. Apply the plan offline (automatic backup is created outside your world)
+.\nbtcli.exe apply 'D:\WorldCopy' `
+  --plan 'D:\Plans\rename-plan.json' `
+  --world-offline
+```
+
+For more editing examples and crash recovery steps, see **[Editing Worlds & Crash Recovery](../safe-editing/)**.
+
+---
+
+## Recipe 3: See All Text Inside an Adventure Map
+
+<SafetyBanner tier="safe" lang="en" />
+
+Want to preview every sign, book, item name, dialogue line, and scoreboard title before translating?
+
+```powershell title="PowerShell"
+# Quick count of how many text entries exist in each category
+.\nbtcli.exe scan 'D:\WorldCopy' --summary
+
+# Save all unique text entries to a readable JSON file outside your world
+New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
+.\nbtcli.exe extract 'D:\WorldCopy' --unique --output 'D:\Exports\map-text.json'
+```
+
+Open `D:\Exports\map-text.json` in Notepad or VS Code to browse all the text.
+
+---
+
+## Recipe 4: Translate an Adventure Map Into Another Language
+
+<SafetyBanner tier="preview" lang="en" />
+
+Here is the big-picture loop for translating an English map (`en_us`) into Traditional Chinese (`zh_tw`):
+
+```powershell title="PowerShell"
+# 1. Start a translation project (splits map text into pages of 30 items)
+$start = .\nbtcli.exe translate start 'D:\WorldCopy' `
+  --source-language en_us `
+  --target-language zh_tw `
+  --page-size 30 | ConvertFrom-Json
+$sid = $start.data.status.sessionId
+
+# 2. Export page 0 and save its ready-to-fill reply template
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+$page = .\nbtcli.exe translate export 'D:\WorldCopy' `
+  --session-id $sid --page 0 `
+  --output 'D:\Translate\page-0.txt' | ConvertFrom-Json
+$page.data.replyTemplate | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Translate\reply-0.json'
+```
+
+Next:
+1. Open `D:\Translate\reply-0.json`, fill in your translations (or hand it to an AI assistant), and submit it with `translate submit` or `translate advance`.
+2. Repeat until all pages are done (`pending` reaches `0`).
+3. Run `translate plan` -> `apply --world-offline` -> `translate seal`.
+
+Read the full walkthrough in **[Map Translation Guide](../translation-workflow/)**, or let an AI handle the whole loop with **[AI Agent Quickstart](../ai-agents/)**.
+
+---
+
+## Recipe 5: Export a Client Resource Pack (`.zip`) Without Editing the Map
+
+<SafetyBanner tier="preview" lang="en" />
+
+Once your translation session has `pending: 0`, you can build a standalone `.zip` resource pack outside the world folder (replace `--pack-format 34` with the number matching your Minecraft version — see [Supported Versions](../support-and-troubleshooting/)):
+
+```powershell title="PowerShell"
+New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-Null
+
+.\nbtcli.exe translate create-pack 'D:\WorldCopy' `
+  --session-id '<YOUR-SESSION-ID>' `
+  --revision 2 `
+  --original-lang en_us `
+  --target-lang zh_tw `
+  --prefix map. `
+  --name 'my-translation-pack.zip' `
+  --format zip `
+  --pack-format 34 `
+  --output 'D:\Exports\Packs' `
+  --plan-output 'D:\Plans\pack-plan.json' `
+  --apply --world-offline
+```
+
+See **[Resource Packs & Language Files](../resources-and-packs/)** for merging into an existing texture pack (`--merge`).
+
+---
+
+## Recipe 6: Back Up a World and Restore It Later
+
+<SafetyBanner tier="safe" lang="en" />
+
+```powershell title="PowerShell"
+# Create a backup outside your world folder
+.\nbtcli.exe backup 'D:\WorldCopy' --suffix before-experiment
+```
+
+Copy the `manifestHash` shown in the output! If you ever want to restore the world (or just one broken file like `level.dat`):
+
+```powershell title="PowerShell"
+New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
+
+# 1. Preview the restore plan (add "--path level.dat" to restore only one file)
+.\nbtcli.exe restore 'D:\WorldCopy' `
+  --manifest-hash '<YOUR-MANIFEST-HASH>' `
+  --output 'D:\Backups\restore-plan.json'
+
+# 2. Close Minecraft and apply the restore plan
+.\nbtcli.exe apply 'D:\WorldCopy' `
+  --plan 'D:\Backups\restore-plan.json' `
+  --world-offline
+```
+
+See **[Backups & Where Files Live](../backups-and-state/)** for full details.
+
+---
+
+## Recipe 7: Check If a Map Has Corrupted Files or Bad Datapack JSON
+
+<SafetyBanner tier="safe" lang="en" />
+
+```powershell title="PowerShell"
+# Fast structure check
+.\nbtcli.exe validate 'D:\WorldCopy' --quick
+
+# Full deep check across all regions and datapacks
+.\nbtcli.exe validate 'D:\WorldCopy'
+```
+
+If `success` is `true`, everything parsed cleanly. If any file is broken or unsupported, the output tells you the exact file path so you can fix or skip it.

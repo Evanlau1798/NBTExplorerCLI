@@ -9,19 +9,21 @@ const { lang = 'en' } = Astro.props;
 const headers =
   lang === 'zh-tw'
     ? {
-        profile: 'Profile 名稱',
+        profile: '版本代號',
         dv: 'DataVersion',
+        packFormat: '資源包 pack_format',
         layout: '維度目錄結構',
-        items: '物品資料結構',
-        text: '文字組件格式',
-        pack: '資源包目錄規則',
+        items: '物品資料格式',
+        text: '文字格式',
+        pack: '資源包命名規則',
       }
     : {
-        profile: 'Profile',
+        profile: 'Version Profile',
         dv: 'DataVersion',
+        packFormat: 'Resource pack_format',
         layout: 'Dimension Layout',
-        items: 'Item Schema',
-        text: 'Text Component Schema',
+        items: 'Item Format',
+        text: 'Text Format',
         pack: 'Pack Layout',
       };
 ---
@@ -31,6 +33,7 @@ const headers =
     <tr>
       <th>{headers.profile}</th>
       <th>{headers.dv}</th>
+      <th>{headers.packFormat}</th>
       <th>{headers.layout}</th>
       <th>{headers.items}</th>
       <th>{headers.text}</th>
@@ -46,6 +49,9 @@ const headers =
           </td>
           <td>
             <code>{row.dataVersion}</code>
+          </td>
+          <td>
+            <code>{row.packFormat}</code>
           </td>
           <td>
             <code>{row.layout}</code>

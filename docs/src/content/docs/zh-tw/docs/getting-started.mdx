@@ -1,6 +1,6 @@
 ---
-title: 安裝驗證與安全查閱
-description: 驗證 Windows x64 發行壓縮包雜湊、檢查執行檔狀態，並在世界副本上執行唯讀 NBT 查詢與世界文字掃描。
+title: 下載安裝與初次使用
+description: 一步一步帶你在 Windows 上下載解壓縮、打開 PowerShell、安全複製 Minecraft 世界存檔，並跑完第一次唯讀檢查。
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -8,49 +8,45 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 <SafetyBanner tier="safe" lang="zh-tw" />
 
-本指南將帶您完成 **NBTExplorerCLI** 的下載、SHA-256 雜湊與溯源清單驗證、解壓縮獨立封裝執行環境，並在 Minecraft Java Edition 世界副本上執行第一次唯讀查閱命令（`get`、`list`、`search`、`scan` 與 `extract`）。
+即使你平常很少碰命令列（PowerShell），跟著這篇從頭做到尾，大約 3 分鐘就能完成安裝並安全查閱你的第一個 Minecraft Java 版世界。
 
-## 安裝與驗證四步驟
+## 第一部分：下載與準備（約 1 分鐘）
 
 <Steps>
 
-1. **下載並驗證 Windows x64 壓縮包**
+1. **從 GitHub Releases 下載 Windows 壓縮檔**
 
-   您可以從以下兩個官方管道取得 Windows x64 發行包（`nbtcli-win-x64.zip`）與 `SHA256SUMS.txt`：
+   打開官方 **[GitHub Releases 頁面](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**，在最新版本下載 **`nbtcli-win-x64.zip`**。
 
-   - **[GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases)**：通過完整發布驗證流程的正式標籤版本（`v1.0.0`）。
-   - **[GitHub Actions 候選建置](https://github.com/Evanlau1798/NBTExplorerCLI/actions)**：針對特定 Commit 產出、並於無 SDK 的乾淨 Windows Server Core 容器內完成冒煙測試的建置產物（`nbtcli-windows-x64`）。
+   :::tip[不需要另外安裝 .NET 或 Java]
+   所有執行需要的元件都已經包在這個壓縮檔裡面，下載解壓縮就能直接用。
+   :::
 
-   解壓縮前，請先確認 ZIP 檔案的 SHA-256 雜湊值與隨附的 `SHA256SUMS.txt` 一致：
+2. **把整個壓縮檔解壓縮到同一個資料夾**
 
-   ```powershell title="PowerShell"
-   $zipHash = (Get-FileHash .\nbtcli-win-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
-   $expected = (Get-Content .\SHA256SUMS.txt | Select-Object -First 1).Split(' ')[0].Trim().ToLowerInvariant()
-   if ($zipHash -ne $expected) { throw "SHA-256 雜湊不符！" } else { "驗證成功: $zipHash" }
-   ```
+   在檔案總管裡對 `nbtcli-win-x64.zip` 按右鍵選「**解壓縮全部...**」，建議放到路徑簡單、沒有特殊符號的資料夾，例如 `C:\Tools\nbtcli`。
 
-2. **解壓縮獨立封裝執行環境**
+   :::caution[不要把 `nbtcli.exe` 單獨拉出來]
+   請讓 `nbtcli.exe` 和同資料夾裡的所有 `.dll`、`.json` 檔案保持在一起。如果只把 `.exe` 搬走，程式會無法啟動。
+   :::
 
-   請將壓縮包完整解壓縮至獨立資料夾。本套件為**獨立封裝（Self-Contained）**，已內建固定版本的 .NET Runtime（`10.0.15`）與必要函式庫（`ICSharpCode.SharpZipLib.dll`）。請務必讓 `nbtcli.exe` 與同目錄下的 `.dll` 及 `.json` 檔案保持在一起：
+3. **在這個資料夾裡打開 PowerShell**
 
-   ```powershell title="PowerShell"
-   Expand-Archive -Path .\nbtcli-win-x64.zip -DestinationPath .\nbtcli
-   Set-Location .\nbtcli
-   ```
+   打開 `C:\Tools\nbtcli` 資料夾後，任選下面一種最順手的方法：
+   - **方法 A（最推薦）**：點一下檔案總管最上方的「路徑網址列」，輸入 `powershell` 後按 **Enter**。
+   - **方法 B**：按住鍵盤 **Shift** 鍵，在資料夾空白處點滑鼠右鍵，選「**在終端機中開啟**」（或「在此處開啟 PowerShell 視窗」）。
 
-   > [!TIP]
-   > 每個發行包內皆附有 `candidate.json`，完整記錄建置版本（`1.0.0`）、Git Commit 雜湊、固定 SDK 版本（`10.0.404`）、相依套件版本，以及壓縮包內每個檔案各自的 SHA-256 雜湊值。
+4. **確認 `nbtcli.exe` 可以正常啟動**
 
-3. **檢查版本與命令說明**
-
-   執行 `--version` 與 `--help` 確認執行檔可正常啟動：
+   在 PowerShell 視窗輸入下面這行並按 **Enter**：
 
    ```powershell title="PowerShell"
    .\nbtcli.exe --version
-   .\nbtcli.exe --help
    ```
 
-   ```json title="stdout (nbtcli --version)"
+   正常會看到類似這樣的輸出：
+
+   ```json title="輸出結果"
    {
      "schemaFamily": "nbtcli.cli",
      "schemaVersion": 1,
@@ -65,36 +61,62 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
    }
    ```
 
-   若要查詢根命令支援的參數清單，請執行 `help <命令>`；查詢子命令（例如 `translate start`）則需將 `--help` 接在最後：
+   :::note[如果 Windows 跳出「Windows 已保護您的電腦」（SmartScreen）]
+   因為這是沒有付費商業數位簽章的開源工具，第一次執行時 Windows 可能會跳出提醒畫面。只要你確實是從上方官方 GitHub Releases 下載的，點選「**其他資訊**」->「**仍要執行**」即可。
+   :::
+
+   隨時可以查看所有指令或單一指令的說明：
 
    ```powershell title="PowerShell"
+   .\nbtcli.exe --help --ui-locale zh-TW
    .\nbtcli.exe help get --ui-locale zh-TW
-   .\nbtcli.exe help translate --ui-locale zh-TW
    .\nbtcli.exe translate start --help --ui-locale zh-TW
    ```
 
-4. **準備一份世界副本**
+5. **複製一份測試用的 Minecraft 世界副本**
 
-   雖然唯讀查閱命令絕不會修改世界檔案，但在測試查詢、掃描或編輯流程前，強烈建議先複製一份獨立的 Minecraft 世界存檔（例如 `D:\WorldCopy`）。複製存檔資料夾前請先關閉 Minecraft，確保所有區塊與世界資料皆已完整寫入磁碟。
+   雖然唯讀查閱完全不會改動存檔，但養成「永遠先在副本上操作」的習慣，才能讓原本的存檔萬無一失：
+   1. **先完全關閉 Minecraft**（確保遊戲已經把最新進度存回硬碟）。
+   2. 按鍵盤 `Win + R`，輸入 `%APPDATA%\.minecraft\saves` 後按 **Enter**，就會打開原版啟動器的存檔資料夾。
+      *（若使用 Prism Launcher、CurseForge 或 Modrinth 啟動器，請在該啟動器打開實例資料夾，裡面就會看到 `saves`。）*
+   3. 把想測試的世界資料夾**複製**一份出來，貼到好打字的路徑，例如 `D:\WorldCopy`。
 
 </Steps>
 
 ---
 
-## 使用 `get` 讀取單一節點
+## 第二部分：試跑前四個「純讀取」指令
 
-`get` 可用於讀取特定的 NBT 標籤、區塊檔（`.mca`）、資料包 JSON 屬性或 ZIP 壓縮包內項目。
+以下四個指令都屬於**純讀取模式**，保證不會修改 `D:\WorldCopy` 裡的任何檔案。操作時請把 `D:\WorldCopy` 換成你自己的世界副本路徑。
 
-<Tabs syncKey="get-mode">
-  <TabItem label="易讀顯示模式 (預設)">
-
-預設情況下，`get` 會回傳簡潔易讀的 `display-json`：
+### 1. 查看世界有哪些維度與區塊（`list`）
 
 ```powershell title="PowerShell"
-.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+.\nbtcli.exe list 'D:\WorldCopy'
 ```
 
-```json title="stdout (display-json)"
+這會列出世界包含哪些維度（主世界、地獄、終界或自訂維度）以及各自有多少個區塊檔（`.mca`）。
+
+### 2. 讀取單一存檔欄位（`get`）
+
+來讀看看 `level.dat` 裡記錄的 Minecraft 資料版本與世界名稱：
+
+```powershell title="PowerShell"
+# 查看世界的 Minecraft DataVersion 版本號
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+
+# 查看世界的顯示名稱
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName
+```
+
+各參數白話說明：
+- `'D:\WorldCopy'`：你的世界副本路徑（用單引號 `'...'` 包起來，路徑裡有空格也不會出錯）。
+- `--path level.dat`：要打開世界裡的哪一個檔案。
+- `--pointer /Data/DataVersion`：要讀檔案裡的哪一個欄位（跟資料夾路徑一樣用 `/` 往下找：`Data` 底下的 `DataVersion`）。
+
+輸出範例：
+
+```json title="輸出結果"
 {
   "schemaFamily": "nbtcli.cli",
   "schemaVersion": 1,
@@ -110,57 +132,55 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 }
 ```
 
-  </TabItem>
-  <TabItem label="可逆型別模式 (--types)">
+看 `data.value`：`3953` 就代表這張地圖是 Minecraft Java `1.21`！
 
-若您後續打算將輸出中的 `data.value` 修改後交給 `set` 或 `batch` 寫回世界，請加上 `--types` 以取得 `nbtcli.typed-nbt` 結構，完整保留 NBT 精確型別（如 `byte`、`short`、`int`、`long`、`float` 原始位元與型別陣列）：
+### 3. 不知道路徑在哪裡？用關鍵字搜尋（`search`）
+
+如果不確定欄位叫什麼全名，可以直接用 `--name`（搜欄位名稱）或 `--query`（搜文字內容）：
 
 ```powershell title="PowerShell"
-.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
+# 在 level.dat 裡搜尋名稱包含 "Spawn" 的所有欄位
+.\nbtcli.exe search 'D:\WorldCopy' --path level.dat --name Spawn --limit 10
 ```
 
-```json title="stdout (typed-nbt)"
-{
-  "schemaFamily": "nbtcli.cli",
-  "schemaVersion": 1,
-  "success": true,
-  "command": "get",
-  "outcome": "Success",
-  "data": {
-    "representation": "typed-nbt",
-    "tagType": "String",
-    "value": {
-      "schemaFamily": "nbtcli.typed-nbt",
-      "schemaVersion": 1,
-      "data": {
-        "name": "",
-        "root": {
-          "tag": "string",
-          "value": "Original Map Name"
-        }
-      }
-    }
-  },
-  "error": null
-}
+### 4. 統計並匯出地圖裡所有可翻譯文字（`scan` 與 `extract`）
+
+想知道一張冒險地圖裡總共有多少告示牌、書本、物品、實體、指令方塊、計分板與資料包文字：
+
+```powershell title="PowerShell"
+# 快速統計各類文字各有幾筆
+.\nbtcli.exe scan 'D:\WorldCopy' --summary
 ```
 
-  </TabItem>
-</Tabs>
+如果想把全部不重複的文字匯出成一個檔案，用記事本或 VS Code 慢慢看，請先在世界資料夾**外面**建立一個資料夾（例如 `D:\Exports`），再執行 `extract`：
 
-### 查詢不同類型的世界目標
+```powershell title="PowerShell"
+# 先在世界外建立輸出資料夾
+New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
+
+# 匯出所有不重複的文字到 D:\Exports\world-text.json
+.\nbtcli.exe extract 'D:\WorldCopy' --unique --output 'D:\Exports\world-text.json'
+```
+
+:::tip[為什麼 `D:\Exports` 要建在世界資料夾外面？]
+為了避免在你的存檔裡留下多餘檔案，NBTExplorerCLI 規定所有匯出檔與計畫檔都必須存放在世界資料夾以外的既有資料夾中。
+:::
+
+---
+
+<details>
+<summary>進階查閱：讀取區塊檔（.mca）、資料包 JSON、ZIP 資源包與保留型別（--types）</summary>
+
+除了 `level.dat`，也可以直接查閱特定區塊、資料包 JSON 或資源包壓縮檔內的文字：
 
 <Tabs syncKey="target-kind">
-  <TabItem label="level.dat">
-
-```powershell title="PowerShell"
-.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName
-```
-
-  </TabItem>
   <TabItem label="地形或實體區塊 (.mca)">
 
 ```powershell title="PowerShell"
+# 列出 r.0.0.mca 裡面已經生成的區塊座標
+.\nbtcli.exe list 'D:\WorldCopy' --path 'region/r.0.0.mca' --limit 20
+
+# 讀取座標 (0, 0) 區塊內的欄位
 .\nbtcli.exe get 'D:\WorldCopy' --path 'region/r.0.0.mca' --chunk 0,0 --dimension minecraft:overworld --pointer /Status
 ```
 
@@ -172,54 +192,33 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 ```
 
   </TabItem>
-  <TabItem label="ZIP 壓縮包項目">
+  <TabItem label="ZIP 資源包項目">
 
 ```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy\resources.zip' --entry 'assets/custom/lang/en_us.json' --pointer /item.custom.sword
 ```
 
   </TabItem>
+  <TabItem label="保留精確型別 (--types)">
+
+如果接下來打算用 `set` 修改這個欄位，讀取時請加上 `--types`，保留 Minecraft 精確的資料型別（如 `byte`、`short`、`int`、`long`、`float`、`string`）：
+
+```powershell title="PowerShell"
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types
+```
+
+  </TabItem>
 </Tabs>
 
----
+**關於掃描快取**：`scan`、`extract` 與 `validate` 預設會在世界資料夾外的 `%LOCALAPPDATA%\nbtcli\scan\<world-id>` 保存可隨時重建的高速快取，讓你第二次掃描快非常多。想強制重掃可加 `--refresh`，不想留快取可加 `--no-cache`。
 
-## 使用 `list` 與 `search` 探索世界結構
-
-對世界目錄執行 `list`，可列出該世界宣告的所有維度、地形區塊檔數量與實體區塊檔數量：
-
-```powershell title="PowerShell"
-.\nbtcli.exe list 'D:\WorldCopy'
-```
-
-對 `.mca` 區塊檔執行 `list`（不加 `--chunk`）可列出所有已生成的區塊座標；執行 `search` 則可依文字內容（`--query`）、標籤名稱（`--name`）或 NBT 型別（`--type`）搜尋節點：
-
-```powershell title="PowerShell"
-.\nbtcli.exe list 'D:\WorldCopy' --path 'region/r.0.0.mca' --limit 20
-.\nbtcli.exe search 'D:\WorldCopy' --path level.dat --name Spawn --limit 10
-```
+</details>
 
 ---
 
-## 使用 `scan` 與 `extract` 掃描及抽取世界文字
+## 下一步要看哪裡？
 
-`scan` 會索引世界內 21 種可翻譯或可檢視的文字來源（包含告示牌、懸掛式告示牌、書本、物品、實體、容器、指令方塊、函數、計分板、Boss 血條、進度與語言檔）：
-
-```powershell title="PowerShell"
-# 快速輸出全世界的文字來源統計摘要
-.\nbtcli.exe scan 'D:\WorldCopy' --summary
-
-# 指定單一維度掃描，並在輸出中包含解碼後的文字項目
-.\nbtcli.exe scan 'D:\WorldCopy' --dimension minecraft:overworld --show-items --limit 25
-```
-
-> [!NOTE]
-> 獨立的 `scan`、`extract` 與一般 `validate` 預設會在世界資料夾外建立可隨時重建的高速掃描快取（預設位於 `%LOCALAPPDATA%\nbtcli\scan\<world-id>`，亦可使用 `--cache-root` 指定世界外的其他目錄）；翻譯與寫入工作流程則使用 state root 下的獨立快取。加上 `--refresh` 可強制重新剖析，加上 `--no-cache` 則不儲存快取。
-
-若要將解碼後的文字與精確來源位置匯出至世界資料夾外的既有目錄，請先建立父目錄後執行 `extract`：
-
-```powershell title="PowerShell"
-New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
-.\nbtcli.exe extract 'D:\WorldCopy' --unique --output 'D:\Exports\world-text-unique.json'
-```
-
-熟悉唯讀查閱與掃描後，請接著閱讀 **[安全編輯與中斷復原](../safe-editing/)**，了解如何先預覽變更計畫再安全寫入世界。
+- 想直接照抄日常常用操作的步驟？前往 **[常見任務速查](../recipes/)**。
+- 要翻譯整張冒險地圖？直接看 **[冒險地圖翻譯教學](../translation-workflow/)**。
+- 想安全修改存檔內容？接著看 **[安全修改存檔與中斷復原](../safe-editing/)**。
+- 想讓 AI 助手幫你代勞？前往 **[AI Agent 快速整合指南](../ai-agents/)**。

@@ -1,0 +1,103 @@
+---
+title: AI Agent 快速整合指南
+description: 專為 Claude、ChatGPT、Codex、Cursor 等 AI 助手準備的高資訊密度操作契約、快速 SOP 與現成提示詞。
+---
+
+import SafetyBanner from '../../../../components/SafetyBanner.astro';
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+**NBTExplorerCLI**（`nbtcli.exe`）從設計之初就針對 AI Agent 與自動化腳本優化：每次執行都輸出單行結構化 JSON、嚴格驗證輸入 Schema、並透過明確退出碼回報狀態，讓 AI 不需依賴不穩定的文字剖析即可安全查閱、翻譯與修改世界存檔。
+
+---
+
+## 1. 給一般使用者：一個連結讓 AI 立刻上手
+
+如果你想讓 AI 助手（例如 Claude Code、Codex、Cursor、Antigravity，或具備本機終端機權限的 AI）幫你查存檔或翻譯整張冒險地圖，**不需要把整套網站一頁一頁貼給它**。
+
+直接把我們專門寫給 AI 的單檔完整說明書 **`llms.txt`** 交給它即可：
+
+- **線上直讀網址**：`https://nbtcli.evanlau1798.com/llms.txt`（[直接開啟 `llms.txt`](../../../llms.txt)）
+- **儲存庫內檔案位置**：`docs/public/llms.txt`
+
+### 直接可用的翻譯委託提示詞
+
+```text title="複製貼給你的 AI 助手"
+請先完整閱讀 https://nbtcli.evanlau1798.com/llms.txt，掌握 nbtcli.exe 的指令契約、安全規範與標準流程。
+
+請使用 C:\Tools\nbtcli\nbtcli.exe，幫我將位於 D:\WorldCopy 的 Minecraft 世界副本從 en_us 翻譯成 zh_tw：
+1. 先執行 capabilities 與 scan --summary，回報支援狀態與文字總量。
+2. 啟動翻譯工作階段（translate start），逐頁執行 export -> 翻譯 -> submit/advance，保持專有名詞一致，保留原格式與佔位符。
+3. 所有暫存檔與計畫檔請放在 D:\Translate（不可寫進 D:\WorldCopy）。
+4. 待 pending 歸零後，產生 --direct 更新計畫並先向我確認 Minecraft 已關閉，再執行 apply --world-offline 與 translate seal。
+```
+
+---
+
+## 2. 高密度協定摘要（供 AI Agent 快速讀取）
+
+如需完整旗標矩陣、6 種輸入 JSON Schema、經典舊版限制與 8 套標準 SOP，請直接讀取 **[`llms.txt`](../../../llms.txt)**。以下為核心執行契約摘要：
+
+### 不可違反的核心不變量（Invariants）
+
+| 項目 | 嚴格規範 |
+| :--- | :--- |
+| **單行 JSON 輸出** | 每次呼叫僅向 `stdout` 輸出單行 UTF-8 JSON（`schemaFamily: "nbtcli.cli"`、`schemaVersion: 1`）。務必同時檢查 `$LASTEXITCODE` 與 `response.success`。 |
+| **查詢說明語法** | 根命令：`nbtcli help <cmd>` 或 `nbtcli <cmd> --help`。子命令：`nbtcli translate <subcmd> --help` / `nbtcli agent <subcmd> --help`。（`nbtcli help translate start` 會以退出碼 `2` 失敗。） |
+| **訊息語言** | 在任意位置傳入 `--ui-locale en-US` 或 `--ui-locale zh-TW`，只改變人讀的 `error.message`／說明文字，不改變 JSON 鍵名或翻譯語言設定。 |
+| **外部路徑規範** | 禁止將 `--output`、`--plan-output`、`--state-root`、`--cache-root` 放在 `<world>` 內。呼叫輸出指令前務必先建立父資料夾。 |
+| **離線寫入保護** | 所有會修改世界的命令均須在關閉 Minecraft 與編輯器後帶入 `--world-offline`。優先採用「預覽 -> 檢視計畫 -> `apply --plan <file> --world-offline`」。 |
+| **資源匯出預設值** | `translate export-lang` 與 `translate create-pack` 若省略 `--output` 會預設寫入 `<world>` 內。要保持原世界完全不動，務必明確指定外部 `--output`。 |
+| **State Root 一致性** | 相關聯的 `plan`、`apply`、`status`、`recover`、`backup`、`restore`、`translate`、`agent` 必須帶入相同的 `--state-root`。預設為 `%LOCALAPPDATA%\nbtcli\worlds\<world-id>`。 |
+
+### 退出碼分支決策表
+
+| 退出碼 | 狀態分類 | Agent 標準動作 |
+| :--- | :--- | :--- |
+| `0` | `Success` | 繼續下一步。 |
+| `1` | `InternalFailure` | 檢查 `error.code`/`details`；切勿盲目重試寫入。 |
+| `2` | `InvalidArguments` | 透過 `<cmd> [<subcmd>] --help` 校正旗標。未動任何檔案。 |
+| `3` | `Conflict` | 建立計畫後世界或工作階段已變更，或重複 `operationId` 帶入不同內容。重新讀取／規劃，或開新工作階段後用 `translate memory` 沿用譯文。 |
+| `4` | `Unsupported` | 檢查 `capabilities`；改用 `--path`/`--dimension`/`--types` 縮小範圍，或對無 `DataVersion` 的舊 Anvil 世界傳入 `--minecraft-version`（`1.2.5`、`1.5.2`、`1.6.4`、`1.8.1`）。 |
+| `5` | `IoOrValidation` | 檔案遺失、被鎖定或 NBT/JSON 損壞。確認 Minecraft 已關閉；執行 `validate` 定位損壞的相對路徑。 |
+| `6` | `ResourceLimit` | 超過 64 MiB、100,000 筆槽位／操作、256 層深度或 100 ms 正規表示式上限。縮小範圍或調降 `--page-size`/`--page-bytes`。 |
+| `7` | `RecoveryRequired` | 寫入途中中斷。**切勿開啟遊戲或發起新寫入**。先執行 `status --plan-hash <hash>`（或 `data.pendingPlanHash`），再執行 `recover`（退出 `0`）或 `recover --rollback`（退出 `8`）。 |
+| `8` | `RolledBack` | `recover --rollback` 已完整還原修改前位元組。切勿誤判為正向寫入成功。 |
+| `130` | `Cancelled` | 操作取消；若發生於寫入期間，需先執行 `status` 與 `recover`。 |
+
+### 標準快速工作流
+
+```powershell title="1. 單一型別安全編輯（務必從 get --types 取值）"
+New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
+$r = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types | ConvertFrom-Json
+if (-not $r.success) { throw $r.error.message }
+$val = $r.data.value
+$val.data.root.value = 'New Map Name'
+$val | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\val.json'
+.\nbtcli.exe set 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --value-file 'D:\Plans\val.json' --output 'D:\Plans\plan.json'
+.\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Plans\plan.json' --world-offline --output 'D:\Plans\receipt.json'
+```
+
+```powershell title="2. 分頁地圖翻譯閉環（start -> export/advance -> plan -> apply -> seal）"
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+$s = .\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30 | ConvertFrom-Json
+$sid = $s.data.status.sessionId
+# 迴圈：export 分頁 -> 填寫 data.replyTemplate 的 slots（"translated"+譯文 或 "unchanged"+null）-> submit/advance 至 pending == 0
+# 收尾：
+$opId = [guid]::NewGuid().ToString()
+$rev = (.\nbtcli.exe translate status 'D:\WorldCopy' --session-id $sid | ConvertFrom-Json).data.status.revision
+.\nbtcli.exe translate plan 'D:\WorldCopy' --session-id $sid --revision $rev --direct --operation-id $opId --output 'D:\Translate\plan.json'
+.\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Translate\plan.json' --world-offline --output 'D:\Translate\receipt.json'
+$planHash = (Get-Content -Raw 'D:\Translate\plan.json' | ConvertFrom-Json).data.planHash
+.\nbtcli.exe translate seal 'D:\WorldCopy' --session-id $sid --revision $rev --operation-id $opId --plan-hash $planHash
+```
+
+### AI Agent 最常見五大踩坑
+
+1. **禁止對 `set` 傳入裸字串** — 必須使用從 `get --types`（`data.value`）取出的完整 `nbtcli.typed-nbt` 封套。
+2. **禁止從 `nbtcli.session-reply` 刪減未翻譯槽位** — 該頁所有槽位都必須保留（填 `"translated"` 或 `"unchanged"` + `"text": null`），且所有 ID 與雜湊不得更動。
+3. **禁止未建目錄就指定 `--output`，或把 `--output` 指進 `<world>`** — 先建立外部父資料夾再輸出。
+4. **禁止任意翻譯具識別作用的實體 `CustomName`** — 為保護 `@e[name=...]` 選擇器，預設會拒絕；只有在確認需要同步改寫指令引用時，才在 `translate plan --direct` 加上 `--synchronize-references`。
+5. **禁止把 CLI 驗證宣稱為遊戲實測通過** — `validate` / `apply` 只驗證二進位與 JSON 結構，實機排版與指令執行仍需在對應版 Minecraft 中驗證。
+
+完整 Schema 範本與所有子命令旗標清單請直接查閱 **[`llms.txt`](../../../llms.txt)** 或 **[完整命令參考](../command-reference/)**。

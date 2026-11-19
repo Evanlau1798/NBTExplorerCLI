@@ -1,6 +1,6 @@
 ---
-title: 地圖翻譯工作流
-description: 透過持久化的分頁翻譯工作階段、術語表、修改計畫驗證與封存機制，有條理地完成大型 Minecraft 冒險地圖翻譯。
+title: 冒險地圖翻譯教學
+description: 一頁一頁翻譯整張 Minecraft Java 版冒險地圖，自動保護文字顏色、互動事件與指令語法不損壞。
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -9,40 +9,21 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
 
 <SafetyBanner tier="preview" lang="zh-tw" />
 
-翻譯一張大型冒險地圖或自訂世界，往往需要處理散落在告示牌、書本、物品、實體、計分板、Boss 血條與資料包中的數百至數千筆文字。**NBTExplorerCLI** 提供了持久化的<strong>分頁式翻譯工作階段（Translation Session）</strong>工作流（`nbtcli translate`）。
+翻譯一張大型冒險地圖，常常會面對數百甚至數千行散落在告示牌、書本、物品、NPC、計分板、Boss 血條、指令方塊與資料包裡的文字。**NBTExplorerCLI** 會幫你把全部文字整理成存在世界資料夾外的**翻譯進度（Session）**，切成一頁一頁慢慢翻，並自動保護所有顏色格式、點擊事件與指令語法。
 
-所有工作階段進度與紀錄皆儲存在世界資料夾外的獨立狀態目錄中。在您最後一步明確對翻譯計畫執行 `apply --world-offline` 之前，您的 Minecraft 世界存檔完全不會被修改。
+在你最後一步明確執行 `apply --world-offline` 之前，你的 Minecraft 世界檔案**完全不會被改動**。
 
 <WorkflowPipeline kind="translate" lang="zh-tw" />
 
-## 1. 選用步驟：設定外部翻譯工具或 AI 助手偏好（`agent`）
-
-若您搭配外部翻譯腳本或 AI 助手處理匯出的分頁，可先透過 `agent` 為該世界儲存預設的來源語言、目標語言與每頁筆數設定：
-
-```powershell title="PowerShell"
-New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
-# 匯出帶有版本標記的問卷範本
-.\nbtcli.exe agent setup 'D:\WorldCopy' `
-  --source-language en_us `
-  --target-language zh_tw `
-  --output 'D:\Translate\agent-questionnaire.json'
-
-# 填寫 JSON 內的 agentName 與偏好欄位後提交儲存
-.\nbtcli.exe agent submit 'D:\WorldCopy' `
-  --request 'D:\Translate\agent-questionnaire.json'
-
-# 隨時查詢目前已儲存的偏好設定
-.\nbtcli.exe agent status 'D:\WorldCopy'
-```
-
-> [!NOTE]
-> `agent` 命令僅在本機狀態資料夾內記錄設定，絕不會主動連線至任何外部網路服務，也不會自動取得修改世界存檔的權限。
+:::tip[想讓 AI 助手幫你把每一頁翻完？]
+你可以手動照這篇操作，也可以直接把我們專為 AI 寫的 [`llms.txt`](../../../llms.txt) 說明書交給 Claude、ChatGPT、Codex 或 Cursor，讓 AI 自動幫你跑完匯出與提交循環！詳見 **[AI Agent 快速整合指南](../ai-agents/)**。
+:::
 
 ---
 
-## 2. 建立翻譯工作階段（`translate start`）
+## 步驟 1：開啟翻譯進度（`translate start`）
 
-對您的世界副本執行 `translate start`，並指定 `--source-language` 與 `--target-language`（若已透過 `agent` 設定則可省略）：
+對你的世界副本（`D:\WorldCopy`）執行 `translate start`，告訴工具地圖原本是什麼語言（`--source-language`）、你要翻成什麼語言（`--target-language`），以及每頁想要幾筆文字（`--page-size`）：
 
 ```powershell title="PowerShell"
 .\nbtcli.exe translate start 'D:\WorldCopy' `
@@ -51,11 +32,9 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
   --page-size 30
 ```
 
-您也可以搭配 `--dimension`、`--region`、`--types`、`--path` 或 `--match-pattern` 將翻譯範圍限定於特定區域或文字類型。
+會回傳類似這樣的結果：
 
-請從回傳的 JSON 中記下 `sessionId` 與初始的 `revision`（從 `0` 開始）：
-
-```json title="stdout (translate start)"
+```json title="輸出結果"
 {
   "schemaFamily": "nbtcli.cli",
   "schemaVersion": 1,
@@ -74,152 +53,146 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 }
 ```
 
-### 認識翻譯槽位（Text Slots）的保護機制
+把 **`sessionId`** 記下來，後面每個步驟都會用到它：
+- `total`：這張地圖總共找到幾筆可翻譯文字。
+- `pending`：還有幾筆尚未翻譯。
+- `revision`：版本計數器，每成功提交一頁就會加 `1`。
 
-- **每個實際出現位置都有獨立的 `slotId`**：即使兩塊告示牌寫著相同的英文句子，每個位置仍會分配到獨立的槽位，讓您能依遊戲場景語境分別調整譯文。
-- **自動保護顏色格式與互動事件**：槽位僅暴露純文字部分；底層 JSON Text Component 的顏色、點擊與懸停事件（Click/Hover Events）、計分板變數與目標選擇器皆安全保留在本機工作階段中，避免因翻譯手誤而破壞指令語法。
+:::note[為什麼翻譯不會把顏色和指令弄壞？]
+每一行告示牌、每一頁書本或每個物品名稱都有自己獨立的 `slotId`，就算兩塊告示牌寫著同樣的英文，你也可以依不同場景翻成不同中文。而且你只需要修改純文字，底層的顏色、點擊／懸停事件與選擇器都安全保存在工具內，不怕手滑打錯符號把機關搞壞。
+:::
 
 ---
 
-## 3. 匯出分頁並提交譯文（`export`、`submit`、`advance`）
+## 步驟 2：匯出分頁、填寫譯文並提交
 
 <Steps>
 
-1. **匯出目標分頁（`export`）**
+1. **匯出第 0 頁（`translate export`）**
 
-   將第一頁（`--page 0`）匯出至世界外的 UTF-8 檔案：
+   先在世界資料夾外建立工作資料夾（例如 `D:\Translate`），匯出第 0 頁並把可直接填寫譯文的範本存成 `reply-0.json`：
 
    ```powershell title="PowerShell"
+   # 在世界外建立翻譯工作資料夾
    New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+
+   # 匯出第 0 頁（記得換成你自己的 sessionId）
    $export = .\nbtcli.exe translate export 'D:\WorldCopy' `
-     --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+     --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
      --page 0 `
      --output 'D:\Translate\page-0-prompt.txt' | ConvertFrom-Json
-   ```
 
-   匯出的回應與檔案包含兩部分：
-   - 唯讀的 `nbtcli.session-page` JSON 區塊，顯示每個槽位的原文、來源角色與語境群組。
-   - 可供直接填寫並送回的 `nbtcli.session-reply` JSON 回覆範本。
-
-2. **填寫匯出的回覆範本**
-
-   請將實際回傳的 `data.replyTemplate` 另存為獨立檔案。保留原本的識別欄位，包含 `operationId`、`targetLocale` 與每個槽位的 `sourceTextHash`，並保留完整槽位清單。已翻譯的槽位請填 `"state": "translated"` 並在 `text` 填入譯文；若刻意保留原文不譯，請填 `"state": "unchanged"` 且 `"text": null`。
-
-   ```powershell title="PowerShell"
    if (-not $export.success) { throw $export.error.message }
+
+   # 把回覆範本另存成 reply-0.json
    $export.data.replyTemplate | ConvertTo-Json -Depth 50 |
      Set-Content -Encoding utf8 'D:\Translate\reply-0.json'
    ```
 
-3. **提交回覆並推進至下一頁**
+   - `page-0-prompt.txt`：給你參考的原文清單與來源位置（看得出是告示牌、書本還是物品）。
+   - `reply-0.json`：實際要填寫譯文並交回去的檔案。
+
+2. **填寫 `reply-0.json`**
+
+   用記事本或 VS Code 打開 `D:\Translate\reply-0.json`。裡面的編號欄位（如 `operationId`、`sessionId`、`slotId`、`sourceTextHash`）都保持原樣不要動，也不要刪減 `slots` 裡的任何一筆：
+   - **有翻譯的項目**：把 `"state"` 改成 `"translated"`，並在 `"text"` 填入中文譯文。
+   - **刻意保留原文不翻**（例如特殊符號或人名）：把 `"state"` 改成 `"unchanged"`，並把 `"text"` 設為 `null`。
+
+3. **提交這一頁並前進到下一頁（`submit` 或 `advance`）**
 
    <Tabs syncKey="submit-mode">
-     <TabItem label="提交回覆檔 (submit)">
+     <TabItem label="只提交這一頁 (submit)">
 
    ```powershell title="PowerShell"
    .\nbtcli.exe translate submit 'D:\WorldCopy' `
-     --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+     --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
      --reply 'D:\Translate\reply-0.json'
    ```
 
      </TabItem>
-     <TabItem label="提交並取得下一待譯頁 (advance)">
+     <TabItem label="提交並直接拿下一頁 (advance)">
 
-   `translate advance` 可搭配 `--reply` 一次完成提交與取得下一頁，亦可不帶 `--reply` 直接查詢下一個待處理的分頁：
+   `translate advance` 可以一次完成「送出譯文」並回傳「下一頁還沒翻的內容」（不帶 `--reply` 時則直接查看下一個未翻譯分頁）：
 
    ```powershell title="PowerShell"
    .\nbtcli.exe translate advance 'D:\WorldCopy' `
-     --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+     --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
      --reply 'D:\Translate\reply-0.json'
    ```
 
      </TabItem>
    </Tabs>
 
+   重複步驟 2 直到 `pending` 變成 **`0`**。中途隨時可以停下來隔天再翻，所有進度都會自動保存在世界資料夾外。
+
 </Steps>
 
-每次成功提交都會將工作階段的 `revision` 加 1（例如由 `0` 變為 `1`），並回傳下一個待處理分頁（`data.pendingPage`）。若以相同的 `operationId` 重複送出完全相同的回覆檔，系統會視為冪等操作並直接回傳既有收據。
-
-> [!IMPORTANT]
-> 每次提交回覆時，NBTExplorerCLI 都會檢查世界檔案是否與建立工作階段時的快照一致。若期間世界曾被外部修改，`submit` 會回傳結束代碼 `3`（`Conflict`）並提示 `"repair": "start-new-session"`，同時完整保留您已提交過的所有譯文紀錄供後續查閱。
-
----
-
-## 4. 管理術語表、備註、翻譯記憶與重置
-
-在翻譯過程中，您可以隨時查詢或維護輔助資訊：
-
-- **查看翻譯進度**：`nbtcli translate status 'D:\WorldCopy' --session-id <guid>`
-- **查詢單一槽位**：`nbtcli translate get 'D:\WorldCopy' --session-id <guid> --slot-id <slot-id>`
-- **檢視語境群組**：`nbtcli translate groups 'D:\WorldCopy' --session-id <guid> --limit 50`
-- **讀取術語表或譯者備註**：
-  ```powershell title="PowerShell"
-  .\nbtcli.exe translate glossary 'D:\WorldCopy' --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff
-  .\nbtcli.exe translate note 'D:\WorldCopy' --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff
-  ```
-- **從舊工作階段查詢翻譯記憶（Translation Memory）**：
-  ```powershell title="PowerShell"
-  $previousSessionId = Read-Host '舊工作階段的 session ID'
-  $slotId = Read-Host '目前工作階段的完整 slot ID'
-  $glossaryVersion = Read-Host '術語表版本號'
-  .\nbtcli.exe translate memory 'D:\WorldCopy' `
-    --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
-    --slot-id $slotId `
-    --source-sessions $previousSessionId `
-    --glossary-version $glossaryVersion
-  ```
-- **跳頁或重置特定槽位**：將 `nbtcli.session-command` 格式的 JSON 檔案透過 `--request` 傳給 `translate jump`、`translate note`、`translate glossary` 或 `translate reset`（執行確認重置時需加上 `--confirm`）。
+:::caution[翻譯期間不要改動原世界資料夾]
+每次提交譯文時，工具會確認世界檔案跟開始翻譯時完全相同。如果翻譯到一半你另外改了地圖，工具會安全中止並回傳退出碼 `3`（`Conflict`），但已經翻好的譯文都會保留下來，讓你開新進度後用 `translate memory` 沿用。
+:::
 
 ---
 
-## 5. 產出計畫、離線套用並封存工作階段（`plan` -> `apply` -> `seal`）
+## 步驟 3：把翻好的成果套用到地圖
 
-當 `pending` 降為 `0`（所有槽位皆已標記為 `Translated` 或 `Unchanged`），請先透過 `translate status` 確認目前的 `revision` 編號，再依序完成最後三個步驟：
+當 `pending` 降到 `0`，先執行 `translate status` 確認最新的 `revision` 編號：
+
+```powershell title="PowerShell"
+.\nbtcli.exe translate status 'D:\WorldCopy' --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff'
+```
+
+接著照順序完成最後三步：
 
 <Steps>
 
-1. **產生翻譯修改計畫（`translate plan`）**
+1. **產生更新計畫（`translate plan`）**
+
+   選擇你希望玩家怎麼看到翻譯：
 
    <Tabs syncKey="translate-plan-mode">
-     <TabItem label="直接替換世界內文字 (--direct)">
+     <TabItem label="直接把譯文寫進地圖 (--direct)">
 
-   直接將譯文寫入世界 NBT 與資料包檔案中：
+   **對玩家最簡單**：直接替換地圖裡的文字，玩家下載地圖打開就能看到中文，完全不用裝資源包：
 
    ```powershell title="PowerShell"
+   $opId = [guid]::NewGuid().ToString()
+
    .\nbtcli.exe translate plan 'D:\WorldCopy' `
-     --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+     --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
      --revision 2 `
      --direct `
-     --operation-id 88888888-4444-4444-4444-121212121212 `
+     --operation-id $opId `
      --output 'D:\Translate\world-translate-plan.json'
    ```
 
      </TabItem>
-     <TabItem label="轉為翻譯鍵並附加語言檔 (--keys)">
+     <TabItem label="轉成翻譯鍵並附加語言檔 (--keys)">
 
-   將世界內文字轉為 `translate` 翻譯鍵並同步產生 `.json` 語言檔（詳見 [資源包、語言檔與引用](../resources-and-packs/)）：
+   把地圖文字改成翻譯鍵，並把 `.json` 語言檔打包進資源包，支援多語言切換（詳見 **[資源包與語言檔輸出](../resources-and-packs/)**）：
 
    ```powershell title="PowerShell"
+   $opId = [guid]::NewGuid().ToString()
+
    .\nbtcli.exe translate plan 'D:\WorldCopy' `
-     --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+     --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
      --revision 2 `
      --keys `
      --prefix map. `
      --language-output 'resources.zip#assets/adventure/lang/zh_tw.json' `
-     --operation-id 88888888-4444-4444-4444-121212121212 `
+     --operation-id $opId `
      --output 'D:\Translate\world-translate-plan.json'
    ```
 
      </TabItem>
    </Tabs>
 
-   請記下回傳 JSON 中的 `planHash`。
+   *（如果你不想改動地圖本身，只想匯出獨立 `.zip` 資源包，請看 **[資源包與語言檔輸出](../resources-and-packs/)** 的 `export-lang` 與 `create-pack`。）*
 
-2. **在離線狀態下套用計畫（`apply`）**
+2. **關閉 Minecraft，離線套用計畫（`apply`）**
 
    <SafetyBanner tier="write" lang="zh-tw" />
 
-   關閉 Minecraft 並套用剛剛產出的翻譯計畫：
+   確認 Minecraft 已完全關閉，再執行：
 
    ```powershell title="PowerShell"
    .\nbtcli.exe apply 'D:\WorldCopy' `
@@ -228,19 +201,84 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
      --output 'D:\Translate\world-translate-receipt.json'
    ```
 
-3. **封存翻譯工作階段（`translate seal`）**
+   套用完成後，建議立刻打開 Minecraft 進入 `D:\WorldCopy` 實際逛一圈，確認告示牌、書本與對話顯示正常！
 
-   確認 `apply` 成功完成（結束代碼 `0`）後，帶入相同的 `--revision`、`--operation-id` 與 `--plan-hash` 封存工作階段：
+3. **將翻譯進度標記為完成並封存（`translate seal`）**
+
+   確認 `apply` 成功（退出碼 `0`）後，帶入相同的 `--revision`、`--operation-id` 與計畫檔的 `planHash` 封存進度：
 
    ```powershell title="PowerShell"
    $planHash = (Get-Content -Raw 'D:\Translate\world-translate-plan.json' | ConvertFrom-Json).data.planHash
+
    .\nbtcli.exe translate seal 'D:\WorldCopy' `
-     --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+     --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
      --revision 2 `
-     --operation-id 88888888-4444-4444-4444-121212121212 `
+     --operation-id $opId `
      --plan-hash $planHash
    ```
 
-   `translate seal` 會在磁碟上核對已完成且通過驗證的寫入日誌後，才將工作階段標記為已封存。若 `apply` 尚未執行或中途發生中斷，`seal` 會拒絕封存並引導您先執行 `status` 與 `recover`。
+   `seal` 會核對硬碟上已完成的寫入紀錄，確認地圖真的寫完後才會關閉進度。
 
 </Steps>
+
+---
+
+## 選用進階小幫手
+
+一般地圖翻譯不需要用到以下功能，但在翻譯超大型地圖時非常實用：
+
+- **只翻地圖的一部分**：在 `translate start` 加上 `--dimension`、`--region`、`--types`、`--path` 或 `--match-pattern`（例如 `--types Sign,Book` 只翻告示牌跟書本）。
+- **翻譯經典舊版地圖（1.2.5 / 1.5.2 / 1.6.4 / 1.8.1）**：在 `translate start` 加上 `--minecraft-version 1.8.1`（或 `1.2.5`、`1.5.2`、`1.6.4`）。純文字字數上限請看 **[支援版本與疑難排解](../support-and-troubleshooting/)**。
+- **隨時查進度或看關聯文本**：
+  - 查進度：`.\nbtcli.exe translate status 'D:\WorldCopy' --session-id <id>`
+  - 查單筆文字：`.\nbtcli.exe translate get 'D:\WorldCopy' --session-id <id> --slot-id <slot-id>`
+  - 看同一本書／同一塊告示牌的群組：`.\nbtcli.exe translate groups 'D:\WorldCopy' --session-id <id> --limit 50`
+
+<details>
+<summary>進階操作：術語表（glossary）、譯者備註（note）、翻譯記憶（memory）、重置與預設偏好（agent）</summary>
+
+### 查看或更新術語表與備註
+
+```powershell title="PowerShell"
+# 查看目前儲存的專有名詞術語表或備註
+.\nbtcli.exe translate glossary 'D:\WorldCopy' --session-id '<session-id>'
+.\nbtcli.exe translate note 'D:\WorldCopy' --session-id '<session-id>'
+```
+
+若要新增術語、新增備註、跳到指定頁碼，或把某些槽位重置回待翻譯，請準備 `nbtcli.session-command` 格式的 JSON 檔並透過 `--request` 傳給 `translate glossary`、`translate note`、`translate jump` 或 `translate reset`（執行確認重置時加 `--confirm`）。範本見 **[完整命令參考](../command-reference/)**。
+
+### 從舊翻譯進度沿用譯文（`translate memory`）
+
+地圖更新後重新開了新進度時，可以從舊進度查詢相容的歷史譯文：
+
+```powershell title="PowerShell"
+.\nbtcli.exe translate memory 'D:\WorldCopy' `
+  --session-id '<目前-session-id>' `
+  --slot-id '<完整-slot-id>' `
+  --source-sessions '<舊-session-id>' `
+  --glossary-version '<術語表版本號>'
+```
+
+### 為外部工具儲存預設語言偏好（`agent`）
+
+如果想幫這個世界固定存下預設的來源／目標語言與每頁筆數，可選用 `agent` 指令：
+
+```powershell title="PowerShell"
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+
+# 1. 匯出偏好設定問卷
+.\nbtcli.exe agent setup 'D:\WorldCopy' `
+  --source-language en_us `
+  --target-language zh_tw `
+  --output 'D:\Translate\agent-questionnaire.json'
+
+# 2. 在檔案裡填寫 configuration.agentName 後提交儲存
+.\nbtcli.exe agent submit 'D:\WorldCopy' --request 'D:\Translate\agent-questionnaire.json'
+
+# 3. 隨時查看已儲存的設定
+.\nbtcli.exe agent status 'D:\WorldCopy'
+```
+
+`agent` 只會把偏好存在本機狀態目錄內，絕不會主動連網，也不會修改你的世界存檔。
+
+</details>

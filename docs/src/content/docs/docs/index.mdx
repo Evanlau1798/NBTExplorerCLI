@@ -1,84 +1,96 @@
 ---
 title: Documentation Overview
-description: Learn how NBTExplorerCLI inspects, translates, and safely edits Minecraft Java Edition worlds on Windows x64.
+description: Plain-language guide to inspecting, translating, and safely editing Minecraft Java Edition worlds with NBTExplorerCLI on Windows.
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import SafetyBanner from '../../../components/SafetyBanner.astro';
 
-**NBTExplorerCLI** (`nbtcli.exe`, version `1.0.0`) is a self-contained Windows x64 command-line tool built for **Minecraft Java Edition** worlds (`1.12.2` through `1.21.11`, `DataVersion` `1343` to `4671`). It enables players, adventure map creators, localization teams, and tool developers to inspect NBT data, scan and translate in-world text, generate resource packs, and apply verified offline edits.
+**NBTExplorerCLI** (`nbtcli.exe`, version `1.0.0`) is a free, ready-to-run Windows command-line tool for **Minecraft Java Edition** worlds. You do not need to install .NET or Java separately — just download the ZIP from GitHub Releases, unzip it, and run commands in PowerShell.
+
+Whether you want to peek inside a save file, translate an entire adventure map into another language, package a resource pack, or let an AI assistant help you edit a world safely, this documentation walks you through every step in plain language.
 
 <SafetyBanner tier="safe" lang="en" />
 
-## When to Use NBTExplorerCLI
+## Who Is This Tool For?
 
 <CardGrid>
-  <Card title="Built For">
-    - **Adventure Map Localization Teams**: Scanning thousands of signs, books, items, command blocks, and datapack entries into structured pages and glossaries.
-    - **Technical Creators & Server Admins**: Inspecting or batch-modifying `level.dat`, `.mca` region chunks, entities, and datapacks offline with SHA-256 precondition checks and pre-write backups.
-    - **Automation Scripts & AI Agents**: Driving world inspection and translation via deterministic single-line JSON responses and machine-readable exit codes (`0` through `8` and `130`).
+  <Card title="Great For">
+    - **Adventure Map Translators & Players**: Automatically collect text from signs, books, items, entities, scoreboards, bossbars, command blocks, and datapacks into clean pages — translate by hand or with AI.
+    - **Mapmakers & Server Admins**: Check or update `level.dat`, region chunks (`.mca`), entities, and datapacks while Minecraft is closed, with built-in previews and automatic backups.
+    - **AI Assistants & PowerShell Scripts**: Every command outputs clean JSON, making it easy for Claude, ChatGPT, Codex, Cursor, or your own scripts to inspect and translate worlds accurately.
   </Card>
-  <Card title="Not Designed For">
-    - **Live In-Game Editing**: World-modifying commands require Minecraft and other editors to be closed (`--world-offline`) so region files and metadata are never corrupted by concurrent writes.
-    - **3D Viewport Terrain Rendering**: NBTExplorerCLI is a deterministic command-line engine rather than a 3D visual block editor.
-    - **Minecraft Bedrock Edition Saves**: The storage and NBT codecs target **Minecraft Java Edition** saves only.
+  <Card title="Not Built For">
+    - **Editing While Minecraft Is Running**: Always close Minecraft (and other map tools) before applying changes so your save never gets corrupted.
+    - **3D Visual Block Building**: This is a text-based command-line tool, not a 3D map viewer.
+    - **Minecraft Bedrock Edition Saves**: Only **Minecraft Java Edition** worlds are supported. Run `nbtcli capabilities` to check exact version support.
   </Card>
 </CardGrid>
 
-## Understanding Operation Safety Levels
+## Safety Labels Used Across This Guide
 
-Every guide and command in this documentation displays one of three plain-language safety labels so you always know whether an action can affect your Minecraft save files:
+Every page and command shows one of three color-coded labels so you always know if an action can touch your Minecraft save:
 
-| Safety Badge | What It Means for Your World Save |
+| Safety Label | What Happens to Your World Folder |
 | --- | --- |
-| **Safe to Inspect** | Reads files or checks external status logs only. Your Minecraft world folder is never modified. |
-| **Preview Only** | Creates a change plan (`nbtcli.patch-plan`) or saves translation progress in an external directory outside your world. Your world files remain untouched. |
-| **Modifies World Save** | Writes changes to your world folder. Always work on a world copy, close Minecraft and other editors first, and pass `--world-offline`. |
+| **Read Only** | Only reads data or checks status. Your world folder is never modified. |
+| **Preview Only** | Creates a reviewable plan file or saves translation progress in a separate folder outside your world. Your world folder stays untouched. |
+| **Modifies World** | Writes changes into your world folder. Always test on a copy first, close Minecraft, and pass `--world-offline`. |
 
-## Six Core Workflows
+## Where Should I Start?
 
-Follow these guides in order to master the complete workflow from first read-only inspection to crash-safe offline editing and map localization:
+Pick the guide that matches what you want to do right now:
 
 <CardGrid>
-  <Card title="1. Install and Inspect">
-    Verify the release ZIP SHA-256 checksum, inspect `candidate.json`, extract the self-contained package, and run your first read-only `get`, `list`, `search`, and `scan` commands on a world copy.
+  <Card title="1. Install & First Run">
+    Download the ZIP, unzip it, open PowerShell in that folder, make a safe copy of your Minecraft world, and run your first read-only checks.
 
-    [Read Install and Inspect ->](./getting-started/)
+    [Start here ->](./getting-started/)
   </Card>
-  <Card title="2. Safe Editing and Recovery">
-    Select exact NBT nodes with JSON Pointers or typed segments, preview changes with `set`, `batch`, or `plan`, apply plans offline with `apply --world-offline`, and recover or roll back interrupted writes.
+  <Card title="2. Common Tasks (Recipes)">
+    Want to rename a world, see all map text, translate a map, or make a backup right away? Follow short copy-paste recipes for everyday goals.
 
-    [Read Safe Editing and Recovery ->](./safe-editing/)
+    [Browse recipes ->](./recipes/)
   </Card>
-  <Card title="3. Translation Workflow">
-    Create paginated translation sessions (`translate start`), export pages (`export`), submit validated replies (`submit` / `advance`), manage notes and glossaries, and complete world translation with `plan`, `apply`, and `seal`.
+  <Card title="3. FAQ & Plain-Language Glossary">
+    New to PowerShell or terms like NBT, `level.dat`, JSON Pointer, or Patch Plan? Every common question and technical word is explained simply here.
 
-    [Read Translation Workflow ->](./translation-workflow/)
+    [Read FAQ & Glossary ->](./faq/)
   </Card>
-  <Card title="4. Resource Packs and References">
-    Compare direct in-world text replacement (`--direct`), translation key conversion (`--keys` and `convert`), standalone language/resource pack exports (`export-lang`, `create-pack`), and reference synchronization.
+  <Card title="4. Map Translation Guide">
+    Translate a full adventure map step by step: start a translation project, export pages, fill in translations, and apply them cleanly to your map.
 
-    [Read Resource Packs and References ->](./resources-and-packs/)
+    [Read Map Translation Guide ->](./translation-workflow/)
   </Card>
-  <Card title="5. Backups and State Files">
-    Create and verify content-addressed world backups (`backup` and `restore`), and inspect the external file tree (`cache/`, `sessions/`, `objects/`, `journals/`, `backups/`) stored outside your world directory.
+  <Card title="5. Resource Packs & Language Files">
+    Choose between writing translations directly into your map, using translation keys, or exporting a standalone `.zip` client resource pack.
 
-    [Read Backups and State Files ->](./backups-and-state/)
+    [Read Resource Packs Guide ->](./resources-and-packs/)
   </Card>
-  <Card title="6. Support Scope and Troubleshooting">
-    Check supported Minecraft Java Edition `DataVersion` profiles, inspect exit codes (`0` through `8` and `130`), understand parser verification versus live in-game verification boundaries, and resolve common errors.
+  <Card title="6. Editing Worlds & Crash Recovery">
+    Learn the two-step "Preview first, Apply second" editing flow, and what to do if a write is ever interrupted midway.
 
-    [Read Support Scope and Troubleshooting ->](./support-and-troubleshooting/)
+    [Read Editing & Recovery ->](./safe-editing/)
+  </Card>
+  <Card title="7. Backups & Where Files Live">
+    Back up a world before experimenting, restore a whole map or one broken file, and see where temporary caches and backups are stored.
+
+    [Read Backups Guide ->](./backups-and-state/)
+  </Card>
+  <Card title="8. AI Agent Quickstart">
+    Using Claude, ChatGPT, Codex, or Cursor? Grab the ready-to-paste prompt and our high-density [`llms.txt`](../llms.txt) manual built specifically for AI agents.
+
+    [Open AI Agent Quickstart ->](./ai-agents/)
   </Card>
 </CardGrid>
 
-Need to look up a specific command, flag, or input JSON format quickly? Go straight to the **[Command Reference](./command-reference/)**. For automation, see the **[`llms.txt`](../llms.txt)** reference index.
+Need to look up every flag or troubleshoot an error code? Jump to **[Command Reference](./command-reference/)** or **[Supported Versions & Troubleshooting](./support-and-troubleshooting/)**.
 
-## One Predictable JSON Response Format
+## Reading Command Output in 10 Seconds
 
-Every invocation of `nbtcli.exe` writes exactly one newline-delimited UTF-8 JSON object to standard output (`stdout`):
+Every command prints one clean block of JSON text. You only need to look at **three fields**:
 
-```json title="stdout (nbtcli.cli)"
+```json title="Example output"
 {
   "schemaFamily": "nbtcli.cli",
   "schemaVersion": 1,
@@ -93,19 +105,20 @@ Every invocation of `nbtcli.exe` writes exactly one newline-delimited UTF-8 JSON
 }
 ```
 
-### Interface Language vs. Translation Languages
+1. **`success`**: `true` means it worked; `false` means something stopped it.
+2. **`data`**: The answer you asked for (for example, your world name, version number, or translation progress).
+3. **`error`**: When `success` is `false`, `error.message` explains in plain language what went wrong.
 
-NBTExplorerCLI strictly separates the language of CLI messages from the languages of your Minecraft world text:
+### Switching Message Language (`--ui-locale`)
 
-- **CLI Interface Language (`--ui-locale`)**: Accepts `zh-TW` (default) or `en-US` before or after any command. It controls human-readable `error.message` and instruction text without changing JSON keys, machine error codes, or world data.
-- **World & Resource Languages**: Flags such as `--source-language`, `--target-language`, `--lang`, `--original-lang`, and `--target-lang` control how Minecraft text and resource pack language files (such as `en_us` and `zh_tw`) are processed.
+You can add `--ui-locale en-US` or `--ui-locale zh-TW` to any command to choose whether help and error messages appear in English or Traditional Chinese. This only changes tool messages — it never changes your Minecraft world language settings (`--source-language` / `--target-language`).
 
 ## License and Third-Party Notices
 
-NBTExplorerCLI is licensed under the **MIT License** (`LICENSE` in the repository and release archive). Bundled third-party components retain their respective terms and notices:
+NBTExplorerCLI is licensed under the **MIT License** (`LICENSE`). Bundled third-party components keep their own licenses and notices:
 
 - **SharpZipLib** (`licenses/SharpZipLib.md`)
 - **Unicode Character Database** (`licenses/Unicode.md`)
-- **.NET Runtime Licenses and Third-Party Notices** (`licenses/dotnet-LICENSE.txt` and `licenses/dotnet-THIRD-PARTY-NOTICES.txt` in the Windows x64 release package)
+- **.NET Runtime Licenses and Third-Party Notices** (included in the Windows x64 download under `licenses/`)
 
-Minecraft game assets and user-created worlds remain subject to their respective owners' terms and licenses.
+Minecraft assets and user-created worlds belong to their respective owners.

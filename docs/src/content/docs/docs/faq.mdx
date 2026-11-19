@@ -1,0 +1,85 @@
+---
+title: FAQ & Plain-Language Glossary
+description: Straightforward answers to everyday questions and simple explanations of Minecraft save and CLI terms.
+---
+
+New to command-line tools or Minecraft save internals? This page answers the most common questions in plain English and explains technical terms without jargon.
+
+---
+
+## Frequently Asked Questions
+
+### Where are my Minecraft Java Edition worlds saved on Windows?
+
+- **Official Minecraft Launcher**: Press `Win + R`, type `%APPDATA%\.minecraft\saves`, and press **Enter**. Each subfolder inside `saves` is one world.
+- **Prism Launcher / MultiMC**: Right-click your instance -> **Folder** -> open `.minecraft\saves`.
+- **CurseForge / Modrinth App**: Open your profile/instance -> click **Open Folder** -> open `saves`.
+
+Always **copy** the world folder to another location (like `D:\WorldCopy`) while Minecraft is closed before experimenting!
+
+### Do I need to install .NET or Java to run `nbtcli.exe`?
+
+**No.** The official `nbtcli-win-x64.zip` from GitHub Releases already includes the exact .NET runtime it needs. Just unzip all files into one folder and run `.\nbtcli.exe`.
+
+### Why did Windows show "Windows protected your PC" (SmartScreen)?
+
+Windows SmartScreen flags new open-source `.exe` files that do not have a paid commercial signing certificate. As long as you downloaded `nbtcli-win-x64.zip` directly from the official [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) page, you can click **More info** -> **Run anyway**.
+
+### Will running `nbtcli.exe` accidentally break my world?
+
+NBTExplorerCLI has four layers of protection built in:
+1. **Inspection commands never write to your world** (`get`, `list`, `search`, `scan`, `extract`, `validate`, `backup`).
+2. **Editing commands default to Preview Only** — `set`, `plan`, `batch`, `convert`, `restore`, and `translate plan` only build a plan file outside your world without touching your save.
+3. **Writing requires explicit confirmation** (`apply ... --world-offline`) while Minecraft is closed.
+4. **Automatic backups before writing** — Before replacing any world file, `nbtcli` saves a copy of the original file outside your world and records a recovery journal so interrupted writes can be finished or rolled back cleanly.
+
+Still, keeping your own copy of your world before editing is always the #1 best habit!
+
+### Why does every command output JSON instead of normal text?
+
+Structured JSON output makes it easy for both people and AI assistants / scripts to see exact results without messy formatting. To read any response quickly:
+- Check `"success": true` (worked) or `"success": false` (stopped).
+- Look inside `"data"` for the result.
+- If it failed, read `"error"."message"` for the plain-language explanation.
+
+### How is this different from the classic GUI NBTExplorer?
+
+- **Classic NBTExplorer** is a point-and-click tree window great for casually clicking around one or two tags by hand.
+- **NBTExplorerCLI** is a command-line engine built for **large jobs, adventure map translation, resource pack generation, crash-safe edits, PowerShell scripts, and AI agents** — with automatic previews, backups, and support for modern Java Edition versions (`1.20.4` through `1.21.11` and `26.1-snapshot-6`) plus classic Anvil worlds (`1.2.5`, `1.5.2`, `1.6.4`, `1.8.1`).
+
+### Does it work with Minecraft Bedrock Edition or modded worlds?
+
+- **Bedrock Edition**: No — only **Minecraft Java Edition** saves are supported.
+- **Modded Java worlds**: Read-only inspection (`get`, `list`, `search`) works on standard NBT tags, while translation and editing follow vanilla Java Edition schemas and fail safely if an unrecognized custom format is encountered. Always test on a world copy and verify inside the game.
+
+### Can I let Claude, ChatGPT, Codex, or Cursor run `nbtcli.exe` for me?
+
+**Yes!** That is one of its core strengths. Just give your AI assistant our dedicated manual URL (`https://nbtcli.evanlau1798.com/llms.txt`) or check **[AI Agent Quickstart](../ai-agents/)** for copy-paste prompts.
+
+### How do I switch error and help messages between English and Traditional Chinese?
+
+Add `--ui-locale en-US` or `--ui-locale zh-TW` anywhere in your command:
+
+```powershell title="PowerShell"
+.\nbtcli.exe help get --ui-locale en-US
+.\nbtcli.exe help get --ui-locale zh-TW
+```
+
+---
+
+## Plain-Language Glossary
+
+| Term | Plain-Language Meaning |
+| :--- | :--- |
+| **NBT** | Minecraft's save file format (Named Binary Tag). Think of it like a compact binary folder tree storing world settings, blocks, items, and entities. |
+| **`level.dat`** | The main settings file in every Minecraft world folder (holds the world name, `DataVersion`, gamerules, spawn coordinates, etc.). |
+| **Region File (`.mca`) & Chunk** | Minecraft divides the map into 16x16-block columns called **chunks**, and groups 32x32 chunks into `.mca` files inside `region/` or `entities/`. |
+| **`DataVersion`** | A single integer Minecraft saves in `level.dat` that identifies the exact game version (for example, `3953` is Java `1.21`). |
+| **JSON Pointer (`--pointer`)** | A slash-separated address pointing to one specific value inside a file, just like a folder path (for example, `/Data/LevelName`). |
+| **Typed NBT (`--types`)** | Because Minecraft cares strictly about whether a number is a `Byte`, `Short`, `Int`, or `String`, `--types` saves that exact label alongside the value so edits never corrupt a tag. |
+| **Patch Plan (`plan.json`)** | A read-only "preview blueprint" describing exactly which files and values will change. You create it first, check it, and only apply it when ready. |
+| **Translation Session & Slot** | A saved translation project stored outside your world. Every individual sign line, book page, or item name becomes one numbered **slot** so nothing gets mixed up or lost. |
+| **Translation Key (`--keys`)** | Replaces hard-coded text (like `"Welcome!"`) inside the map with a placeholder key (like `map.abc123`), while the actual words live in a resource pack `.json` language file so players can switch languages. |
+| **State Root (`--state-root`)** | The external folder (by default inside `%LOCALAPPDATA%\nbtcli\`) where `nbtcli` keeps backups, translation progress, caches, and recovery logs — completely separate from your Minecraft world folder. |
+| **`--world-offline`** | A safety switch required on commands that modify your world, reminding you to close Minecraft and any other editors first. |
+| **Exit Code** | A small number (`0` through `8`, or `130`) returned when a command finishes. `0` means success; anything else tells scripts (and you) why it stopped. |

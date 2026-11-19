@@ -1,0 +1,185 @@
+---
+title: 常見任務速查
+description: 針對日常最常見的 Minecraft 存檔查閱、改名、地圖翻譯、資源包匯出與備份還原，提供可直接複製貼上的精簡步驟。
+---
+
+import SafetyBanner from '../../../../components/SafetyBanner.astro';
+
+已經知道自己想做什麼、只想直接照著貼指令？從下面挑出最接近你需求的任務即可。所有指令都在解壓縮後的 `nbtcli` 資料夾內開啟 PowerShell 執行，並將 `D:\WorldCopy` 換成你自己的世界副本路徑。
+
+---
+
+## 任務 1：查這張地圖是哪一個 Minecraft 版本
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+```powershell title="PowerShell"
+.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
+```
+
+看輸出裡的 `data.value`，對照常見版本號：
+- `3700` = Java `1.20.4`
+- `3953` = Java `1.21`
+- `4325` = Java `1.21.5`
+- `4671` = Java `1.21.11`
+- `4774` = Java `26.1-snapshot-6`
+
+*（1.9 之前的老舊 Anvil 存檔沒有 `DataVersion`，請參閱 [支援版本與疑難排解](../support-and-troubleshooting/) 使用 `--minecraft-version`。）*
+
+---
+
+## 任務 2：安全修改世界顯示名稱（`LevelName`）
+
+<SafetyBanner tier="write" lang="zh-tw" />
+
+請先確認已經**關閉 Minecraft**，並且先在測試副本 `D:\WorldCopy` 上操作。
+
+```powershell title="PowerShell"
+# 1. 在世界資料夾外建立存放計畫的資料夾
+New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
+
+# 2. 讀取原本的 LevelName 並保留正確的 Minecraft 資料型別
+$read = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName --types | ConvertFrom-Json
+if (-not $read.success) { throw $read.error.message }
+
+# 3. 填入新的地圖名稱並另存成檔案
+$replacement = $read.data.value
+$replacement.data.root.value = '我的超讚冒險地圖'
+$replacement | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\new-name.json'
+
+# 4. 產生修改預覽計畫（這一步還完全不會改動世界！）
+.\nbtcli.exe set 'D:\WorldCopy' `
+  --path level.dat `
+  --pointer /Data/LevelName `
+  --value-file 'D:\Plans\new-name.json' `
+  --output 'D:\Plans\rename-plan.json'
+
+# 5. 離線正式套用（寫入前會自動在世界外建立備份）
+.\nbtcli.exe apply 'D:\WorldCopy' `
+  --plan 'D:\Plans\rename-plan.json' `
+  --world-offline
+```
+
+想了解更多修改方式或中斷復原步驟，請看 **[安全修改存檔與中斷復原](../safe-editing/)**。
+
+---
+
+## 任務 3：看清楚整張冒險地圖裡有哪些文字
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+動手翻譯前，可以先快速盤點所有告示牌、書本、物品名稱、對話與計分板文字：
+
+```powershell title="PowerShell"
+# 看各類文字各有幾筆
+.\nbtcli.exe scan 'D:\WorldCopy' --summary
+
+# 把所有不重複的文字匯出到外部 JSON 檔方便瀏覽
+New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
+.\nbtcli.exe extract 'D:\WorldCopy' --unique --output 'D:\Exports\map-text.json'
+```
+
+直接用記事本或 VS Code 打開 `D:\Exports\map-text.json` 就能瀏覽全部內容。
+
+---
+
+## 任務 4：把英文冒險地圖翻成繁體中文
+
+<SafetyBanner tier="preview" lang="zh-tw" />
+
+以下是把英文地圖（`en_us`）翻成繁體中文（`zh_tw`）的標準起手式：
+
+```powershell title="PowerShell"
+# 1. 開啟翻譯進度（每頁 30 筆文字，完全不改動原存檔）
+$start = .\nbtcli.exe translate start 'D:\WorldCopy' `
+  --source-language en_us `
+  --target-language zh_tw `
+  --page-size 30 | ConvertFrom-Json
+$sid = $start.data.status.sessionId
+
+# 2. 匯出第 0 頁，並把可直接填寫譯文的範本存成 reply-0.json
+New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+$page = .\nbtcli.exe translate export 'D:\WorldCopy' `
+  --session-id $sid --page 0 `
+  --output 'D:\Translate\page-0.txt' | ConvertFrom-Json
+$page.data.replyTemplate | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Translate\reply-0.json'
+```
+
+接著：
+1. 打開 `D:\Translate\reply-0.json` 填寫譯文（或直接交給 AI 助手填寫），再用 `translate submit` 或 `translate advance` 送回。
+2. 重複處理直到未翻譯筆數（`pending`）變成 `0`。
+3. 依序執行 `translate plan` -> `apply --world-offline` -> `translate seal` 完成寫入。
+
+詳細步驟請見 **[冒險地圖翻譯教學](../translation-workflow/)**；想讓 AI 全程自動幫你翻，請見 **[AI Agent 快速整合指南](../ai-agents/)**。
+
+---
+
+## 任務 5：不改地圖，只匯出客戶端 `.zip` 資源包
+
+<SafetyBanner tier="preview" lang="zh-tw" />
+
+翻譯進度全部完成（`pending: 0`）後，可以把譯文打包成獨立的 `.zip` 資源包（請將 `--pack-format 34` 換成符合你 Minecraft 版本的數值，見 [支援版本](../support-and-troubleshooting/)）：
+
+```powershell title="PowerShell"
+New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-Null
+
+.\nbtcli.exe translate create-pack 'D:\WorldCopy' `
+  --session-id '<你的-SESSION-ID>' `
+  --revision 2 `
+  --original-lang en_us `
+  --target-lang zh_tw `
+  --prefix map. `
+  --name 'my-translation-pack.zip' `
+  --format zip `
+  --pack-format 34 `
+  --output 'D:\Exports\Packs' `
+  --plan-output 'D:\Plans\pack-plan.json' `
+  --apply --world-offline
+```
+
+若需要和既有材質包合併（`--merge`），請參閱 **[資源包與語言檔輸出](../resources-and-packs/)**。
+
+---
+
+## 任務 6：修改前先備份世界，出事隨時還原
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+```powershell title="PowerShell"
+# 在世界資料夾外建立完整備份
+.\nbtcli.exe backup 'D:\WorldCopy' --suffix before-experiment
+```
+
+請記下輸出裡的 `manifestHash`！萬一需要還原整個世界（或單獨救回某個壞掉的檔案，例如 `level.dat`）：
+
+```powershell title="PowerShell"
+New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
+
+# 1. 預覽還原計畫（若只想還原單一檔案，加上 "--path level.dat"）
+.\nbtcli.exe restore 'D:\WorldCopy' `
+  --manifest-hash '<你的-MANIFEST-HASH>' `
+  --output 'D:\Backups\restore-plan.json'
+
+# 2. 關閉 Minecraft 後套用還原計畫
+.\nbtcli.exe apply 'D:\WorldCopy' `
+  --plan 'D:\Backups\restore-plan.json' `
+  --world-offline
+```
+
+詳見 **[備份還原與檔案存放位置](../backups-and-state/)**。
+
+---
+
+## 任務 7：檢查地圖有沒有損壞的區塊或語法錯誤的資料包
+
+<SafetyBanner tier="safe" lang="zh-tw" />
+
+```powershell title="PowerShell"
+# 快速檢查基本結構
+.\nbtcli.exe validate 'D:\WorldCopy' --quick
+
+# 深入檢查所有區塊與資料包
+.\nbtcli.exe validate 'D:\WorldCopy'
+```
+
+看到 `success: true` 代表檔案結構正常；若有壞檔或不支援的項目，輸出會直接告訴你是哪一個檔案出問題。

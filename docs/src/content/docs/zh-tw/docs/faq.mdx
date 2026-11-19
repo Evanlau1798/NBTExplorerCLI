@@ -1,0 +1,85 @@
+---
+title: 常見問題與名詞白話詞典
+description: 用最容易懂的白話回答一般玩家的常見疑問，並將常見的 Minecraft 存檔與命令列術語一次講清楚。
+---
+
+不常使用命令列，或對存檔結構名詞感到陌生嗎？這頁整理了大家最常問的問題，並把文檔中出現的專有名詞全部翻成白話。
+
+---
+
+## 常見問題（FAQ）
+
+### 我的 Minecraft Java 版存檔放在電腦哪裡？
+
+- **官方 Minecraft 啟動器**：按鍵盤 `Win + R`，輸入 `%APPDATA%\.minecraft\saves` 後按 **Enter**，裡面的每一個資料夾就是一個世界。
+- **Prism Launcher / MultiMC**：對實例按右鍵 ->「**資料夾**」-> 打開 `.minecraft\saves`。
+- **CurseForge / Modrinth App**：點開你的模組包／設定檔 -> 點「**開啟資料夾（Open Folder）**」-> 打開 `saves`。
+
+請務必先**關閉 Minecraft**，再把世界資料夾**複製**一份到別處（例如 `D:\WorldCopy`）進行測試。
+
+### 執行 `nbtcli.exe` 需要另外安裝 .NET 或 Java 嗎？
+
+**不需要。** 從 GitHub Releases 下載的 `nbtcli-win-x64.zip` 已經內建所有必要的 .NET 執行環境，解壓縮到同一個資料夾就能直接執行 `.\nbtcli.exe`。
+
+### 為什麼第一次執行時 Windows 跳出「Windows 已保護您的電腦」（SmartScreen）？
+
+Windows SmartScreen 預設會對沒有付費商業數位簽章的開源 `.exe` 跳出提醒。只要您確定是從官方 [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases) 下載的 `nbtcli-win-x64.zip`，點「**其他資訊**」->「**仍要執行**」即可正常使用。
+
+### 用這個工具會不會不小心把我的存檔弄壞？
+
+NBTExplorerCLI 內建四道防呆保護：
+1. **所有查閱與掃描指令都是純讀取**（`get`、`list`、`search`、`scan`、`extract`、`validate`、`backup`），絕不會動到存檔。
+2. **修改指令預設只做「預覽」**：`set`、`plan`、`batch`、`convert`、`restore` 與 `translate plan` 預設只在世界外產生計畫檔，不會直接覆蓋存檔。
+3. **寫入必須明確授權**：實際寫入一定要先關閉 Minecraft，並明確輸入 `apply ... --world-offline`。
+4. **寫入前自動備份與中斷復原**：動到世界檔案前會先在世界外保存原檔備份並寫入復原紀錄，萬一寫到一半電腦或視窗意外關掉，也能安全續寫或一鍵還原。
+
+即使如此，**永遠先複製一份世界測試**依然是最安心的好習慣！
+
+### 為什麼每個指令都輸出 JSON 而不是一般純文字？怎麼看懂？
+
+統一的 JSON 格式讓一般人、腳本與 AI 助手都能精準判讀結果。平常只要抓三個重點：
+- 看 `"success"`：`true` 代表成功，`false` 代表失敗。
+- 看 `"data"`：指令查到或建立出來的結果都在這裡。
+- 失敗時看 `"error"` 裡的 `"message"`：裡面會用白話告訴你原因。
+
+### 這個工具跟傳統視窗版 NBTExplorer（GUI）有什麼不同？
+
+- **傳統 GUI 版 NBTExplorer**：適合打開視窗，用手動滑鼠點開改一兩個欄位。
+- **NBTExplorerCLI**：專為**大量處理、翻譯整張冒險地圖、匯出資源包、安全批次修改、PowerShell 腳本與 AI 助手整合**而生，支援預覽與自動備份，並支援新版 Java 存檔（`1.20.4` 至 `1.21.11` 與 `26.1-snapshot-6`）及舊版經典 Anvil 存檔（`1.2.5`、`1.5.2`、`1.6.4`、`1.8.1`）。
+
+### 支援基岩版（Bedrock）或模組（Mod）世界嗎？
+
+- **基岩版**：不支援，僅支援 **Minecraft Java Edition**。
+- **模組 Java 世界**：純讀取查閱（`get`、`list`、`search`）可以讀標準 NBT 標籤；翻譯與寫入會依照原版 Java 規則檢查，遇到看不懂的自訂格式會安全停止而不是硬改。請務必先在副本測試並進遊戲實際確認。
+
+### 我可以直接叫 Claude、ChatGPT、Codex 或 Cursor 幫我操作嗎？
+
+**完全可以！** 這也是本工具最方便的使用方式之一。只要把專用說明書網址（`https://nbtcli.evanlau1798.com/llms.txt`）貼給你的 AI 助手，或直接使用 **[AI Agent 快速整合指南](../ai-agents/)** 裡的現成提示詞即可。
+
+### 怎麼把錯誤訊息切換成繁體中文或英文？
+
+在任何指令加上 `--ui-locale zh-TW` 或 `--ui-locale en-US` 即可：
+
+```powershell title="PowerShell"
+.\nbtcli.exe help get --ui-locale zh-TW
+.\nbtcli.exe help get --ui-locale en-US
+```
+
+---
+
+## 名詞白話詞典
+
+| 名詞 | 白話解釋 |
+| :--- | :--- |
+| **NBT** | Minecraft 存檔專用的資料格式（Named Binary Tag）。可以想像成壓縮過的資料夾樹狀結構，用來記世界設定、方塊、物品與實體資料。 |
+| **`level.dat`** | 每個世界資料夾裡最重要的主設定檔，記錄地圖名稱、`DataVersion`、遊戲規則、出生點座標等資訊。 |
+| **區塊檔（`.mca`）與區塊（Chunk）** | Minecraft 會把地圖切成一塊一塊 16x16 的「區塊」，再把 32x32 個區塊打包成一個 `.mca` 檔案放在 `region/` 或 `entities/` 資料夾裡。 |
+| **`DataVersion`** | Minecraft 存在 `level.dat` 裡的一組數字，用來辨識確切的遊戲版本（例如 `3953` 代表 Java `1.21`）。 |
+| **JSON Pointer（`--pointer`）** | 像資料夾路徑一樣用 `/` 串起來的欄位地址，用來指明要看哪一個值（例如 `/Data/LevelName`）。 |
+| **保留型別（`--types` / `typed-nbt`）** | Minecraft 對資料型別很嚴格（例如某個數字一定要是 `Byte`、`Short`、`Int` 還是純文字 `String`），加上 `--types` 就會把型別一起記下來，改值時才不會存壞。 |
+| **預覽計畫（Patch Plan / `plan.json`）** | 正式動手改存檔前產生的「修改草稿清單」，寫清楚等一下要改哪些檔案與內容；確認沒問題後才交給 `apply` 套用。 |
+| **翻譯進度（Session）與槽位（Slot）** | 存在世界資料夾外的翻譯專案紀錄。地圖裡每一行告示牌、每一頁書或每個物品名稱都會編成一個獨立槽位（Slot），方便分頁翻譯且不會互相搞混。 |
+| **翻譯鍵（Translation Key / `--keys`）** | 把地圖裡寫死的文字（如 `"Welcome!"`）換成代碼（如 `map.abc123`），實際文字則交給資源包的 `.json` 語言檔管理，玩家切換遊戲語言時就能自動切換字幕。 |
+| **外部狀態目錄（State Root / `--state-root`）** | 存在 `%LOCALAPPDATA%\nbtcli\`（或你自訂路徑）的外部資料夾，專門存放備份、翻譯進度、快取與復原日誌，不汙染原本的世界資料夾。 |
+| **`--world-offline`** | 修改存檔指令必加的安全確認旗標，提醒你在執行前務必關閉 Minecraft 與其他編輯器。 |
+| **退出碼（Exit Code）** | 指令跑完後回傳的一個數字（`0` 到 `8` 或 `130`）。`0` 代表成功，其他數字則用來一眼分辨是語法打錯、檔案被鎖定還是需要復原。 |

@@ -259,3 +259,28 @@
   border-radius: 3px;
   color: var(--sl-color-gray-1);
 }
+
+/* Progressive disclosure blocks for optional technical details */
+.sl-markdown-content details {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: var(--nbt-radius);
+  padding: 0.85rem 1.1rem;
+  margin: 1.25rem 0;
+  background: rgba(17, 23, 34, 0.4);
+}
+
+:root[data-theme='light'] .sl-markdown-content details {
+  background: #f8fafc;
+}
+
+.sl-markdown-content details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+.sl-markdown-content details[open] summary {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--sl-color-gray-5);
+}

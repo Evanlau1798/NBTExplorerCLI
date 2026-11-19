@@ -1,6 +1,6 @@
 ---
-title: Support Scope and Troubleshooting
-description: Supported Minecraft Java Edition DataVersion profiles, exit codes, verification boundaries, and solutions for common errors.
+title: Supported Versions & Troubleshooting
+description: Which Minecraft Java Edition versions are supported, how to solve common problems step by step, and what every exit code means.
 ---
 
 import { Steps } from '@astrojs/starlight/components';
@@ -10,113 +10,139 @@ import SafetyBanner from '../../../components/SafetyBanner.astro';
 
 <SafetyBanner tier="safe" lang="en" />
 
-This page summarizes the supported **Minecraft Java Edition** profiles, explains the boundary between CLI/parser verification and live in-game verification, lists all CLI exit codes, and provides step-by-step solutions for common errors.
-
-## 1. Supported Minecraft Java Edition Profiles
-
-Run `nbtcli capabilities` at any time to inspect the registered command list and the declared support matrix for each pinned Minecraft `DataVersion` profile:
-
-```powershell title="PowerShell"
-.\nbtcli.exe capabilities
-```
-
-<ProfileTable lang="en" />
-
-The `java-classic-anvil` entry under `capabilities.storageProfiles` covers read-only inspection of older Anvil saves with storage version `19133` and no `DataVersion`. This storage metadata cannot identify an exact game release or command grammar.
-
-For an Anvil world known to run on **Java 1.2.5**, **Java 1.5.2**, **Java 1.6.4**, or **Java 1.8.1**, pass the exact version with `--minecraft-version` to `scan`, `extract`, or `translate start`. The session and its direct plan retain this version when reopened or applied. Choose world text roles with `--types` when a bundled classic resource pack is outside your translation scope. Java 1.2.5 supports direct edits to vanilla signs. The other listed profiles also support books, display fields, and recognized command text arguments.
-
-In Java 1.2.5, 1.5.2, and 1.6.4, signs store plain text. Translated sign lines must fit 15 UTF-16 code units each and contain no line breaks. In Java 1.5.2 and 1.6.4, plain-text book titles and pages can hold 16 and 256 code units, respectively. Scoreboard display names can hold 32 code units, and team prefixes and suffixes can hold 16 each. Keep entity names used as selector identifiers unchanged. Use the matching vanilla game version to verify that the translated commands run.
-
-For shaped and shapeless crafting recipes, `scan` and `validate` can report `InvalidRecipeResult` for an absent, malformed, or air output item. The check follows the data pack's registered format. The matching Minecraft server verifies registry resolution, ingredients, stack sizes, and data pack interactions.
-
-### Reading the `capabilities` Output
-
-For each profile, `capabilities` reports five operations (`read`, `extract`, `plan`, `write`, `recover`) across six facets (`layout`, `itemSchema`, `textSchema`, `commandGrammar`, `compression`, `packLayout`):
-
-- **Readable does not automatically imply writable**: Never assume a world format can be modified just because `get` or `list` can read it. The planner and writer check whether the specific target role, component schema, and profile are supported before creating or applying a plan.
-- **Parser Verification vs. Live In-Game Verification**:
-  - `validate`, `scan`, `plan`, and `apply` verify binary NBT/region framing, JSON syntax, SHA-256 preimages/postimages, and schema rules at the CLI level.
-  - Passing CLI validation is **not** a substitute for loading the world inside the Minecraft Java Edition client. In-game visual rendering, custom font spacing, and live command execution behavior that have not yet been tested in the running game remain **pending live in-game verification** (`尚待實機驗證`) — always verify your translated or edited world copy inside Minecraft before distributing a map.
+Not sure whether your Minecraft version is supported, or ran into an error message? Start here to check version support and fix the most common issues step by step.
 
 ---
 
-## 2. Supported World Text Roles (21 Roles)
+## 1. Supported Minecraft Java Edition Versions
 
-When running `scan`, `extract`, `validate`, `convert`, or `translate start`, the `--types` option can filter by any combination of the 21 supported text roles:
+**NBTExplorerCLI** works exclusively with **Minecraft Java Edition** saves (Bedrock Edition is not supported). You can always run `.\nbtcli.exe capabilities` to check the exact built-in support matrix.
+
+### Modern Java Edition Versions (Detected Automatically)
+
+<ProfileTable lang="en" />
+
+### Classic Older Anvil Worlds (`1.2.5`, `1.5.2`, `1.6.4`, `1.8.1`)
+
+Older Minecraft Java Edition Anvil saves (storage version `19133`, before Minecraft added `DataVersion`) do not store an exact version number inside `level.dat`:
+- **Read-only inspection** works automatically (`java-classic-anvil`).
+- **Translating or direct editing**: Tell `nbtcli` the exact game version using `--minecraft-version` on `scan`, `extract`, `validate`, or `translate start` — supported versions are **`1.2.5`**, **`1.5.2`**, **`1.6.4`**, and **`1.8.1`**:
+
+```powershell title="Example: start translating a Java 1.8.1 adventure map"
+.\nbtcli.exe translate start 'D:\ClassicWorldCopy' `
+  --minecraft-version 1.8.1 `
+  --source-language en_us `
+  --target-language zh_tw
+```
+
+The chosen version is automatically remembered by the translation session and its direct update plan.
+
+<details>
+<summary>Important Limits for Classic Versions (1.2.5, 1.5.2, 1.6.4, 1.8.1) & Crafting Recipes</summary>
+
+- **Java 1.2.5**: Supports direct edits to vanilla signs (plain text, up to 15 UTF-16 code units per line, no line breaks).
+- **Java 1.5.2 and 1.6.4**: Supports signs (15 UTF-16 code units/line, no line breaks), plain-text books (title up to 16, each page up to 256 code units), display fields, scoreboard display names (up to 32), team prefixes/suffixes (up to 16 each), and recognized command text arguments.
+- **Java 1.8.1**: Supports signs, books, display fields, and recognized command text arguments.
+- Keep entity names used as command selector identifiers unchanged, use `--types` if a bundled classic resource pack is outside your scope, and always test in the matching vanilla Minecraft version.
+- **Crafting Recipes**: For shaped and shapeless crafting recipes in datapacks, `scan` and `validate` report `InvalidRecipeResult` if the output item is missing, malformed, or air. Registry resolution, ingredients, and stack sizes are still verified by the matching Minecraft server.
+
+</details>
+
+:::caution[Always Test Your Edited World Inside Minecraft!]
+Passing `validate`, `scan`, or `apply` confirms that the save files are structurally valid and uncorrupted, **not** how signs wrap visually, how custom fonts look, or how complex map commands behave during live gameplay. Always open your world copy in Minecraft and play-test before sharing your map!
+:::
+
+---
+
+## 2. Common Problems & How to Fix Them
+
+### Problem 1: PowerShell Says `nbtcli.exe` Is Not Recognized or Will Not Run
+
+**What happened**: You typed `nbtcli` without `.\`, opened PowerShell in the wrong folder, or moved `nbtcli.exe` away from its `.dll` files.
+
+<Steps>
+
+1. Make sure you extracted **all** files from `nbtcli-win-x64.zip` into the same folder (keep the `.dll` and `.json` files next to `nbtcli.exe`).
+2. Open PowerShell **inside that exact folder** (click File Explorer's address bar -> type `powershell` -> press **Enter**).
+3. Put **`.\`** in front of the command: `.\nbtcli.exe --version`.
+4. If Windows SmartScreen pops up on first launch, click **More info** -> **Run anyway**.
+
+</Steps>
+
+### Problem 2: World File Is Locked or Access Denied (Exit Code `5`)
+
+**What happened**: `scan`, `backup`, or `apply` failed with `IO_ERROR` or `ACCESS_DENIED`.
+
+<Steps>
+
+1. Close Minecraft (including any singleplayer world or local server) completely.
+2. Close any other apps viewing the world folder (NBT viewers, 3D map editors, or ZIP tools).
+3. Double-check the folder path, and run your command again on your world copy.
+
+</Steps>
+
+### Problem 3: Write Interrupted — `RECOVERY_REQUIRED` (Exit Code `7`)
+
+**What happened**: `apply` stopped halfway (for example, the window was closed before finishing).
+
+<Steps>
+
+1. **Do NOT open the world in Minecraft.**
+2. Copy `planHash` (or `data.pendingPlanHash`) and `stateRoot` from the output.
+3. Check what happened: `.\nbtcli.exe status 'D:\WorldCopy' --plan-hash <hash>`.
+4. Either finish the edit (`.\nbtcli.exe recover 'D:\WorldCopy' --plan-hash <hash> --world-offline`) or undo everything cleanly back to your original files (`.\nbtcli.exe recover 'D:\WorldCopy' --plan-hash <hash> --rollback --world-offline`, which returns exit code `8`).
+
+</Steps>
+
+### Problem 4: World Changed After Creating a Plan or Translation Session (Exit Code `3`)
+
+**What happened**: `apply` or `translate submit` failed with `CONFLICT`.
+
+**Why**: A file inside the world folder changed after you created the plan or started translating, so `nbtcli` blocked the write to prevent overwriting newer changes.
+
+**How to fix**:
+- **For an edit plan**: Re-run `get --types` and `set` / `plan` on the current world folder to create a fresh plan.
+- **For a translation session** (`repair: "start-new-session"`): Start a new translation session on the updated world copy, then reuse your previous translations via `translate memory` (see **[Map Translation Guide](../translation-workflow/)**).
+
+### Problem 5: Corrupted File or Unsupported Format (Exit Code `4` or `5`)
+
+**What happened**: `scan` or `validate` reported `coverageComplete: false` with exit code `4` (unsupported format) or `5` (damaged file, such as an empty `.mca` chunk file or broken datapack JSON).
+
+<Steps>
+
+1. Run `.\nbtcli.exe validate 'D:\WorldCopy'` to see which exact file path had a problem.
+2. If you have a backup, restore just that one file: `.\nbtcli.exe restore 'D:\WorldCopy' --manifest-hash <hash> --path <relative-path> --output 'D:\Backups\fix-plan.json'` followed by `apply --world-offline`.
+3. If you only want to work on healthy parts of the map, limit the scope using `--dimension`, `--region`, `--path`, or `--types`.
+
+</Steps>
+
+### Problem 6: Size or Time Limit Hit (Exit Code `6`)
+
+**What happened**: Output showed `RESOURCE_LIMIT` or `PATTERN_TIMEOUT`.
+
+**Why**: To prevent out-of-memory crashes or runaway regexes, `nbtcli` enforces safety caps (64 MiB max output/file, 100,000 slots/ops, 256 nesting levels, 100 ms regex timeout).
+
+**How to fix**:
+- Split large worlds into smaller chunks with `--dimension`, `--region`, `--path`, or `--types`.
+- Lower `--page-size` or `--page-bytes` when translating.
+- Simplify complex `--match-pattern` filters.
+
+---
+
+## 3. All 21 Supported Map Text Categories (`--types`)
+
+You can filter `scan`, `extract`, `validate`, `convert`, or `translate start` to specific kinds of map text using `--types` (for example, `--types Sign,Book,ItemName`):
 
 - **Blocks & Signs**: `Sign`, `HangingSign`, `ContainerName`, `CommandBlock`
 - **Books & Lecterns**: `Book`, `LecternBook`, `Title`, `Author`
 - **Items & Entities**: `ItemName`, `ItemLore`, `ArmorStand`, `EntityName`, `TextDisplay`
-- **World & UI State**: `BossBar`, `ScoreboardTeam`, `ScoreboardObjective`
-- **Datapacks & Resources**: `McFunction`, `Advancement`, `CommandStorage`, `LangKey`, `TranslationKey`
+- **Scoreboards & Bossbars**: `BossBar`, `ScoreboardTeam`, `ScoreboardObjective`
+- **Datapacks & Language Files**: `McFunction`, `Advancement`, `CommandStorage`, `LangKey`, `TranslationKey`
 
 ---
 
-## 3. Exit Codes Reference
+## 4. Exit Codes Reference
 
-Every invocation returns a deterministic exit code alongside the JSON response on `stdout`. When an exit code is non-zero (`success: false`), inspect `error.code`, `error.message`, and `error.details` for the exact reason.
+Every command returns a numeric exit code alongside its JSON response (`0` = worked; anything else = check `error.message` and the table below):
 
 <ExitCodeTable lang="en" />
-
----
-
-## 4. Common Troubleshooting Scenarios
-
-### Scenario A: World File Is Locked or Access Is Denied (Exit Code `5`)
-
-**Symptom**: `scan`, `backup`, or `apply` fails with exit code `5` (`IO_ERROR` or `ACCESS_DENIED`).
-
-<Steps>
-
-1. Close the Minecraft Java Edition client, integrated server, or dedicated server completely.
-2. Close any other tools inspecting the same world folder (such as NBT viewers, map renderers, or archive managers).
-3. Re-run the command on your world copy.
-
-</Steps>
-
-### Scenario B: Write Interrupted — `RECOVERY_REQUIRED` (Exit Code `7`)
-
-**Symptom**: `apply` or `recover` returns exit code `7` (`RECOVERY_REQUIRED`).
-
-<Steps>
-
-1. **Do not open the world in Minecraft.**
-2. Copy the `planHash` and `stateRoot` from the JSON output.
-3. Run `nbtcli status <world> --plan-hash <hash> --state-root <stateRoot>` to inspect the journal state.
-4. Run `nbtcli recover <world> --plan-hash <hash> --state-root <stateRoot> --world-offline` to finish the planned write, or add `--rollback` to restore the original pre-edit files (returns exit code `8`).
-
-</Steps>
-
-### Scenario C: World Modified Externally After Creating a Plan or Session (Exit Code `3`)
-
-**Symptom**: `apply` or `translate submit` fails with exit code `3` (`CONFLICT`).
-
-**Why It Happens**: One or more world files changed on disk after your `patch-plan` or translation session snapshot was created. NBTExplorerCLI refuses to overwrite changed files with stale plans.
-
-**How to Resolve**:
-- If an edit plan is stale: Re-run `get --types` and `set` / `plan` on the current world files to generate a fresh plan.
-- If a translation session snapshot is stale (`repair: "start-new-session"`): Start a new session on the updated world copy; follow the [translation memory example](../translation-workflow/) with the new session ID, its full slot hash, the previous session ID, and the glossary version.
-
-### Scenario D: Corrupted Region/NBT File or Unsupported Format (Exit Code `4` or `5`)
-
-**Symptom**: `scan` or `validate` reports `coverageComplete: false` with exit code `4` (unsupported profile/feature) or exit code `5` (malformed/corrupt file, such as a zero-byte region file or invalid JSON in a datapack).
-
-<Steps>
-
-1. Run `nbtcli validate <world>` and inspect the per-source diagnostics in the JSON output to see which exact relative file path failed.
-2. If a single file is damaged and you have a verified backup, restore that specific file using `nbtcli restore <world> --manifest-hash <hash> --path <relative-path> --apply --world-offline`.
-3. If you only need to translate or edit healthy dimensions or specific files, scope your command using `--dimension`, `--region`, `--path`, or `--types` to exclude the damaged or unsupported file.
-
-</Steps>
-
-### Scenario E: Resource Budget or Regex Timeout Exceeded (Exit Code `6`)
-
-**Symptom**: Command exits with code `6` (`RESOURCE_LIMIT` or `PATTERN_TIMEOUT`).
-
-**Why It Happens**: To prevent out-of-memory crashes or runaway regular expressions, NBTExplorerCLI enforces a 64 MiB artifact/output ceiling, a 100,000-slot session limit, a 256-segment node depth limit, and a 100 ms regex timeout.
-
-**How to Resolve**:
-- Narrow the target scope with `--dimension`, `--region`, `--path`, or `--types`.
-- When starting or exporting a translation session, lower `--page-size` or `--page-bytes`.
-- Simplify complex `--match-pattern` regular expressions.

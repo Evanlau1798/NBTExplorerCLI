@@ -11,7 +11,7 @@ export default defineConfig({
         en: 'NBTExplorerCLI',
         'zh-TW': 'NBTExplorerCLI',
       },
-      description: 'Windows x64 command-line tool for inspecting, translating, and safely editing Minecraft Java Edition worlds.',
+      description: 'Windows x64 tool for inspecting, translating, and safely editing Minecraft Java Edition worlds.',
       favicon: '/favicon.svg',
       logo: {
         src: './src/assets/logo.svg',
@@ -33,58 +33,73 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Start Here',
-          translations: { 'zh-TW': '入門指南' },
+          translations: { 'zh-TW': '快速入門' },
           items: [
             {
-              label: 'Documentation Overview',
-              translations: { 'zh-TW': '文檔總覽與核心概念' },
+              label: 'Overview',
+              translations: { 'zh-TW': '工具總覽' },
               slug: 'docs',
             },
             {
-              label: 'Install and Inspect',
-              translations: { 'zh-TW': '安裝驗證與安全查閱' },
+              label: 'Install & First Run',
+              translations: { 'zh-TW': '下載安裝與初次使用' },
               slug: 'docs/getting-started',
+            },
+            {
+              label: 'Common Tasks (Recipes)',
+              translations: { 'zh-TW': '常見任務速查' },
+              slug: 'docs/recipes',
+            },
+            {
+              label: 'FAQ & Glossary',
+              translations: { 'zh-TW': '常見問題與名詞白話詞典' },
+              slug: 'docs/faq',
             },
           ],
         },
         {
-          label: 'Core Workflows',
-          translations: { 'zh-TW': '核心工作流程' },
+          label: 'Core Guides',
+          translations: { 'zh-TW': '核心功能指南' },
           items: [
             {
-              label: 'Safe Editing and Recovery',
-              translations: { 'zh-TW': '安全編輯與中斷復原' },
-              slug: 'docs/safe-editing',
-            },
-            {
-              label: 'Translation Workflow',
-              translations: { 'zh-TW': '地圖翻譯工作流' },
+              label: 'Map Translation Guide',
+              translations: { 'zh-TW': '冒險地圖翻譯教學' },
               slug: 'docs/translation-workflow',
             },
             {
-              label: 'Resource Packs and References',
-              translations: { 'zh-TW': '資源包、語言檔與引用' },
+              label: 'Resource Packs & Language Files',
+              translations: { 'zh-TW': '資源包與語言檔輸出' },
               slug: 'docs/resources-and-packs',
             },
             {
-              label: 'Backups and State Files',
-              translations: { 'zh-TW': '備份與狀態檔管理' },
+              label: 'Editing Worlds & Crash Recovery',
+              translations: { 'zh-TW': '安全修改存檔與中斷復原' },
+              slug: 'docs/safe-editing',
+            },
+            {
+              label: 'Backups & Where Files Live',
+              translations: { 'zh-TW': '備份還原與檔案存放位置' },
               slug: 'docs/backups-and-state',
             },
           ],
         },
         {
-          label: 'Reference and Support',
-          translations: { 'zh-TW': '參考與疑難排解' },
+          label: 'Reference & AI Agents',
+          translations: { 'zh-TW': '參考手冊與 AI 整合' },
           items: [
             {
+              label: 'AI Agent Quickstart',
+              translations: { 'zh-TW': 'AI Agent 快速整合指南' },
+              slug: 'docs/ai-agents',
+            },
+            {
               label: 'Command Reference',
-              translations: { 'zh-TW': 'CLI 命令完整參考' },
+              translations: { 'zh-TW': '完整命令參考' },
               slug: 'docs/command-reference',
             },
             {
-              label: 'Support Scope and Troubleshooting',
-              translations: { 'zh-TW': '支援範圍與疑難排解' },
+              label: 'Supported Versions & Troubleshooting',
+              translations: { 'zh-TW': '支援版本與疑難排解' },
               slug: 'docs/support-and-troubleshooting',
             },
           ],

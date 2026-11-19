@@ -1,6 +1,6 @@
 ---
-title: 資源包、語言檔與引用
-description: 比較直接替換世界文字、轉為翻譯鍵、匯出獨立語言檔與資源包，以及同步實體名稱引用。
+title: 資源包與語言檔輸出
+description: 比較直接寫進地圖、轉成多語言翻譯鍵、或單獨匯出客戶端資源包，並了解如何保護實體名稱不被改壞。
 ---
 
 import { FileTree, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -8,28 +8,29 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 <SafetyBanner tier="preview" lang="zh-tw" />
 
-在翻譯或處理 Minecraft Java Edition 世界文字時，**NBTExplorerCLI** 同時支援**直接修改世界存檔內容**與**匯出獨立資源包／語言檔**。先了解各模式的差異，能協助您為地圖選擇最合適的交付方式。
+翻完一張 Minecraft Java 版冒險地圖後，你可以依發布需求決定要把譯文「直接放進地圖」還是「做成資源包」。這頁幫你快速選對方案並示範怎麼操作。
 
-## 1. 五種本地化與轉換模式比較
+## 1. 我該選哪一種輸出方式？
 
-| 工作流模式 | 使用命令 | 是否修改世界內遊戲 NBT/JSON？ | 是否產出語言檔或資源包？ | 適用情境 |
+| 交付方式 | 使用指令 | 會改地圖存檔嗎？ | 會產出資源包或語言檔嗎？ | 最推薦用在什麼情況 |
 | --- | --- | --- | --- | --- |
-| **直接替換世界文字** | `translate plan --direct` -> `apply` | 是（原地替換世界內的文字） | 否 | 希望玩家直接載入地圖就能看到譯文，無須額外掛載資源包。 |
-| **工作階段翻譯鍵轉換** | `translate plan --keys` -> `apply` | 是（將世界文字改為 `translate` 鍵） | 是（寫入或合併對應的 `.json` 語言檔） | 希望地圖改用翻譯鍵（如 `map.<digest>`），並搭配內嵌或資料夾資源包切換語言。 |
-| **單次全文轉翻譯鍵** | `convert <world> --lang <locale>` | 是（加上 `--apply` 時） | 是（預設輸出至 `resources.zip#assets/nbt/lang/<locale>.json`） | 不透過分頁翻譯工作階段，想一次將現有世界文字抽離成翻譯鍵與語言檔。 |
-| **匯出獨立語言檔** | `translate export-lang` | 不改遊戲 NBT（省略 `--output` 時會寫入世界內的 `.nbtcli.language`） | 是（輸出原文與譯文 `.json` 語言檔） | 只想從已完成的工作階段取得語言檔，不改動世界內的遊戲 NBT。 |
-| **建立獨立資源包** | `translate create-pack` | 不改遊戲 NBT（省略 `--output` 時會寫入世界目錄或 `resourcepacks/`） | 是（建立或合併 ZIP／資料夾資源包） | 想將翻譯成果打包成客戶端資源包，或安全合併至既有的美術資源包中，而不改動遊戲 NBT。 |
+| **直接把譯文寫進地圖** | `translate plan --direct` -> `apply` | 會 | 不會 | **對玩家最省事。** 載入地圖就能直接看中文，完全不需要掛載資源包。 |
+| **多語言地圖（翻譯鍵 + 資源包）** | `translate plan --keys` -> `apply` | 會 | 會 | 希望同一張地圖支援多國語言，玩家切換 Minecraft 語言就能自動換字幕。 |
+| **只匯出獨立資源包** | `translate create-pack` | 不會（需指定外部 `--output`） | 會（`.zip` 或資料夾） | 不改動地圖本身的 NBT，只把譯文打包或合併成客戶端資源包。 |
+| **只匯出純語言 JSON 檔** | `translate export-lang` | 不會（需指定外部 `--output`） | 會（`en_us.json`、`zh_tw.json`） | 只需要原始 `.json` 語言檔交給其他翻譯或資源包作者使用。 |
+| **單次全文抽成翻譯鍵** | `convert <world> --lang <locale>` | 會（加 `--apply` 時） | 會 | 不經分頁翻譯，直接把現有地圖的文字一次抽離成翻譯鍵與語言檔。 |
 
 ---
 
-## 2. 工作階段翻譯鍵計畫（`translate plan --keys`）
+## 2. 把翻譯進度轉成翻譯鍵與資源包（`translate plan --keys`）
 
-當您使用 `--keys` 產生工作階段計畫時，所有已翻譯的槽位都會從純文字轉為 Minecraft `translate` 翻譯鍵（例如 `map.<slot-digest>`），且對應的語言檔會納入**同一份原子修改計畫**中一併驗證與寫入（執行前請確認外部輸出目錄如 `D:\Translate` 已存在）：
+如果希望地圖支援多語言，`--keys` 會把每一筆文字換成翻譯鍵（例如 `map.<代碼>`），同時在**同一份計畫**中產生對應的 `.json` 語言檔：
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
+
 .\nbtcli.exe translate plan 'D:\WorldCopy' `
-  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
   --revision 2 `
   --keys `
   --prefix map. `
@@ -37,59 +38,50 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
   --output 'D:\Translate\keys-plan.json'
 ```
 
-### `--language-output` 支援的三種目標路徑與資源包結構
+接著關閉 Minecraft，執行 `.\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Translate\keys-plan.json' --world-offline` 套用。
 
-`--language-output` 用於指定相對於世界目錄的語言檔或壓縮包內部項目：
+### `--language-output` 支援的三種寫法
 
-- **`generated.zip#assets/example/lang/zh_tw.json`**：若該 ZIP 資源包尚不存在，會自動建立新的資源包壓縮檔。
-- **`resources.zip#assets/example/lang/zh_tw.json`**：將語言檔安全合併至世界既有的 `resources.zip` 中，並完整保留壓縮包內的其他資產與 `pack.png`。
-- **`resourcepacks/client/assets/example/lang/zh_tw.json`**：將語言檔寫入或合併至世界內的資料夾型資源包。
+`--language-output` 用來指定語言檔要放在世界內的哪裡：
+
+- **`generated.zip#assets/example/lang/zh_tw.json`**：自動新建一個 `.zip` 資源包。
+- **`resources.zip#assets/example/lang/zh_tw.json`**：安全合併進地圖原本就有的 `resources.zip`，原有的材質、音效與 `pack.png` 都會完整保留。
+- **`resourcepacks/client/assets/example/lang/zh_tw.json`**：寫入或合併到資料夾型資源包。
 
 <FileTree>
 - D:\Exports\Packs\adventure-pack.zip
   - pack.mcmeta
-  - pack.png (合併時自動保留既有圖示)
+  - pack.png (合併時自動保留原圖示)
   - assets/
     - adventure/
       - lang/
-        - **en_us.json** (原始語言字串)
-        - **zh_tw.json** (目標翻譯字串)
+        - **en_us.json** (原始語言文字)
+        - **zh_tw.json** (你的翻譯結果)
 </FileTree>
 
-> [!IMPORTANT]
-> `--language-output` 路徑中的語言檔名（如 `zh_tw.json`）必須與工作階段的目標語言一致，且既有資源包的 `pack.mcmeta` 格式必須與該世界的 `DataVersion` 相容。
+:::note[語言檔名要和目標語言一致]
+`--language-output` 結尾的語言檔名（例如 `zh_tw.json`）必須跟翻譯進度的目標語言一致，且既有資源包的 `pack.mcmeta` 版本必須相容你的世界版本。
+:::
 
 ---
 
-## 3. 匯出獨立語言檔與資源包（`export-lang` 與 `create-pack`）
+## 3. 匯出獨立語言檔或資源包（`export-lang` 與 `create-pack`）
 
-當所有槽位皆已完成翻譯或標記為保留原文時，這兩個命令可先預覽要產出的資源檔案；若加上 `--apply --world-offline`，則會直接輸出資源檔案，且**不會修改世界內的遊戲 NBT，也不會將工作階段封存**。若省略 `--output`，`export-lang` 預設會寫入世界資料夾內的 `.nbtcli.language`，而 `create-pack` 則依 Profile 寫入世界根目錄或 `resourcepacks/`（`java-dimensions-namespaced` 會使用 `resourcepacks/`）。若要讓整個世界資料夾完全維持不變，請明確指定外部 `--output`，並事先準備好世界資料夾外的既有父目錄（如 `D:\Exports` 與 `D:\Plans`）。
+所有文字都翻完（`pending: 0`）後，這兩個指令可以幫你輸出獨立的 `.json` 語言檔或完整資源包，**完全不修改地圖內的遊戲 NBT**。
+
+:::caution[記得明確加上外部 `--output` 資料夾]
+如果省略 `--output`，`export-lang` 預設會寫入世界內的 `.nbtcli.language`，`create-pack` 則預設會寫入世界根目錄或 `<world>\resourcepacks`。只要明確加上外部路徑（例如 `--output 'D:\Exports\Packs'`），就能確保原世界資料夾完全不被動到。
+:::
 
 <Tabs syncKey="pack-export-mode">
-  <TabItem label="匯出獨立語言檔 (export-lang)">
+  <TabItem label="建立或合併客戶端資源包 (create-pack)">
 
 ```powershell title="PowerShell"
-New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
-# 預覽獨立語言檔匯出並儲存計畫檔
-.\nbtcli.exe translate export-lang 'D:\WorldCopy' `
-  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
-  --revision 2 `
-  --original-lang en_us `
-  --target-lang zh_tw `
-  --prefix map. `
-  --output 'D:\Exports\LangFiles' `
-  --plan-output 'D:\Plans\export-lang-plan.json'
-```
+New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-Null
 
-若要直接寫入檔案，請加上 `--apply --world-offline`（或使用 `nbtcli apply` 套用已儲存的 `--plan-output` 計畫檔）。
-
-  </TabItem>
-  <TabItem label="建立或合併資源包 (create-pack)">
-
-```powershell title="PowerShell"
-New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
+# 先預覽（要直接輸出檔案時，加上 --apply --world-offline）
 .\nbtcli.exe translate create-pack 'D:\WorldCopy' `
-  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
   --revision 2 `
   --original-lang en_us `
   --target-lang zh_tw `
@@ -103,25 +95,49 @@ New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
 ```
 
   </TabItem>
+  <TabItem label="匯出純語言 JSON 檔 (export-lang)">
+
+```powershell title="PowerShell"
+New-Item -ItemType Directory -Path 'D:\Exports\LangFiles', 'D:\Plans' -Force | Out-Null
+
+# 預覽獨立語言檔匯出
+.\nbtcli.exe translate export-lang 'D:\WorldCopy' `
+  --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
+  --revision 2 `
+  --original-lang en_us `
+  --target-lang zh_tw `
+  --prefix map. `
+  --output 'D:\Exports\LangFiles' `
+  --plan-output 'D:\Plans\export-lang-plan.json'
+```
+
+  </TabItem>
 </Tabs>
 
-`create-pack` 重要參數說明：
+### 常用選項白話說明
 
-- **`--output <目錄>` vs. `--plan-output <檔案>`**：在 `export-lang` 與 `create-pack` 中，`--output` 用來指定資源檔輸出的目標資料夾，`--plan-output` 則用來匯出 `nbtcli.patch-plan` 計畫檔。
-- **`--format zip|directory`**：選擇輸出 `.zip` 壓縮檔或解開的資源包資料夾。
-- **`--pack-format <major[.minor]>`**：明確指定 `pack.mcmeta` 中的 Minecraft `pack_format` 版本號（輸出至外部獨立目錄時必填）。
-- **`--merge <路徑>`**：將產生的語言檔合併至既有的 ZIP 或資料夾資源包中。原有的美術貼圖、音效與 `pack.png` 皆會完整保留；若遇到衝突的翻譯鍵或內容不一致的檔案，會在寫入任何檔案前主動回報衝突並中止。
-- **套用已保存的資源計畫檔**：當預覽時目標 `--output` 子資料夾尚未建立，計畫會綁定至最近一層已存在的父目錄（`physicalRoot`）。對已儲存的資源計畫執行 `apply` 時，請直接使用預覽 JSON 回傳的 `commitArguments`。
+- **`--output <資料夾>` vs. `--plan-output <計畫檔>`**：`--output` 指定匯出的 `.zip` 或 `.json` 要放哪裡；`--plan-output` 則是另存預覽計畫檔的位置。
+- **`--format zip|directory`**：選擇打包成單一 `.zip`（直接丟進 Minecraft 的 `resourcepacks` 資料夾就能用）或是解開的資料夾。
+- **`--pack-format <版本號>`**：匯出到世界外時必填，讓 Minecraft 認得這個資源包對應的遊戲版本（`22` = 1.20.4、`34` = 1.21、`55` = 1.21.5、`75` = 1.21.11、`80` = 26.1-snapshot-6）。
+- **`--merge <路徑>`**：選用！把新翻好的語言檔合併進你原本的材質／音效資源包中，貼圖、音效與 `pack.png` 都會保留；若遇到衝突的翻譯鍵會主動提醒並中止，不會偷蓋掉原檔。
+
+<details>
+<summary>進階：稍後再套用另存的資源計畫檔</summary>
+
+想直接寫出檔案時，直接在 `export-lang` 或 `create-pack` 結尾加上 `--apply --world-offline` 最方便。如果是先存 `--plan-output` 稍後再交給 `nbtcli apply`，請直接使用預覽輸出 JSON 中回傳的 `commitArguments`（當預覽時目標子資料夾尚未建立時特別重要）。
+
+</details>
 
 ---
 
-## 4. 單次世界文字轉翻譯鍵（`convert`）
+## 4. 不開翻譯進度，一次全文轉翻譯鍵（`convert`）
 
-若您不需要分頁人工翻譯，只想一次將世界內的現有文字轉為翻譯鍵並抽離成語言檔，請使用 `convert`：
+如果你只是想把現有英文地圖裡的文字全部抽離成翻譯鍵 + `en_us.json`，不想建立分頁翻譯進度，直接用 `convert`：
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
-# 預覽轉換結果並匯出計畫檔
+
+# 先預覽轉換計畫
 .\nbtcli.exe convert 'D:\WorldCopy' `
   --lang en_us `
   --prefix nbt. `
@@ -129,27 +145,26 @@ New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
   --output 'D:\Plans\convert-plan.json'
 ```
 
-- 預設情況下，若多處文字具有完全相同的內容、角色、語境與佔位符簽章，`convert` 會共用同一個翻譯鍵；若希望每個實際出現位置都擁有獨立的翻譯鍵，請加上 **`--keepdup`**。
-- 執行實際寫入（`--apply --world-offline`）時，`convert` 預設會先建立一份完整的世界備份並回傳 `convenienceBackupHash`（加上 `--no-backup` 僅會略過這份額外完整備份，底層強制的寫前備份與中斷復原日誌依然全程運作）。
+- 預設情況下，一模一樣的文字出現在多處會共用同一個翻譯鍵；若希望每個出現位置都有獨立翻譯鍵，請加上 **`--keepdup`**。
+- 加上 `--apply --world-offline` 正式轉換時，`convert` 預設會先幫你存一份完整世界備份（只有加 `--no-backup` 才會略過這份額外完整備份，底層寫前備份與中斷復原仍全程運作）。
 
 ---
 
-## 5. 自訂實體名稱與引用同步（`--synchronize-references`）
+## 5. 翻譯實體名稱時，避免把地圖指令方塊搞壞
 
-在許多 Minecraft 冒險地圖中，指令方塊或函數（如 `@e[name=...]`）會透過實體或盔甲座的自訂名稱（`CustomName`）來鎖定目標。如果只翻譯了實體的 `CustomName` 卻沒有同步更新尋找該名稱的指令，地圖機關就可能失效。
+很多冒險地圖的指令方塊會用名字來抓特定的盔甲座或 NPC，例如 `@e[name="QuestGuide"]`。如果只把實體的名字翻成中文，卻沒同步改到抓它的指令，劇情或機關就可能卡關！
 
-為了保護地圖機關運作：
-
-1. **預設安全攔截**：在一般的 `translate plan --direct`、`translate plan --keys` 與 `convert` 中，只要偵測到具識別作用的實體或盔甲座名稱被修改，預設會安全拒絕產出計畫，避免意外破壞 `@e[name=...]` 選擇器。
-2. **有邊界的引用同步（`--synchronize-references`）**：在 `translate plan --direct` 模式下，若您確實要翻譯具識別作用的實體名稱，並希望工具自動將同一範圍內可證明匹配的指令引用一併更新，請加上 `--synchronize-references`：
+因此 NBTExplorerCLI 內建兩層保護：
+1. **預設安全攔截**：一般執行 `translate plan` 或 `convert` 時，如果改到具有識別用途的實體或盔甲座名稱，預設會先攔截提醒，防止意外破壞地圖機關。
+2. **安全同步引用（`--synchronize-references`）**：在 `translate plan --direct` 模式下，如果你確定要連實體名稱一起翻譯，並讓工具自動同步更新同範圍內抓到它的指令，請加上 `--synchronize-references`：
 
 ```powershell title="PowerShell"
 .\nbtcli.exe translate plan 'D:\WorldCopy' `
-  --session-id 6f9619ff-8b86-d011-b42d-00cf4fc964ff `
+  --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
   --revision 2 `
   --direct `
   --synchronize-references `
   --output 'D:\Translate\direct-sync-plan.json'
 ```
 
-若範圍內有任何指令引用存在歧義、動態拼接或無法證明可安全改寫，規劃器會在修改任何檔案前立即中止並回報原因。
+只要範圍內有任何無法證明可安全改寫的動態或模糊指令，工具就會在改動任何檔案前先安全中止。

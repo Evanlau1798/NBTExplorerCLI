@@ -1,6 +1,6 @@
 ---
-title: 備份與狀態檔管理
-description: 建立與驗證以內容雜湊定址的世界備份、修復損壞檔案，並了解 NBTExplorerCLI 如何管理世界資料夾外的外部狀態目錄。
+title: 備份還原與檔案存放位置
+description: 學會用一行指令幫世界建備份與還原，並看懂 NBTExplorerCLI 把快取、翻譯進度與備份存在電腦的哪個資料夾。
 ---
 
 import { FileTree, Steps } from '@astrojs/starlight/components';
@@ -8,57 +8,25 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 <SafetyBanner tier="safe" lang="zh-tw" />
 
-**NBTExplorerCLI** 會將所有的工具紀錄、掃描快取、翻譯工作階段、備份資料塊（Blobs）與中斷復原日誌統一保存在**您的 Minecraft 世界資料夾之外**。這確保在查閱世界、建立掃描快取或進行翻譯時，絕不會在您的存檔資料夾內塞入額外的暫存檔。
-
-## 1. 認識外部狀態目錄（`--state-root`）
-
-預設情況下，與特定世界綁定的狀態檔會儲存在 Windows 本機應用程式資料目錄下：
-
-<FileTree>
-- %LOCALAPPDATA%\nbtcli\
-  - worlds\
-    - 4a8b9c1d2e3f... (無連字號之 world-id)
-      - cache\ (供翻譯與寫入工作流使用的可重建掃描快取)
-      - sessions\ (分頁翻譯工作階段、槽位回覆與術語表紀錄)
-      - agent\ (外部翻譯輔助工具之預設語言與分頁偏好)
-      - objects\ (以 SHA-256 內容定址的寫前備份與快照實體檔案庫)
-      - journals\ (寫入交易日誌與最終完成收據)
-      - backup_before-translation_20261118T070000Z_a1b2c3.json
-  - scan\
-    - 4a8b9c1d2e3f...\ (獨立執行 scan、extract、validate 時的預設快取)
-</FileTree>
-
-您也可以使用 `--state-root 'D:\NbtState\MyWorld'` 指定世界外的自訂資料夾。請注意，在執行相關聯的 `plan`、`apply`、`status`、`recover`、`backup`、`restore`、`translate` 與 `agent` 命令時，請務必帶入**相同**的 `--state-root`。
-
-### 狀態目錄（State Root）內部結構一覽
-
-| 子資料夾／檔案 | 用途說明 | 是否可刪除或重建？ |
-| --- | --- | --- |
-| `cache/` | 儲存翻譯與寫入流程使用的快取。 | **可重建**：與獨立的掃描快取（`scan --refresh` 更新之 `%LOCALAPPDATA%\nbtcli\scan\<world-id>`）分開管理。 |
-| `sessions/` | 儲存翻譯工作階段（`translate start`、`submit`、`note`、`glossary`、`seal`）。 | **翻譯期間請保留**：內含您的翻譯進度、已提交譯文與術語表紀錄。 |
-| `agent/` | 儲存外部輔助工具問卷設定（`agent setup` / `submit`）。 | **使用者偏好設定**：保留此目錄即可維持該世界的預設翻譯語言與分頁筆數。 |
-| `objects/` | 以 SHA-256 內容定址的儲存庫，保存經雜湊驗證的寫前備份與完整備份內容。 | **還原與回滾必備**：`restore` 與 `recover` 必須依賴此目錄才能重建原始世界檔案。 |
-| `journals/` | 儲存 `apply`、`status` 與 `recover` 使用的寫入日誌與完成收據。 | **中斷復原必備**：當寫入進行中或需要復原（結束代碼 `7`）時，切勿刪除。 |
-| `backup_<suffix>_*.json` | 執行 `backup --suffix <名稱>` 時產生的具名備份清單。 | **請與 `objects/` 一併保留**：記錄世界備份中每個檔案的路徑與 SHA-256 雜湊值。 |
-
-### 世界範圍綁定（Scope Binding）機制
-
-`<world-id>` 是工具產生的無連字號世界識別碼。請為每一個世界副本指定各自獨立的 `--state-root`。如果您重新建立或複製了世界資料夾，請對該資料夾重新執行掃描並產生新的計畫檔。接續處理既有的復原日誌時，請使用相同的世界路徑與 `--state-root`。
+**NBTExplorerCLI** 會把所有工具自己的資料——掃描快取、翻譯進度、備份檔案與復原紀錄——全部放在**你的 Minecraft 世界資料夾之外**。不管你掃描幾次地圖或開了幾個翻譯進度，都不會把原本的存檔資料夾弄亂。
 
 ---
 
-## 2. 建立經雜湊驗證的世界備份（`backup`）
+## 1. 修改前先幫世界建一份備份（`backup`）
 
-在進行大規模修改前，建議先執行 `backup` 為整個世界建立一份經雜湊驗證的完整備份（若只需備份單一檔案，可加上 `--path <相對路徑>`）：
+執行 `backup` 會把整個世界（或加上 `--path level.dat` 只備份單一檔案）安全存到外部備份區：
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
+
 .\nbtcli.exe backup 'D:\WorldCopy' `
   --suffix before-translation `
   --output 'D:\Backups\before-translation-manifest.json'
 ```
 
-```json title="stdout (backup)"
+輸出範例：
+
+```json title="輸出結果"
 {
   "schemaFamily": "nbtcli.cli",
   "schemaVersion": 1,
@@ -75,32 +43,32 @@ New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
 }
 ```
 
-> [!IMPORTANT]
-> 備份清單 JSON 檔（`before-translation-manifest.json`）記錄的是檔案路徑與 SHA-256 雜湊值的**索引表**；實際的檔案位元組內容儲存在 `stateRoot` 下的 `objects/` 子資料夾中。請同時保留 `manifestHash` 與該 `stateRoot` 目錄，日後才能順利執行 `restore`。
+記下裡面的 **`manifestHash`**（以及 `stateRoot`）！
+
+:::caution[記得同時保留 `objects/` 資料夾與 `manifestHash`]
+`backup` 產生的 `.json` 檔案只是紀錄「有哪些檔案」的**清單索引**，真正備份下來的檔案資料都存在 `stateRoot` 底下的 `objects/` 資料夾裡。將來還需要還原的話，千萬別把 `objects/` 刪掉！
+:::
 
 ---
 
-## 3. 從備份還原世界檔案（`restore`）
+## 2. 還原整個世界或單一損壞檔案（`restore`）
 
 <SafetyBanner tier="write" lang="zh-tw" />
 
-`restore` 會根據備份清單與 `objects/` 儲存庫將世界（或透過 `--path` 指定的單一檔案）還原至備份時的狀態。即使目前世界內的目標檔案已經損壞或被誤刪，`restore` 依然能將其乾淨修復。
+不管是整個存檔想退回備份點，還是只有其中一個檔案（例如 `level.dat`）壞掉或被誤刪，都可以用 `restore` 救回：
 
 <Steps>
 
-1. **預覽還原計畫**
-
-   先不加 `--apply` 執行 `restore`，檢視預計還原的檔案清單：
+1. **先預覽還原計畫**
 
    ```powershell title="PowerShell"
+   # 預覽還原整個世界（若只想救回單一檔案，加上 "--path level.dat"）
    .\nbtcli.exe restore 'D:\WorldCopy' `
-     --manifest-hash 4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a `
+     --manifest-hash '4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a' `
      --output 'D:\Backups\restore-plan.json'
    ```
 
-2. **在離線狀態下套用還原計畫**
-
-   關閉 Minecraft，並使用與預覽時相同的世界路徑與 `--state-root` 執行 `apply`。`apply` 會檢查預覽時記錄的前置狀態，拒絕覆寫在預覽之後才發生的外部變更：
+2. **關閉 Minecraft，離線套用還原計畫**
 
    ```powershell title="PowerShell"
    .\nbtcli.exe apply 'D:\WorldCopy' `
@@ -108,6 +76,46 @@ New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
      --world-offline
    ```
 
-   若預覽時有指定 `--state-root`，此處請一併帶入相同的選項。若只需修復單一損壞檔案，可在預覽命令加上 `--path level.dat`，檢視輸出的計畫檔後再執行 `apply`。
+   *（若備份或預覽時有指定自訂 `--state-root`，這裡請帶上同一個 `--state-root`。）*
 
 </Steps>
+
+---
+
+## 3. 工具檔案都存在哪裡？哪些可以放心清理？
+
+預設情況下，所有外部資料都放在 Windows 的本機應用程式資料夾（`%LOCALAPPDATA%\nbtcli\`）：
+
+<FileTree>
+- %LOCALAPPDATA%\nbtcli\
+  - worlds\
+    - 4a8b9c1d2e3f... (每個世界一個資料夾)
+      - cache\ (翻譯與編輯用的加速快取)
+      - sessions\ (翻譯進度、已翻譯文與術語表)
+      - agent\ (選用的預設語言設定)
+      - objects\ (真正的備份與回滾原始檔 — 請保留！)
+      - journals\ (寫入紀錄與中斷復原日誌 — 請保留！)
+      - backup_before-translation_20261118T070000Z_a1b2c3.json
+  - scan\
+    - 4a8b9c1d2e3f...\ (獨立 scan / extract / validate 用的快取)
+</FileTree>
+
+### 資料夾清理對照表
+
+| 資料夾／檔案 | 裡面裝什麼 | 可以安心刪掉嗎？ |
+| --- | --- | --- |
+| `scan/` 與 `worlds/<id>/cache/` | 讓重複掃描更快的高速快取。 | **可以。** 下次掃描會自動重建（或執行 `scan --refresh` 更新）。 |
+| `sessions/` | 你的翻譯進度、已提交頁數、備註與術語表。 | **翻譯期間請保留。** 等整張地圖確定翻完封存後再清理。 |
+| `agent/` | 透過 `agent setup` 記住的預設語言與分頁設定。 | **看需求。** 不需要記住預設值就可以刪。 |
+| `objects/` 與 `backup_*.json` | `restore` 與 `recover --rollback` 還原時真正依賴的原始檔案內容。 | **還需要還原就別刪！** |
+| `journals/` | `status` 與 `recover` 判斷寫入進度的紀錄。 | **寫入中斷（退出碼 7）期間絕對不可刪除。** |
+
+<details>
+<summary>進階：用 --state-root 把資料存到指定磁碟或區分不同世界副本</summary>
+
+如果你同時保留多份世界副本，或想把備份和翻譯紀錄存到 D 槽（例如 `D:\NbtState\MyMap`），只要在相關指令加上 `--state-root 'D:\NbtState\MyMap'` 即可。
+
+- 同一個專案關聯的 `plan`、`apply`、`status`、`recover`、`backup`、`restore`、`translate`、`agent` 必須帶入**相同**的 `--state-root`。
+- 建議替每份獨立的世界副本指定各自的 `--state-root`；每次重新複製世界資料夾時，請重新掃描並產生新的計畫檔。
+
+</details>

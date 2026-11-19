@@ -7,8 +7,6 @@ export const PRODUCT_META = {
   command: 'nbtcli',
   version: '1.0.0',
   zipName: 'nbtcli-win-x64.zip',
-  checksumFile: 'SHA256SUMS.txt',
-  manifestFile: 'candidate.json',
   repoUrl: 'https://github.com/Evanlau1798/NBTExplorerCLI',
   releasesUrl: 'https://github.com/Evanlau1798/NBTExplorerCLI/releases',
   actionsUrl: 'https://github.com/Evanlau1798/NBTExplorerCLI/actions',
@@ -22,42 +20,42 @@ export const SAFETY_LABELS: Record<
 > = {
   en: {
     safe: {
-      badge: 'Safe to Inspect',
-      title: 'Safe to Inspect — Does Not Modify Your World',
+      badge: 'Read Only',
+      title: 'Read Only — Safe to Run Anytime',
       description:
-        'Commands in this mode only read files or display information. Your Minecraft world save remains completely untouched.',
+        'Only reads information from your world or checks status logs. Your Minecraft save files are never modified.',
     },
     preview: {
       badge: 'Preview Only',
-      title: 'Preview Mode — Generates a Plan File Without Touching the World',
+      title: 'Preview Mode — Saves Plans Outside Your World',
       description:
-        'Creates a reviewable change plan or session file outside your world folder so you can check every change before writing.',
+        'Prepares a reviewable plan or saves translation progress in a separate folder outside your world. Your Minecraft save stays untouched until you apply it.',
     },
     write: {
-      badge: 'Modifies World Save',
-      title: 'Modifies World Save — Close Minecraft and Back Up First',
+      badge: 'Modifies World',
+      title: 'Modifies World Save — Close Minecraft & Use a Copy First',
       description:
-        'Writes changes to the selected world folder. Always test on a world copy, close Minecraft and other tools first, and pass --world-offline.',
+        'Writes changes into the selected Minecraft world folder. Always test on a copy first, close Minecraft and other editors, and pass --world-offline.',
     },
   },
   'zh-tw': {
     safe: {
-      badge: '安全查閱：不改存檔',
-      title: '安全查閱模式 — 完全不會修改您的世界存檔',
+      badge: '純讀取：不改存檔',
+      title: '純讀取模式 — 隨時執行都不會改到世界',
       description:
-        '此模式下的指令僅讀取資料並輸出結果，不會對 Minecraft 世界資料夾進行任何寫入或更動。',
+        '只讀取存檔資訊或查看狀態紀錄，完全不會修改您的 Minecraft 世界資料夾。',
     },
     preview: {
-      badge: '預覽模式：僅產出計畫',
-      title: '預覽與計畫模式 — 在世界資料夾外產生變更計畫，不直接改動存檔',
+      badge: '僅預覽：先出計畫',
+      title: '預覽模式 — 在世界資料夾外準備計畫，原存檔不動',
       description:
-        '先將預計修改的內容產生為獨立的計畫檔（Plan）或工作階段紀錄，讓您在實際寫入前能完整檢查每一項變更。',
+        '先在世界資料夾外產生預覽計畫或儲存翻譯進度，確認內容沒問題後才會實際寫入。',
     },
     write: {
-      badge: '修改存檔：請先關遊戲並備份',
-      title: '寫入存檔模式 — 執行前請務必關閉 Minecraft 並使用世界副本',
+      badge: '會修改存檔：先關遊戲',
+      title: '寫入存檔模式 — 執行前請先關閉 Minecraft 並用世界副本測試',
       description:
-        '此操作會實際修改指定的世界資料夾。請先建立備份或在世界副本上操作，確認遊戲與其他編輯器皆已關閉後，再加上 --world-offline 執行。',
+        '這個操作會實際修改指定的世界資料夾。請務必先複製一份世界測試、關閉 Minecraft 與其他編輯器，再加上 --world-offline。',
     },
   },
 };
@@ -85,128 +83,128 @@ export const TRANSLATE_SUBCOMMANDS: TranslateSubcommandEntry[] = [
     subcommand: 'start',
     tier: 'preview',
     summary: {
-      en: 'Scans the selected scope and opens a new translation session with paginated text slots.',
-      'zh-tw': '掃描指定範圍並建立新的翻譯工作階段，將世界文字切分為可分頁處理的翻譯槽位（Slots）。',
+      en: 'Scans the map and starts a new translation project split into easy-to-handle pages.',
+      'zh-tw': '掃描地圖文字並建立新的翻譯進度，自動把文字切成方便處理的一頁一頁。',
     },
   },
   {
     subcommand: 'status',
     tier: 'safe',
     summary: {
-      en: 'Checks session translation progress and verifies whether the world files have changed since the session started.',
-      'zh-tw': '查看目前的翻譯進度，並檢查世界檔案自工作階段建立以來是否曾被外部修改。',
+      en: 'Shows how many text items are translated or still remaining, and checks if the world changed.',
+      'zh-tw': '查看已翻譯與未翻譯的數量進度，並確認原世界檔案有沒有被改動過。',
     },
   },
   {
     subcommand: 'export',
     tier: 'safe',
     summary: {
-      en: 'Exports a specific page of text slots along with a structured reply template.',
-      'zh-tw': '匯出指定頁碼的待譯文字與結構化回覆範本（Reply Template）。',
+      en: 'Exports one page of map text along with a ready-to-fill reply template.',
+      'zh-tw': '匯出指定頁碼的地圖原文，並附上可直接填寫譯文的回覆範本。',
     },
   },
   {
     subcommand: 'advance',
     tier: 'preview',
     summary: {
-      en: 'Optionally validates and saves a completed reply file, then returns the next pending page.',
-      'zh-tw': '可選擇同時提交並驗證已完成的回覆檔，接著自動回傳下一個待處理的分頁。',
+      en: 'Submits a finished reply file (optional) and returns the next unfinished page right away.',
+      'zh-tw': '可同時送出已填好的譯文檔並直接拿到下一頁還沒翻的內容（不帶譯文檔時則是查詢下一頁）。',
     },
   },
   {
     subcommand: 'submit',
     tier: 'preview',
     summary: {
-      en: 'Validates and saves a translated reply JSON file (or stdin) for the current revision and returns the next pending page.',
-      'zh-tw': '驗證並儲存翻譯回覆 JSON（支援檔案或標準輸入），更新工作階段版本號並回傳下一頁。',
+      en: 'Checks and saves your completed translation reply file and updates the session progress.',
+      'zh-tw': '檢查並儲存你填好的翻譯回覆檔，推進翻譯進度。',
     },
   },
   {
     subcommand: 'get',
     tier: 'safe',
     summary: {
-      en: 'Inspects a single translation slot, its source text, format rules, and current translated value.',
-      'zh-tw': '查詢單一翻譯槽位（Slot）的原文、格式限制與目前儲存的譯文。',
+      en: 'Looks up a single text entry by its slot ID, including original text and current translation.',
+      'zh-tw': '依編號（slot ID）查看單筆文字的原文、限制規則與目前的譯文。',
     },
   },
   {
     subcommand: 'jump',
     tier: 'preview',
     summary: {
-      en: 'Updates the manual page pointer using a versioned session-command request.',
-      'zh-tw': '透過版本化的 session-command 請求切換目前手動檢視的目標頁碼。',
+      en: 'Moves the current page pointer to a different page using a session-command JSON file.',
+      'zh-tw': '透過設定檔（session-command）跳轉到指定的頁碼。',
     },
   },
   {
     subcommand: 'note',
     tier: 'preview',
     summary: {
-      en: 'Reads or updates translator context notes attached to the session.',
-      'zh-tw': '查閱或新增工作階段內的譯者備註與背景說明。',
+      en: 'Reads or adds translator notes (for example, tone or character context) to the session.',
+      'zh-tw': '查看或新增給譯者的備註說明（例如語氣或劇情背景）。',
     },
   },
   {
     subcommand: 'glossary',
     tier: 'preview',
     summary: {
-      en: 'Reads or updates the session terminology glossary to keep recurring names consistent.',
-      'zh-tw': '查閱或更新專有名詞術語表，確保地圖內重複出現的人名、地名與物品譯名一致。',
+      en: 'Reads or updates your glossary so recurring character, item, and place names stay consistent.',
+      'zh-tw': '查看或更新專有名詞術語表，讓地圖裡反覆出現的人名、地名與物品譯名保持一致。',
     },
   },
   {
     subcommand: 'reset',
     tier: 'preview',
     summary: {
-      en: 'Previews or confirms resetting selected slots back to pending while preserving historical records.',
-      'zh-tw': '預覽或確認將指定的槽位重置回待翻譯狀態（保留歷史紀錄，不會刪除已寫入世界的檔案）。',
+      en: 'Previews or resets chosen entries back to unfinished so you can re-translate them.',
+      'zh-tw': '預覽或把指定幾筆譯文重置回未翻譯狀態，方便重新調整譯文。',
     },
   },
   {
     subcommand: 'groups',
     tier: 'safe',
     summary: {
-      en: 'Lists context groups of related text occurrences across the world.',
-      'zh-tw': '分頁列出世界內具相同語境關聯的文字群組。',
+      en: 'Lists groups of related text (for example, pages of the same book or lines of the same sign).',
+      'zh-tw': '列出彼此相關的文字群組（例如同一本書的各頁或同一塊告示牌的多行文字）。',
     },
   },
   {
     subcommand: 'memory',
     tier: 'safe',
     summary: {
-      en: 'Queries compatible translation candidates from other local sessions.',
-      'zh-tw': '從本機其他翻譯工作階段中查詢相容的歷史翻譯記憶候選詞。',
+      en: 'Looks up reusable translations from older local translation sessions.',
+      'zh-tw': '從本機過去的翻譯紀錄中查找可以沿用的譯文。',
     },
   },
   {
     subcommand: 'plan',
     tier: 'preview',
     summary: {
-      en: 'Generates a verified world PatchPlan in either --direct (replace text in-place) or --keys (convert to translation keys + language file) mode.',
-      'zh-tw': '根據已完成的翻譯產生修補計畫：可選擇 --direct（直接替換世界文字）或 --keys（轉為翻譯鍵並附加語言檔）。',
+      en: 'Turns finished translations into a world update plan: --direct replaces text in-place, --keys converts text to translation keys + language file.',
+      'zh-tw': '把完成的翻譯打包成世界更新計畫：--direct 直接替換地圖文字，--keys 則轉成翻譯鍵並產生語言檔。',
     },
   },
   {
     subcommand: 'export-lang',
     tier: 'preview',
     summary: {
-      en: 'Previews or writes standalone original/target language JSON files from frozen session values without modifying gameplay NBT.',
-      'zh-tw': '從工作階段匯出獨立的原文／譯文語言檔（.json），不修改世界內的遊戲 NBT 資料。',
+      en: 'Previews or exports standalone original and translated .json language files without editing map NBT.',
+      'zh-tw': '預覽或匯出獨立的原文／譯文 .json 語言檔，不更動地圖本身的 NBT 資料。',
     },
   },
   {
     subcommand: 'create-pack',
     tier: 'preview',
     summary: {
-      en: 'Previews or builds a standalone Minecraft resource pack (ZIP or directory), optionally merging with an existing pack.',
-      'zh-tw': '預覽或建立獨立的 Minecraft 資源包（ZIP 或資料夾格式），支援與既有資源包安全合併（--merge）。',
+      en: 'Previews or builds a standalone Minecraft resource pack (.zip or folder), optionally merging into an existing pack.',
+      'zh-tw': '預覽或建立獨立的 Minecraft 資源包（.zip 或資料夾），也可安全合併進既有的資源包。',
     },
   },
   {
     subcommand: 'seal',
     tier: 'preview',
     summary: {
-      en: 'Marks the translation session as completed after verifying the durable world apply receipt and plan hash.',
-      'zh-tw': '在確認世界已完成 apply 寫入並核對 plan-hash 後，將翻譯工作階段正式封存為已完成狀態。',
+      en: 'Marks a translation project as complete after confirming the world update succeeded.',
+      'zh-tw': '在確認世界更新（apply）成功後，將這份翻譯進度正式標記為已完成並封存。',
     },
   },
 ];
@@ -221,122 +219,122 @@ export interface ExitCodeEntry {
 export const EXIT_CODES: ExitCodeEntry[] = [
   {
     code: 0,
-    label: { en: 'Success', 'zh-tw': '成功完成' },
+    label: { en: 'Success', 'zh-tw': '執行成功' },
     meaning: {
-      en: 'The command completed normally (including a valid search with zero matches or a verified no-op).',
-      'zh-tw': '指令正常完成（包含合法但無符合項目的搜尋，或確認無需變更的操作）。',
+      en: 'Everything finished normally (including a search that simply found zero matches).',
+      'zh-tw': '指令正常完成（包含合法但沒有查到相符結果的搜尋）。',
     },
     action: {
-      en: 'Proceed to the next step in your workflow.',
-      'zh-tw': '可繼續進行下一步驟。',
+      en: 'Continue to the next step.',
+      'zh-tw': '可以繼續下一步。',
     },
   },
   {
     code: 1,
-    label: { en: 'Internal Failure', 'zh-tw': '非預期內部錯誤' },
+    label: { en: 'Unexpected Error', 'zh-tw': '非預期錯誤' },
     meaning: {
-      en: 'An unexpected internal error occurred.',
-      'zh-tw': '發生非預期的內部錯誤。',
+      en: 'An unexpected internal error happened.',
+      'zh-tw': '程式內部發生非預期的錯誤。',
     },
     action: {
-      en: 'Inspect error.code and error.details; verify the world status before retrying.',
-      'zh-tw': '請檢查 JSON 中的 error.code 與 error.details，並在重試前先確認世界狀態。',
+      en: 'Read error.message and error.details in the JSON output before trying again.',
+      'zh-tw': '請查看輸出 JSON 中的 error.message 與 error.details 了解原因。',
     },
   },
   {
     code: 2,
-    label: { en: 'Invalid Arguments', 'zh-tw': '參數或語法錯誤' },
+    label: { en: 'Command Syntax Error', 'zh-tw': '指令或參數打錯' },
     meaning: {
-      en: 'Unknown command or flag, missing required value, repeated option, or incompatible selector.',
-      'zh-tw': '未知的命令或旗標、缺少必要參數值、重複指定選項，或選擇器彼此衝突。',
+      en: 'Unknown option, missing value, duplicate option, or conflicting flags.',
+      'zh-tw': '輸入了不存在的參數、漏填參數值，或同時用了互斥的選項。',
     },
     action: {
-      en: 'Run nbtcli help <command> to check exact flag names. No files were changed.',
-      'zh-tw': '請執行 nbtcli help <command> 核對正確參數名稱。此時不會有任何檔案被修改。',
+      en: 'Run nbtcli help <command> (or <command> <subcommand> --help) to check spelling. No files were touched.',
+      'zh-tw': '執行 nbtcli help <指令>（子命令用 <指令> <子命令> --help）核對寫法。不會改到任何檔案。',
     },
   },
   {
     code: 3,
-    label: { en: 'Conflict or Stale State', 'zh-tw': '狀態衝突或來源已變更' },
+    label: { en: 'World or Session Changed (Conflict)', 'zh-tw': '檔案已變動或衝突' },
     meaning: {
-      en: 'The world or session changed since the plan/page was created, the node address is ambiguous, or an operation ID was reused with different input.',
-      'zh-tw': '世界存檔或工作階段在產生計畫後曾被修改、節點位址具歧義，或重複使用了相同的 operation-id 卻帶入不同內容。',
+      en: 'The world files changed after you created the plan or started translating, so applying an old plan was blocked for safety.',
+      'zh-tw': '建立計畫或翻譯進度後，世界檔案曾被其他程式改動過，因此工具為了保護存檔拒絕覆寫。',
     },
     action: {
-      en: 'Re-scan or export the latest session revision and generate a fresh plan.',
-      'zh-tw': '請重新掃描世界或匯出最新工作階段分頁，並重新產生計畫。',
+      en: 'Generate a fresh plan from the updated world (or start a new translation session and reuse prior translations).',
+      'zh-tw': '請針對最新的世界副本重新產生計畫（或開新翻譯進度並沿用先前譯文）。',
     },
   },
   {
     code: 4,
-    label: { en: 'Unsupported Format or Incomplete Scope', 'zh-tw': '格式不支援或範圍不完整' },
+    label: { en: 'Unsupported Version or Feature', 'zh-tw': '尚未支援的版本或格式' },
     meaning: {
-      en: 'The target world uses an unsupported DataVersion/profile feature, or selected sources could not be completely discovered.',
-      'zh-tw': '目標世界使用了未支援的 DataVersion 或結構特性，或選定的範圍無法完整解析。',
+      en: 'The world uses a Minecraft version or format feature that is not supported for this operation.',
+      'zh-tw': '這個存檔使用了目前操作尚未支援的 Minecraft 版本或資料結構。',
     },
     action: {
-      en: 'Check nbtcli capabilities and narrow the scan/edit scope with --path, --dimension, or --types.',
-      'zh-tw': '請執行 nbtcli capabilities 查詢支援程度，並使用 --path、--dimension 或 --types 縮小操作範圍。',
+      en: 'Run nbtcli capabilities to check supported versions, or narrow your target with --path, --dimension, or --types.',
+      'zh-tw': '執行 nbtcli capabilities 查看支援範圍，或加上 --path、--dimension、--types 縮小處理範圍。',
     },
   },
   {
     code: 5,
-    label: { en: 'File, Access, or Validation Error', 'zh-tw': '檔案讀寫、權限或資料損壞錯誤' },
+    label: { en: 'File Missing, Locked, or Damaged', 'zh-tw': '檔案找不到、被鎖定或損壞' },
     meaning: {
-      en: 'Missing file, locked world file, malformed NBT/JSON input, or pre-commit preparation failure.',
-      'zh-tw': '找不到檔案、檔案被遊戲或其他程式鎖定、NBT/JSON 格式損壞，或寫前準備失敗。',
+      en: 'A file is missing, currently locked by Minecraft or another app, or contains broken NBT/JSON data.',
+      'zh-tw': '找不到指定檔案、檔案正被 Minecraft 或其他程式佔用，或檔案內容本身已損壞。',
     },
     action: {
-      en: 'Ensure Minecraft is closed, verify the file path, or restore damaged files from a backup.',
-      'zh-tw': '請確認 Minecraft 已關閉、檢查檔案路徑是否正確，或使用 backup/restore 修復損壞檔案。',
+      en: 'Close Minecraft, double-check the folder path, or run validate to find damaged files.',
+      'zh-tw': '先確認已關閉 Minecraft、檢查路徑有沒有打錯，或用 validate 找出哪個檔案損壞。',
     },
   },
   {
     code: 6,
-    label: { en: 'Resource or Timeout Limit', 'zh-tw': '超過資源上限或正規表示式逾時' },
+    label: { en: 'Safety Size or Time Limit Hit', 'zh-tw': '超過安全大小或時間上限' },
     meaning: {
-      en: 'Input size, slot count, node depth, output size (64 MiB max), or regex match time (100 ms) exceeded safety limits.',
-      'zh-tw': '輸入大小、翻譯槽位數量、節點深度、輸出大小（上限 64 MiB）或正規表示式配對（100 毫秒）超過安全上限。',
+      en: 'A file/output exceeded 64 MiB, a session exceeded 100,000 text items, depth exceeded 256 levels, or a regex pattern took over 100 ms.',
+      'zh-tw': '檔案或輸出超過 64 MiB、翻譯項目超過 100,000 筆、結構深度超過 256 層，或正規表示式比對超過 100 毫秒。',
     },
     action: {
-      en: 'Filter by --dimension, --region, or --path, reduce --page-size, or simplify --match-pattern.',
-      'zh-tw': '請透過 --dimension、--region 或 --path 縮小範圍，調降 --page-size，或簡化 --match-pattern。',
+      en: 'Split the work using --dimension, --region, or --path, lower --page-size, or simplify --match-pattern.',
+      'zh-tw': '用 --dimension、--region 或 --path 分批處理，調小 --page-size，或簡化搜尋條件。',
     },
   },
   {
     code: 7,
-    label: { en: 'Recovery Required', 'zh-tw': '需要執行復原（Recovery Required）' },
+    label: { en: 'Interrupted Write — Recovery Needed', 'zh-tw': '寫入中斷，需要先執行復原' },
     meaning: {
-      en: 'A write operation was interrupted or encountered an I/O error after committing began.',
-      'zh-tw': '寫入作業在提交過程中斷或發生 I/O 錯誤，世界處於待復原狀態。',
+      en: 'A world write stopped partway through (for example, the window was closed or crashed mid-write).',
+      'zh-tw': '修改寫入到一半被中斷（例如視窗意外關閉），世界目前處於待復原保護狀態。',
     },
     action: {
-      en: 'Do NOT open the world in Minecraft. Keep the returned planHash and stateRoot, run nbtcli status, then run nbtcli recover.',
-      'zh-tw': '請勿在遊戲中開啟該世界。保留回傳的 planHash 與 stateRoot，先執行 nbtcli status 檢查，再執行 nbtcli recover。',
+      en: 'Do NOT open the world in Minecraft. Copy planHash and stateRoot from the output, run nbtcli status, then run nbtcli recover (or recover --rollback to undo).',
+      'zh-tw': '千萬不要在 Minecraft 裡打開世界。記下輸出中的 planHash 與 stateRoot，先跑 nbtcli status，再跑 nbtcli recover 續寫或加 --rollback 還原。',
     },
   },
   {
     code: 8,
-    label: { en: 'Rolled Back', 'zh-tw': '已完成回滾（Rolled Back）' },
+    label: { en: 'Rolled Back to Original', 'zh-tw': '已安全還原回修改前' },
     meaning: {
-      en: 'Recovery rolled the world back to its verified pre-edit state rather than applying the changes forward.',
-      'zh-tw': '復原程序已將世界安全退回修改前的驗證狀態，而非完成寫入變更。',
+      en: 'nbtcli recover --rollback finished restoring your original world files from backup.',
+      'zh-tw': '已透過 recover --rollback 把世界檔案完整還原成修改前的狀態。',
     },
     action: {
-      en: 'Your original world bytes are restored. Create a new plan if you wish to apply changes again.',
-      'zh-tw': '世界已安全恢復原狀。若仍需套用修改，請重新產生新的計畫檔。',
+      en: 'Your original world is back to normal. You can safely review and create a new plan whenever ready.',
+      'zh-tw': '你的原世界已恢復正常。若還要修改，重新產生新計畫即可。',
     },
   },
   {
     code: 130,
     label: { en: 'Cancelled', 'zh-tw': '操作已取消' },
     meaning: {
-      en: 'The operation recorded a cancelled receipt.',
-      'zh-tw': '操作記錄為已取消狀態。',
+      en: 'The command was cancelled before completion.',
+      'zh-tw': '操作在完成前被中止。',
     },
     action: {
-      en: 'If cancelled during a write, run status and recover with the plan hash before using the world.',
-      'zh-tw': '若在寫入期間中断，請在使用該世界前透過計畫雜湊值執行 status 與 recover。',
+      en: 'If this happened during apply, run status and recover before opening the world.',
+      'zh-tw': '如果是在寫入途中取消的，開啟世界前請先用 status 與 recover 確認並復原。',
     },
   },
 ];
@@ -344,6 +342,7 @@ export const EXIT_CODES: ExitCodeEntry[] = [
 export interface ProfileMatrixRow {
   profile: string;
   dataVersion: number;
+  packFormat: number;
   layout: string;
   itemSchema: string;
   textSchema: string;
@@ -354,6 +353,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   {
     profile: 'java-1.20.4',
     dataVersion: 3700,
+    packFormat: 22,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-tags-1.20.4',
     textSchema: 'java-text-json (v1)',
@@ -362,6 +362,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   {
     profile: 'java-1.21',
     dataVersion: 3953,
+    packFormat: 34,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-components-1.20.5',
     textSchema: 'java-text-json (v1)',
@@ -370,6 +371,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   {
     profile: 'java-1.21.5',
     dataVersion: 4325,
+    packFormat: 55,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-components-1.21.5',
     textSchema: 'java-text-nbt (v1)',
@@ -378,6 +380,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   {
     profile: 'java-1.21.11',
     dataVersion: 4671,
+    packFormat: 75,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-components-1.21.11',
     textSchema: 'java-text-nbt (v2)',
@@ -386,6 +389,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   {
     profile: 'java-26.1-snapshot-6',
     dataVersion: 4774,
+    packFormat: 80,
     layout: 'java-dimensions-namespaced',
     itemSchema: 'java-item-components-26.1-snapshot-6',
     textSchema: 'java-text-nbt (v2)',
