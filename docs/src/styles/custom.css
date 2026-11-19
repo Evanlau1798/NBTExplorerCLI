@@ -25,7 +25,7 @@
 
 :root[data-theme='light'] {
   --sl-color-accent-low: #d1fae5;
-  --sl-color-accent: #059669;
+  --sl-color-accent: #047857;
   --sl-color-accent-high: #064e3b;
   --sl-color-white: #0f172a;
   --sl-color-gray-1: #1e293b;
@@ -35,6 +35,10 @@
   --sl-color-gray-5: #cbd5e1;
   --sl-color-gray-6: #f1f5f9;
   --sl-color-black: #f8fafc;
+  --sl-color-bg-nav: var(--sl-color-black);
+  --sl-color-bg-sidebar: var(--sl-color-gray-6);
+  --sl-color-hairline-shade: var(--sl-color-gray-5);
+  --sl-color-hairline-light: var(--sl-color-gray-5);
 }
 
 /* Sharp craft-engineering geometry */
