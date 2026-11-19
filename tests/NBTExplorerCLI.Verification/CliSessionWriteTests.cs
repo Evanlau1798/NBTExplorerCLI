@@ -38,7 +38,7 @@ internal static class CliSessionWriteTests
     private static Invocation Seal(string work, string world, Guid id, long revision, Guid operation, Hash256 hash) => Call(work, world, id, "seal",
         "--revision", revision.ToString(), "--operation-id", operation.ToString(), "--plan-hash", hash.Hex);
     private static FileSystemTranslationSessionStore Store(string work) => new(Path.Combine(State(work), "sessions"));
-    public static void Java164PreservesPlainTextAndRejectsValuesVanillaCannotLoad()
+    public static void ClassicPlainTextRejectsValuesVanillaCannotLoad(string version)
     {
         var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
         try
@@ -61,10 +61,10 @@ internal static class CliSessionWriteTests
             PutDat("level.dat", WorldMetadataTests.Classic());
             var tickets = new NbtDocument("", Data(new NbtEntry("TicketList", new NbtList(NbtType.Byte, []))));
             PutDat(force, tickets);
-            using var started = Success(Call(work, world, id, "start", "--minecraft-version", "1.6.4", "--source-language", "en_us", "--target-language", "zh_tw"));
+            using var started = Success(Call(work, world, id, "start", "--minecraft-version", version, "--source-language", "en_us", "--target-language", "zh_tw"));
             var state = new TranslationSessionService(Store(work)).Read(id);
             Require(state.Slots.Select(slot => slot.Slot.SourceText).Order().SequenceEqual(["\"Plain\" page", "Hello miner", "Journal", "Miner", "Welcome"]),
-                "1.6.4 exposes plain sign and book text, ignores empty chunk tickets, and leaves later commands opaque");
+                "Classic profiles expose plain sign and book text, ignore empty chunk tickets, and leave later commands opaque");
             foreach (var (role, max) in new[] { ("sign.front.line", 15), ("book.title", 16), ("book.page", 256) })
             {
                 var revision = Submit(work, world, id, translate: item => item.Context == role ? new string('x', max + 1) : item.SourceText);
@@ -74,7 +74,7 @@ internal static class CliSessionWriteTests
             }
             var accepted = Submit(work, world, id);
             var (plan, file) = Plan(work, world, id, accepted);
-            Require(plan.ProfileVersion == "java-1.6.4", "explicit 1.6.4 binds the durable plan");
+            Require(plan.ProfileVersion == "java-" + version, "the selected version binds the durable plan");
             using var applied = Success(Apply(work, world, file));
             using var completion = Success(Seal(work, world, id, accepted, Guid.NewGuid(), plan.PlanHash));
             var stored = RegionFile.Read(File.ReadAllBytes(Path.Combine(world, path))).ReadChunk(0).Document;
@@ -85,7 +85,7 @@ internal static class CliSessionWriteTests
                 && Read(PathSegment.ForIndex(2), PathSegment.ForKey("Command")) is NbtString { Value: opaque }
                 && Read(PathSegment.ForIndex(3), PathSegment.ForKey("Items"), PathSegment.ForIndex(0),
                     PathSegment.ForKey("tag"), PathSegment.ForKey("pages"), PathSegment.ForIndex(0)) is NbtString { Value: "譯文:\"Plain\" page" },
-                "1.6.4 does not encode plain sign or book text as JSON and keeps later commands untouched");
+                "Plain sign and book text remains literal, and later commands stay untouched");
             var rollback = Run(work, "recover", world, "--plan-hash", plan.PlanHash.Hex, "--rollback", "--world-offline", "--state-root", State(work));
             Require(rollback.Exit == 8 && File.ReadAllBytes(Path.Combine(world, path)).SequenceEqual(original), "rollback restores original region and padding");
             PutDat(force, new("", Data(new NbtEntry("TicketList", new NbtList(NbtType.Compound, [Data(new NbtEntry("ModId", new NbtString("mod")))])))));
@@ -95,7 +95,7 @@ internal static class CliSessionWriteTests
         }
         finally { Directory.Delete(world, true); Directory.Delete(work, true); }
     }
-    public static void Java164ScoreboardUsesVanillaFieldsAndLengths()
+    public static void ClassicPlainTextScoreboardUsesVanillaFieldsAndLengths(string version)
     {
         var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
         try
@@ -117,17 +117,17 @@ internal static class CliSessionWriteTests
             var originalBoard = CompressedNbt.WriteDocument(new("", Data(new NbtEntry("data", board))), NbtCompression.GZip);
             WorldDiscoveryTests.Put(world, boardPath, originalBoard);
 
-            using var started = Success(Call(work, world, id, "start", "--minecraft-version", "1.6.4", "--source-language", "en_us", "--target-language", "zh_tw"));
+            using var started = Success(Call(work, world, id, "start", "--minecraft-version", version, "--source-language", "en_us", "--target-language", "zh_tw"));
             var state = new TranslationSessionService(Store(work)).Read(id);
             var fields = new Dictionary<string, int> { ["New objective"] = 32, ["New team"] = 32, ["Saved objective"] = 32, ["Saved team"] = 32, ["Before"] = 16, ["After"] = 16 };
             Require(state.Slots.Select(row => row.Slot.SourceText).Order().SequenceEqual(fields.Keys.Order()),
-                "1.6.4 enumerates real scoreboard fields and leaves unregistered command forms opaque");
+                "Classic profiles enumerate vanilla scoreboard fields and leave unregistered command forms opaque");
             foreach (var (source, limit) in fields)
             {
                 var revision = Submit(work, world, id, translate: item => item.SourceText == source ? new string('譯', limit + 1) : item.SourceText);
                 var preview = Call(work, world, id, "plan", "--direct", "--revision", revision.ToString());
                 Require(preview.Exit == 3 && File.ReadAllBytes(Path.Combine(world, regionPath)).SequenceEqual(region)
-                    && File.ReadAllBytes(Path.Combine(world, boardPath)).SequenceEqual(originalBoard), $"1.6.4 must reject oversized scoreboard field {source} before writing");
+                    && File.ReadAllBytes(Path.Combine(world, boardPath)).SequenceEqual(originalBoard), $"Reject oversized scoreboard field {source} before writing");
             }
             var accepted = Submit(work, world, id, translate: item => new string('譯', fields[item.SourceText]));
             var (plan, file) = Plan(work, world, id, accepted);

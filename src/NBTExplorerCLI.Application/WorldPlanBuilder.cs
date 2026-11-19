@@ -72,6 +72,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         var scope = new SnapshotScope(snapshot.Manifest.Scope.Dimensions, snapshot.Manifest.Scope.Regions, snapshot.Manifest.Scope.Types, outputs.Select(artifact => artifact.RelativePath));
         var rules = snapshot.StorageRules.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<StorageTextRule>)pair.Value);
         var extraction = new WorldTextExtraction(inventory, new(scope, snapshot.Limits, ClassicVersion: classicVersion), rules);
+        var classicPlainText = MinecraftProfiles.UsesClassicPlainText(extraction.LayoutProfile);
         var literal = requested.OfType<LiteralPatch>().Select(operation => operation.Translation)
             .Concat(requested.OfType<KeyConversionPatch>().Select(operation => new LiteralTranslation(operation.Conversion.Slot, operation.Conversion.Reply)))
             .ToDictionary(translation => translation.Slot.Address); var found = new HashSet<SourceAddress>();
@@ -99,7 +100,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
                         var slot = translation.Slot;
                         if (!found.Add(occurrence.Address) || slot.SourceText != occurrence.Text || slot.Context != occurrence.Context || slot.AllowedEmpty != occurrence.AllowedEmpty) throw new EditRejectedException(EditFailure.Precondition, "Literal operation differs from its actual source slot");
                         ValidateLiteral(translation, snapshot.Manifest.SnapshotId.Digest);
-                        if (snapshot.Manifest.Versions.Profile == MinecraftProfiles.Java164.Id) ValidateJava164Text(translation);
+                        if (classicPlainText) ValidateClassicPlainText(translation, classicVersion!);
                     }
                 comparisonTrace?.SetTag("comparisons", (long)(row.Text?.Occurrences.Length ?? 0));
             }
@@ -220,7 +221,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
             if (actual != input.Image) throw new ArtifactConflictException("A bound source changed");
         }
     }
-    private static void ValidateJava164Text(LiteralTranslation translation)
+    private static void ValidateClassicPlainText(LiteralTranslation translation, string version)
     {
         var slot = translation.Slot;
         var value = translation.Reply.Text;
@@ -235,7 +236,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
             _ => int.MaxValue
         };
         if (value.Length > limit || slot.Role == "sign.front.line" && value.AsSpan().IndexOfAny('\r', '\n') >= 0)
-            throw new EditRejectedException(EditFailure.Precondition, $"Java 1.6.4 text exceeds the vanilla field limits for {slot.Role}");
+            throw new EditRejectedException(EditFailure.Precondition, $"Java {version} text exceeds the vanilla field limits for {slot.Role}");
     }
 
     private static void ValidateLiteral(LiteralTranslation translation, Hash256 snapshot)

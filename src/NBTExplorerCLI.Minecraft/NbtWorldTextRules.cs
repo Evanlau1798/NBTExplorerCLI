@@ -153,8 +153,9 @@ internal sealed partial class NbtTextReader
         {
             foreach (var (objective, objectivePath) in Sequence(Field(data, "Objectives", path), At(path, "Objectives")))
                 Component(Field(objective, "DisplayName", objectivePath), At(objectivePath, "DisplayName"), "scoreboard.objective.name");
-            var prefix = profile == MinecraftProfiles.Java164 ? "Prefix" : "MemberNamePrefix";
-            var suffix = profile == MinecraftProfiles.Java164 ? "Suffix" : "MemberNameSuffix";
+            var plain = MinecraftProfiles.UsesClassicPlainText(profile);
+            var prefix = plain ? "Prefix" : "MemberNamePrefix";
+            var suffix = plain ? "Suffix" : "MemberNameSuffix";
             foreach (var (team, teamPath) in Sequence(Field(data, "Teams", path), At(path, "Teams")))
             {
                 Component(Field(team, "DisplayName", teamPath), At(teamPath, "DisplayName"), "scoreboard.team.name");
