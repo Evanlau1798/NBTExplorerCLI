@@ -26,7 +26,7 @@ internal sealed partial class NbtTextReader
         }
         var blocks = classic ? "TileEntities" : "block_entities";
         foreach (var (block, blockPath) in Sequence(Field(root, blocks, path), At(path, blocks))) BlockEntity(block, blockPath);
-        if (classic)
+        if (classic && profile != MinecraftProfiles.Java125)
             foreach (var (entity, entityPath) in Sequence(Field(root, "Entities", path), At(path, "Entities"))) Entity(entity, entityPath);
     }
     internal void Entities(NbtValue root)
@@ -39,12 +39,23 @@ internal sealed partial class NbtTextReader
         if (rawIdentity is not NbtString && (rawIdentity is not null || knownIdentity is null)) { output.Diagnostic(path, "MissingBlockEntityIdentity"); return; }
         var identity = rawIdentity is NbtString id ? MinecraftIdentifier.DefaultNamespace(id.Value) : knownIdentity!;
         if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingBlockEntityIdentity"); return; }
-        var role = identity == "minecraft:command_block" || classic && identity == "minecraft:Control" ? "command_block.name" : "container.name";
-        Component(Field(value, "CustomName", path), At(path, "CustomName"), role);
-        foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
+        var signsOnly = profile == MinecraftProfiles.Java125;
+        if (signsOnly && (identity is "minecraft:sign" or "minecraft:hanging_sign"
+            || identity == "minecraft:Sign" && (Field(value, "front_text", path) is not null || Field(value, "back_text", path) is not null)))
+        {
+            output.Diagnostic(path, "UnsupportedClassicSignSchema");
+            return;
+        }
+        if (!signsOnly)
+        {
+            var role = identity == "minecraft:command_block" || classic && identity == "minecraft:Control" ? "command_block.name" : "container.name";
+            Component(Field(value, "CustomName", path), At(path, "CustomName"), role);
+            foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
+        }
         if (classic && identity == "minecraft:Sign")
             foreach (var field in new[] { "Text1", "Text2", "Text3", "Text4" })
                 Component(Field(value, field, path), At(path, field), "sign.front.line", classicEncoded: true);
+        if (signsOnly) return;
         if (profile == MinecraftProfiles.ClassicAnvil && identity == "minecraft:Control")
             Literal(Field(value, "Command", path), At(path, "Command"), "command.block.raw");
         if (identity is "minecraft:sign" or "minecraft:hanging_sign")
@@ -124,6 +135,7 @@ internal sealed partial class NbtTextReader
     }
     internal void Level(NbtValue root)
     {
+        if (profile == MinecraftProfiles.Java125) return;
         if (Field(root, "Data", TypedPath.Root) is not { } data) return;
         var path = At(TypedPath.Root, "Data");
         if (Field(data, "Player", path) is { } player) Player(player, At(path, "Player"));
@@ -143,6 +155,12 @@ internal sealed partial class NbtTextReader
             && counters.Entries.All(entry => entry.Value is NbtShort)) return;
         if (Field(root, "data", TypedPath.Root) is not { } data) { output.Diagnostic(TypedPath.Root, "MissingSavedDataRoot"); return; }
         var path = At(TypedPath.Root, "data");
+        if (profile == MinecraftProfiles.Java125)
+        {
+            if (artifact != "data/" + filename || !ClassicNonTextData(filename, data, path))
+                output.Diagnostic(TypedPath.Root, "UnsupportedSavedData");
+            return;
+        }
         if (filename.StartsWith("command_storage_", StringComparison.Ordinal) && filename.EndsWith(".dat", StringComparison.Ordinal))
         {
             if (Field(data, "contents", path) is { } contents) Storage(root, contents, At(path, "contents"), storageRules ?? []);

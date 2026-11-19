@@ -44,6 +44,7 @@ internal static class CliWorkflowCases
         new("cli-session-write-arguments-world-export", "cli-session-write", _ => CliSessionWriteTests.ArgumentsForeignWorldsAndExistingExportsNeverConsumeSessionWork()),
         new("cli-session-write-public-pure-mixed-unchanged", "cli-session-write", _ => CliSessionWriteTests.PureMixedAndUnchangedSessionsUseThePublicPlanApplySealWorkflow()),
         new("cli-session-write-java-1-8-1", "cli-session-write", _ => CliSessionWriteTests.VersionlessAnvilUsesAnExplicitVersionForSessionApplyAndRollback()),
+        new("cli-session-write-java-1-2-5", "cli-session-write", _ => CliSessionWriteTests.Java125TranslatesOnlyVanillaSigns()),
         new("cli-session-write-java-1-5-2", "cli-session-write", _ => CliSessionWriteTests.ClassicPlainTextRejectsValuesVanillaCannotLoad("1.5.2")),
         new("cli-session-write-java-1-5-2-scoreboard", "cli-session-write", _ => CliSessionWriteTests.ClassicPlainTextScoreboardUsesVanillaFieldsAndLengths("1.5.2")),
         new("cli-session-write-java-1-6-4", "cli-session-write", _ => CliSessionWriteTests.ClassicPlainTextRejectsValuesVanillaCannotLoad("1.6.4")),

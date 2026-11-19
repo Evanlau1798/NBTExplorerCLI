@@ -10,6 +10,7 @@ internal sealed partial class CommandTextReader
 
     private void ClassicCommand(string body, int offset, TypedPath path)
     {
+        if (profile == MinecraftProfiles.Java125) return;
         var cursor = 0;
         string Word()
         {

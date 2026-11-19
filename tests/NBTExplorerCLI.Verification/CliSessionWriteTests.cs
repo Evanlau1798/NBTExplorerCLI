@@ -38,6 +38,62 @@ internal static class CliSessionWriteTests
     private static Invocation Seal(string work, string world, Guid id, long revision, Guid operation, Hash256 hash) => Call(work, world, id, "seal",
         "--revision", revision.ToString(), "--operation-id", operation.ToString(), "--plan-hash", hash.Hex);
     private static FileSystemTranslationSessionStore Store(string work) => new(Path.Combine(State(work), "sessions"));
+    public static void Java125TranslatesOnlyVanillaSigns()
+    {
+        var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
+        try
+        {
+            const string path = "region/r.0.0.mca";
+            static NbtCompound Data(params NbtEntry[] fields) => new(fields);
+            static NbtEntry Text(string key, string value) => new(key, new NbtString(value));
+            var foreign = Data(Text("id", "Control"), Text("Command", "/say Foreign command"));
+            var sheep = Data(Text("id", "Sheep"), Text("CustomName", "Foreign entity name"));
+            NbtDocument Chunk(string text, params NbtCompound[] extraTiles)
+            {
+                var sign = Data(Text("id", "Sign"), Text("Text1", text), Text("CustomName", "Foreign sign name"));
+                var level = Data(new("xPos", new NbtInt(0)), new("zPos", new NbtInt(0)),
+                    new("TileEntities", new NbtList(NbtType.Compound, [sign, foreign, .. extraTiles])),
+                    new("Entities", new NbtList(NbtType.Compound, [sheep])));
+                return new("", Data(new NbtEntry("Level", level)));
+            }
+            var original = WorldDiscoveryTests.Region(Chunk("Welcome"), [0]);
+            WorldDiscoveryTests.Put(world, path, original);
+            var marker = CompressedNbt.WriteDocument(WorldMetadataTests.Classic(), NbtCompression.GZip);
+            WorldDiscoveryTests.Put(world, "level.dat", marker);
+            using var started = Success(Call(work, world, id, "start", "--minecraft-version", "1.2.5", "--source-language", "en_us", "--target-language", "zh_tw"));
+            var slots = new TranslationSessionService(Store(work)).Read(id).Slots;
+            Require(slots.Length == 1 && slots[0].Slot is { SourceText: "Welcome", Role: "sign.front.line" }, "Java 1.2.5 offers only vanilla sign text");
+            foreach (var invalid in new[] { new string('譯', 16), "含\n換行" })
+            {
+                var revision = Submit(work, world, id, translate: _ => invalid);
+                var response = Call(work, world, id, "plan", "--direct", "--revision", revision.ToString());
+                Require(response.Exit == 3 && File.ReadAllBytes(Path.Combine(world, path)).SequenceEqual(original), "invalid sign text is refused before writing");
+            }
+            var accepted = Submit(work, world, id, translate: _ => new string('譯', 15));
+            var (plan, file) = Plan(work, world, id, accepted);
+            Require(plan.ProfileVersion == "java-1.2.5", "the original sign profile is bound to the plan");
+            using var applied = Success(Apply(work, world, file));
+            using var completion = Success(Seal(work, world, id, accepted, Guid.NewGuid(), plan.PlanHash));
+            var stored = RegionFile.Read(File.ReadAllBytes(Path.Combine(world, path))).ReadChunk(0).Document;
+            Require(stored.Root.Equals(Chunk(new string('譯', 15)).Root), "only vanilla sign data changes");
+            var rollback = Run(work, "recover", world, "--plan-hash", plan.PlanHash.Hex, "--rollback", "--world-offline", "--state-root", State(work));
+            Require(rollback.Exit == 8 && File.ReadAllBytes(Path.Combine(world, path)).SequenceEqual(original), "rollback restores original Anvil bytes");
+            var modernText = new NbtEntry("front_text", Data(Text("messages", "Later text")));
+            foreach (var identity in new[] { "minecraft:sign", "minecraft:hanging_sign", "Sign" })
+            {
+                var mixed = WorldDiscoveryTests.Region(Chunk("Welcome", Data(Text("id", identity), Text("Text1", "Partial"), modernText)), [0]);
+                WorldDiscoveryTests.Put(world, path, mixed);
+                var scan = Run(work, "scan", world, "--minecraft-version", "1.2.5", "--path", path, "--no-cache");
+                var denied = Call(work, world, Guid.NewGuid(), "start", "--minecraft-version", "1.2.5", "--source-language", "en_us", "--target-language", "zh_tw");
+                Require(scan.Exit == 4 && scan.Output.Contains("UnsupportedClassicSignSchema", StringComparison.Ordinal) && denied.Exit == 4
+                    && File.ReadAllBytes(Path.Combine(world, path)).SequenceEqual(mixed), "mixed sign schemas cannot start a partial translation session");
+            }
+            WorldDiscoveryTests.Put(world, "moddata.dat", marker);
+            var unknown = Run(work, "scan", world, "--minecraft-version", "1.2.5", "--path", "moddata.dat", "--no-cache");
+            Require(unknown.Exit == 4 && unknown.Output.Contains("UnknownSourceLayout", StringComparison.Ordinal), "unknown root sidecars remain unsupported");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
     public static void ClassicPlainTextRejectsValuesVanillaCannotLoad(string version)
     {
         var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();

@@ -41,11 +41,13 @@ public static class MinecraftProfiles
     private static readonly CapabilityProfile Java12111 = Create("java-1.21.11", "java-dimensions-directory", "java-item-components-1.21.11", "java-text-nbt", "java-commands-1.21.11", LogicalListEncoding.CompoundWrapper, textVersion: 2);
     private static readonly CapabilityProfile Snapshot2616 = Create("java-26.1-snapshot-6", "java-dimensions-namespaced", "java-item-components-26.1-snapshot-6", "java-text-nbt", "java-commands-26.1-snapshot-6", LogicalListEncoding.CompoundWrapper, textVersion: 2);
     public static CapabilityProfile ClassicAnvil { get; } = Create("java-classic-anvil", "java-dimensions-directory", "java-classic-item-tags", "java-classic-stored-text", "java-classic-commands-unresolved", LogicalListEncoding.Homogeneous, "java-classic-packs-unresolved");
+    internal static CapabilityProfile Java125 { get; } = Create("java-1.2.5", "java-dimensions-directory", "java-classic-item-tags", "java-classic-stored-text", "java-no-stored-commands-1.2.5", LogicalListEncoding.Homogeneous, "java-classic-packs-unresolved");
     private static readonly CapabilityProfile Java152 = Create("java-1.5.2", "java-dimensions-directory", "java-classic-item-tags", "java-classic-stored-text", "java-commands-1.5.2", LogicalListEncoding.Homogeneous, "java-classic-packs-unresolved");
     public static CapabilityProfile Java164 { get; } = Create("java-1.6.4", "java-dimensions-directory", "java-classic-item-tags", "java-classic-stored-text", "java-commands-1.6.4", LogicalListEncoding.Homogeneous, "java-classic-packs-unresolved");
     public static CapabilityProfile Java181 { get; } = Create("java-1.8.1", "java-dimensions-directory", "java-classic-item-tags", "java-text-json", "java-commands-1.8.1", LogicalListEncoding.Homogeneous, "java-classic-packs-unresolved");
     private static readonly Dictionary<string, CapabilityProfile> ClassicProfiles = new(StringComparer.Ordinal)
     {
+        ["1.2.5"] = Java125,
         ["1.5.2"] = Java152,
         ["1.6.4"] = Java164,
         ["1.8.1"] = Java181
@@ -54,7 +56,7 @@ public static class MinecraftProfiles
     public static CapabilityProfile? ForClassicVersion(string version) => ClassicProfiles.GetValueOrDefault(version);
     public static string? ClassicVersion(string profile) => ClassicProfiles.FirstOrDefault(pair => pair.Value.Id == profile).Key;
     public static bool IsVersionedClassic(CapabilityProfile? profile) => profile is not null && ClassicProfiles.ContainsValue(profile);
-    public static bool UsesClassicPlainText(CapabilityProfile? profile) => profile == Java152 || profile == Java164;
+    public static bool UsesClassicPlainText(CapabilityProfile? profile) => profile == Java125 || profile == Java152 || profile == Java164;
     public static CapabilityProfile? ForDataVersion(int dataVersion)
         => dataVersion switch { 3700 => Java1204, 3953 => Java121, 4325 => Java1215, 4671 => Java12111, 4774 => Snapshot2616, _ => null };
 

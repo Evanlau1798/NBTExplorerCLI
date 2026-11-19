@@ -17,7 +17,9 @@ public static class NbtTextExtractor
         var reader = new NbtTextReader(binding, profile, layoutProfile ?? profile, output, limits);
         switch (source.Role)
         {
-            case WorldSourceRole.Player: reader.Player(document.Root, TypedPath.Root); break;
+            case WorldSourceRole.Player:
+                if (profile != MinecraftProfiles.Java125) reader.Player(document.Root, TypedPath.Root);
+                break;
             case WorldSourceRole.Terrain: reader.Terrain(document.Root); break;
             case WorldSourceRole.Entities: reader.Entities(document.Root); break;
             case WorldSourceRole.Level: reader.Level(document.Root); break;
