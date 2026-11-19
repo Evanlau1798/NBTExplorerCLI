@@ -188,13 +188,18 @@ internal sealed partial class CommandTextReader
             var end = CompoundEnd(path, start);
             if (end >= path.Length || path[end] != ']') return false;
             var root = Snbt.ParseDocument(Utf8.GetBytes(path[start..end]), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
-            if (root.Value is not LogicalMinecraftCompound || root.ContainsStringValues) return false;
+            if (root.Value is not LogicalMinecraftCompound || root.ContainsStringValues && !EnchantmentFilter(path.AsSpan(0, start - 1), root)) return false;
             structural.Append(path, copied, start - copied);
             copied = end;
             start = path.IndexOf('{', copied);
         }
         return PlainDataPath(structural.Append(path, copied, path.Length - copied).ToString());
     }
+    private static bool EnchantmentFilter(ReadOnlySpan<char> path, SnbtNode filter)
+        => (path is "tag.Enchantments" or "tag.StoredEnchantments"
+            || path.EndsWith(".tag.Enchantments", StringComparison.Ordinal) || path.EndsWith(".tag.StoredEnchantments", StringComparison.Ordinal))
+            && StaticNbtMatch.Enchantment(filter);
+
     private static int CompoundEnd(string path, int start)
     {
         char quote = '\0';

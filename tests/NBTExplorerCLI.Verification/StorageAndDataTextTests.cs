@@ -17,6 +17,7 @@ internal static class StorageAndDataTextTests
     [
         new("text-storage-explicit-rules-and-candidates", "discovery", _ => ExplicitStorageRulesAndUnknownCandidates()),
         new("command-storage-display-modes", "discovery", _ => CommandStorageDisplayModes()),
+        new("command-filtered-item-tag-data-controls", "discovery", _ => FilteredItemTagDataControls()),
         new("text-storage-command-display-consumers", "discovery", _ => StorageCommandProofTests.CrossFileDisplayConsumers()),
         new("text-storage-saved-path-alias", "discovery", _ => StorageCommandProofTests.AliasedSeedBeforeScan()),
         new("text-storage-namespaced-seed-path-alias", "discovery", _ => StorageCommandProofTests.AliasedSeedBeforeScan(true)),
@@ -31,6 +32,29 @@ internal static class StorageAndDataTextTests
         new("cli-session-write-storage-archive", "cli-session-write", _ => StorageCommandProofTests.CliArchiveSession()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
+
+    private static void FilteredItemTagDataControls()
+    {
+        const string script = """
+            data get storage demo:data item.tag.Enchantments[{id:"minecraft:sharpness"}].lvl
+            data remove storage demo:data item.tag.StoredEnchantments[{id:"minecraft:mending"}]
+            execute store result storage demo:data item.tag.Enchantments[{id:"minecraft:sharpness"}].lvl short 1 run scoreboard players get #power stats
+            execute if data storage demo:data item.tag.Enchantments[{id:"minecraft:sharpness"}].lvl run tellraw @a[name=Guide] {"text":"Visible"}
+            """;
+        var binding = new SourceAddress(new(World, "controls.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var uses = new List<CommandStorageAccess>();
+        var result = CommandTextExtractor.Extract(new(binding, script), profile, storageAccess: uses.Add);
+        Require(result.Complete && result.Text.Occurrences.Single().Text == "Visible" && result.References.Single().Name == "Guide",
+            "filtered item tag controls preserve subsequent text and exact selector references");
+        Require(uses.Count == 4 && uses.All(access => access.Use == CommandStorageUse.Other), "metadata filters do not authorize changing ordinary storage values");
+        foreach (var path in new[] { "item.tag.Enchantments[{id:\"Readable label\"}]", "item.tag.Enchantments[{id:\"minecraft:sharpness\",Name:\"Label\"}]",
+            "item.rawtag.Enchantments[{id:\"minecraft:sharpness\"}]", "item.tag.Enchantments[{Name:\"Label\"}]" })
+        {
+            var unresolved = CommandTextExtractor.Extract(new(binding, "data get storage demo:data " + path), profile);
+            Require(!unresolved.Complete && unresolved.Text.Occurrences.IsEmpty, "unknown filter values and locations remain unresolved");
+        }
+    }
 
     private static TypedPath StoragePath(params string[] keys) => new(new[] { "data", "contents" }.Concat(keys).Select(PathSegment.ForKey));
     public static void ExplicitStorageRulesAndUnknownCandidates()

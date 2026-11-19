@@ -28,10 +28,12 @@ internal static class StaticNbtMatch
         {
             "Potion" => ResourceId(field.Node),
             "Enchantments" or "StoredEnchantments" => field.Node.Value is LogicalMinecraftList
-                && field.Node.Children.All(item => item.Node.Value is LogicalMinecraftCompound
-                    && item.Node.Children.All(member => !member.Node.ContainsStringValues || member.Selector.Key == "id" && ResourceId(member.Node))),
+                && field.Node.Children.All(item => Enchantment(item.Node)),
             _ => false
         });
+
+    internal static bool Enchantment(SnbtNode root) => root.Value is LogicalMinecraftCompound
+        && root.Children.All(member => !member.Node.ContainsStringValues || member.Selector.Key == "id" && ResourceId(member.Node));
 
     private static bool ResourceId(SnbtNode node) => node.Value is LogicalMinecraftLeaf { Value: NbtString id }
         && MinecraftIdentifier.ResourceLocation(id.Value);
