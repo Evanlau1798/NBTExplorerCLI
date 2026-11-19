@@ -61,6 +61,13 @@ internal static class WorldMetadataTests
             && !modern.DimensionDirectories.ContainsKey("") && modern.DimensionDirectories.Count == 4, "modern layout requires its separately versioned registry");
         var mixed = WorldMetadata.Read(Level(4774), Separate(4325, Dimensions));
         Require(mixed.DataVersion == 4774 && mixed.WorldGenDataVersion == 4325, "each artifact keeps its own known version evidence");
+        foreach (var version in new[] { 4775, 4786, 4903, 5023, 5130, 5131 })
+        {
+            var latest = WorldMetadata.Read(Level(version), Separate(version, Dimensions));
+            Require(latest.Profile == modern.Profile && latest.DataVersion == version && latest.WorldGenDataVersion == version
+                && latest.DimensionDirectories.SequenceEqual(modern.DimensionDirectories),
+                $"DataVersion {version} can use the same independently validated namespaced layout");
+        }
     }
     public static void MissingConflictingAndUnsafeEvidence()
     {
@@ -70,6 +77,7 @@ internal static class WorldMetadataTests
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4775, Dimensions)));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4774)));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4774), Separate(999999, Dimensions)));
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(5130, Dimensions), Separate(5130, Dimensions)));
         BinaryNbtTests.RejectCodec(CodecError.InvalidTag, () => WorldMetadata.Read(Level(3953, Dimensions, claimedVersion: 4774)));
         Reject<ArgumentException>(() => WorldMetadata.Read(Level(3953, new([new("test:../escape", new NbtCompound([]))]))));
         Reject<ArgumentException>(() => WorldMetadata.Read(Level(3953, new([new("test:path", new NbtCompound([])), new("test:path", new NbtCompound([]))]))));

@@ -45,8 +45,19 @@ internal static class PackTextExtractionTests
             (PackSourceKind.Datapack, 71, "java-1.21.5"), (PackSourceKind.ResourcePack, 55, "java-1.21.5") })
             Require(MinecraftProfiles.ForPackMetadata(Metadata(format, kind))?.Id == expected, "pack schema comes from its declared format family");
         Require(MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, null, new(99, 0), new(99, int.MaxValue)))?.Id == "java-26.1-snapshot-6"
-            && MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, null, new(99, 1), new(99, 2))) is null
-            && MinecraftProfiles.ForPackMetadata(Metadata(70)) is null, "known format99.0 has exact snapshot6 profile; unknown major/minimum minor cannot inherit it");
+            && MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, null, new(99, 1), new(99, 2)))?.Id == "java-26.1-snapshot-6"
+            && MinecraftProfiles.ForPackMetadata(Metadata(70)) is null, "revisions of the supported major format share one profile");
+        foreach (var (kind, major, minor) in new[] {
+            (PackSourceKind.Datapack, 101, 1), (PackSourceKind.Datapack, 107, 1), (PackSourceKind.Datapack, 121, 0), (PackSourceKind.Datapack, 128, 0),
+            (PackSourceKind.ResourcePack, 84, 0), (PackSourceKind.ResourcePack, 88, 0), (PackSourceKind.ResourcePack, 97, 1), (PackSourceKind.ResourcePack, 104, 0)
+        })
+        {
+            var format = new PackFormatVersion(major, minor);
+            Require(MinecraftProfiles.ForPackMetadata(new(kind, null, format, format))?.Id == "java-26.1-snapshot-6",
+                $"the namespaced world era reads verified pack format {kind} {major}.{minor}");
+        }
+        Require(MinecraftProfiles.ForPackMetadata(new(PackSourceKind.ResourcePack, null, new(105, 0), new(105, 0))) is null,
+            "unverified new resource pack major format stays unsupported");
         foreach (var entry in new[] { "assets/p/models/item/display.json", "assets/p/font/icons.json", "assets/p/shaders/core/demo.json" })
         {
             var source = new WorldSourceLocation(new(World, "resources.zip", ArtifactKind.Archive, entry),

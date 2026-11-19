@@ -64,7 +64,7 @@ internal static class MinecraftProfileTests
             "1.21.5 retains java121 layout while independently using NBT text; no single modern switch");
         Require(java121.Supports(ProfileOperation.Read, ProfileFacet.Layout, ProfileFacet.TextSchema)
             && !java121.Supports(ProfileOperation.Write, ProfileFacet.Layout), "read/structural extraction does not imply accepted world write capability");
-        foreach (var unknown in new[] { -1, 0, 1975, 4298, 4773, 4775, int.MaxValue })
+        foreach (var unknown in new[] { -1, 0, 1975, 4298, 4773 })
             Require(MinecraftProfiles.ForDataVersion(unknown) is null, "data outside the implemented schema ranges stays unsupported");
         Require(MinecraftProfiles.ForDataVersion(4774)!.Features[ProfileFacet.CommandGrammar].Operations.Extract == SupportLevel.Unknown,
             "command grammar remains unaccepted until owning work package verifies it");

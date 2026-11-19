@@ -376,6 +376,8 @@ Check `minimumDataVersion` and `maximumDataVersion` for each family's inclusive 
 
 The scanner reads supported Anvil layouts, including Java 1.14.4-era `Level`-wrapped chunks retained within newer worlds. Use the full scan result to check coverage for a particular save.
 
+The namespaced layout introduced in 26.1 Snapshot 6 has `maximumDataVersion: null`. Later versions using the same layout can share it. This was verified with an original 26.4 Snapshot 10 save.
+
 | Profile | `DataVersion` | Resource `pack_format` | Datapack Format | Text Schema | Pack / Layout |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `java-1.20.1` | `3465` | `15` | `15` | `java-text-json (v1)` | `java-pack-plural` |

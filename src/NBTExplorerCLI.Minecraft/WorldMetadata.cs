@@ -34,9 +34,11 @@ public sealed record WorldMetadata(CapabilityProfile Profile, int? DataVersion, 
         }
         else
         {
-            if (separateWorldGen is null) throw Unsupported("Missing separately stored dimension registry");
+            if (separateWorldGen is null || At(level.Root, "Data", "WorldGenSettings") is not null)
+                throw Unsupported("Expected a single separately stored dimension registry");
             registryVersion = Version(At(separateWorldGen.Root, "DataVersion"));
-            if (MinecraftProfiles.ForDataVersion(registryVersion) is null) throw Unsupported("Unknown dimension-registry DataVersion");
+            if (registryVersion > version || MinecraftProfiles.ForDataVersion(registryVersion) is null)
+                throw Unsupported("Incompatible dimension-registry DataVersion");
             registry = At(separateWorldGen.Root, "data", "dimensions");
         }
         if (registry is not NbtCompound dimensions) throw Unsupported("Missing declared dimension registry");

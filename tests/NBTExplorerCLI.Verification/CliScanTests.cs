@@ -129,6 +129,8 @@ internal static class CliScanTests
             Require(profiles.EnumerateArray().Any(profile => profile.GetProperty("dataVersion").GetInt32() == 4671)
                 && profiles.EnumerateArray().Any(profile => profile.GetProperty("minimumDataVersion").GetInt32() <= 4189
                     && profile.GetProperty("maximumDataVersion").GetInt32() >= 4189)
+                && profiles.EnumerateArray().Any(profile => profile.GetProperty("minimumDataVersion").GetInt32() == 4774
+                    && profile.GetProperty("maximumDataVersion").ValueKind == JsonValueKind.Null)
                 && profiles.EnumerateArray().All(profile => profile.GetProperty("features").EnumerateArray()
                 .All(feature => feature.GetProperty("operations").GetProperty("write").GetString() != "supported")), "raw profile declarations do not infer write support from readability");
         }

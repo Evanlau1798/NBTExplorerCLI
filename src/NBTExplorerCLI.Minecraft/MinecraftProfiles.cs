@@ -19,10 +19,11 @@ public static class MinecraftProfiles
     }
 
     public static PackFormatVersion RequiredResourcePackFormat(int? dataVersion)
-        => new(dataVersion switch
+        => dataVersion == 5023 ? new(97, 1) : new(dataVersion switch
         {
             3463 or 3465 => 15, 3578 => 18, 3690 => 21, 3700 => 22, 3819 => 28, 3837 or 3839 => 32,
             3946 or 3947 or 3953 or 3955 => 34, 4189 => 46, 4325 => 55, 4671 => 75, 4774 => 80,
+            4786 => 84, 4903 => 88, 5130 => 104,
             _ => throw new CodecException(CodecError.UnsupportedProfile, 0, "The target world's resource pack format is not verified")
         }, 0);
     public static CapabilityProfile? ForPackMetadata(PackMetadata metadata)
@@ -39,7 +40,7 @@ public static class MinecraftProfiles
             (PackSourceKind.Datapack, >= 45 and <= 61, 0) or (PackSourceKind.ResourcePack, >= 34 and <= 46, 0) => Java121,
             (PackSourceKind.Datapack, 71, 0) or (PackSourceKind.ResourcePack, 55, 0) => Java1215,
             (PackSourceKind.Datapack, 94, 1) or (PackSourceKind.ResourcePack, 75, 0) => Java12111,
-            (PackSourceKind.Datapack, 99, 0) or (PackSourceKind.ResourcePack, 80, 0) => Snapshot2616,
+            (PackSourceKind.Datapack, >= 99 and <= 128, _) or (PackSourceKind.ResourcePack, >= 80 and <= 104, _) => Snapshot2616,
             _ => null
         };
     }
@@ -69,7 +70,7 @@ public static class MinecraftProfiles
     public static bool IsVersionedClassic(CapabilityProfile? profile) => profile is not null && ClassicProfiles.ContainsValue(profile);
     public static bool UsesClassicPlainText(CapabilityProfile? profile) => profile == Java125 || profile == Java152 || profile == Java164;
 
-    public static ImmutableArray<(int DataVersion, int Minimum, int Maximum, CapabilityProfile Profile)> DataVersionRanges { get; } =
+    public static ImmutableArray<(int DataVersion, int Minimum, int? Maximum, CapabilityProfile Profile)> DataVersionRanges { get; } =
     [
         (1976, 1976, 3462, HistoricalJson),
         (3465, 3463, 3689, Java1201),
@@ -79,13 +80,13 @@ public static class MinecraftProfiles
         (3953, 3946, 4297, Java121),
         (4325, 4325, 4325, Java1215),
         (4671, 4671, 4671, Java12111),
-        (4774, 4774, 4774, Snapshot2616)
+        (4774, 4774, null, Snapshot2616)
     ];
 
     public static CapabilityProfile? ForDataVersion(int dataVersion)
     {
         foreach (var range in DataVersionRanges)
-            if (dataVersion >= range.Minimum && dataVersion <= range.Maximum) return range.Profile;
+            if (dataVersion >= range.Minimum && (range.Maximum is null || dataVersion <= range.Maximum)) return range.Profile;
         return null;
     }
 
