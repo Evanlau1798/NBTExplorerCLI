@@ -34,8 +34,10 @@ internal static class ArchivePackDiscovery
                 : parts.Length >= 4 && parts[0] is "data" or "assets" && entry.FullName.EndsWith(".json", StringComparison.Ordinal) ? WorldSourceRole.PackJson
                 : WorldSourceRole.Irrelevant;
             var state = role == WorldSourceRole.Irrelevant ? SourceOutcome.Irrelevant : outcome;
+            var payload = Read(entry);
             if (!add(new(new(artifact, role, PackRoot: root, PackKind: kind), null, state, role == WorldSourceRole.Irrelevant ? null : code,
-                Hash256.Compute(Read(entry)), new(Read: SupportLevel.Supported), metadata))) return false;
+                Hash256.Compute(payload), new(Read: SupportLevel.Supported), metadata)
+            { MayUseCommandStorage = role == WorldSourceRole.Function && payload.AsSpan().IndexOf("storage"u8) >= 0 })) return false;
         }
         return true;
     }

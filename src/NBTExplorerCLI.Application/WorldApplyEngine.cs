@@ -201,13 +201,15 @@ public sealed partial class WorldApplyEngine
         RecordCandidates(active.Header.Plan, active.Header.AccessBinding, candidates);
         var images = Images(active.Header);
         if (!Known(active.Header, images)) return Finish(active, images, direction, "Source image differs before commit", cancellation);
+        var storageWrites = direction == ApplyDirection.Forward && StorageDisplayPolicy.TargetsStorage(active.Header.Plan.Operations);
+        var semanticDependencies = storageWrites || active.Header.Plan.Operations.Any(operation => operation is ReferencePatch or ResourcePatch);
         active = Advance(active, direction, ApplyJournalPhase.Committing, 0, active.Journal.ReceiptHash);
         for (var index = 0; index < candidates.Count; index++)
         {
             using var currentResourceScope = ResourceOutputPolicy.Guard(inventory, active.Header.Plan);
             ResourceOutputPolicy.CheckCatalog(inventory, active.Header.Plan);
-            WorldReferenceMembers.Catalog(inventory, active.Header.Plan);
-            if (active.Header.Plan.Operations.Any(operation => operation is ReferencePatch or ResourcePatch))
+            WorldReferenceMembers.Catalog(inventory, active.Header.Plan, includeStorage: storageWrites);
+            if (semanticDependencies)
             {
                 images = Images(active.Header);
                 if (!Known(active.Header, images)) return Finish(active, images, direction, "Semantic dependency changed between commits", cancellation);
@@ -215,7 +217,7 @@ public sealed partial class WorldApplyEngine
             cancellation.ThrowIfCancellationRequested(); candidates[index].Commit();
             active = Advance(active, direction, ApplyJournalPhase.Committing, index + 1, active.Journal.ReceiptHash);
         }
-        WorldReferenceMembers.Catalog(inventory, active.Header.Plan);
+        WorldReferenceMembers.Catalog(inventory, active.Header.Plan, includeStorage: storageWrites);
         using var finalResourceScope = ResourceOutputPolicy.Guard(inventory, active.Header.Plan);
         ResourceOutputPolicy.CheckCatalog(inventory, active.Header.Plan);
         images = Images(active.Header);

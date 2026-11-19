@@ -6,7 +6,8 @@ namespace NBTExplorerCLI.Application;
 
 internal static class WorldArchiveEdits
 {
-    internal static PreparedArtifactBytes Create(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits)
+    internal static PreparedArtifactBytes Create(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits,
+        IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null)
     {
         using var archive = ZipArchiveValidation.OpenRead(bytes, limits);
         var replacements = new List<(string Entry, Hash256 Expected, byte[] Replacement)>(); var additions = new List<(string Entry, byte[] Contents)>(); long retainedBytes = 0;
@@ -26,7 +27,7 @@ internal static class WorldArchiveEdits
             if (entry is not null) { using var stream = entry.Open(); stream.ReadExactly(original); }
             entryTrace?.SetTag("bytes", entry is null ? 0L : original.LongLength);
             PreparedArtifactBytes transformed;
-            if (source.Location.Role == WorldSourceRole.Function) transformed = WorldCommandEdits.Create(source.Location.Artifact, original, group.ToArray(), source, limits);
+            if (source.Location.Role == WorldSourceRole.Function) transformed = WorldCommandEdits.Create(source.Location.Artifact, original, group.ToArray(), source, limits, storageDisplayLists);
             else if (source.Location.Role == WorldSourceRole.Structure)
             {
                 var parsed = WorldArtifactEdits.ReadNbt(original, limits); var expected = WorldArtifactEdits.Transform(parsed.Document, group.ToArray(), source, limits);

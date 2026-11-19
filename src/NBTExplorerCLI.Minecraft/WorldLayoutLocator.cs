@@ -74,6 +74,20 @@ public static class WorldLayoutLocator
         }
         return new(artifact, WorldSourceRole.Unknown);
     }
+
+    public static string? CommandStorageNamespace(CapabilityProfile layout, string relativePath, bool ignoreCase = false)
+    {
+        var namespaced = layout.Features[ProfileFacet.Layout].Schema == "java-dimensions-namespaced";
+        var prefix = namespaced ? "data/" : "data/command_storage_";
+        var suffix = namespaced ? "/command_storage.dat" : ".dat";
+        var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (relativePath.Length <= prefix.Length + suffix.Length
+            || !relativePath.StartsWith(prefix, comparison) || !relativePath.EndsWith(suffix, comparison)) return null;
+        var space = relativePath[prefix.Length..^suffix.Length];
+        if (ignoreCase) space = space.ToLowerInvariant();
+        return MinecraftIdentifier.ResourceLocation(space + ":storage") ? space : null;
+    }
+
     internal static bool IsClassicChunkTickets(string path) => path is "forcedchunks.dat" or "DIM-1/forcedchunks.dat" or "DIM1/forcedchunks.dat";
     private static string? Under(string path, string directory)
         => directory.Length == 0 ? path : path.StartsWith(directory + "/", StringComparison.Ordinal) ? path[(directory.Length + 1)..] : null;

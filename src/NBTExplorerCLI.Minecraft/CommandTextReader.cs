@@ -18,6 +18,7 @@ internal sealed partial class CommandTextReader
     private readonly Action<CommandSelectorReference>? selectorReference;
     private readonly Action<CommandNameTemplate>? nameTemplate;
     private readonly Action<CommandStorageAccess>? storageAccess;
+    private readonly IReadOnlySet<(string Storage, string Path)>? storageDisplayLists;
     private readonly bool inspectNested;
     private readonly Hash256 hash;
     private readonly int byteBase;
@@ -31,13 +32,14 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
         this.componentRoot = componentRoot;
         this.selectorReference = selectorReference;
         this.nameTemplate = nameTemplate;
         this.storageAccess = storageAccess;
+        this.storageDisplayLists = storageDisplayLists;
         this.inspectNested = inspectNested;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();

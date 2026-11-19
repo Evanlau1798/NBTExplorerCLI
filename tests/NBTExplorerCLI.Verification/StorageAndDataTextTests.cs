@@ -17,6 +17,18 @@ internal static class StorageAndDataTextTests
     [
         new("text-storage-explicit-rules-and-candidates", "discovery", _ => ExplicitStorageRulesAndUnknownCandidates()),
         new("command-storage-display-modes", "discovery", _ => CommandStorageDisplayModes()),
+        new("text-storage-command-display-consumers", "discovery", _ => StorageCommandProofTests.CrossFileDisplayConsumers()),
+        new("text-storage-saved-path-alias", "discovery", _ => StorageCommandProofTests.AliasedSeedBeforeScan()),
+        new("text-storage-namespaced-seed-path-alias", "discovery", _ => StorageCommandProofTests.AliasedSeedBeforeScan(true)),
+        new("text-storage-namespaced-trailing-dot", "discovery", _ => StorageCommandProofTests.NamespacedLogicalAliases(false)),
+        new("text-storage-namespaced-trailing-dot-reader", "discovery", _ => StorageCommandProofTests.NamespacedLogicalAliases(true)),
+        new("text-storage-world-evidence-budget", "discovery", _ => StorageCommandProofTests.WorldEvidenceBudget()),
+        new("prepare-world-storage-role-freshness", "preparation", _ => StorageCommandProofTests.PreparationRevalidatesStorageUses()),
+        new("prepare-world-storage-alias-freshness", "preparation", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(false)),
+        new("apply-storage-alias-forward-recovery", "apply", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(true)),
+        new("prepare-world-storage-late-namespaced-reader", "preparation", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(false, true)),
+        new("apply-storage-late-namespaced-reader-forward-recovery", "apply", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(true, true)),
+        new("cli-session-write-storage-archive", "cli-session-write", _ => StorageCommandProofTests.CliArchiveSession()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
 
@@ -27,7 +39,7 @@ internal static class StorageAndDataTextTests
         {
             var contents = C(E("golden:test", C(E("value", S("Literal")), E("message", Text("Component", modern)), E("internal", S("Unknown")), E("number", new NbtInt(7)))));
             var document = new NbtDocument("", C(E("DataVersion", new NbtInt(version)), E("data", C(E("contents", contents)))));
-            var source = new WorldSourceLocation(new(World, modern ? "data/minecraft/command_storage_golden.dat" : "data/command_storage_golden.dat", ArtifactKind.Nbt), WorldSourceRole.SavedData);
+            var source = new WorldSourceLocation(new(World, modern ? "data/golden/command_storage.dat" : "data/command_storage_golden.dat", ArtifactKind.Nbt), WorldSourceRole.SavedData);
             var unknown = NbtTextExtractor.Extract(source, document);
             Require(!unknown.Complete && unknown.Occurrences.IsEmpty && unknown.Unclassified.Length == 3
                 && unknown.Unclassified.All(candidate => candidate.Address.Artifact == source.Artifact && candidate.Address.SemanticRole == "command_storage.candidate"), "arbitrary storage strings are exact unclassified candidates, never automatically authorized slots");
@@ -71,6 +83,16 @@ internal static class StorageAndDataTextTests
                 "the original component grammar reports normalized storage reads and separates parsed and raw modes");
             Require(!result.Complete && result.Text.Occurrences.IsEmpty, "observing a display address does not certify dynamic data or create an editable slot");
         }
+
+        const string nativeFlags = """
+            tellraw @a {storage:'demo:messages',nbt:'lines[]',interpret:true,plain:true}
+            tellraw @a {storage:'demo:messages',nbt:'lines[]',interpret:true,type:'text'}
+            tellraw @a {storage:'demo:messages',nbt:'lines[]',interpret:true,type:'nbt',plain:false}
+            """;
+        var flagUses = new List<CommandStorageAccess>();
+        _ = CommandTextExtractor.Extract(new(binding, nativeFlags), MinecraftProfiles.ForDataVersion(5130)!, storageAccess: flagUses.Add);
+        Require(flagUses.Count == 3 && flagUses[0].Use != CommandStorageUse.InterpretedDisplay && flagUses[1].Use != CommandStorageUse.InterpretedDisplay
+            && flagUses[2].Use == CommandStorageUse.InterpretedDisplay, "invalid native component flags and types cannot prove interpreted display");
 
         const string writtenBook = """give @s written_book{title:'Guide',author:'Author',pages:['[{"text":"Intro"},{"nbt":"lines[]","storage":"demo:messages","interpret":true}]'],custom:{opaque:'{"nbt":"secret[]","storage":"demo:private","interpret":true}'}}""";
         var bookUses = new List<CommandStorageAccess>();

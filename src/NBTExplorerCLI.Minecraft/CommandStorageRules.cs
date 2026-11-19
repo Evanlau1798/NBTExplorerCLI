@@ -25,6 +25,13 @@ internal sealed partial class CommandTextReader
 
     private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path)
     {
+        if (StorageDisplayWrite(tokens, index) is { } list)
+        {
+            var value = tokens[^1];
+            ObserveStorage(list.Storage, list.Path, CommandStorageUse.ListElementWrite,
+                Address(path, value.Start, value.Text.Length, source.Address.SemanticRole));
+            return;
+        }
         var target = index + 2;
         var pathIndex = DataTargetEnd(tokens, target);
         if (pathIndex < 0) return;
@@ -60,14 +67,22 @@ internal sealed partial class CommandTextReader
             ObserveStorageOperand(tokens, sourceTarget, path);
             return;
         }
-        if (mode != "value" || tokens.Count != sourceMode + 2) return;
-        if (tokens[target].Text == "storage" && operation is "append" or "prepend" && tokens[pathIndex].Text.Split('.').All(PlainControlToken))
-        {
-            var value = tokens[sourceMode + 1];
-            ObserveStorage(tokens[target + 1].Text, tokens[pathIndex].Text, CommandStorageUse.ListElementWrite,
-                Address(path, value.Start, value.Text.Length, source.Address.SemanticRole));
-        }
-        else ObserveStorageOperand(tokens, target, path);
+        if (mode == "value" && tokens.Count == sourceMode + 2) ObserveStorageOperand(tokens, target, path);
+    }
+
+    private static (string Storage, string Path)? StorageDisplayWrite(List<CommandToken> tokens, int index)
+        => tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "storage"
+            && MinecraftIdentifier.ResourceLocation(tokens[index + 3].Text) && tokens[index + 4].Text.Split('.').All(PlainControlToken)
+            && tokens[index + 5].Text is "append" or "prepend" && tokens[index + 6].Text == "value"
+            ? (MinecraftIdentifier.DefaultNamespace(tokens[index + 3].Text), tokens[index + 4].Text) : null;
+
+    private bool ReadStorageDisplayWrite(List<CommandToken> tokens, int index, TypedPath path)
+    {
+        if (storageDisplayLists is not { Count: > 0 } || StorageDisplayWrite(tokens, index) is not { } list || !storageDisplayLists.Contains(list)) return false;
+        var value = tokens[^1];
+        Component(value.Start, value.Start + value.Text.Length, TextExtractionCollector.At(path, "storage.list.value"),
+            storedRole: source.Address.SemanticRole + ".storage.component");
+        return true;
     }
 
     private void ObserveStorageOperand(List<CommandToken> tokens, int index, TypedPath path)
@@ -77,12 +92,12 @@ internal sealed partial class CommandTextReader
         ObserveStorage(id.Text, "", CommandStorageUse.Other, Address(path, id.Start, id.Text.Length, source.Address.SemanticRole));
     }
 
-    private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address)
+    private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address, bool hasUnclassifiedReferences = false)
     {
         if (!MinecraftIdentifier.ResourceLocation(storage)) return;
         var normalized = MinecraftIdentifier.DefaultNamespace(storage);
         retained = checked(retained + TextExtractionBudget.RecordBytes(address, (long)normalized.Length + path.Length));
         if (retained > limits.MaxDecodedBytes) Limit();
-        storageAccess?.Invoke(new(normalized, path, use, address));
+        storageAccess?.Invoke(new(normalized, path, use, address, hasUnclassifiedReferences));
     }
 }

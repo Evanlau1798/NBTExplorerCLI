@@ -15,8 +15,9 @@ public sealed class WorldQuerySnapshot
     public ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> StorageRules { get; }
     internal WorldDiscoveryResult Discovery { get; }
     internal DecodeLimits Limits { get; }
+    internal StorageDisplayPolicy StorageDisplays { get; }
     private readonly Func<IEnumerable<TextSourceExtraction>> read;
-    internal WorldQuerySnapshot(ScanCacheManifest manifest, Func<IEnumerable<TextSourceExtraction>> read, ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> storageRules, WorldDiscoveryResult discovery, DecodeLimits limits)
-        => (Manifest, this.read, StorageRules, Discovery, Limits) = (manifest, read, storageRules, discovery, limits);
+    internal WorldQuerySnapshot(ScanCacheManifest manifest, Func<IEnumerable<TextSourceExtraction>> read, ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> storageRules, WorldDiscoveryResult discovery, DecodeLimits limits, StorageDisplayPolicy storageDisplays)
+        => (Manifest, this.read, StorageRules, Discovery, Limits, StorageDisplays) = (manifest, read, storageRules, discovery, limits, storageDisplays);
     public IEnumerable<TextSourceExtraction> ReadSources() => read();
 }

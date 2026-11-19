@@ -12,7 +12,8 @@ internal sealed class WorldQueryContext
     internal WorldTextExtraction Extraction { get; }
     internal ScanExecutionOptions Execution { get; }
     internal ImmutableDictionary<string, ImmutableArray<DiscoveredSource>> Groups { get; }
-    internal ImmutableDictionary<string, Hash256> ParseKeys { get; }
+    private readonly Lazy<ImmutableDictionary<string, Hash256>> parseKeys;
+    internal ImmutableDictionary<string, Hash256> ParseKeys => parseKeys.Value;
     internal ImmutableArray<ManifestSource> Inputs { get; }
     internal InterpretationVersions Versions { get; }
     internal StableIdentity SnapshotId { get; }
@@ -33,14 +34,22 @@ internal sealed class WorldQueryContext
         var policyRules = Extraction.StorageRules.SelectMany(pair => pair.Value.Select(rule => SourceIdentity.Occurrence(new(pair.Key, rule.Path, "policy.storage." + rule.Kind)).Digest.Hex)).Order(StringComparer.Ordinal).ToArray();
         var policy = Hash256.Compute(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { limits = Extraction.Limits, request.Scan.MaximumSources, Execution.InFlightBytes, storageRules = policyRules })));
         var layout = Extraction.LayoutProfile?.Id;
-        var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-3" : "world-text-command-28";
+        var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-3" : "world-text-command-31";
         var baseline = new InterpretationVersions("nbt-snbt-json-zip-1", MinecraftProfiles.IsVersionedClassic(Extraction.LayoutProfile) ? layout! : "minecraft-known-5", extractor, "scan-2." + policy.Hex);
         static IEnumerable<CacheSourceBinding> Bindings(IEnumerable<DiscoveredSource> sources) => sources.Select(source => new CacheSourceBinding(source.Location, source.Chunk, source.PackMetadataHash));
         Versions = baseline with { Policy = baseline.Policy + "." + ScanCacheJson.BindingHash(layout, Bindings(Groups.Values.SelectMany(group => group))).Hex };
         SnapshotId = SourceIdentity.Snapshot(inventory.WorldId, Inputs, request.Scan.Scope, Versions);
         var types = new SnapshotScope([], [], request.Scan.Scope.Types, []);
-        ParseKeys = Groups.ToImmutableDictionary(pair => pair.Key, pair => SourceIdentity.Snapshot(inventory.WorldId, [Input(pair.Value)], types,
-            baseline with { Policy = baseline.Policy + "." + ScanCacheJson.BindingHash(layout, Bindings(pair.Value)).Hex }).Digest, StringComparer.Ordinal);
+        parseKeys = new(() =>
+        {
+            var storageKeys = Extraction.StorageDisplays.SourceKeys;
+            return Groups.ToImmutableDictionary(pair => pair.Key, pair =>
+            {
+                var binding = baseline.Policy + "." + ScanCacheJson.BindingHash(layout, Bindings(pair.Value)).Hex;
+                if (storageKeys.TryGetValue(pair.Key, out var display)) binding += "." + display.Hex;
+                return SourceIdentity.Snapshot(inventory.WorldId, [Input(pair.Value)], types, baseline with { Policy = binding }).Digest;
+            }, StringComparer.Ordinal);
+        });
     }
     private static ManifestSource Input(ImmutableArray<DiscoveredSource> sources)
     {

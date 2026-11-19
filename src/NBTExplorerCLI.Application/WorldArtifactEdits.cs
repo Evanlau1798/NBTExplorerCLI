@@ -14,15 +14,16 @@ internal static class WorldArtifactEdits
         var codec = bytes.Length == 0 || bytes[0] == (byte)NbtType.Compound ? NbtCompression.Raw : bytes[0] == 0x1f ? NbtCompression.GZip : NbtCompression.Zlib;
         return (CompressedNbt.ReadDocument(bytes, codec, limits).Document, codec);
     }
-    internal static PreparedArtifactBytes Create(ArtifactAddress artifact, byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits, CapabilityProfile? classic = null)
+    internal static PreparedArtifactBytes Create(ArtifactAddress artifact, byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits, CapabilityProfile? classic = null,
+        IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null)
     {
         var source = sources.Single(item => item.Location.Artifact == artifact && item.Chunk is null);
         if (source.Location.Role == WorldSourceRole.Language && operations.Any(operation => operation is KeyConversionPatch)) return WorldLanguageEdits.Create(artifact, bytes, operations, limits);
         if (artifact.Kind == ArtifactKind.Nbt) return Nbt(bytes, operations, source, limits, classic);
         if (artifact.Kind == ArtifactKind.Json) return WorldJsonEdits.Create(bytes, operations, limits, source);
-        if (artifact.Kind == ArtifactKind.McFunction) return WorldCommandEdits.Create(artifact, bytes, operations, source, limits);
+        if (artifact.Kind == ArtifactKind.McFunction) return WorldCommandEdits.Create(artifact, bytes, operations, source, limits, storageDisplayLists);
         if (artifact.Kind is ArtifactKind.Region or ArtifactKind.Entities) return Region(bytes, operations, sources, limits, classic);
-        if (artifact.Kind == ArtifactKind.Archive) return WorldArchiveEdits.Create(bytes, operations, sources, limits);
+        if (artifact.Kind == ArtifactKind.Archive) return WorldArchiveEdits.Create(bytes, operations, sources, limits, storageDisplayLists);
         throw new NotSupportedException("Artifact format preparation is not implemented");
     }
     private static PreparedArtifactBytes Nbt(byte[] bytes, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits, CapabilityProfile? classic)

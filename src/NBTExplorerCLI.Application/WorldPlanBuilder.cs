@@ -43,6 +43,15 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         if (requested.Any(operation => operation is not (LiteralPatch or TypedPatch or KeyConversionPatch or ReferencePatch))) throw new NotSupportedException("This preparation path requires explicit semantic operations");
         RequireReferenceComposition(requested);
         var referenceInputs = WorldReferenceService.Validate(inventory, snapshot, requested.OfType<ReferencePatch>());
+        var storageDisplays = StorageDisplayPolicy.Empty;
+        if (StorageDisplayPolicy.TargetsStorage(requested))
+        {
+            if (!snapshot.StorageDisplays.CanBindWrites || requested.Any(operation => operation is not LiteralPatch)
+                || !snapshot.StorageDisplays.ProjectedCoverage(snapshot.ReadSources()))
+                throw new EditRejectedException(EditFailure.Precondition, "Storage edits require exclusively interpreted uses and a complete storage source proof");
+            WorldReferenceScan.Match(snapshot.Discovery, WorldDiscovery.Discover(inventory, new(SnapshotScope.All, snapshot.Limits)));
+            storageDisplays = snapshot.StorageDisplays;
+        }
         if (requested.OfType<TypedPatch>().Any(operation => operation.Address.Artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Region or ArtifactKind.Entities))) throw new NotSupportedException("Typed edits require an NBT document");
         var outputs = requested.SelectMany(operation => operation.RequiredOutputs).Distinct().ToArray();
         if (outputs.Any(artifact => artifact.WorldId != inventory.WorldId || artifact.Kind is not (ArtifactKind.Nbt or ArtifactKind.Json or ArtifactKind.McFunction or ArtifactKind.Region or ArtifactKind.Entities or ArtifactKind.Archive))) throw new NotSupportedException("Physical artifact preparation profile is not implemented");
@@ -67,13 +76,17 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         }
         foreach (var metadata in snapshot.Discovery.MetadataSources.IsDefault ? [] : snapshot.Discovery.MetadataSources) Input(metadata.Artifact, ArtifactImage.Present(metadata.ContentHash!));
         foreach (var input in referenceInputs) Input(input.Artifact, input.Image);
+        if (storageDisplays.CanBindWrites)
+            foreach (var source in WorldReferenceScan.Relevant(snapshot.Discovery).Where(source => source.Chunk is null && source.Location.Artifact.ContainerEntry is null))
+                Input(source.Location.Artifact, ArtifactImage.Present(source.ContentHash!));
         var policy = requested.OfType<ReferencePatch>().Skip(1).Any() ? MultipleReferencePolicy : Policy;
         var plan = new PatchPlan(inventory.WorldId, snapshot.Manifest.SnapshotId, snapshot.Manifest.Versions.Profile, policy, requested,
             inputs.Values, outputs.Select(artifact => new OutputDeclaration(artifact, OutputIntent.Write, Checks)), []);
         CheckPreimages(inventory, plan);
         var scope = new SnapshotScope(snapshot.Manifest.Scope.Dimensions, snapshot.Manifest.Scope.Regions, snapshot.Manifest.Scope.Types, outputs.Select(artifact => artifact.RelativePath));
         var rules = snapshot.StorageRules.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<StorageTextRule>)pair.Value);
-        var extraction = new WorldTextExtraction(inventory, new(scope, snapshot.Limits, ClassicVersion: classicVersion), rules);
+        var extraction = new WorldTextExtraction(inventory, new(scope, snapshot.Limits, ClassicVersion: classicVersion), rules)
+        { BoundStorageDisplays = storageDisplays.CanBindWrites ? storageDisplays : null };
         var classicPlainText = MinecraftProfiles.UsesClassicPlainText(extraction.LayoutProfile);
         var literal = requested.OfType<LiteralPatch>().Select(operation => operation.Translation)
             .Concat(requested.OfType<KeyConversionPatch>().Select(operation => new LiteralTranslation(operation.Conversion.Slot, operation.Conversion.Reply)))
@@ -150,7 +163,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
             foreach (var conversion in conversions) ValidateNonFunctionKey(conversion, source, bytes);
         }
         CheckPreimages(inventory, plan);
-        return new(plan, sources.ToImmutableDictionary());
+        return new(plan, sources.ToImmutableDictionary(), storageDisplays);
 
         void ValidateNonFunctionKey(TranslationKeyConversion conversion, DiscoveredSource source, byte[] bytes)
         {
@@ -257,6 +270,6 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     }
 }
 
-internal sealed record BoundWorldPlan(PatchPlan Plan, ImmutableDictionary<(ArtifactAddress Artifact, ChunkPosition? Chunk), DiscoveredSource> Sources);
+internal sealed record BoundWorldPlan(PatchPlan Plan, ImmutableDictionary<(ArtifactAddress Artifact, ChunkPosition? Chunk), DiscoveredSource> Sources, StorageDisplayPolicy StorageDisplays);
 
 public sealed class ReferencePolicyException(string message = "Multiple reference groups require the verified group policy; roll back any pending journal before creating a fresh plan.") : NotSupportedException(message);

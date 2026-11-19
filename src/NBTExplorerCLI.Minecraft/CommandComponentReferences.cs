@@ -35,8 +35,11 @@ internal sealed partial class CommandTextReader
                     && fields.GetValueOrDefault("storage") is LogicalMinecraftLeaf { Value: NbtString storage })
                 {
                     var interpreted = fields.GetValueOrDefault("interpret") is LogicalMinecraftLeaf { Value: NbtByte { Value: 1 } }
+                        && fields.GetValueOrDefault("plain") is null or LogicalMinecraftLeaf { Value: NbtByte { Value: 0 } }
+                        && fields.GetValueOrDefault("type") is null or LogicalMinecraftLeaf { Value: NbtString { Value: "nbt" } }
                         && !OtherComponentContent(fields.ContainsKey);
-                    ReportStorage(storage.Value, nbtPath.Value, interpreted, path);
+                    var unknownClick = fields.TryGetValue("click_event", out var clickData) && ComponentReferenceRules.Click(clickData, grammar, limits) is null;
+                    ReportStorage(storage.Value, nbtPath.Value, interpreted, path, unknownClick);
                 }
                 if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
                     || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, grammar, limits) is null)
@@ -69,7 +72,8 @@ internal sealed partial class CommandTextReader
                 {
                     var interpreted = value.TryGetNativeProperty("interpret", out var flag) && flag.ValueKind == JsonValueKind.True
                         && !OtherComponentContent(field => value.TryGetNativeProperty(field, out _));
-                    ReportStorage(NativeJsonStrings.Read(storage), NativeJsonStrings.Read(nbtPath), interpreted, path);
+                    var unknownClick = value.TryGetNativeProperty("clickEvent", out var clickData) && ComponentReferenceRules.Click(clickData, null, limits) is null;
+                    ReportStorage(NativeJsonStrings.Read(storage), NativeJsonStrings.Read(nbtPath), interpreted, path, unknownClick);
                 }
                 if (!observeStorageOnly && (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
                     || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null))
@@ -84,11 +88,11 @@ internal sealed partial class CommandTextReader
                 }
             }
         }
-        void ReportStorage(string storage, string path, bool interpreted, TypedPath component)
+        void ReportStorage(string storage, string path, bool interpreted, TypedPath component, bool unknownClick)
         {
             var address = Address(new(grammarPath.Segments.Concat(component.Segments)), start, end - start, source.Address.SemanticRole,
                 enclosingString?.StartByte, enclosingString?.LengthBytes);
-            ObserveStorage(storage, path, interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay, address);
+            ObserveStorage(storage, path, interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay, address, unknownClick);
         }
         void Selector(string selector, TypedPath path, SnbtSpan span)
         {

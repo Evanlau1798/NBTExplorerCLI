@@ -10,6 +10,7 @@ internal sealed partial class CommandTextReader
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
         if (storageAccess is not null) ObserveDataStorage(tokens, index, path);
+        if (ReadStorageDisplayWrite(tokens, index, path)) return;
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;
         if (tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"

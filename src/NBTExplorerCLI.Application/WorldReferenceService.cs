@@ -160,10 +160,13 @@ internal static class WorldReferenceMembers
             var slot = new TextOccurrence(member.Address, member.ExpectedText, member.Address.SemanticRole, true).ToSlot("en_us", "en_us");
             return new LiteralTranslation(slot, new(slot.Id, slot.SourceTextHash, "en_us", member.ReplacementText));
         }).ToArray();
-    internal static void Catalog(IWorldInventory inventory, PatchPlan plan)
+    internal static void Catalog(IWorldInventory inventory, PatchPlan plan, bool includeStorage = true)
     {
-        if (!plan.Operations.Any(operation => operation is ReferencePatch)) return;
+        var storage = includeStorage && StorageDisplayPolicy.TargetsStorage(plan.Operations);
+        if (!plan.Operations.Any(operation => operation is ReferencePatch) && !storage) return;
         var discovery = WorldDiscovery.Discover(inventory, new(SnapshotScope.All));
+        if (storage && WorldStorageUseIndex.HasUnsafeSeedPath(discovery))
+            throw new ArtifactConflictException("Command storage seed has a noncanonical file path or is a directory");
         var known = plan.Preconditions.Select(input => input.Artifact).ToHashSet();
         if (!discovery.Complete || WorldReferenceScan.Relevant(discovery).Any(source => !known.Contains(PlanOuter(source.Location.Artifact))))
         {

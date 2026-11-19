@@ -12,6 +12,9 @@ public sealed partial class WorldTextExtraction
 {
     private readonly IWorldInventory inventory;
     private readonly ScanRequest request;
+    private readonly Lazy<StorageDisplayPolicy> storageDisplays;
+    internal StorageDisplayPolicy StorageDisplays => BoundStorageDisplays ?? storageDisplays.Value;
+    internal StorageDisplayPolicy? BoundStorageDisplays { get; init; }
     public ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> StorageRules { get; }
     public WorldDiscoveryResult Discovery { get; }
     internal CapabilityProfile? LayoutProfile { get; }
@@ -38,6 +41,7 @@ public sealed partial class WorldTextExtraction
         LayoutProfile = request.ClassicVersion is null ? Discovery.Metadata?.Profile
             : (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil ? MinecraftProfiles.ForClassicVersion(request.ClassicVersion) : null)
                 ?? throw new CodecException(CodecError.UnsupportedProfile, 0, "Explicit Minecraft version requires recognized Classic Anvil metadata and a registered version");
+        storageDisplays = new(() => WorldStorageUseIndex.Capture(this, inventory, cancellationToken));
     }
     public IEnumerable<TextSourceExtraction> ReadSources() => ReadSourcesCore(Discovery.Sources);
     public IEnumerable<TextSourceExtraction> ReadSources(Action<CommandStorageAccess> storageAccess)
@@ -45,8 +49,13 @@ public sealed partial class WorldTextExtraction
         ArgumentNullException.ThrowIfNull(storageAccess);
         return ReadSourcesCore(Discovery.Sources, storageAccess);
     }
+    internal IEnumerable<TextSourceExtraction> ReadStorageObservations(Action<CommandStorageAccess> observe, Action opaqueStorage)
+        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage);
+    internal IEnumerable<TextSourceExtraction> ReadStorageProducers(StorageDisplayPolicy storage)
+        => ReadSourcesCore(Discovery.Sources.Where(source => storage.SourceKeys.ContainsKey(source.Location.Artifact.RelativePath)), previewStorage: storage);
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
-    private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected, Action<CommandStorageAccess>? storageAccess = null)
+    private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected, Action<CommandStorageAccess>? storageAccess = null, Action? opaqueStorage = null,
+        StorageDisplayPolicy? previewStorage = null)
     {
         foreach (var group in selected.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
         {
@@ -78,10 +87,11 @@ public sealed partial class WorldTextExtraction
                 continue;
             }
             using (archive)
-                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess);
+                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage);
         }
     }
-    private TextSourceExtraction ReadOne(DiscoveredSource source, byte[] bytes, RegionFile? region, ZipArchive? archive, Action<CommandStorageAccess>? storageAccess)
+    private TextSourceExtraction ReadOne(DiscoveredSource source, byte[] bytes, RegionFile? region, ZipArchive? archive, Action<CommandStorageAccess>? storageAccess, Action? opaqueStorage,
+        StorageDisplayPolicy? previewStorage)
     {
         if (source.Outcome != SourceOutcome.Success) return Forward(source);
         if (source.Location.Role == WorldSourceRole.Archive || region is not null && source.Chunk is null)
@@ -100,17 +110,20 @@ public sealed partial class WorldTextExtraction
                 var index = chunk.LocalZ * 32 + chunk.LocalX;
                 var document = (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && source.Location.Role == WorldSourceRole.Terrain
                     ? region.ReadClassicAnvilChunk(index, request.Limits) : region.ReadChunk(index, request.Limits)).Document;
+                if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(document.Root)) opaqueStorage();
                 text = NbtTextExtractor.Extract(source.Location, document, chunk, request.Limits, scope: request.Scope, layoutProfile: LayoutProfile);
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Artifact.Kind == ArtifactKind.Nbt || source.Location.Role == WorldSourceRole.Structure)
             {
                 var document = ReadDat(bytes);
+                if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(document.Root)) opaqueStorage();
                 text = NbtTextExtractor.Extract(source.Location, document, limits: request.Limits, storageRules: StorageRules.GetValueOrDefault(source.Location.Artifact, ImmutableArray<StorageTextRule>.Empty), scope: request.Scope, layoutProfile: LayoutProfile);
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
             {
+                if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes)) opaqueStorage();
                 text = PackTextExtractor.Extract(source.Location, bytes, source.Pack ?? throw new InvalidDataException("Missing pack metadata snapshot"), request.Limits, request.Scope);
                 commandProfile = MinecraftProfiles.ForPackMetadata(source.Pack!);
             }
@@ -133,13 +146,16 @@ public sealed partial class WorldTextExtraction
                 commandProfile = profile;
             }
             else if (source.Location.Role == WorldSourceRole.SavedData && Discovery.Metadata is { } metadata)
+            {
+                if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes)) opaqueStorage();
                 text = DataTextExtractor.Json(source.Location, bytes, metadata, request.Limits, request.Scope);
+            }
             else return new(source, SourceOutcome.Unsupported, null, "UnsupportedTextSource");
             CommandExtractionResult? commands = null;
             if (!text.PendingCommands.IsEmpty)
             {
                 if (commandProfile is null) return new(source, SourceOutcome.Unsupported, text, "CommandGrammarPending");
-                commands = ExtractCommands(text.PendingCommands, commandProfile, storageAccess);
+                commands = ExtractCommands(text.PendingCommands, commandProfile, storageAccess, previewStorage);
                 text = text with { Occurrences = text.Occurrences.AddRange(commands.Text.Occurrences), TranslationKeys = text.TranslationKeys.AddRange(commands.Text.TranslationKeys),
                     Diagnostics = text.Diagnostics.AddRange(commands.Text.Diagnostics), PendingCommands = commands.Text.PendingCommands };
                 CheckRetention(text, commands.References);

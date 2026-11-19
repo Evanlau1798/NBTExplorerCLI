@@ -182,7 +182,8 @@ internal sealed partial class NbtTextReader
             return;
         }
         var filename = artifact[(artifact.LastIndexOf('/') + 1)..];
-        if (!VanillaSavedDataPath(artifact, filename)) { output.Diagnostic(TypedPath.Root, "UnsupportedSavedData"); return; }
+        var commandStorage = WorldLayoutLocator.CommandStorageNamespace(layoutProfile, artifact) is not null;
+        if (!commandStorage && !VanillaSavedDataPath(artifact, filename)) { output.Diagnostic(TypedPath.Root, "UnsupportedSavedData"); return; }
         if ((classic || earlyAnvil) && artifact == "data/idcounts.dat" && root is NbtCompound counters
             && counters.Entries.All(entry => entry.Value is NbtShort)) return;
         if (Field(root, "data", TypedPath.Root) is not { } data) { output.Diagnostic(TypedPath.Root, "MissingSavedDataRoot"); return; }
@@ -193,7 +194,7 @@ internal sealed partial class NbtTextReader
                 output.Diagnostic(TypedPath.Root, "UnsupportedSavedData");
             return;
         }
-        if (filename.StartsWith("command_storage_", StringComparison.Ordinal) && filename.EndsWith(".dat", StringComparison.Ordinal))
+        if (commandStorage || filename.StartsWith("command_storage_", StringComparison.Ordinal) && filename.EndsWith(".dat", StringComparison.Ordinal))
         {
             if (Field(data, "contents", path) is { } contents) Storage(root, contents, At(path, "contents"), storageRules ?? []);
             else output.Diagnostic(path, "MissingStorageContents");

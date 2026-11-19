@@ -7,7 +7,10 @@ namespace NBTExplorerCLI.Application;
 
 public sealed record ScanRequest(SnapshotScope Scope, DecodeLimits? Limits = null, int MaximumSources = 100_000, string? ClassicVersion = null);
 public sealed record DiscoveredSource(WorldSourceLocation Location, ChunkPosition? Chunk, SourceOutcome Outcome,
-    string? DiagnosticCode, Hash256? ContentHash, OperationSupport Capability, PackMetadata? Pack = null, Hash256? PackMetadataHash = null);
+    string? DiagnosticCode, Hash256? ContentHash, OperationSupport Capability, PackMetadata? Pack = null, Hash256? PackMetadataHash = null)
+{
+    internal bool MayUseCommandStorage { get; init; }
+}
 public sealed record WorldDiscoveryResult(WorldMetadata? Metadata, SnapshotScope Scope, WorldInventorySnapshot Inventory, ImmutableArray<DiscoveredSource> Sources, string? DiagnosticCode, ImmutableArray<ManifestSource> MetadataSources = default)
 {
     // Catalog completeness covers enumeration and container headers; payload extraction is a separate stage.
@@ -176,7 +179,8 @@ public static class WorldDiscovery
                         packStates.Add(location.PackRoot, state = DirectoryPackDiscovery.Read(inventory, location.PackRoot, location.PackKind!.Value, limits));
                     if (entry.RelativePath == location.PackRoot + "/pack.mcmeta" && state.Outcome == SourceOutcome.Success && state.ContentHash != hash)
                         changedPacks.Add(location.PackRoot);
-                    if (!Add(new(location, null, state.Outcome, state.Code, hash, new(Read: state.Outcome == SourceOutcome.Success ? SupportLevel.Supported : SupportLevel.Unknown), state.Metadata, state.ContentHash))) break;
+                    if (!Add(new(location, null, state.Outcome, state.Code, hash, new(Read: state.Outcome == SourceOutcome.Success ? SupportLevel.Supported : SupportLevel.Unknown), state.Metadata, state.ContentHash)
+                    { MayUseCommandStorage = location.Role == WorldSourceRole.Function && bytes.AsSpan().IndexOf("storage"u8) >= 0 })) break;
                     continue;
                 }
                 if (location.Role is WorldSourceRole.Terrain or WorldSourceRole.Entities or WorldSourceRole.PointOfInterest)
