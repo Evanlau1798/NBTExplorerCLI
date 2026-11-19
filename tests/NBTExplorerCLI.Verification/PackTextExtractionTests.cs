@@ -14,13 +14,24 @@ internal static class PackTextExtractionTests
         var old = MinecraftProfiles.ForDataVersion(3700);
         Require(old is not null && old.Id == "java-1.20.4" && old.Features[ProfileFacet.ItemSchema].Schema == "java-item-tags-1.20.4"
             && old.Features[ProfileFacet.PackLayout].Schema == "java-pack-plural" && old.Lists.Encoding == LogicalListEncoding.Homogeneous, "official 1.20.4 DV3700 has pre-components items and plural pack directories");
-        foreach (var (kind, format, expected) in new[] { (PackSourceKind.Datapack, 26, "java-1.20.4"), (PackSourceKind.ResourcePack, 22, "java-1.20.4"),
+        Require(MinecraftProfiles.ForDataVersion(3465) is { Id: "java-1.20.1" } early
+            && MinecraftProfiles.ForId(early.Id) == early && MinecraftProfiles.RequiredResourcePackFormat(early).Major == 15,
+            "Java 1.20.1 binds DataVersion 3465 and resource format 15");
+        foreach (var (kind, format, expected) in new[] { (PackSourceKind.Datapack, 15, "java-1.20.1"), (PackSourceKind.ResourcePack, 15, "java-1.20.1"),
+            (PackSourceKind.Datapack, 26, "java-1.20.4"), (PackSourceKind.ResourcePack, 22, "java-1.20.4"),
             (PackSourceKind.Datapack, 48, "java-1.21"), (PackSourceKind.ResourcePack, 34, "java-1.21"),
             (PackSourceKind.Datapack, 71, "java-1.21.5"), (PackSourceKind.ResourcePack, 55, "java-1.21.5") })
             Require(MinecraftProfiles.ForPackMetadata(Metadata(format, kind))?.Id == expected, "pack schema comes from its own exact declared format, not world version");
         Require(MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, null, new(99, 0), new(99, int.MaxValue)))?.Id == "java-26.1-snapshot-6"
             && MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, null, new(99, 1), new(99, 2))) is null
             && MinecraftProfiles.ForPackMetadata(Metadata(70)) is null, "known format99.0 has exact snapshot6 profile; unknown major/minimum minor cannot inherit it");
+        foreach (var entry in new[] { "assets/p/models/item/display.json", "assets/p/font/icons.json", "assets/p/shaders/core/demo.json" })
+        {
+            var source = new WorldSourceLocation(new(World, "resources.zip", ArtifactKind.Archive, entry),
+                WorldSourceRole.PackJson, PackRoot: "resources.zip", PackKind: PackSourceKind.ResourcePack);
+            var text = PackTextExtractor.Extract(source, Encoding.UTF8.GetBytes("{}"), Metadata(15, PackSourceKind.ResourcePack));
+            Require(text.Complete && text.Occurrences.IsEmpty, "native resource definitions do not authorize translation slots: " + entry);
+        }
     }
     public static void LanguageValuesAndDefinitionAddresses()
     {

@@ -5,7 +5,7 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
-    private static int ScoreCondition(List<CommandToken> tokens, int cursor)
+    private int ScoreCondition(List<CommandToken> tokens, int cursor)
     {
         if (cursor + 4 >= tokens.Count || !ScoreHolder(tokens[cursor + 1].Text) || !PlainControlToken(tokens[cursor + 2].Text)) return -1;
         var comparison = tokens[cursor + 3].Text;
@@ -14,7 +14,7 @@ internal sealed partial class CommandTextReader
             && ScoreHolder(tokens[cursor + 4].Text) && PlainControlToken(tokens[cursor + 5].Text) ? 6 : -1;
     }
 
-    private static bool StaticControlCommand(List<CommandToken> tokens, int index, string name)
+    private bool StaticControlCommand(List<CommandToken> tokens, int index, string name)
     {
         var count = tokens.Count - index;
         string Arg(int offset) => offset < count ? tokens[index + offset].Text : "";
@@ -40,11 +40,28 @@ internal sealed partial class CommandTextReader
                 return (count == 8 || count == 9 && Arg(8) is "replace" or "destroy" or "keep" or "hollow" or "outline")
                     && BlockCoordinates(Arg(1), Arg(2), Arg(3)) && BlockCoordinates(Arg(4), Arg(5), Arg(6)) && ResourceLocation(Arg(7));
             case "particle":
-                return MinecraftIdentifier.DefaultNamespace(Arg(1)) is "minecraft:flame" or "minecraft:smoke" or "minecraft:dragon_breath"
-                    && (count == 2 || count == 5 && Position(2) || count is >= 10 and <= 12 && Position(2)
-                    && tokens.Skip(index + 5).Take(3).All(token => Decimal(token.Text, out _))
-                    && Decimal(Arg(8), out var speed) && speed >= 0 && Integer(Arg(9), out var amount) && amount >= 0
-                    && (count == 10 || Arg(10) is "normal" or "force") && (count < 12 || EntityTarget(Arg(11))));
+                var particle = DefaultNamespace(Arg(1));
+                var position = particle switch
+                {
+                    "minecraft:flame" or "minecraft:smoke" or "minecraft:dragon_breath" => 2,
+                    _ when profile.Id == "java-1.20.1" => particle switch
+                    {
+                        "minecraft:block" or "minecraft:block_marker" or "minecraft:falling_dust" when ResourceLocation(Arg(2)) => 3,
+                        "minecraft:dust" when count >= 6 && tokens.Skip(index + 2).Take(4).All(token => Decimal(token.Text, out _)) => 6,
+                        "minecraft:dust_color_transition" when count >= 9 && tokens.Skip(index + 2).Take(7).All(token => Decimal(token.Text, out _)) => 9,
+                        "minecraft:squid_ink" or "minecraft:explosion" or "minecraft:flash" or "minecraft:portal" or "minecraft:sneeze"
+                            or "minecraft:cloud" or "minecraft:end_rod" or "minecraft:electric_spark" or "minecraft:campfire_cosy_smoke"
+                            or "minecraft:totem_of_undying" => 2,
+                        _ => -1
+                    },
+                    _ => -1
+                };
+                return position >= 0 && (count == position || count == position + 3 && Position(position)
+                    || count >= position + 8 && count <= position + 10 && Position(position)
+                    && tokens.Skip(index + position + 3).Take(3).All(token => Decimal(token.Text, out _))
+                    && Decimal(Arg(position + 6), out var speed) && speed >= 0 && Integer(Arg(position + 7), out var amount) && amount >= 0
+                    && (count == position + 8 || Arg(position + 8) is "normal" or "force")
+                    && (count < position + 10 || EntityTarget(Arg(position + 9))));
             case "title":
                 return count == 6 && EntityTarget(Arg(1)) && Arg(2) == "times" && Integer(Arg(3), out _) && Integer(Arg(4), out _) && Integer(Arg(5), out _);
             case "kill":
@@ -104,8 +121,9 @@ internal sealed partial class CommandTextReader
     private static bool EntityTarget(string text) => text.StartsWith('@')
         ? SelectorTarget(text)
         : text.Length is >= 1 and <= 16 && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') || Guid.TryParseExact(text, "D", out _);
-    private static bool ScoreHolder(string text, bool allowWildcard = false)
-        => SelectorTarget(text) || allowWildcard && text == "*" || PlainControlToken(text);
+    private bool ScoreHolder(string text, bool allowWildcard = false)
+        => SelectorTarget(text) || allowWildcard && text == "*" || PlainControlToken(text)
+            || profile.Id == "java-1.20.1" && text.StartsWith('$') && PlainControlToken(text[1..]);
     private static bool PlainControlToken(string text) => text.Length != 0 && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '_' or '-' or '.' or ':' or '#');
 
     internal static bool ResourceOrTag(string text) => ResourceLocation(text.StartsWith('#') ? text[1..] : text);

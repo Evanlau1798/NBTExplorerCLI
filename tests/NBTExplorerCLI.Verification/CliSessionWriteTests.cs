@@ -38,6 +38,39 @@ internal static class CliSessionWriteTests
     private static Invocation Seal(string work, string world, Guid id, long revision, Guid operation, Hash256 hash) => Call(work, world, id, "seal",
         "--revision", revision.ToString(), "--operation-id", operation.ToString(), "--plan-hash", hash.Hex);
     private static FileSystemTranslationSessionStore Store(string work) => new(Path.Combine(State(work), "sessions"));
+    public static void Java1201ScansAndRecoversTaggedPackText()
+    {
+        var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
+        try
+        {
+            static byte[] Utf8(string value) => Encoding.UTF8.GetBytes(value);
+            const string pack = "datapacks/p/";
+            const string function = pack + "data/p/functions/main.mcfunction";
+            const string recipe = pack + "data/p/recipes/output.json";
+            var original = Utf8("give @s minecraft:stick{display:{Name:'{\"text\":\"Guide\"}'}} 1\r\n");
+            var recipeBytes = Utf8("{\"type\":\"minecraft:crafting_shapeless\",\"ingredients\":[{\"item\":\"minecraft:stone\"}],\"result\":{\"item\":\"minecraft:stick\"}}");
+            WorldDiscoveryTests.Put(world, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            WorldDiscoveryTests.Put(world, pack + "pack.mcmeta", Utf8("{\"pack\":{\"pack_format\":15,\"description\":\"\"}}"));
+            WorldDiscoveryTests.Put(world, function, original);
+            WorldDiscoveryTests.Put(world, recipe, recipeBytes);
+            WorldDiscoveryTests.Put(world, "entities/r.0.0.mca", []);
+            using var scan = Success(Run(work, "scan", world, "--no-cache", "--summary"));
+            Require(scan.RootElement.GetProperty("data").GetProperty("coverageComplete").GetBoolean(), "format 15 scans under the Java 1.20.1 profile");
+            Start(work, world, id);
+            var revision = Submit(work, world, id, translate: slot => slot.SourceText == "Guide" ? "指南" : slot.SourceText);
+            var (plan, file) = Plan(work, world, id, revision);
+            using var applied = Success(Apply(work, world, file));
+            var updated = File.ReadAllText(Path.Combine(world, function));
+            Require(updated == "give @s minecraft:stick{display:{Name:\"{\\\"text\\\":\\\"指南\\\"}\"}} 1\r\n"
+                && File.ReadAllBytes(Path.Combine(world, recipe)).SequenceEqual(recipeBytes), "only the authorized NBT text inside the command changes: " + updated);
+            var rollback = Run(work, "recover", world, "--plan-hash", plan.PlanHash.Hex, "--rollback", "--world-offline", "--state-root", State(work));
+            Require(rollback.Exit == 8 && File.ReadAllBytes(Path.Combine(world, function)).SequenceEqual(original), "the verified preimage is restored");
+            Require(new FileInfo(Path.Combine(world, "entities/r.0.0.mca")).Length == 0, "empty region artifacts are inventoried without being rewritten");
+            WorldDiscoveryTests.Put(world, "entities/r.0.0.mca", [0]);
+            Require(Run(work, "scan", world, "--no-cache", "--summary").Exit != 0, "a nonempty truncated region is still rejected");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
     public static void Java125TranslatesOnlyVanillaSigns()
     {
         var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();

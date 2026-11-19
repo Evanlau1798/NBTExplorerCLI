@@ -118,7 +118,7 @@ New-Item -ItemType Directory -Path 'D:\Exports\LangFiles', 'D:\Plans' -Force | O
 
 - **`--output <資料夾>` vs. `--plan-output <計畫檔>`**：`--output` 指定匯出的 `.zip` 或 `.json` 要放哪裡；`--plan-output` 則是另存預覽計畫檔的位置。
 - **`--format zip|directory`**：選擇打包成單一 `.zip`（直接丟進 Minecraft 的 `resourcepacks` 資料夾就能用）或是解開的資料夾。
-- **`--pack-format <版本號>`**：匯出到世界外時必填，讓 Minecraft 認得這個資源包對應的遊戲版本（`22` = 1.20.4、`34` = 1.21、`55` = 1.21.5、`75` = 1.21.11、`80` = 26.1-snapshot-6）。
+- 匯出到世界外時，請填寫 **`--pack-format <版本號>`**。1.20.1 用 `15`、1.20.4 用 `22`、1.21 用 `34`、1.21.5 用 `55`、1.21.11 用 `75`、26.1-snapshot-6 用 `80`。
 - **`--merge <路徑>`**：選用！把新翻好的語言檔合併進你原本的材質／音效資源包中，貼圖、音效與 `pack.png` 都會保留；若遇到衝突的翻譯鍵會主動提醒並中止，不會偷蓋掉原檔。
 
 <details>

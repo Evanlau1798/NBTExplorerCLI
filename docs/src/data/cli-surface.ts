@@ -351,6 +351,15 @@ export interface ProfileMatrixRow {
 
 export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   {
+    profile: 'java-1.20.1',
+    dataVersion: 3465,
+    packFormat: 15,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-tags-1.20.4',
+    textSchema: 'java-text-json (v1)',
+    packLayout: 'java-pack-plural',
+  },
+  {
     profile: 'java-1.20.4',
     dataVersion: 3700,
     packFormat: 22,

@@ -7,6 +7,12 @@ internal sealed partial class CommandTextReader
 {
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
+        if (profile.Id == "java-1.20.1" && tokens.Count == index + 8
+            && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity" && EntityTarget(tokens[index + 3].Text)
+            && tokens[index + 4].Text is ("CustomNameVisible" or "Invulnerable" or "Glowing")
+            && tokens[index + 5].Text == "set" && tokens[index + 6].Text == "value"
+            && tokens[index + 7].Text is ("0b" or "1b" or "0B" or "1B"))
+            return;
         if (tokens.Count >= index + 5 && tokens[index + 1].Text == "merge" && tokens[index + 2].Text == "entity")
         {
             if (tokens.Count != index + 5) throw new CommandSyntaxException();

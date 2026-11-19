@@ -118,7 +118,7 @@ New-Item -ItemType Directory -Path 'D:\Exports\LangFiles', 'D:\Plans' -Force | O
 
 - **`--output <folder>` vs. `--plan-output <file>`**: `--output` is where your generated `.zip` or `.json` files go; `--plan-output` is where the optional preview plan file is saved.
 - **`--format zip|directory`**: Choose a `.zip` file (ready to drop into Minecraft's `resourcepacks` folder) or an unzipped folder.
-- **`--pack-format <number>`**: Required when exporting outside the world so Minecraft recognizes the pack version (`22` for 1.20.4, `34` for 1.21, `55` for 1.21.5, `75` for 1.21.11, `80` for 26.1-snapshot-6).
+- Set **`--pack-format <number>`** when exporting outside the world. Use `15` for 1.20.1, `22` for 1.20.4, `34` for 1.21, `55` for 1.21.5, `75` for 1.21.11, or `80` for 26.1-snapshot-6.
 - **`--merge <path>`**: Optional! Merges your new language files into an existing resource pack while preserving all textures, audio, and `pack.png`. If a translation key conflicts with an existing file, `nbtcli` stops and tells you instead of silently overwriting.
 
 <details>

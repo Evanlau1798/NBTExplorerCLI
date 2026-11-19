@@ -192,6 +192,27 @@ internal static class CommandTextExtractionTests
         Require(parsed.Complete && parsed.Text.Occurrences.Single().Text == "The aura has dissipated", "a particle without a structured payload does not block the function's literal");
         foreach (var command in new[] { "particle minecraft:item{item:{id:'minecraft:paper'}} ~ ~ ~ 0 0 0 0 1 normal", "particle flame ~ ~ ~ 0 0 0 0 -1 normal" })
             Require(!CommandTextExtractor.Extract(new(source, command), profile).Complete, "unknown particle payload or invalid particle arguments remain unresolved");
+        var java1201 = MinecraftProfiles.ForDataVersion(3465)!;
+        foreach (var command in new[] {
+            "scoreboard players set $timer countdown 4",
+            "execute if score $timer countdown matches 1.. run function p:advance",
+            "particle block minecraft:sculk ~ ~ ~ 0.3 0.5 0.3 0.01 2 normal",
+            "particle dust 0.3 0.4 0 1 ~ ~ ~ 0 0 0 0 1 force",
+            "particle dust_color_transition 0.3 0.4 0 1 0.9 0.1 0.2 ~ ~ ~ 0 0 0 0 1 force",
+            "particle minecraft:squid_ink ~ ~ ~ 0 0 0 0 1 normal",
+            "data modify entity @s CustomNameVisible set value 0b"
+        })
+        {
+            var result = CommandTextExtractor.Extract(new(source, command + "\ntellraw @s {\"text\":\"Guide\"}"), java1201);
+            Require(result.Complete && result.Text.Occurrences.Single().Text == "Guide", "valid nontext operands preserve neighboring translations: " + command);
+        }
+        foreach (var command in new[] {
+            "scoreboard players set $ countdown 4", "particle block oak_sign{CustomName:'Guide'} ~ ~ ~ 0 0 0 0 1 normal",
+            "particle dust ~ ~ ~ 0 0 0 0 1 force",
+            "particle dust_color_transition 0.3 0.4 0 1 0.9 0.1 ~ ~ ~ 0 0 0 0 1 force",
+            "data modify entity @s CustomNameVisible set value 'Guide'"
+        })
+            Require(!CommandTextExtractor.Extract(new(source, command), java1201).Complete, "dynamic or invalid operands remain unresolved: " + command);
         foreach (var command in new[] {
             "execute if block 353 125 -115 minecraft:honey_block run tellraw @a {text:'Test'}",
             "execute if items block 132 60 -31 contents minecraft:music_disc_wait run tellraw @a {text:'Test'}",

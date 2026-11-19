@@ -86,12 +86,12 @@ internal sealed partial class NbtTextReader
         if (Field(tag, "BlockEntityTag", path) is { } block) BlockEntity(block, At(path, "BlockEntityTag"));
         if (Field(tag, "EntityTag", path) is { } entity)
         {
-            // Java 1.20.4 vanilla spawn eggs use their registered entity when EntityTag omits id.
+            // Tagged vanilla spawn eggs use their registered entity when EntityTag omits id.
             const string vanilla = "minecraft:";
             const string suffix = "_spawn_egg";
-            var name = profile.Id == "java-1.20.4" && id is not null && id.StartsWith(vanilla, StringComparison.Ordinal) && id.EndsWith(suffix, StringComparison.Ordinal)
+            var name = profile.Id is ("java-1.20.1" or "java-1.20.4") && id is not null && id.StartsWith(vanilla, StringComparison.Ordinal) && id.EndsWith(suffix, StringComparison.Ordinal)
                 ? id[vanilla.Length..^suffix.Length] : null;
-            var fallback = name is not null && Java1204SpawnEggEntities.Contains(name) ? vanilla + name : null;
+            var fallback = name is not null && Java1204SpawnEggEntities.Contains(name) && (name != "breeze" || profile.Id == "java-1.20.4") ? vanilla + name : null;
             Entity(entity, At(path, "EntityTag"), fallbackIdentity: fallback);
         }
         if (id is null && tag is NbtCompound compound && compound.Entries.Any(entry => entry.Name switch

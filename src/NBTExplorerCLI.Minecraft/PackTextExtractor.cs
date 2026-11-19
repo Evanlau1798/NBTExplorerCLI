@@ -61,7 +61,7 @@ public static partial class PackTextExtractor
                     output.Diagnostic(TypedPath.Root, "UnsupportedPackRecipe");
                 else
                 {
-                    var usesItemField = profile.Id == "java-1.20.4";
+                    var usesItemField = profile.Features[ProfileFacet.ItemSchema].Schema == "java-item-tags-1.20.4";
                     root.TryGetNativeProperty("result", out var result);
                     var id = result.ValueKind == JsonValueKind.String && profile.Id == "java-26.1-snapshot-6" ? result
                         : result.TryGetNativeProperty(usesItemField ? "item" : "id", out var field) ? field : default;
@@ -81,6 +81,11 @@ public static partial class PackTextExtractor
                     output.Diagnostic(At(TypedPath.Root, "effects"), "UnsupportedEnchantmentEffects");
             }
             else if (parts.Length < 4 || parts[0] != "data" || parts[2] != "tags") output.Diagnostic(TypedPath.Root, "UnsupportedPackJson");
+        }
+        else if (profile.Id == "java-1.20.1" && metadata.Kind == PackSourceKind.ResourcePack && source.Role == WorldSourceRole.PackJson
+            && entry.Split('/', 4) is ["assets", _, "models" or "font" or "shaders", _])
+        {
+            if (root.ValueKind != JsonValueKind.Object) output.Diagnostic(TypedPath.Root, "InvalidResourceDefinition");
         }
         else output.Diagnostic(TypedPath.Root, "UnsupportedPackSource");
         return output.Finish();

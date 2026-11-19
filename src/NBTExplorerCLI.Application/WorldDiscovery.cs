@@ -181,6 +181,11 @@ public static class WorldDiscovery
                 }
                 if (location.Role is WorldSourceRole.Terrain or WorldSourceRole.Entities or WorldSourceRole.PointOfInterest)
                 {
+                    if (bytes.Length == 0 && metadata.Profile.Id == "java-1.20.1")
+                    {
+                        if (!Add(new(location, null, SourceOutcome.Irrelevant, "EmptyRegion", hash, new()))) break;
+                        continue;
+                    }
                     var region = RegionFile.Read(bytes);
                     if (!Add(new(location, null, SourceOutcome.Success, null, hash, new(Read: SupportLevel.Supported)))) break;
                     foreach (var chunk in region.Chunks.Where(chunk => chunk.Present))
