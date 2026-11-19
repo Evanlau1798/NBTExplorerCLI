@@ -33,7 +33,7 @@ internal static class WorldArtifactEdits
     }
     internal static NbtDocument Transform(NbtDocument document, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits, CapabilityProfile? classic = null)
     {
-        var profile = NbtTextExtractor.Profile(source.Location, document, classic);
+        var profile = NbtTextExtractor.Profile(source.Location, document, out var originalVersion, classic);
         var edits = operations.OfType<TypedPatch>().Select(operation => operation.Edit).ToList();
         var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
         var keyed = WorldKeyEdits.ApplyNative(document, conversions.Where(conversion => conversion.Address.Artifact == source.Location.Artifact && conversion.Rule != KeyConversionRule.EncodedTextToTranslate).ToArray());
@@ -72,7 +72,8 @@ internal static class WorldArtifactEdits
             else edits.Add(TypedEdit.Replace(path, new NbtString(item.Slot.SourceText), new NbtString(item.Reply.Text)));
         }
         var expected = TypedTreeEdits.Apply(keyed, edits);
-        if (NbtTextExtractor.Profile(source.Location, expected, classic).Id != profile.Id) throw new NotSupportedException("Data version migration requires its explicit profile conversion");
+        _ = NbtTextExtractor.Profile(source.Location, expected, out var expectedVersion, classic);
+        if (expectedVersion != originalVersion) throw new NotSupportedException("Data version migration requires its explicit profile conversion");
         return expected;
     }
     private static PreparedArtifactBytes Region(byte[] bytes, IReadOnlyList<PatchOperation> operations, IReadOnlyList<DiscoveredSource> sources, DecodeLimits limits, CapabilityProfile? classic)

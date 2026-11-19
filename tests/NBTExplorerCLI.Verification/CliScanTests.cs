@@ -126,7 +126,9 @@ internal static class CliScanTests
             Put(root, "data/broken.dat", [0]); var broken = Run(root, "validate", root, "--no-cache", "--verbose"); using var failure = JsonDocument.Parse(broken.Output);
             Require(broken.Exit != 0 && !failure.RootElement.GetProperty("success").GetBoolean(), "corruption cannot be an apparently successful validation with issues");
             using var capabilities = Success(Run(root, "capabilities")); var profiles = capabilities.RootElement.GetProperty("data").GetProperty("profiles");
-            Require(profiles.GetArrayLength() == 5 && profiles.EnumerateArray().Any(profile => profile.GetProperty("dataVersion").GetInt32() == 4671)
+            Require(profiles.EnumerateArray().Any(profile => profile.GetProperty("dataVersion").GetInt32() == 4671)
+                && profiles.EnumerateArray().Any(profile => profile.GetProperty("minimumDataVersion").GetInt32() <= 4189
+                    && profile.GetProperty("maximumDataVersion").GetInt32() >= 4189)
                 && profiles.EnumerateArray().All(profile => profile.GetProperty("features").EnumerateArray()
                 .All(feature => feature.GetProperty("operations").GetProperty("write").GetString() != "supported")), "raw profile declarations do not infer write support from readability");
         }

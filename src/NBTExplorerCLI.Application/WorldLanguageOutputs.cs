@@ -65,7 +65,7 @@ internal static class WorldLanguageOutputs
                 if (sources.TryGetValue((outer, null), out var existing)) pack = existing.Pack!;
                 else
                 {
-                    pack = PackMetadata.Read(Metadata(profile), PackSourceKind.ResourcePack, snapshot.Limits);
+                    pack = PackMetadata.Read(Metadata(profile, snapshot.Discovery.Metadata), PackSourceKind.ResourcePack, snapshot.Limits);
                     sources.Add((outer, null), new(new(outer, WorldSourceRole.Archive, PackRoot: packRoot, PackKind: PackSourceKind.ResourcePack), null, SourceOutcome.Success, null, null, new(Read: SupportLevel.Supported), pack));
                 }
             }
@@ -92,13 +92,13 @@ internal static class WorldLanguageOutputs
         return added;
     }
     private static bool ResourceName(string value) => value.Length != 0 && value.All(unit => char.IsAsciiLetterLower(unit) || char.IsAsciiDigit(unit) || unit is '_' or '-' or '.');
-    internal static PreparedArtifactBytes Create(ArtifactAddress artifact, IReadOnlyList<PatchOperation> operations, DecodeLimits limits)
+    internal static PreparedArtifactBytes Create(ArtifactAddress artifact, IReadOnlyList<PatchOperation> operations, DecodeLimits limits, WorldMetadata? world)
     {
         if (operations.Any(operation => operation is not KeyConversionPatch)) throw new EditRejectedException(EditFailure.Precondition, "New outputs require declared language dependencies");
         if (artifact.Kind == ArtifactKind.Json) return WorldLanguageEdits.Create(artifact, "{}"u8.ToArray(), operations, limits);
         var keys = operations.Cast<KeyConversionPatch>().ToArray();
         var profile = MinecraftProfiles.ForId(keys[0].Conversion.Profile) ?? throw new NotSupportedException("Unknown generated pack profile");
-        var entries = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["pack.mcmeta"] = Metadata(profile) }; long retained = entries["pack.mcmeta"].Length;
+        var entries = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["pack.mcmeta"] = Metadata(profile, world) }; long retained = entries["pack.mcmeta"].Length;
         foreach (var group in keys.GroupBy(operation => operation.Conversion.Dependency.LanguageArtifact))
         {
             var language = WorldLanguageEdits.Create(group.Key, "{}"u8.ToArray(), group.Cast<PatchOperation>().ToArray(), limits);
@@ -129,9 +129,9 @@ internal static class WorldLanguageOutputs
         using (var stream = new MemoryStream(bytes, writable: false)) Verify(stream);
         return new(bytes, Verify);
     }
-    private static byte[] Metadata(CapabilityProfile profile)
+    private static byte[] Metadata(CapabilityProfile profile, WorldMetadata? world)
     {
-        var format = MinecraftProfiles.RequiredResourcePackFormat(profile);
+        var format = MinecraftProfiles.RequiredResourcePackFormat(profile, world);
         return format.Major < 65 ? JsonSerializer.SerializeToUtf8Bytes(new { pack = new { pack_format = format.Major, description = "NBTExplorerCLI translations" } })
             : JsonSerializer.SerializeToUtf8Bytes(new { pack = new { min_format = new[] { format.Major, format.Minor }, max_format = new[] { format.Major, format.Minor }, description = "NBTExplorerCLI translations" } });
     }

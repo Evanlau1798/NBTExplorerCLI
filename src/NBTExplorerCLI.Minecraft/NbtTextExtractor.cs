@@ -31,19 +31,23 @@ public static class NbtTextExtractor
         return output.Finish();
     }
     public static CapabilityProfile Profile(WorldSourceLocation source, NbtDocument document, CapabilityProfile? layoutProfile = null)
+        => Profile(source, document, out _, layoutProfile);
+
+    public static CapabilityProfile Profile(WorldSourceLocation source, NbtDocument document, out int? dataVersion, CapabilityProfile? layoutProfile = null)
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(document);
         var versionPath = source.Role == WorldSourceRole.Level ? new TypedPath([PathSegment.ForKey("Data"), PathSegment.ForKey("DataVersion")]) : new([PathSegment.ForKey("DataVersion")]);
         var version = NbtLocator.Resolve(document.Root, versionPath);
         if (version.Status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid || version.Status == ResolutionStatus.Found && version.Value is not NbtInt)
             throw new CodecException(CodecError.InvalidTag, 0, "Invalid artifact DataVersion");
+        dataVersion = (version.Value as NbtInt)?.Value;
         var explicitClassic = MinecraftProfiles.IsVersionedClassic(layoutProfile);
         if (explicitClassic && version.Status != ResolutionStatus.Missing)
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Versioned data cannot use an explicit Classic Anvil grammar");
         if ((layoutProfile == MinecraftProfiles.ClassicAnvil || explicitClassic)
             && version.Status == ResolutionStatus.Missing && source.Role is WorldSourceRole.Level or WorldSourceRole.Terrain or WorldSourceRole.Player or WorldSourceRole.SavedData)
             return layoutProfile!;
-        return version.Value is NbtInt number && MinecraftProfiles.ForDataVersion(number.Value) is { } profile ? profile
+        return dataVersion is { } number && MinecraftProfiles.ForDataVersion(number) is { } profile ? profile
             : throw new CodecException(CodecError.UnsupportedProfile, 0, "Missing or unknown artifact DataVersion");
     }
 }

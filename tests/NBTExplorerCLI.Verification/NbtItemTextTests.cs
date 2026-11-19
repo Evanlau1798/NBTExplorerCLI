@@ -60,7 +60,10 @@ internal static class NbtItemTextTests
             "/Inventory/0/tag/display/Name|/text|item.name|Tagged name", "/Inventory/0/tag/display/Lore/0|/text|item.lore|Tagged lore",
             "/Inventory/0/tag/title|<physical>|book.title|Title", "/Inventory/0/tag/author|<physical>|book.author|Author",
             "/Inventory/0/tag/pages/0|/text|book.page|Page", "/Inventory/0/tag/pages/1||book.page|" }.Order(StringComparer.Ordinal)), "own DV3700 chooses old tags, independently from containing world's layout/profile");
-        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => NbtTextExtractor.Extract(Player, new("", C(E("DataVersion", new NbtInt(3701)), E("Inventory", L(item))))));
+        var sameFamily = NbtTextExtractor.Extract(Player, new("", C(E("DataVersion", new NbtInt(3701)), E("Inventory", L(item)))));
+        Require(sameFamily.Complete && sameFamily.Occurrences.Select(Row).SequenceEqual(result.Occurrences.Select(Row)),
+            "an artifact within the same format range has the same tag slots");
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => NbtTextExtractor.Extract(Player, new("", C(E("DataVersion", new NbtInt(4298)), E("Inventory", L(item))))));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => NbtTextExtractor.Extract(Player, new("", C(E("Inventory", L(item))))));
 
         var eggData = C(E("CustomName", Text("Spawned creature", false)));
@@ -75,9 +78,12 @@ internal static class NbtItemTextTests
             Require(defaultEgg.Complete && Row(defaultEgg.Occurrences.Single()) == "/Inventory/0/tag/EntityTag/CustomName|/text|entity.name|Spawned creature",
                 $"DataVersion {version}: a registered spawn egg may omit EntityTag.id and still carry live entity text");
         }
-        var earlyBreeze = TaggedEntity("minecraft:breeze_spawn_egg", eggData, 3465);
-        Require(!earlyBreeze.Complete && earlyBreeze.Diagnostics.Single().Code == "MissingEntityIdentity",
-            "Java 1.20.1 does not infer an entity from an egg added after that version");
+        foreach (var version in new[] { 3465, 3578, 3689 })
+        {
+            var earlyBreeze = TaggedEntity("minecraft:breeze_spawn_egg", eggData, version);
+            Require(!earlyBreeze.Complete && earlyBreeze.Diagnostics.Single().Code == "MissingEntityIdentity",
+                $"DataVersion {version} does not infer an entity from an egg added after that version");
+        }
         var overrideEgg = TaggedEntity("minecraft:fox_spawn_egg", C(E("id", S("minecraft:armor_stand")), E("CustomName", Text("Override", false))));
         Require(overrideEgg.Complete && overrideEgg.Occurrences.Single().Address.SemanticRole == "armor_stand.name", "an explicit entity type wins over a spawn egg's default");
         foreach (var unknown in new[] { "minecraft:stone", "minecraft:made_up_spawn_egg", "mod:fox_spawn_egg" })

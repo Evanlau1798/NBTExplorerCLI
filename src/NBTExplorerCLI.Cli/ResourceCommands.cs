@@ -56,7 +56,7 @@ internal static class ResourceCommands
         var name = pack ? request.Get("name") ?? "resources" : "";
         if (format == ResourceOutputFormat.ZipPack && !name.EndsWith(".zip", StringComparison.Ordinal)) name += ".zip";
         if (placement.Length != 0) name = pack ? placement + "/" + name : placement;
-        var packFormat = pack ? request.Get("pack-format") is { } declared ? PackFormat(declared) : MinecraftProfiles.RequiredResourcePackFormat(metadata!.Profile) : null;
+        var packFormat = pack ? request.Get("pack-format") is { } declared ? PackFormat(declared) : MinecraftProfiles.RequiredResourcePackFormat(metadata!.DataVersion) : null;
         var objects = target.Objects();
         var recipe = WriteCommands.BeforeCommit(["resources"], "PlanRejected", () =>
         {

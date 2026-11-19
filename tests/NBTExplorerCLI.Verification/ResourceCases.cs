@@ -14,6 +14,7 @@ internal static class ResourceCases
         new("resource-output-descendant-malformed-marker", "resource-output", _ => ResourcePlacementTests.DescendantMalformedFileOrDirectoryMarkersFailClosed()),
         new("cli-resource-direct-safety-session", "cli-resource", _ => CliResourceTests.DirectResourceWritesRequireExplicitSafetyAndKeepSessionStateTruthful()),
         new("cli-resource-default-missing-parents", "cli-resource", _ => CliResourceTests.DefaultWorldLanguageAndModernPackParentsAreCreatedOnlyByApply()),
+        new("cli-resource-verified-intermediate-format", "cli-resource", _ => CliResourceTests.VerifiedIntermediateWorldsInferTheActualPackFormat()),
         new("cli-resource-language-plan-apply-recover", "cli-resource", _ => CliResourceTests.ExportLanguagesPreviewsCanonicalPlansAndUsesThePublicApplyRecoveryPath()),
         new("cli-resource-pack-frozen-merge-output", "cli-resource", _ => CliResourceTests.PackCommandsFreezeMergeInputsAndKeepOutputNamesAndDirectoriesDistinct()),
         new("resource-output-deep-native-handles", "resource-output", context => ResourceScopeHandleTests.DeepScopeRetainsALinearNumberOfNativeHandles(context.ArtifactRoot)),

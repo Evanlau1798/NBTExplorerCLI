@@ -192,7 +192,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
             var language = sources[(conversion.Dependency.LanguageArtifact, null)];
             if (language.Location.Role != WorldSourceRole.Language || language.Pack?.Kind != PackSourceKind.ResourcePack)
                 throw new EditRejectedException(EditFailure.Precondition, "Key conversion language dependency is not an exact resource language source");
-            if (!language.Pack.DeclaresSupport(MinecraftProfiles.RequiredResourcePackFormat(profile))) throw new NotSupportedException("Resource language pack does not support the target component profile");
+            if (!language.Pack.DeclaresSupport(MinecraftProfiles.RequiredResourcePackFormat(profile, snapshot.Discovery.Metadata)))
+                throw new NotSupportedException("Resource language pack does not support the target component profile");
             var languagePath = language.Location.Artifact.ContainerEntry ?? language.Location.Artifact.RelativePath;
             if (!languagePath.EndsWith("/" + conversion.Dependency.Locale + ".json", StringComparison.Ordinal)) throw new EditRejectedException(EditFailure.Precondition, "Language dependency locale differs from its path");
         }

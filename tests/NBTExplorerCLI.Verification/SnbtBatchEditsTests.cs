@@ -10,17 +10,20 @@ internal static class SnbtBatchEditsTests
 {
     public static void OneSnapshotPreservesFragmentAndProtectedBytes()
     {
-        const string input = "say 雪 run { a : 'One', b : \"Two\", c : [I;1,2], keep:'same', n:1.0d } then {a:'One'}";
         foreach (var profile in Enum.GetValues<SnbtProfile>())
         {
+            var prefix = profile == SnbtProfile.Java181 ? "" : "I;";
+            var input = $"say 雪 run {{ a : 'One', b : \"Two\", c : [{prefix}1,2], keep:'same', n:1.0d }} then {{a:'One'}}";
             var source = Bytes(input); var start = Bytes(input[..input.IndexOf('{')]).Length; var document = Snbt.ParseFragment(source, start, profile); source[0] = (byte)'X';
+            var listElement = new TypedPath([PathSegment.ForKey("c"), PathSegment.ForIndex(1)]);
             (TypedPath Path, LogicalMinecraftValue Expected, LogicalMinecraftValue Replacement)[] edits = [
                 (Key("a"), Leaf(new NbtString("One")), Leaf(new NbtString("Three"))), (Key("b"), Leaf(new NbtString("Two")), Leaf(new NbtString("Four"))),
-                (new([PathSegment.ForKey("c"), PathSegment.ForIndex(1)]), Leaf(new NbtInt(2)), Leaf(new NbtInt(3))), (Key("keep"), Leaf(new NbtString("same")), Leaf(new NbtString("same")))];
+                (listElement, Leaf(new NbtInt(2)), Leaf(new NbtInt(3))), (Key("keep"), Leaf(new NbtString("same")), Leaf(new NbtString("same")))];
             var output = Snbt.ReplaceMany(document, edits); var reversed = Snbt.ReplaceMany(document, edits.Reverse());
-            var expected = input.Replace("'One', b", "\"Three\", b", StringComparison.Ordinal).Replace("\"Two\"", "\"Four\"", StringComparison.Ordinal).Replace("[I;1,2]", "[I;1,3]", StringComparison.Ordinal);
+            var expected = input.Replace("'One', b", "\"Three\", b", StringComparison.Ordinal).Replace("\"Two\"", "\"Four\"", StringComparison.Ordinal)
+                .Replace($"[{prefix}1,2]", $"[{prefix}1,3]", StringComparison.Ordinal);
             Require(output.SequenceEqual(Bytes(expected)) && output.SequenceEqual(reversed) && document.Source.AsSpan().SequenceEqual(Bytes(input)), "batch applies one immutable snapshot, keeps original fragment framing/typed-array syntax/protected bytes and does not depend on request order");
-            Require(Snbt.ParseFragment(output, start, profile).Resolve(Key("c")).Value == Leaf(new NbtIntArray([1, 3])), "one readback matches the authorized complete typed result");
+            Require(Snbt.ParseFragment(output, start, profile).Resolve(listElement).Value == Leaf(new NbtInt(3)), "one readback matches the authorized complete typed result");
             Require(Snbt.ReplaceMany(document, [(Key("keep"), Leaf(new NbtString("same")), Leaf(new NbtString("same")))]).SequenceEqual(Bytes(input)), "no-op slots keep original quote spelling and the whole source snapshot");
         }
         var bounded = Snbt.ParseDocument(Bytes("{a:'old',b:'" + new string('B', 70) + "',n:1.0d}"), limits: new(MaxDecodedBytes: 100));

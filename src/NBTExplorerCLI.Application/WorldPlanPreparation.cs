@@ -35,7 +35,7 @@ public sealed class WorldPlanPreparation(IWorldInventory inventory, IArtifactSto
         return PrepareOutputs(plan, (output, input) =>
         {
             var operations = plan.Operations.Where(operation => operation.RequiredOutputs.Contains(output.Artifact)).ToArray();
-            if (input.Image.ExpectedAbsent) return WorldLanguageOutputs.Create(output.Artifact, operations, snapshot.Limits);
+            if (input.Image.ExpectedAbsent) return WorldLanguageOutputs.Create(output.Artifact, operations, snapshot.Limits, snapshot.Discovery.Metadata);
             var bytes = inventory.Read(output.Artifact);
             if (ArtifactImage.Present(Hash256.Compute(bytes)) != input.Image) throw new ArtifactConflictException("Source changed before preparation");
             return WorldArtifactEdits.Create(output.Artifact, bytes, operations, bound.Sources.Values.Where(source => source.Location.Artifact.RelativePath == output.Artifact.RelativePath).ToArray(), snapshot.Limits, classic);

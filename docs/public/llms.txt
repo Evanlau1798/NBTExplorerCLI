@@ -11,7 +11,7 @@
 - [Documentation Overview (zh-TW)](https://nbtcli.evanlau1798.com/zh-tw/docs/): Full user documentation index in Traditional Chinese.
 - [AI Agent Quickstart](https://nbtcli.evanlau1798.com/docs/ai-agents/): Web summary and ready-to-use agent prompts.
 - [Command Reference](https://nbtcli.evanlau1798.com/docs/command-reference/): Searchable command and flag reference.
-- [Supported Versions & Troubleshooting](https://nbtcli.evanlau1798.com/docs/support-and-troubleshooting/): Pinned profile matrix, classic Anvil limits, and error diagnosis.
+- [Supported Versions & Troubleshooting](https://nbtcli.evanlau1798.com/docs/support-and-troubleshooting/): Format families, classic Anvil limits, and error diagnosis.
 - [GitHub Releases](https://github.com/Evanlau1798/NBTExplorerCLI/releases): Official Windows x64 release ZIP containing `nbtcli.exe` and its dependencies.
 
 ## Core Invariants
@@ -370,12 +370,15 @@ Generate with `agent setup <world> --output <file>`, fill `configuration.agentNa
 
 ## Supported Versions & Text Roles
 
-### Pinned Modern Profiles (`capabilities`)
+### Modern Format Families (`capabilities`)
+
+Check `minimumDataVersion` and `maximumDataVersion` for each family's inclusive bounds. This table lists the representative versions and their pack formats. With `create-pack`, specify `--pack-format` if the world's default resource pack format cannot be verified.
 
 | Profile | `DataVersion` | Resource `pack_format` | Datapack Format | Text Schema | Pack / Layout |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `java-1.20.1` | `3465` | `15` | `15` | `java-text-json (v1)` | `java-pack-plural` |
 | `java-1.20.4` | `3700` | `22` | `26` | `java-text-json (v1)` | `java-pack-plural` |
+| `java-1.20.5` | `3837` | `32` | `41` | `java-text-json (v1)` | `java-pack-plural` |
 | `java-1.21` | `3953` | `34` | `48` | `java-text-json (v1)` | `java-pack-singular` |
 | `java-1.21.5` | `4325` | `55` | `71` | `java-text-nbt (v1)` | `java-pack-singular` |
 | `java-1.21.11` | `4671` | `75` | `94.1` | `java-text-nbt (v2)` | `java-pack-singular` |

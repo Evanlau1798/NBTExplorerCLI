@@ -28,6 +28,26 @@ internal static class WorldMetadataTests
         Require(directoryView.Profile.Id == "java-1.21" && directoryView.DimensionDirectories[""] == "minecraft:overworld"
             && directoryView.DimensionDirectories["DIM-1"] == "minecraft:the_nether" && directoryView.DimensionDirectories["DIM1"] == "minecraft:the_end"
             && directoryView.DimensionDirectories["dimensions/models/tags/worldgen"] == "models:tags/worldgen", "directoryView registry retains built-in and literal custom namespace/path roots");
+        foreach (var (version, itemSchema, layout) in new[] {
+            (3463, "java-item-tags-1.20.4", "java-pack-plural"),
+            (3578, "java-item-tags-1.20.4", "java-pack-plural"),
+            (3818, "java-item-tags-1.20.4", "java-pack-plural"),
+            (3819, "java-item-components-1.20.5", "java-pack-plural"),
+            (3839, "java-item-components-1.20.5", "java-pack-plural"),
+            (3945, "java-item-components-1.20.5", "java-pack-plural"),
+            (3946, "java-item-components-1.20.5", "java-pack-singular"),
+            (3955, "java-item-components-1.20.5", "java-pack-singular"),
+            (4189, "java-item-components-1.20.5", "java-pack-singular")
+        })
+        {
+            var intermediate = WorldMetadata.Read(Level(version, Dimensions));
+            Require(intermediate.DataVersion == version && MinecraftProfiles.ForId(intermediate.Profile.Id) == intermediate.Profile
+                && intermediate.Profile.Features[ProfileFacet.ItemSchema].Schema == itemSchema
+                && intermediate.Profile.Features[ProfileFacet.PackLayout].Schema == layout, $"Java DataVersion {version} resolves by its real storage family");
+        }
+        foreach (var (version, expected) in new[] { (3578, 18), (3839, 32), (3955, 34), (4189, 46) })
+            Require(MinecraftProfiles.RequiredResourcePackFormat(version).Major == expected, "generated metadata uses the game's actual resource format");
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => MinecraftProfiles.RequiredResourcePackFormat(3818));
         var modern = WorldMetadata.Read(Level(4774), Separate(4774, Dimensions));
         Require(modern.WorldGenDataVersion == 4774 && modern.DimensionDirectories["dimensions/minecraft/overworld"] == "minecraft:overworld"
             && !modern.DimensionDirectories.ContainsKey("") && modern.DimensionDirectories.Count == 4, "modern layout requires its separately versioned registry");

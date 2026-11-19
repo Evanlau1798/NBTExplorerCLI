@@ -89,6 +89,29 @@ internal static class CliResourceTests
             finally { Directory.Delete(world, true); Directory.Delete(work, true); }
         }
     }
+    public static void VerifiedIntermediateWorldsInferTheActualPackFormat()
+    {
+        var world = WorldQueryTests.CreateWorld(); var work = ScratchDirectory.CreateChild();
+        try
+        {
+            var (id, revision) = CliKeyPlanTests.Session(world, work);
+            var unsupported = new List<int>();
+            foreach (var (version, format) in new[] { (3690, 21), (3819, 28), (3946, 34), (3947, 34) })
+            {
+                Put(world, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(version, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+                var file = Path.Combine(work, $"pack-{version}.json");
+                var result = Call(world, work, id, revision, "create-pack", "--plan-output", file);
+                if (result.Exit == 4) { unsupported.Add(version); continue; }
+                using var preview = Success(result);
+                var operation = (ResourcePatch)PatchPlanJson.Read(File.ReadAllText(file)).Operations.Single();
+                Require(operation.Generation.PackFormat == new PackFormatVersion(format, 0),
+                    $"DataVersion {version} uses its actual resource pack format without an override");
+            }
+            Require(unsupported.Count == 0, "verified default resource pack formats were rejected: " + string.Join(", ", unsupported));
+            Require(!File.Exists(Path.Combine(world, "resources.zip")), "format inference only previews a plan");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
     public static void DirectResourceWritesRequireExplicitSafetyAndKeepSessionStateTruthful()
     {
         var world = WorldQueryTests.CreateWorld(); var work = ScratchDirectory.CreateChild(); var output = ScratchDirectory.CreateChild();

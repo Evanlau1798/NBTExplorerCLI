@@ -23,7 +23,7 @@ internal static class MinecraftProfileTests
             && MinecraftProfiles.ForPackMetadata(Pack(94, 0, PackSourceKind.Datapack)) is null
             && MinecraftProfiles.ForPackMetadata(Pack(94, 2, PackSourceKind.Datapack)) is null
             && MinecraftProfiles.ForPackMetadata(Pack(75, 0, PackSourceKind.ResourcePack)) == profile
-            && MinecraftProfiles.RequiredResourcePackFormat(profile!) == new PackFormatVersion(75, 0), "select exact major and minor versions independently");
+            && MinecraftProfiles.RequiredResourcePackFormat(4671) == new PackFormatVersion(75, 0), "select exact major and minor versions independently");
         var command = new SourceAddress(new(Guid.NewGuid(), "text.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
         var text = CommandTextExtractor.Extract(new(command, "tellraw @s {text:'Hello'}"), profile!);
         Require(text.Complete && text.Text.Occurrences.Single().Text == "Hello", "the exact profile enables the known command component encoding");
@@ -64,8 +64,8 @@ internal static class MinecraftProfileTests
             "1.21.5 retains java121 layout while independently using NBT text; no single modern switch");
         Require(java121.Supports(ProfileOperation.Read, ProfileFacet.Layout, ProfileFacet.TextSchema)
             && !java121.Supports(ProfileOperation.Write, ProfileFacet.Layout), "read/structural extraction does not imply accepted world write capability");
-        foreach (var unknown in new[] { -1, 0, 3952, 3954, 4773, 4775, int.MaxValue })
-            Require(MinecraftProfiles.ForDataVersion(unknown) is null, "unknown artifact version must never silently inherit a nearby profile");
+        foreach (var unknown in new[] { -1, 0, 3462, 4298, 4773, 4775, int.MaxValue })
+            Require(MinecraftProfiles.ForDataVersion(unknown) is null, "data outside the implemented schema ranges stays unsupported");
         Require(MinecraftProfiles.ForDataVersion(4774)!.Features[ProfileFacet.CommandGrammar].Operations.Extract == SupportLevel.Unknown,
             "command grammar remains unaccepted until owning work package verifies it");
         Require(new[] { java121, modern, intermediate }.All(profile => profile.Features.Values.All(feature => feature.Operations.Extract == SupportLevel.Unknown)),

@@ -35,6 +35,10 @@ internal static class CliEditTests
         try
         {
             var original = File.ReadAllBytes(Path.Combine(root, Artifact)); var planFile = Path.Combine(work, "plan.json"); var state = Path.Combine(work, "state");
+            var migration = Run(work, "set", root, "--path", Artifact, "--pointer", "/DataVersion",
+                "--value", Value(4189), "--apply", "--world-offline", "--state-root", state);
+            Require(migration.Exit == 4 && File.ReadAllBytes(Path.Combine(root, Artifact)).SequenceEqual(original),
+                $"DataVersion migration within one schema family must be rejected without writes, actual exit {migration.Exit}");
             using var preview = Success(Run(work, "set", root, "--path", Artifact, "--pointer", "/data/number", "--value", Value(2), "--output", planFile, "--state-root", state));
             var plan = PatchPlanJson.Read(preview.RootElement.GetProperty("data").GetProperty("plan").GetRawText());
             Require(PatchPlanJson.Read(File.ReadAllText(planFile)).PlanHash == plan.PlanHash && plan.Operations.Single() is TypedPatch

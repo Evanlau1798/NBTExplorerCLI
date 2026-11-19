@@ -1,3 +1,4 @@
+using System.Text;
 using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
@@ -19,8 +20,16 @@ internal static class NewLanguagePreparationTests
         public IArtifactCandidate Stage(ArtifactAddress artifact, ArtifactImage preimage, ReadOnlyMemory<byte> bytes)
             => ++stages == 2 ? throw new IOException("Injected new output stage failure") : inner.Stage(artifact, preimage, bytes);
     }
-    public static void AbsentLanguageIsDeclaredBeforeStage() => PrepareAbsent(archived: false);
-    public static void GeneratedPackIsDeclaredBeforeStage() => PrepareAbsent(archived: true);
+    public static void AbsentLanguageIsDeclaredBeforeStage()
+    {
+        PrepareAbsent(archived: false);
+        PrepareAbsent(archived: false, version: 4189);
+    }
+    public static void GeneratedPackIsDeclaredBeforeStage()
+    {
+        PrepareAbsent(archived: true);
+        PrepareAbsent(archived: true, version: 4189);
+    }
     public static void GeneratedPackProfilesAndSizeLimits()
     {
         PrepareAbsent(archived: true, version: 4325);
@@ -91,12 +100,13 @@ internal static class NewLanguagePreparationTests
             try
             {
                 const string original = "{\"text\":\"Hello\",\"color\":\"red\"}";
+                var encoded = version is 3953 or 4189;
                 if (version == 3953) WorldQueryTests.BossWorld(root, componentJson: original);
                 else
                 {
                     var level = WorldMetadataTests.Level(version, version == 4774 ? null : WorldMetadataTests.Dimensions);
                     var data = (NbtCompound)((NbtCompound)level.Root).Entries.Single().Value;
-                    var bosses = new NbtCompound([new("test:event", new NbtCompound([new("Name", new NbtString("Hello"))]))]);
+                    var bosses = new NbtCompound([new("test:event", new NbtCompound([new("Name", new NbtString(encoded ? original : "Hello"))]))]);
                     Put(root, "level.dat", CompressedNbt.WriteDocument(new("", new NbtCompound([new("Data", new NbtCompound(data.Entries.Append(new("CustomBossEvents", bosses))))])), NbtCompression.GZip));
                     if (version == 4774) Put(root, "data/minecraft/world_gen_settings.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Separate(version, WorldMetadataTests.Dimensions), NbtCompression.GZip));
                 }
@@ -106,15 +116,16 @@ internal static class NewLanguagePreparationTests
                 var physical = archived ? new ArtifactAddress(World, "z-generated.zip", ArtifactKind.Archive) : language;
                 if (!archived)
                 {
-                    Put(root, "resourcepacks/client/pack.mcmeta", "{\"pack\":{\"pack_format\":34,\"description\":\"Resources\"}}"u8.ToArray());
+                    var packFormat = version == 4189 ? 46 : 34;
+                    Put(root, "resourcepacks/client/pack.mcmeta", Encoding.UTF8.GetBytes($$$"""{"pack":{"pack_format":{{{packFormat}}},"description":"Resources"}}"""));
                     Put(root, "resourcepacks/client/assets/test/lang/en_us.json", "{\"old\":\"Keep\"}"u8.ToArray());
                 }
                 var limits = new DecodeLimits(MaxCompressedBytes: compressedLimit ?? DecodeLimits.Default.MaxCompressedBytes);
                 var snapshot = new WorldQueryService(new WorldInventory(root, World), new FileSystemScanCacheStore(cache)).QueryAsync(new(new(SnapshotScope.All, limits))).GetAwaiter().GetResult().Snapshot!;
                 var slot = snapshot.ReadSources().SelectMany(row => row.Text?.Occurrences ?? []).Single(item => item.Address.Artifact.RelativePath == "level.dat" && item.Text == "Hello").ToSlot("en_us", "zh_tw");
                 var profile = MinecraftProfiles.ForDataVersion(version)!;
-                var address = version == 3953 ? new SourceAddress(slot.Address.Artifact, slot.Address.NodePath, slot.Role, componentPath: TypedPath.Root) : slot.Address;
-                var conversion = new TranslationKeyConversion(address, new NbtString(version == 3953 ? original : "Hello"), version == 3953 ? KeyConversionRule.EncodedTextToTranslate : KeyConversionRule.LiteralToTranslateComponent,
+                var address = encoded ? new SourceAddress(slot.Address.Artifact, slot.Address.NodePath, slot.Role, componentPath: TypedPath.Root) : slot.Address;
+                var conversion = new TranslationKeyConversion(address, new NbtString(encoded ? original : "Hello"), encoded ? KeyConversionRule.EncodedTextToTranslate : KeyConversionRule.LiteralToTranslateComponent,
                     profile.Id, profile.Version, slot, new(slot.Id, slot.SourceTextHash, "zh_tw", translation), new(language, archived ? physical : null, "zh_tw", "test.created", translation));
                 var operation = new KeyConversionPatch("new-language", conversion);
                 var inventory = new WorldInventory(root, World); var builder = new WorldPlanBuilder(inventory);
@@ -143,7 +154,7 @@ internal static class NewLanguagePreparationTests
                         using var zip = ZipArchiveValidation.OpenRead(output);
                         Require(zip.Entries.Select(item => item.FullName).Order().SequenceEqual(new[] { entry, "pack.mcmeta" }.Order()), "generated pack contains exactly declared language and metadata entries");
                         using var metadata = new MemoryStream(); using (var stream = zip.GetEntry("pack.mcmeta")!.Open()) stream.CopyTo(metadata);
-                        Require(PackMetadata.Read(metadata.ToArray(), PackSourceKind.ResourcePack).DeclaresSupport(MinecraftProfiles.RequiredResourcePackFormat(profile)), "generated pack metadata supports the exact target profile");
+                        Require(PackMetadata.Read(metadata.ToArray(), PackSourceKind.ResourcePack).DeclaresSupport(MinecraftProfiles.RequiredResourcePackFormat(version)), "generated pack metadata supports the actual target world version");
                         using var bytes = new MemoryStream(); using (var stream = zip.GetEntry(entry)!.Open()) stream.CopyTo(bytes); jsonBytes = bytes.ToArray();
                     }
                     else jsonBytes = output;

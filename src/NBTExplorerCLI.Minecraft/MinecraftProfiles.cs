@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NBTExplorerCLI.Domain;
 
 namespace NBTExplorerCLI.Minecraft;
@@ -6,19 +7,24 @@ public static class MinecraftProfiles
 {
     public static CapabilityProfile? ForId(string id) => id switch
     {
-        "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-1.21" => Java121, "java-1.21.5" => Java1215,
+        "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-1.20.5" => Java1205, "java-1.21" => Java121, "java-1.21.5" => Java1215,
         "java-1.21.11" => Java12111, "java-26.1-snapshot-6" => Snapshot2616, "java-classic-anvil" => ClassicAnvil,
         _ => ClassicProfiles.Values.FirstOrDefault(profile => profile.Id == id)
     };
-    public static PackFormatVersion RequiredResourcePackFormat(CapabilityProfile profile)
+    public static PackFormatVersion RequiredResourcePackFormat(CapabilityProfile profile, WorldMetadata? world)
     {
         ArgumentNullException.ThrowIfNull(profile);
-        return new(profile.Id switch
-        {
-            "java-1.20.1" => 15, "java-1.20.4" => 22, "java-1.21" => 34, "java-1.21.5" => 55, "java-1.21.11" => 75, "java-26.1-snapshot-6" => 80,
-            _ => throw new CodecException(CodecError.UnsupportedProfile, 0, "Unknown required pack format")
-        }, 0);
+        if (world?.Profile.Id == profile.Id) return RequiredResourcePackFormat(world.DataVersion);
+        return RequiredResourcePackFormat(DataVersionRanges.FirstOrDefault(range => range.Profile.Id == profile.Id).DataVersion);
     }
+
+    public static PackFormatVersion RequiredResourcePackFormat(int? dataVersion)
+        => new(dataVersion switch
+        {
+            3463 or 3465 => 15, 3578 => 18, 3690 => 21, 3700 => 22, 3819 => 28, 3837 or 3839 => 32,
+            3946 or 3947 or 3953 or 3955 => 34, 4189 => 46, 4325 => 55, 4671 => 75, 4774 => 80,
+            _ => throw new CodecException(CodecError.UnsupportedProfile, 0, "The target world's resource pack format is not verified")
+        }, 0);
     public static CapabilityProfile? ForPackMetadata(PackMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
@@ -27,9 +33,10 @@ public static class MinecraftProfiles
         if (!metadata.DeclaresSupport(version)) return null;
         return (metadata.Kind, version.Major, version.Minor) switch
         {
-            (PackSourceKind.Datapack, >= 4 and <= 15, 0) or (PackSourceKind.ResourcePack, 15, 0) => Java1201,
-            (PackSourceKind.Datapack, 26, 0) or (PackSourceKind.ResourcePack, 22, 0) => Java1204,
-            (PackSourceKind.Datapack, 48, 0) or (PackSourceKind.ResourcePack, 34, 0) => Java121,
+            (PackSourceKind.Datapack, >= 4 and <= 23, 0) or (PackSourceKind.ResourcePack, >= 15 and <= 20, 0) => Java1201,
+            (PackSourceKind.Datapack, >= 24 and <= 32, 0) or (PackSourceKind.ResourcePack, >= 21 and <= 27, 0) => Java1204,
+            (PackSourceKind.Datapack, >= 33 and <= 44, 0) or (PackSourceKind.ResourcePack, >= 28 and <= 33, 0) => Java1205,
+            (PackSourceKind.Datapack, >= 45 and <= 61, 0) or (PackSourceKind.ResourcePack, >= 34 and <= 46, 0) => Java121,
             (PackSourceKind.Datapack, 71, 0) or (PackSourceKind.ResourcePack, 55, 0) => Java1215,
             (PackSourceKind.Datapack, 94, 1) or (PackSourceKind.ResourcePack, 75, 0) => Java12111,
             (PackSourceKind.Datapack, 99, 0) or (PackSourceKind.ResourcePack, 80, 0) => Snapshot2616,
@@ -38,6 +45,7 @@ public static class MinecraftProfiles
     }
     private static readonly CapabilityProfile Java1201 = Create("java-1.20.1", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1204 = Create("java-1.20.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.4", LogicalListEncoding.Homogeneous, "java-pack-plural");
+    private static readonly CapabilityProfile Java1205 = Create("java-1.20.5", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.21", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java121 = Create("java-1.21", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.21", LogicalListEncoding.Homogeneous);
     private static readonly CapabilityProfile Java1215 = Create("java-1.21.5", "java-dimensions-directory", "java-item-components-1.21.5", "java-text-nbt", "java-commands-1.21.5", LogicalListEncoding.CompoundWrapper);
     private static readonly CapabilityProfile Java12111 = Create("java-1.21.11", "java-dimensions-directory", "java-item-components-1.21.11", "java-text-nbt", "java-commands-1.21.11", LogicalListEncoding.CompoundWrapper, textVersion: 2);
@@ -59,8 +67,25 @@ public static class MinecraftProfiles
     public static string? ClassicVersion(string profile) => ClassicProfiles.FirstOrDefault(pair => pair.Value.Id == profile).Key;
     public static bool IsVersionedClassic(CapabilityProfile? profile) => profile is not null && ClassicProfiles.ContainsValue(profile);
     public static bool UsesClassicPlainText(CapabilityProfile? profile) => profile == Java125 || profile == Java152 || profile == Java164;
+
+    public static ImmutableArray<(int DataVersion, int Minimum, int Maximum, CapabilityProfile Profile)> DataVersionRanges { get; } =
+    [
+        (3465, 3463, 3689, Java1201),
+        (3700, 3690, 3818, Java1204),
+        // 24w09a introduced item components. 24w21a renamed datapack directories.
+        (3837, 3819, 3945, Java1205),
+        (3953, 3946, 4297, Java121),
+        (4325, 4325, 4325, Java1215),
+        (4671, 4671, 4671, Java12111),
+        (4774, 4774, 4774, Snapshot2616)
+    ];
+
     public static CapabilityProfile? ForDataVersion(int dataVersion)
-        => dataVersion switch { 3465 => Java1201, 3700 => Java1204, 3953 => Java121, 4325 => Java1215, 4671 => Java12111, 4774 => Snapshot2616, _ => null };
+    {
+        foreach (var range in DataVersionRanges)
+            if (dataVersion >= range.Minimum && dataVersion <= range.Maximum) return range.Profile;
+        return null;
+    }
 
     private static CapabilityProfile Create(string id, string layout, string items, string text, string commands, LogicalListEncoding lists, string packLayout = "java-pack-singular", int textVersion = 1)
         => new(id, 2, new Dictionary<ProfileFacet, FormatFeature>

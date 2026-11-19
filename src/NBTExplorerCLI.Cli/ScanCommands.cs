@@ -12,9 +12,9 @@ internal static class ScanCommands
     internal static CliResult Execute(CliArguments request)
     {
         if (request.Command == "capabilities")
-            return new(new { commands = CliArguments.Commands, profiles = new[] { 3465, 3700, 3953, 4325, 4671, 4774 }.Select(version =>
-                new { dataVersion = version, profile = MinecraftProfiles.ForDataVersion(version)!.Id,
-                    features = MinecraftProfiles.ForDataVersion(version)!.Features.OrderBy(pair => pair.Key).Select(pair => new { facet = pair.Key, pair.Value.Schema, pair.Value.Version, pair.Value.Operations }).ToArray() }).ToArray(),
+            return new(new { commands = CliArguments.Commands, profiles = MinecraftProfiles.DataVersionRanges.Select(range =>
+                new { dataVersion = range.DataVersion, minimumDataVersion = range.Minimum, maximumDataVersion = range.Maximum, profile = range.Profile.Id,
+                    features = range.Profile.Features.OrderBy(pair => pair.Key).Select(pair => new { facet = pair.Key, pair.Value.Schema, pair.Value.Version, pair.Value.Operations }).ToArray() }).ToArray(),
                 storageProfiles = new[] { new { storageVersion = WorldMetadata.ClassicAnvilStorageVersion, profile = MinecraftProfiles.ClassicAnvil.Id, readOnly = true,
                     explicitTranslationVersions = MinecraftProfiles.ClassicGameVersions } } });
         var options = new ScanOptions(request); var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.Input!));
