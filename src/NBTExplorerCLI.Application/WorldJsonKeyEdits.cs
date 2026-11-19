@@ -6,7 +6,8 @@ namespace NBTExplorerCLI.Application;
 
 internal static class WorldJsonKeyEdits
 {
-    internal static byte[] Convert(byte[] source, IReadOnlyList<TranslationKeyConversion> conversions, DecodeLimits limits, IReadOnlyList<LiteralTranslation>? translations = null)
+    internal static byte[] Convert(byte[] source, IReadOnlyList<TranslationKeyConversion> conversions, DecodeLimits limits, IReadOnlyList<LiteralTranslation>? translations = null,
+        SnbtProfile? grammar = null)
     {
         translations ??= [];
         if (translations.Any(item => item.Slot.Address.JsonTarget != JsonTargetKind.Value)) throw new NotSupportedException("JSON literal targets must be value slots");
@@ -39,13 +40,13 @@ internal static class WorldJsonKeyEdits
         var keyed = direct.Length == 0 ? changed : NativeJsonKeyEdits.Convert(changed, direct.Select(conversion =>
             (conversion.Address.NodePath, conversion.Slot.SourceText, conversion.Dependency.Key, conversion.Reply.Text.Contains('%'))), limits);
         var remaining = translations.Where(item => !handled.Contains(item.Slot.Address.NodePath)).ToArray();
-        return remaining.Length == 0 ? keyed : WorldJsonEdits.CreateLiterals(keyed, remaining, limits).Bytes;
+        return remaining.Length == 0 ? keyed : WorldJsonEdits.CreateLiterals(keyed, remaining, limits, grammar).Bytes;
     }
-    internal static PreparedArtifactBytes Create(byte[] source, IReadOnlyList<PatchOperation> operations, DecodeLimits limits)
+    internal static PreparedArtifactBytes Create(byte[] source, IReadOnlyList<PatchOperation> operations, DecodeLimits limits, SnbtProfile? grammar)
     {
         if (operations.Any(operation => operation is not (LiteralPatch or KeyConversionPatch))) throw new NotSupportedException("JSON component preparation requires literal or key operations");
         var output = Convert(source, operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray(), limits,
-            operations.OfType<LiteralPatch>().Select(operation => operation.Translation).ToArray());
+            operations.OfType<LiteralPatch>().Select(operation => operation.Translation).ToArray(), grammar);
         return new(output, stream => { using var json = BoundedJson.ReadDecoded(WorldArtifactEdits.Read(stream), limits); });
     }
 }

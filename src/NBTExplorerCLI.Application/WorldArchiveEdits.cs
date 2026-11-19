@@ -34,7 +34,7 @@ internal static class WorldArchiveEdits
                 transformed = new(output, stream => { if (WorldArtifactEdits.ReadNbt(WorldArtifactEdits.Read(stream), limits).Document != expected) throw new InvalidDataException("ZIP NBT candidate projection differs"); });
             }
             else if (source.Location.Role == WorldSourceRole.Language && group.Any(operation => operation is KeyConversionPatch)) transformed = WorldLanguageEdits.Create(source.Location.Artifact, original, group.ToArray(), limits);
-            else if (source.Location.Role is WorldSourceRole.PackJson or WorldSourceRole.PackMetadata or WorldSourceRole.Language) transformed = WorldJsonEdits.Create(original, group.ToArray(), limits, source.Location.Artifact);
+            else if (source.Location.Role is WorldSourceRole.PackJson or WorldSourceRole.PackMetadata or WorldSourceRole.Language) transformed = WorldJsonEdits.Create(original, group.ToArray(), limits, source);
             else throw new NotSupportedException("Unknown ZIP entry preparation profile");
             retainedBytes = checked(retainedBytes + transformed.Bytes.Length);
             if (retainedBytes > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "ZIP transformed entry buffers exceed aggregate budget");

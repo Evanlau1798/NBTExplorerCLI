@@ -32,6 +32,36 @@ internal static class CommandTextExtractionTests
     }
     public static void ModernSnbtAndUnknownGrammar()
     {
+        var early = MinecraftProfiles.ForDataVersion(4298) ?? throw new InvalidOperationException("25w02a needs an NBT text profile");
+        var authoring = new SourceAddress(new(World, "snbt-transition.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var homogeneous = CommandTextExtractor.Extract(new(authoring, "tellraw @s [{text:'One'},{text:'Two'}]"), early);
+        Require(homogeneous.Complete && homogeneous.Text.Occurrences.Select(row => row.Text).SequenceEqual(new[] { "One", "Two" }),
+            "early native NBT components use the original homogeneous SNBT lists");
+        var mixed = new CommandCandidate(authoring, "tellraw @s ['One',{text:'Two'}]");
+        Require(!CommandTextExtractor.Extract(mixed, early).Complete
+            && CommandTextExtractor.Extract(mixed, MinecraftProfiles.ForDataVersion(4317)!).Complete,
+            "native text began before the grammar allowed heterogeneous lists");
+        const string hover = "tellraw @s {text:'Open',hover_event:{action:'show_text',text:{text:'Hint',extra:[{selector:'@e[name=Guard]'}]}}}";
+        var hovered = CommandTextExtractor.Extract(new(authoring, hover), early);
+        Require(hovered.Complete && hovered.Text.Occurrences.Any(row => row.Text == "Hint") && hovered.References.Single().Name == "Guard",
+            "the first inline hover field contributes both text and selector references");
+        var stored = new NbtCompound([new("text", new NbtString("Open")), new("extra", new NbtList(NbtType.Compound,
+            [new NbtCompound([new("", new NbtString("Wrapped"))]), new NbtCompound([new("text", new NbtString("Styled"))])]))]);
+        var storedAddress = new SourceAddress(new(World, "scoreboard.dat", ArtifactKind.Nbt), TypedPath.Root, "scoreboard.display");
+        var storedText = TextComponentExtractor.Nbt(storedAddress, stored, early);
+        Require(storedText.Complete && storedText.Occurrences.Any(row => row.Text == "Wrapped"),
+            "native binary text already used wrappers before command SNBT allowed mixed lists");
+        var clickPayload = System.Text.Json.JsonSerializer.Serialize("/tellraw @s {text:'\\u0041'}");
+        var clicked = new CommandCandidate(authoring, "tellraw @s {text:'Open',click_event:{action:'run_command',command:" + clickPayload + "}}");
+        Require(!CommandTextExtractor.Extract(clicked, early).Complete
+            && CommandTextExtractor.Extract(clicked, MinecraftProfiles.ForDataVersion(4317)!).Text.Occurrences.Any(row => row.Text == "A"),
+            "nested click commands use the same SNBT grammar as their enclosing profile");
+        var mixedLists = MinecraftProfiles.ForDataVersion(4308)!;
+        Require(CommandTextExtractor.Extract(mixed, mixedLists).Complete && !CommandTextExtractor.Extract(clicked, mixedLists).Complete,
+            "mixed lists arrived before extended escapes and numbers");
+        var grammar = MinecraftProfiles.SnbtGrammar(mixedLists);
+        var list = Snbt.ParseDocument("['One',{text:'Two'}]"u8.ToArray(), grammar).Root.Value;
+        Require(Snbt.ParseDocument(Snbt.Write(list, grammar), grammar).Root.Value == list, "the transitional SNBT writer retains mixed list element types");
         foreach (var version in new[] { 4325, 4774 })
         {
             const string command = "execute as @e[name=!\"Guard\"] run tellraw @s ['Same',{text:'Same',hover_event:{action:'show_text',value:{text:'Hover雪'}}}]\r";

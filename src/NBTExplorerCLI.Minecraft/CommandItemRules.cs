@@ -31,7 +31,7 @@ internal sealed partial class CommandTextReader
             if (!seen.Add(name)) { Unknown(node, token.Start + keyStart, cursor - keyStart, "AmbiguousItemComponent"); return; }
             var start = ++cursor;
             var bytes = Utf8.GetBytes(value[start..^1]);
-            var parsed = Snbt.ParseFragment(bytes, 0, profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt" ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+            var parsed = Snbt.ParseFragment(bytes, 0, MinecraftProfiles.SnbtGrammar(profile), limits);
             var characters = Utf8.GetCharCount(bytes.AsSpan(0, parsed.ConsumedSpan.EndByte)); cursor += characters;
             if (name is "minecraft:custom_name" or "minecraft:item_name" or "minecraft:lore" or "minecraft:written_book_content" or "minecraft:writable_book_content"
                 or "minecraft:container" or "minecraft:bundle_contents" or "minecraft:charged_projectiles" or "minecraft:block_entity_data" or "minecraft:entity_data")

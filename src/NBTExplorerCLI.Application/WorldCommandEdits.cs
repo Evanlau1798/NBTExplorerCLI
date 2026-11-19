@@ -45,6 +45,7 @@ internal static class WorldCommandEdits
                 || conversion.Profile != profile.Id || conversion.ProfileVersion != profile.Version) throw new EditRejectedException(EditFailure.Precondition, "Command key target differs from its exact component and slot profile");
         var keyedEncoded = conversions.Where(item => item.Address.ComponentPath is not null).Select(item => SpanKey(item.Address)).ToHashSet();
         var edits = new List<(SyntaxLocator Span, byte[] Bytes)>(); long replacementBytes = 0; var modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
+        var grammar = MinecraftProfiles.SnbtGrammar(profile);
         foreach (var group in translations.GroupBy(item => SpanKey(item.Slot.Address)))
         {
             if (keyedEncoded.Contains(group.Key)) continue;
@@ -60,12 +61,11 @@ internal static class WorldCommandEdits
             else if (first.Slot.Address.ComponentPath is not null)
             {
                 if (group.Any(item => item.Slot.Address.ComponentPath is null)) throw new EditRejectedException(EditFailure.Precondition, "Command syntax layers conflict");
-                var parsed = Snbt.ParseFragment(bytes, checked((int)span.StartByte), profile == MinecraftProfiles.Java181
-                    ? SnbtProfile.Java181 : modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+                var parsed = Snbt.ParseFragment(bytes, checked((int)span.StartByte), grammar, limits);
                 if (parsed.Root.Span.LengthBytes != span.LengthBytes || parsed.Root.Value is not LogicalMinecraftLeaf { Value: NbtString text }) throw new EditRejectedException(EditFailure.Precondition, "Command embedded JSON span differs");
                 var originalText = profile == MinecraftProfiles.Java181 ? ClassicTextJson.Normalize(text.Value, limits, storedComponent: true) : text.Value;
                 var json = WorldJsonEdits.RewriteJson(originalText, group.ToArray(), limits);
-                replacement = Snbt.Write(new LogicalMinecraftLeaf(new NbtString(json)), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+                replacement = Snbt.Write(new LogicalMinecraftLeaf(new NbtString(json)), grammar, limits);
             }
             else
             {
@@ -77,9 +77,9 @@ internal static class WorldCommandEdits
                 {
                     var token = bytes.AsSpan(checked((int)span.StartByte), checked((int)span.LengthBytes));
                     var previous = jsonString ? WorldJsonEdits.ReadString(token)
-                        : Snbt.ParseDocument(token.ToArray(), SnbtProfile.Java1215, limits).Root.Value is LogicalMinecraftLeaf { Value: NbtString rawClick }
+                        : Snbt.ParseDocument(token.ToArray(), grammar, limits).Root.Value is LogicalMinecraftLeaf { Value: NbtString rawClick }
                             ? rawClick.Value : throw new EditRejectedException(EditFailure.Precondition, "Command click payload is not a string");
-                    value = ClickCommandText.Rewrite(previous, first.Slot.SourceText, value, modern, limits);
+                    value = ClickCommandText.Rewrite(previous, first.Slot.SourceText, value, modern ? grammar : null, limits);
                 }
                 if (MinecraftProfiles.IsVersionedClassic(profile) && first.Slot.Role == source.Address.SemanticRole + ".message")
                 {
@@ -90,7 +90,7 @@ internal static class WorldCommandEdits
                 }
                 else replacement = jsonString
                     ? NativeJsonEdits.ReplaceStrings("\"\""u8.ToArray(), [(TypedPath.Root, "", value)], limits)
-                    : Snbt.Write(new LogicalMinecraftLeaf(new NbtString(value)), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+                    : Snbt.Write(new LogicalMinecraftLeaf(new NbtString(value)), grammar, limits);
             }
             if (replacement.Contains((byte)'\r') || replacement.Contains((byte)'\n')) throw new NotSupportedException("This command profile cannot encode a literal line break inside a syntax token");
             replacementBytes = checked(replacementBytes + replacement.Length);

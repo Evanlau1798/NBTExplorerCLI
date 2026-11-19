@@ -42,6 +42,7 @@ internal static class WorldKeyEdits
         var grammar = first.GrammarProfile switch
         {
             "java-snbt-through-1.21.4" => SnbtProfile.JavaThrough1214,
+            "java-snbt-mixed-lists" => SnbtProfile.JavaMixedLists,
             "java-snbt-1.21.5" => SnbtProfile.Java1215,
             _ => throw new NotSupportedException("Unknown encoded SNBT grammar")
         };
@@ -98,7 +99,7 @@ internal static class WorldKeyEdits
             {
                 var item = group.Single();
                 replacement = item.Slot.Role == ClickCommandText.Role
-                    ? ClickCommandText.Rewrite(text.Value, item.Slot.SourceText, item.Reply.Text, syntax.NodePath!.Segments[^1].Key == "command", limits)
+                    ? ClickCommandText.Rewrite(text.Value, item.Slot.SourceText, item.Reply.Text, syntax.NodePath!.Segments[^1].Key == "command" ? grammar : null, limits)
                     : item.Slot.SourceText == text.Value ? item.Reply.Text : throw new EditRejectedException(EditFailure.Precondition, "SNBT literal preimage differs");
             }
             Retain(replacement.Length); changes.Add((syntax.NodePath!, target.Value, new LogicalMinecraftLeaf(new NbtString(replacement))));

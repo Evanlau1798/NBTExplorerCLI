@@ -65,7 +65,7 @@ public static partial class PackTextExtractor
                 foreach (var (item, itemPath) in Elements(items, At(path, field), output)) JsonItem(item, itemPath, output, rawComponent, rawComponent, profile);
         if (value.TryGetNativeProperty("Item", out var carried)) JsonItem(carried, At(path, "Item"), output, rawComponent, rawComponent, profile);
         if (id == "minecraft:item_display" && value.TryGetNativeProperty("item", out var displayed)) JsonItem(displayed, At(path, "item"), output, rawComponent, rawComponent, profile);
-        if (profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt")
+        if (MinecraftProfiles.UsesCompoundEquipment(profile))
         {
             if (value.TryGetNativeProperty("equipment", out var equipment))
                 foreach (var slot in new[] { "head", "chest", "legs", "feet", "mainhand", "offhand", "body", "saddle" })

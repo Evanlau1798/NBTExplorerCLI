@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 
 namespace NBTExplorerCLI.Formats;
 
-public enum SnbtProfile { JavaThrough1214, Java1215, Java181 }
+public enum SnbtProfile { JavaThrough1214, Java1215, Java181, JavaMixedLists }
 public enum SnbtError { UnexpectedEnd, InvalidToken, TrailingInput, InvalidEscape, InvalidNumber, MixedList, InvalidArrayElement, LimitExceeded, UnsupportedGrammar, UnsupportedValue, Missing, Ambiguous, Precondition }
 public sealed class SnbtException(SnbtError code, long offset, string message) : Exception(message)
 {

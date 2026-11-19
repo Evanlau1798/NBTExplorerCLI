@@ -19,7 +19,7 @@ internal static class WorldArtifactEdits
         var source = sources.Single(item => item.Location.Artifact == artifact && item.Chunk is null);
         if (source.Location.Role == WorldSourceRole.Language && operations.Any(operation => operation is KeyConversionPatch)) return WorldLanguageEdits.Create(artifact, bytes, operations, limits);
         if (artifact.Kind == ArtifactKind.Nbt) return Nbt(bytes, operations, source, limits, classic);
-        if (artifact.Kind == ArtifactKind.Json) return WorldJsonEdits.Create(bytes, operations, limits, artifact);
+        if (artifact.Kind == ArtifactKind.Json) return WorldJsonEdits.Create(bytes, operations, limits, source);
         if (artifact.Kind == ArtifactKind.McFunction) return WorldCommandEdits.Create(artifact, bytes, operations, source, limits);
         if (artifact.Kind is ArtifactKind.Region or ArtifactKind.Entities) return Region(bytes, operations, sources, limits, classic);
         if (artifact.Kind == ArtifactKind.Archive) return WorldArchiveEdits.Create(bytes, operations, sources, limits);
@@ -67,7 +67,8 @@ internal static class WorldArtifactEdits
             {
                 if (NbtLocator.Resolve(document.Root, path).Value is not NbtString raw)
                     throw new EditRejectedException(EditFailure.Precondition, "NBT click command is not a string");
-                edits.Add(TypedEdit.Replace(path, raw, new NbtString(ClickCommandText.Rewrite(raw.Value, item.Slot.SourceText, item.Reply.Text, true, limits))));
+                edits.Add(TypedEdit.Replace(path, raw, new NbtString(ClickCommandText.Rewrite(raw.Value, item.Slot.SourceText, item.Reply.Text,
+                    MinecraftProfiles.SnbtGrammar(profile), limits))));
             }
             else edits.Add(TypedEdit.Replace(path, new NbtString(item.Slot.SourceText), new NbtString(item.Reply.Text)));
         }

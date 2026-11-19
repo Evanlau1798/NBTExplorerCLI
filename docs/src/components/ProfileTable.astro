@@ -11,7 +11,7 @@ const headers =
     ? {
         profile: '版本代號',
         dv: 'DataVersion',
-        packFormat: '資源包 pack_format',
+        packFormat: '代表版本的資源包格式',
         layout: '維度目錄結構',
         items: '物品資料格式',
         text: '文字格式',
@@ -20,7 +20,7 @@ const headers =
     : {
         profile: 'Version Profile',
         dv: 'DataVersion',
-        packFormat: 'Resource pack_format',
+        packFormat: 'Example Resource Pack Format',
         layout: 'Dimension Layout',
         items: 'Item Format',
         text: 'Text Format',
@@ -49,10 +49,10 @@ const headers =
               <code>{row.profile}</code>
             </td>
             <td>
-              <code>{row.dataVersion}</code>
+              <code>{row.dataVersionRange}</code>
             </td>
             <td>
-              <code>{row.packFormat}</code>
+              <code>{row.packFormat ?? '—'}</code>
             </td>
             <td>
               <code>{row.layout}</code>

@@ -22,8 +22,7 @@ internal static class SnbtTextExtractor
         if (source.Syntax is not null || source.ComponentPath is not null) throw new CodecException(CodecError.UnsupportedProfile, 0, "Nested syntax binding is unsupported");
         var encoding = new UTF8Encoding(false, true);
         if (encoding.GetByteCount(syntax) > limits.MaxDecodedBytes) throw new SnbtException(SnbtError.LimitExceeded, 0, "SNBT string exceeds decode budget");
-        var grammar = profile == MinecraftProfiles.Java181 ? SnbtProfile.Java181
-            : profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt" ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214;
+        var grammar = MinecraftProfiles.SnbtGrammar(profile);
         var parsed = Snbt.ParseDocument(encoding.GetBytes(syntax), grammar, limits);
         var document = MinecraftNbtAdapter.Encode(new("", parsed.Root.Value), profile, limits);
         if (compound && document.Root is not NbtCompound) throw new SnbtException(SnbtError.InvalidToken, 0, "Item tag requires an SNBT compound");
@@ -54,7 +53,10 @@ internal static class SnbtTextExtractor
             }
             var span = parsed.Resolve(new(logical)).Span;
             var locator = new SyntaxLocator(grammar switch
-                { SnbtProfile.Java181 => "java-snbt-1.8.1", SnbtProfile.Java1215 => "java-snbt-1.21.5", _ => "java-snbt-through-1.21.4" }, 1,
+                {
+                    SnbtProfile.Java181 => "java-snbt-1.8.1", SnbtProfile.Java1215 => "java-snbt-1.21.5",
+                    SnbtProfile.JavaMixedLists => "java-snbt-mixed-lists", _ => "java-snbt-through-1.21.4"
+                }, 1,
                 span.StartByte, span.LengthBytes, parsed.SourceHash.Hex, "utf8-java-string", SyntaxLocator.DetectNewline(syntax), new(logical));
             return new(source.Artifact, source.NodePath, address.SemanticRole, source.Dimension, source.Chunk, address.ComponentPath, locator, address.JsonTarget);
         }

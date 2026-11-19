@@ -8,22 +8,24 @@ namespace NBTExplorerCLI.Application;
 
 internal static class WorldJsonEdits
 {
-    internal static PreparedArtifactBytes Create(byte[] bytes, IReadOnlyList<PatchOperation> operations, DecodeLimits limits, ArtifactAddress? artifact = null)
+    internal static PreparedArtifactBytes Create(byte[] bytes, IReadOnlyList<PatchOperation> operations, DecodeLimits limits, DiscoveredSource source)
     {
         if (operations.Any(operation => operation is ReferencePatch))
         {
-            if (artifact is null) throw new ArgumentException("References require an exact JSON artifact", nameof(artifact));
-            operations = operations.Where(operation => operation is not ReferencePatch).Concat(WorldReferenceMembers.Literals(operations, artifact).Select((item, index) => new LiteralPatch("reference-" + index, item))).ToArray();
+            operations = operations.Where(operation => operation is not ReferencePatch).Concat(WorldReferenceMembers.Literals(operations, source.Location.Artifact).Select((item, index) => new LiteralPatch("reference-" + index, item))).ToArray();
         }
-        if (operations.Any(operation => operation is KeyConversionPatch)) return WorldJsonKeyEdits.Create(bytes, operations, limits);
+        SnbtProfile? grammar = source.Pack is { } pack && MinecraftProfiles.ForPackMetadata(pack) is { } profile
+            ? MinecraftProfiles.SnbtGrammar(profile)
+            : source.Location.Role == WorldSourceRole.SavedData ? SnbtProfile.Java1215 : null;
+        if (operations.Any(operation => operation is KeyConversionPatch)) return WorldJsonKeyEdits.Create(bytes, operations, limits, grammar);
         if (operations.Any(operation => operation is not LiteralPatch)) throw new NotSupportedException("JSON preparation requires exact literal value slots");
-        return CreateLiterals(bytes, operations.Cast<LiteralPatch>().Select(operation => operation.Translation).ToArray(), limits);
+        return CreateLiterals(bytes, operations.Cast<LiteralPatch>().Select(operation => operation.Translation).ToArray(), limits, grammar);
     }
-    internal static PreparedArtifactBytes CreateLiterals(byte[] bytes, IReadOnlyList<LiteralTranslation> literals, DecodeLimits limits)
+    internal static PreparedArtifactBytes CreateLiterals(byte[] bytes, IReadOnlyList<LiteralTranslation> literals, DecodeLimits limits, SnbtProfile? grammar)
     {
         if (literals.Any(item => item.Slot.Address.JsonTarget != JsonTargetKind.Value)) throw new NotSupportedException("JSON preparation requires literal value slots");
         var changes = LiteralChanges(bytes, literals.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null),
-            item => item.Slot.Address.NodePath, limits).ToList();
+            item => item.Slot.Address.NodePath, limits, grammar).ToList();
         var encoded = literals.Where(item => item.Slot.Address.Syntax is not null || item.Slot.Address.ComponentPath is not null).GroupBy(item => item.Slot.Address.NodePath).ToArray();
         var spans = encoded.Length == 0 ? null : NativeJsonStringSpans.Read(bytes, limits);
         long retainedCharacters = 0;
@@ -49,7 +51,7 @@ internal static class WorldJsonEdits
         return new UTF8Encoding(false, true).GetString(changed);
     }
     internal static IEnumerable<(TypedPath Path, string Expected, string Replacement)> LiteralChanges(byte[] bytes,
-        IEnumerable<LiteralTranslation> translations, Func<LiteralTranslation, TypedPath> locate, DecodeLimits limits)
+        IEnumerable<LiteralTranslation> translations, Func<LiteralTranslation, TypedPath> locate, DecodeLimits limits, SnbtProfile? grammar = null)
     {
         Dictionary<TypedPath, SnbtSpan>? spans = null;
         foreach (var item in translations)
@@ -60,7 +62,7 @@ internal static class WorldJsonEdits
             if (!spans.TryGetValue(path, out var span)) throw new EditRejectedException(EditFailure.Precondition, "JSON click command is not a string");
             var original = ReadString(bytes.AsSpan(span.StartByte, span.LengthBytes));
             yield return (path, original, ClickCommandText.Rewrite(original, item.Slot.SourceText, item.Reply.Text,
-                path.Segments[^1].Key == "command", limits));
+                path.Segments[^1].Key == "command" ? grammar ?? throw new NotSupportedException("Missing SNBT grammar for click command") : null, limits));
         }
     }
     internal static string ReadString(ReadOnlySpan<byte> bytes)

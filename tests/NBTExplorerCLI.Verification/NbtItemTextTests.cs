@@ -63,7 +63,7 @@ internal static class NbtItemTextTests
         var sameFamily = NbtTextExtractor.Extract(Player, new("", C(E("DataVersion", new NbtInt(3701)), E("Inventory", L(item)))));
         Require(sameFamily.Complete && sameFamily.Occurrences.Select(Row).SequenceEqual(result.Occurrences.Select(Row)),
             "an artifact within the same format range has the same tag slots");
-        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => NbtTextExtractor.Extract(Player, new("", C(E("DataVersion", new NbtInt(4298)), E("Inventory", L(item))))));
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => NbtTextExtractor.Extract(Player, new("", C(E("DataVersion", new NbtInt(1975)), E("Inventory", L(item))))));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => NbtTextExtractor.Extract(Player, new("", C(E("Inventory", L(item))))));
 
         var eggData = C(E("CustomName", Text("Spawned creature", false)));

@@ -32,6 +32,7 @@ internal static class NewLanguagePreparationTests
     }
     public static void GeneratedPackProfilesAndSizeLimits()
     {
+        PrepareAbsent(archived: true, version: 4308, expectedResourceFormat: 49);
         PrepareAbsent(archived: true, version: 4325);
         PrepareAbsent(archived: true, version: 4774);
         PrepareAbsent(archived: true, compressedLimit: 4096, translation: new string('X', 1000));
@@ -94,7 +95,8 @@ internal static class NewLanguagePreparationTests
         }
         finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
     }
-    private static void PrepareAbsent(bool archived, int version = 3953, long? compressedLimit = null, string translation = "你好", bool oversized = false)
+    private static void PrepareAbsent(bool archived, int version = 3953, long? compressedLimit = null, string translation = "你好", bool oversized = false,
+        int? expectedResourceFormat = null)
     {
             var root = WorldQueryTests.CreateWorld(); var cache = ScratchDirectory.CreateChild();
             try
@@ -154,7 +156,8 @@ internal static class NewLanguagePreparationTests
                         using var zip = ZipArchiveValidation.OpenRead(output);
                         Require(zip.Entries.Select(item => item.FullName).Order().SequenceEqual(new[] { entry, "pack.mcmeta" }.Order()), "generated pack contains exactly declared language and metadata entries");
                         using var metadata = new MemoryStream(); using (var stream = zip.GetEntry("pack.mcmeta")!.Open()) stream.CopyTo(metadata);
-                        Require(PackMetadata.Read(metadata.ToArray(), PackSourceKind.ResourcePack).DeclaresSupport(MinecraftProfiles.RequiredResourcePackFormat(version)), "generated pack metadata supports the actual target world version");
+                        var format = expectedResourceFormat is { } major ? new PackFormatVersion(major, 0) : MinecraftProfiles.RequiredResourcePackFormat(version);
+                        Require(PackMetadata.Read(metadata.ToArray(), PackSourceKind.ResourcePack).DeclaresSupport(format), "generated pack metadata supports the actual target world version");
                         using var bytes = new MemoryStream(); using (var stream = zip.GetEntry(entry)!.Open()) stream.CopyTo(bytes); jsonBytes = bytes.ToArray();
                     }
                     else jsonBytes = output;

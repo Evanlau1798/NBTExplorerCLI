@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using NBTExplorerCLI.Domain;
+using NBTExplorerCLI.Formats;
 
 namespace NBTExplorerCLI.Minecraft;
 
@@ -8,6 +9,8 @@ public static class MinecraftProfiles
     public static CapabilityProfile? ForId(string id) => id switch
     {
         "java-1.14.4" => HistoricalJson, "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-1.20.5" => Java1205, "java-1.21" => Java121, "java-1.21.5" => Java1215,
+        "java-nbt-text-initial-hover" => InitialNativeText, "java-nbt-text-homogeneous" => EarlyNativeText,
+        "java-nbt-text-mixed-lists" => MixedListText, "java-1.21.9" => Java1219,
         "java-1.21.11" => Java12111, "java-26.1-snapshot-6" => Snapshot2616, "java-classic-anvil" => ClassicAnvil,
         _ => ClassicProfiles.Values.FirstOrDefault(profile => profile.Id == id)
     };
@@ -19,13 +22,19 @@ public static class MinecraftProfiles
     }
 
     public static PackFormatVersion RequiredResourcePackFormat(int? dataVersion)
-        => dataVersion == 5023 ? new(97, 1) : new(dataVersion switch
+        => dataVersion switch
         {
-            3463 or 3465 => 15, 3578 => 18, 3690 => 21, 3700 => 22, 3819 => 28, 3837 or 3839 => 32,
-            3946 or 3947 or 3953 or 3955 => 34, 4189 => 46, 4325 => 55, 4671 => 75, 4774 => 80,
-            4786 => 84, 4903 => 88, 5130 => 104,
-            _ => throw new CodecException(CodecError.UnsupportedProfile, 0, "The target world's resource pack format is not verified")
-        }, 0);
+            4536 => new(65, 1), 5023 => new(97, 1),
+            _ => new(dataVersion switch
+            {
+                3463 or 3465 => 15, 3578 => 18, 3690 => 21, 3700 => 22, 3819 => 28, 3837 or 3839 => 32,
+                3946 or 3947 or 3953 or 3955 => 34, 4189 => 46,
+                4298 => 47, 4304 => 48, 4308 => 49, 4310 => 50, 4313 => 51, 4315 => 52, 4316 or 4317 => 53,
+                4325 => 55, 4534 => 65, 4554 => 69,
+                4671 => 75, 4774 => 80, 4786 => 84, 4903 => 88, 5130 => 104,
+                _ => throw new CodecException(CodecError.UnsupportedProfile, 0, "The target world's resource pack format is not verified")
+            }, 0)
+        };
     public static CapabilityProfile? ForPackMetadata(PackMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
@@ -38,8 +47,13 @@ public static class MinecraftProfiles
             (PackSourceKind.Datapack, >= 24 and <= 32, 0) or (PackSourceKind.ResourcePack, >= 21 and <= 27, 0) => Java1204,
             (PackSourceKind.Datapack, >= 33 and <= 44, 0) or (PackSourceKind.ResourcePack, >= 28 and <= 33, 0) => Java1205,
             (PackSourceKind.Datapack, >= 45 and <= 61, 0) or (PackSourceKind.ResourcePack, >= 34 and <= 46, 0) => Java121,
-            (PackSourceKind.Datapack, 71, 0) or (PackSourceKind.ResourcePack, 55, 0) => Java1215,
-            (PackSourceKind.Datapack, 94, 1) or (PackSourceKind.ResourcePack, 75, 0) => Java12111,
+            (PackSourceKind.Datapack, 62, 0) or (PackSourceKind.ResourcePack, 47, 0) => InitialNativeText,
+            (PackSourceKind.Datapack, 63, 0) or (PackSourceKind.ResourcePack, 48, 0) => EarlyNativeText,
+            // Resource format 53 is shared by both SNBT grammars. Use their common syntax without world evidence.
+            (PackSourceKind.Datapack, >= 64 and <= 68, 0) or (PackSourceKind.ResourcePack, >= 49 and <= 53, 0) => MixedListText,
+            (PackSourceKind.Datapack, >= 69 and <= 82, _) or (PackSourceKind.ResourcePack, >= 54 and <= 64, 0) or (PackSourceKind.ResourcePack, 65, 0) => Java1215,
+            (PackSourceKind.Datapack, >= 83 and <= 93, _) or (PackSourceKind.ResourcePack, 65, > 0) or (PackSourceKind.ResourcePack, >= 66 and <= 74, _) => Java1219,
+            (PackSourceKind.Datapack, >= 94 and <= 98, _) or (PackSourceKind.ResourcePack, >= 75 and <= 79, _) => Java12111,
             (PackSourceKind.Datapack, >= 99 and <= 128, _) or (PackSourceKind.ResourcePack, >= 80 and <= 104, _) => Snapshot2616,
             _ => null
         };
@@ -49,7 +63,11 @@ public static class MinecraftProfiles
     private static readonly CapabilityProfile Java1204 = Create("java-1.20.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.4", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1205 = Create("java-1.20.5", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.21", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java121 = Create("java-1.21", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.21", LogicalListEncoding.Homogeneous);
+    private static readonly CapabilityProfile InitialNativeText = Create("java-nbt-text-initial-hover", "java-dimensions-directory", "java-item-components-1.21.5", "java-text-nbt", "java-commands-nbt-text-homogeneous", LogicalListEncoding.CompoundWrapper);
+    private static readonly CapabilityProfile EarlyNativeText = Create("java-nbt-text-homogeneous", "java-dimensions-directory", "java-item-components-1.21.5", "java-text-nbt", "java-commands-nbt-text-homogeneous", LogicalListEncoding.CompoundWrapper);
+    private static readonly CapabilityProfile MixedListText = Create("java-nbt-text-mixed-lists", "java-dimensions-directory", "java-item-components-1.21.5", "java-text-nbt", "java-commands-nbt-text-mixed-lists", LogicalListEncoding.CompoundWrapper);
     private static readonly CapabilityProfile Java1215 = Create("java-1.21.5", "java-dimensions-directory", "java-item-components-1.21.5", "java-text-nbt", "java-commands-1.21.5", LogicalListEncoding.CompoundWrapper);
+    private static readonly CapabilityProfile Java1219 = Create("java-1.21.9", "java-dimensions-directory", "java-item-components-1.21.5", "java-text-nbt", "java-commands-1.21.5", LogicalListEncoding.CompoundWrapper, textVersion: 2);
     private static readonly CapabilityProfile Java12111 = Create("java-1.21.11", "java-dimensions-directory", "java-item-components-1.21.11", "java-text-nbt", "java-commands-1.21.11", LogicalListEncoding.CompoundWrapper, textVersion: 2);
     private static readonly CapabilityProfile Snapshot2616 = Create("java-26.1-snapshot-6", "java-dimensions-namespaced", "java-item-components-26.1-snapshot-6", "java-text-nbt", "java-commands-26.1-snapshot-6", LogicalListEncoding.CompoundWrapper, textVersion: 2);
     public static CapabilityProfile ClassicAnvil { get; } = Create("java-classic-anvil", "java-dimensions-directory", "java-classic-item-tags", "java-classic-stored-text", "java-classic-commands-unresolved", LogicalListEncoding.Homogeneous, "java-classic-packs-unresolved");
@@ -78,8 +96,13 @@ public static class MinecraftProfiles
         // 24w09a introduced item components. 24w21a renamed datapack directories.
         (3837, 3819, 3945, Java1205),
         (3953, 3946, 4297, Java121),
-        (4325, 4325, 4325, Java1215),
-        (4671, 4671, 4671, Java12111),
+        // Native text, the hover field rename, mixed lists and extended literals arrived separately.
+        (4298, 4298, 4303, InitialNativeText),
+        (4304, 4304, 4307, EarlyNativeText),
+        (4308, 4308, 4316, MixedListText),
+        (4325, 4317, 4535, Java1215),
+        (4554, 4536, 4670, Java1219),
+        (4671, 4671, 4773, Java12111),
         (4774, 4774, null, Snapshot2616)
     ];
 
@@ -89,6 +112,16 @@ public static class MinecraftProfiles
             if (dataVersion >= range.Minimum && (range.Maximum is null || dataVersion <= range.Maximum)) return range.Profile;
         return null;
     }
+
+    public static SnbtProfile SnbtGrammar(CapabilityProfile profile)
+        => profile == Java181 ? SnbtProfile.Java181 : profile == MixedListText ? SnbtProfile.JavaMixedLists
+            : profile.Lists.Encoding == LogicalListEncoding.CompoundWrapper && profile != InitialNativeText && profile != EarlyNativeText
+                ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214;
+
+    internal static string NativeHoverField(CapabilityProfile profile) => profile == InitialNativeText ? "text" : "value";
+
+    internal static bool UsesCompoundEquipment(CapabilityProfile profile)
+        => profile != InitialNativeText && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
 
     private static CapabilityProfile Create(string id, string layout, string items, string text, string commands, LogicalListEncoding lists, string packLayout = "java-pack-singular", int textVersion = 1)
         => new(id, 2, new Dictionary<ProfileFacet, FormatFeature>

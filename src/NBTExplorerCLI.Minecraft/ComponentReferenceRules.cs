@@ -9,17 +9,17 @@ internal static class ComponentReferenceRules
     private static bool Inert(string? action) => action is "open_url" or "change_page" or "copy_to_clipboard";
 
     internal static string CommandField(bool modern) => modern ? "command" : "value";
-    internal static ClickCommandText.Binding? Click(JsonElement value, bool modern, DecodeLimits limits)
-        => Click(Field(value, "action"), Field(value, CommandField(modern)), modern, limits);
+    internal static ClickCommandText.Binding? Click(JsonElement value, SnbtProfile? grammar, DecodeLimits limits)
+        => Click(Field(value, "action"), Field(value, CommandField(grammar.HasValue)), grammar, limits);
 
-    internal static ClickCommandText.Binding? Click(NbtValue value, bool modern, DecodeLimits limits)
-        => Click(Field(value, "action"), Field(value, CommandField(modern)), modern, limits);
+    internal static ClickCommandText.Binding? Click(NbtValue value, SnbtProfile grammar, DecodeLimits limits)
+        => Click(Field(value, "action"), Field(value, "command"), grammar, limits);
 
-    internal static ClickCommandText.Binding? Click(LogicalMinecraftValue value, bool modern, DecodeLimits limits)
-        => Click(Field(value, "action"), Field(value, CommandField(modern)), modern, limits);
+    internal static ClickCommandText.Binding? Click(LogicalMinecraftValue value, SnbtProfile? grammar, DecodeLimits limits)
+        => Click(Field(value, "action"), Field(value, CommandField(grammar.HasValue)), grammar, limits);
 
-    private static ClickCommandText.Binding? Click(string? action, string? command, bool modern, DecodeLimits limits)
-        => Inert(action) ? ClickCommandText.NoText : action == "run_command" && command is not null ? ClickCommandText.Read(command, modern, limits) : null;
+    private static ClickCommandText.Binding? Click(string? action, string? command, SnbtProfile? grammar, DecodeLimits limits)
+        => Inert(action) ? ClickCommandText.NoText : action == "run_command" && command is not null ? ClickCommandText.Read(command, grammar, limits) : null;
 
     private static string? Field(JsonElement value, string name)
         => value.TryGetNativeProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? NativeJsonStrings.Read(property) : null;

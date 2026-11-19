@@ -142,8 +142,8 @@ internal sealed class SnbtReader
                 if (Modern && arrayType != NbtType.End) child = Promote(child, arrayType);
                 if (arrayType != NbtType.End && SnbtLiterals.Type(child.Value) != arrayType)
                     throw new SnbtException(SnbtError.InvalidArrayElement, child.Span.StartByte, "Typed array element has the wrong type");
-                if (!Modern && arrayType == NbtType.End && values.Count > 0 && SnbtLiterals.Type(child.Value) != SnbtLiterals.Type(values[0]))
-                    throw new SnbtException(SnbtError.MixedList, child.Span.StartByte, "SNBT through Java 1.21.4 list must be homogeneous");
+                if (!Modern && _profile != SnbtProfile.JavaMixedLists && arrayType == NbtType.End && values.Count > 0 && SnbtLiterals.Type(child.Value) != SnbtLiterals.Type(values[0]))
+                    throw new SnbtException(SnbtError.MixedList, child.Span.StartByte, "This SNBT profile requires homogeneous lists");
                 children.Add(new(PathSegment.ForIndex(values.Count), null, child)); values.Add(child.Value);
                 if (!Take(',')) break;
                 White();

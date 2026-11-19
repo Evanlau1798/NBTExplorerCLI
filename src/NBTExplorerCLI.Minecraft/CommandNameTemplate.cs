@@ -13,7 +13,7 @@ internal sealed partial class CommandTextReader
     private void ReadSummonNameTemplate(int start, int end, TypedPath grammarPath, string type, TextExtractionResult extraction)
     {
         var modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
-        var syntax = Snbt.ParseDocument(Utf8.GetBytes(source.Command[start..end]), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+        var syntax = Snbt.ParseDocument(Utf8.GetBytes(source.Command[start..end]), MinecraftProfiles.SnbtGrammar(profile), limits);
         if (syntax.Root.Value is not LogicalMinecraftCompound root) return;
         var encoded = root.Entries.SingleOrDefault(entry => entry.Name == "CustomName");
         if (encoded is null) return;

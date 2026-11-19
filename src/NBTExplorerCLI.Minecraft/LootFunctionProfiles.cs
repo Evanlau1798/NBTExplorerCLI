@@ -15,12 +15,12 @@ public static class LootFunctionProfiles
         if (!identifier.Contains(':')) identifier = "minecraft:" + identifier;
         if (!identifier.StartsWith("minecraft:", StringComparison.Ordinal)) return false;
         var name = identifier[10..];
-        return profile.Id switch
+        return profile.Features.GetValueOrDefault(ProfileFacet.ItemSchema)?.Schema switch
         {
-            "java-1.20.1" or "java-1.20.4" => NbtTags.Contains(name),
-            "java-1.20.5" or "java-1.21" or "java-1.21.5" => Components.Contains(name),
-            "java-1.21.11" => name == "discard" || Components.Contains(name),
-            "java-26.1-snapshot-6" => Snapshot.Contains(name),
+            "java-item-tags-1.20.4" when profile.Id is "java-1.20.1" or "java-1.20.4" => NbtTags.Contains(name),
+            "java-item-components-1.20.5" or "java-item-components-1.21.5" => Components.Contains(name),
+            "java-item-components-1.21.11" => name == "discard" || Components.Contains(name),
+            "java-item-components-26.1-snapshot-6" => Snapshot.Contains(name),
             _ => false
         };
     }

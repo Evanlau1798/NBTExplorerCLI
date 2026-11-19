@@ -133,7 +133,7 @@ internal sealed partial class NbtTextReader
     }
     private void Equipment(NbtValue value, TypedPath path)
     {
-        if (modern)
+        if (MinecraftProfiles.UsesCompoundEquipment(profile))
         {
             if (Field(value, "equipment", path) is not { } equipment) return;
             var equipmentPath = At(path, "equipment");

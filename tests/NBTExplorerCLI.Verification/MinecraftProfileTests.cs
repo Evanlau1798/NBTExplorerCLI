@@ -13,15 +13,15 @@ internal static class MinecraftProfileTests
         Require(profile?.Id == "java-1.21.11" && profile.Features[ProfileFacet.Layout].Schema == "java-dimensions-directory"
             && profile.Features[ProfileFacet.TextSchema].Version == 2 && profile.Lists.Encoding == LogicalListEncoding.CompoundWrapper,
             "1.21.11 combines directory-layout worlds with the newer NBT component schema");
-        Require(MinecraftProfiles.ForId("java-1.21.11") == profile && MinecraftProfiles.ForDataVersion(4670) is null
-            && MinecraftProfiles.ForDataVersion(4672) is null, "only the release DataVersion selects this profile");
+        Require(MinecraftProfiles.ForId("java-1.21.11") == profile && MinecraftProfiles.ForDataVersion(4670)?.Id == "java-1.21.9"
+            && MinecraftProfiles.ForDataVersion(4672) == profile, "post-release versions can share the same directory profile");
         Require(WorldMetadata.Read(WorldMetadataTests.Level(4671, WorldMetadataTests.Dimensions)).DimensionDirectories["DIM-1"] == "minecraft:the_nether",
             "1.21.11 resolves the world registry from level.dat and keeps separate vanilla dimension directories");
         PackMetadata Pack(int major, int minor, PackSourceKind kind) => PackMetadata.Read(Encoding.UTF8.GetBytes(
             $$$"""{"pack":{"description":"Hello","min_format":[{{{major}}},{{{minor}}}],"max_format":[{{{major}}},{{{minor}}}]}}"""), kind);
         Require(MinecraftProfiles.ForPackMetadata(Pack(94, 1, PackSourceKind.Datapack)) == profile
-            && MinecraftProfiles.ForPackMetadata(Pack(94, 0, PackSourceKind.Datapack)) is null
-            && MinecraftProfiles.ForPackMetadata(Pack(94, 2, PackSourceKind.Datapack)) is null
+            && MinecraftProfiles.ForPackMetadata(Pack(94, 0, PackSourceKind.Datapack)) == profile
+            && MinecraftProfiles.ForPackMetadata(Pack(94, 2, PackSourceKind.Datapack)) == profile
             && MinecraftProfiles.ForPackMetadata(Pack(75, 0, PackSourceKind.ResourcePack)) == profile
             && MinecraftProfiles.RequiredResourcePackFormat(4671) == new PackFormatVersion(75, 0), "select exact major and minor versions independently");
         var command = new SourceAddress(new(Guid.NewGuid(), "text.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
@@ -64,7 +64,7 @@ internal static class MinecraftProfileTests
             "1.21.5 retains java121 layout while independently using NBT text; no single modern switch");
         Require(java121.Supports(ProfileOperation.Read, ProfileFacet.Layout, ProfileFacet.TextSchema)
             && !java121.Supports(ProfileOperation.Write, ProfileFacet.Layout), "read/structural extraction does not imply accepted world write capability");
-        foreach (var unknown in new[] { -1, 0, 1975, 4298, 4773 })
+        foreach (var unknown in new[] { -1, 0, 1975 })
             Require(MinecraftProfiles.ForDataVersion(unknown) is null, "data outside the implemented schema ranges stays unsupported");
         Require(MinecraftProfiles.ForDataVersion(4774)!.Features[ProfileFacet.CommandGrammar].Operations.Extract == SupportLevel.Unknown,
             "command grammar remains unaccepted until owning work package verifies it");

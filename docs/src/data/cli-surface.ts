@@ -341,8 +341,8 @@ export const EXIT_CODES: ExitCodeEntry[] = [
 
 export interface ProfileMatrixRow {
   profile: string;
-  dataVersion: number;
-  packFormat: number;
+  dataVersionRange: string;
+  packFormat: number | null;
   layout: string;
   itemSchema: string;
   textSchema: string;
@@ -351,8 +351,17 @@ export interface ProfileMatrixRow {
 
 export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   {
+    profile: 'java-1.14.4',
+    dataVersionRange: '1976–3462',
+    packFormat: null,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-tags-1.20.4',
+    textSchema: 'java-text-json (v1)',
+    packLayout: 'java-pack-plural',
+  },
+  {
     profile: 'java-1.20.1',
-    dataVersion: 3465,
+    dataVersionRange: '3463–3689',
     packFormat: 15,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-tags-1.20.4',
@@ -361,7 +370,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   },
   {
     profile: 'java-1.20.4',
-    dataVersion: 3700,
+    dataVersionRange: '3690–3818',
     packFormat: 22,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-tags-1.20.4',
@@ -370,7 +379,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   },
   {
     profile: 'java-1.20.5',
-    dataVersion: 3837,
+    dataVersionRange: '3819–3945',
     packFormat: 32,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-components-1.20.5',
@@ -379,7 +388,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   },
   {
     profile: 'java-1.21',
-    dataVersion: 3953,
+    dataVersionRange: '3946–4297',
     packFormat: 34,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-components-1.20.5',
@@ -387,8 +396,35 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
     packLayout: 'java-pack-singular',
   },
   {
+    profile: 'java-nbt-text-initial-hover',
+    dataVersionRange: '4298–4303',
+    packFormat: 47,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-components-1.21.5',
+    textSchema: 'java-text-nbt (v1)',
+    packLayout: 'java-pack-singular',
+  },
+  {
+    profile: 'java-nbt-text-homogeneous',
+    dataVersionRange: '4304–4307',
+    packFormat: 48,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-components-1.21.5',
+    textSchema: 'java-text-nbt (v1)',
+    packLayout: 'java-pack-singular',
+  },
+  {
+    profile: 'java-nbt-text-mixed-lists',
+    dataVersionRange: '4308–4316',
+    packFormat: 49,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-components-1.21.5',
+    textSchema: 'java-text-nbt (v1)',
+    packLayout: 'java-pack-singular',
+  },
+  {
     profile: 'java-1.21.5',
-    dataVersion: 4325,
+    dataVersionRange: '4317–4535',
     packFormat: 55,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-components-1.21.5',
@@ -396,8 +432,17 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
     packLayout: 'java-pack-singular',
   },
   {
+    profile: 'java-1.21.9',
+    dataVersionRange: '4536–4670',
+    packFormat: 69,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-components-1.21.5',
+    textSchema: 'java-text-nbt (v2)',
+    packLayout: 'java-pack-singular',
+  },
+  {
     profile: 'java-1.21.11',
-    dataVersion: 4671,
+    dataVersionRange: '4671–4773',
     packFormat: 75,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-components-1.21.11',
@@ -406,7 +451,7 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   },
   {
     profile: 'java-26.1-snapshot-6',
-    dataVersion: 4774,
+    dataVersionRange: '4774+',
     packFormat: 80,
     layout: 'java-dimensions-namespaced',
     itemSchema: 'java-item-components-26.1-snapshot-6',

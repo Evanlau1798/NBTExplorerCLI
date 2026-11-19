@@ -1,5 +1,6 @@
 using System.Text;
 using NBTExplorerCLI.Domain;
+using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Minecraft;
 using static NBTExplorerCLI.Verification.TextSlotTests;
 
@@ -46,7 +47,29 @@ internal static class PackTextExtractionTests
             Require(MinecraftProfiles.ForPackMetadata(Metadata(format, kind))?.Id == expected, "pack schema comes from its declared format family");
         Require(MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, null, new(99, 0), new(99, int.MaxValue)))?.Id == "java-26.1-snapshot-6"
             && MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, null, new(99, 1), new(99, 2)))?.Id == "java-26.1-snapshot-6"
-            && MinecraftProfiles.ForPackMetadata(Metadata(70)) is null, "revisions of the supported major format share one profile");
+            && MinecraftProfiles.ForPackMetadata(Metadata(70))?.Id == "java-1.21.5", "known adjacent pack formats share one profile");
+        var earlyPack = MinecraftProfiles.ForPackMetadata(Metadata(62));
+        Require(earlyPack == MinecraftProfiles.ForDataVersion(4298) && MinecraftProfiles.ForPackMetadata(Metadata(63)) == MinecraftProfiles.ForDataVersion(4304)
+            && earlyPack?.Lists.Encoding == LogicalListEncoding.CompoundWrapper && MinecraftProfiles.SnbtGrammar(earlyPack) == SnbtProfile.JavaThrough1214,
+            "the first native-NBT pack formats share binary wrappers and the earlier command grammar");
+        Require(MinecraftProfiles.ForPackMetadata(Metadata(64)) == MinecraftProfiles.ForDataVersion(4308)
+            && MinecraftProfiles.ForPackMetadata(Metadata(68)) == MinecraftProfiles.ForDataVersion(4316)
+            && MinecraftProfiles.ForPackMetadata(Metadata(53, PackSourceKind.ResourcePack)) == MinecraftProfiles.ForDataVersion(4316),
+            "data and resource pack formats share the grammar when their SNBT features agree");
+        foreach (var (format, equipment) in new[] { (62, "\"ArmorItems\":[ITEM]"), (63, "\"equipment\":{\"head\":ITEM}") })
+        {
+            const string item = """{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":{"text":"Held note"}}}""";
+            var recipe = """{"type":"minecraft:crafting_shapeless","ingredients":["minecraft:paper"],"result":{"id":"minecraft:armor_stand","components":{"minecraft:entity_data":{"id":"minecraft:armor_stand",""" + equipment.Replace("ITEM", item, StringComparison.Ordinal) + "}}}}";
+            const string pack = "datapacks/example";
+            var source = new WorldSourceLocation(new(World, pack + "/data/example/recipe/equipment.json", ArtifactKind.Json), WorldSourceRole.PackJson,
+                PackRoot: pack, PackKind: PackSourceKind.Datapack);
+            var extracted = PackTextExtractor.Extract(source, Encoding.UTF8.GetBytes(recipe), Metadata(format));
+            Require(extracted.Complete && extracted.Occurrences.SingleOrDefault()?.Text == "Held note", "pack entity equipment matches the original schema");
+            var loot = source with { Artifact = new(World, pack + "/data/example/loot_table/name.json", ArtifactKind.Json) };
+            var table = """{"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:paper","functions":[{"function":"minecraft:set_name","name":{"text":"Loot name"}}]}]}]}""";
+            var lootResult = PackTextExtractor.Extract(loot, Encoding.UTF8.GetBytes(table), Metadata(format));
+            Require(lootResult.Complete && lootResult.Occurrences.SingleOrDefault()?.Text == "Loot name", "native text loot function remains recognized before the equipment change");
+        }
         foreach (var (kind, major, minor) in new[] {
             (PackSourceKind.Datapack, 101, 1), (PackSourceKind.Datapack, 107, 1), (PackSourceKind.Datapack, 121, 0), (PackSourceKind.Datapack, 128, 0),
             (PackSourceKind.ResourcePack, 84, 0), (PackSourceKind.ResourcePack, 88, 0), (PackSourceKind.ResourcePack, 97, 1), (PackSourceKind.ResourcePack, 104, 0)

@@ -11,7 +11,7 @@ internal sealed partial class CommandTextReader
     {
         if (snbt)
         {
-            var grammar = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt" ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214;
+            var grammar = MinecraftProfiles.SnbtGrammar(profile);
             var parsed = Snbt.ParseDocument(bytes, grammar, limits);
             if (itemTree)
             {
@@ -32,7 +32,7 @@ internal sealed partial class CommandTextReader
                 if (fields.TryGetValue("selector", out var selector) && selector is LogicalMinecraftLeaf { Value: NbtString text })
                     Selector(text.Value, At(path, "selector"), parsed.Resolve(At(path, "selector")).Span);
                 if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
-                    || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, true, limits) is null)
+                    || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, grammar, limits) is null)
                     Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
                 if (fields.TryGetValue("extra", out var extra)) VisitNbt(extra, At(path, "extra"));
                 if (fields.ContainsKey("translate") && fields.TryGetValue("with", out var arguments)) VisitNbt(arguments, At(path, "with"));
@@ -40,8 +40,9 @@ internal sealed partial class CommandTextReader
                 if (fields.TryGetValue("hover_event", out var hover) && hover is LogicalMinecraftCompound hoverObject)
                 {
                     var action = hoverObject.Entries.SingleOrDefault(entry => entry.Name == "action")?.Value;
-                    var content = hoverObject.Entries.SingleOrDefault(entry => entry.Name == "value")?.Value;
-                    if (action is LogicalMinecraftLeaf { Value: NbtString { Value: "show_text" } } && content is not null) VisitNbt(content, At(At(path, "hover_event"), "value"));
+                    var member = MinecraftProfiles.NativeHoverField(profile);
+                    var content = hoverObject.Entries.SingleOrDefault(entry => entry.Name == member)?.Value;
+                    if (action is LogicalMinecraftLeaf { Value: NbtString { Value: "show_text" } } && content is not null) VisitNbt(content, At(At(path, "hover_event"), member));
                 }
             }
         }
@@ -55,7 +56,7 @@ internal sealed partial class CommandTextReader
                 if (value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
                     Selector(NativeJsonStrings.Read(selector), At(path, "selector"), spans[At(path, "selector")]);
                 if (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
-                    || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, false, limits) is null)
+                    || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null)
                     Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
                 if (value.TryGetNativeProperty("extra", out var extra)) VisitJson(extra, At(path, "extra"));
                 if (value.TryGetNativeProperty("translate", out _) && value.TryGetNativeProperty("with", out var arguments)) VisitJson(arguments, At(path, "with"));
@@ -82,8 +83,8 @@ internal sealed partial class CommandTextReader
             {
                 "selector" or "nbt" => true,
                 "score" => !ComponentReferenceRules.IsSelfScore(entry.Value),
-                "click_event" => ComponentReferenceRules.Click(entry.Value, true, limits) is null,
-                "clickEvent" => ComponentReferenceRules.Click(entry.Value, false, limits) is null,
+                "click_event" => ComponentReferenceRules.Click(entry.Value, MinecraftProfiles.SnbtGrammar(profile), limits) is null,
+                "clickEvent" => ComponentReferenceRules.Click(entry.Value, null, limits) is null,
                 "minecraft:custom_data" or "custom_data" or "title" or "filtered_title" or "author" or "generation" or "resolved" or "id" or "count" or "Count" or "slot" or "Slot" => false,
                 _ => PotentialReferences(entry.Value)
             });
@@ -103,7 +104,7 @@ internal sealed partial class CommandTextReader
                 {
                     "selector" or "nbt" => true,
                     "score" => !ComponentReferenceRules.IsSelfScore(property.Value),
-                    "clickEvent" => ComponentReferenceRules.Click(property.Value, false, limits) is null,
+                    "clickEvent" => ComponentReferenceRules.Click(property.Value, null, limits) is null,
                     _ => Contains(property.Value)
                 });
     }

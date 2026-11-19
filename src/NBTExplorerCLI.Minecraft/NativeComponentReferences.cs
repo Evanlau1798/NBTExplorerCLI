@@ -41,7 +41,8 @@ public static class NativeComponentReferences
             if (value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
                 reader.Selector(Child(root, "selector"), NativeJsonStrings.Read(selector));
             if (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
-                || value.TryGetNativeProperty(modern ? "click_event" : "clickEvent", out var click) && ComponentReferenceRules.Click(click, modern, limits) is null) reader.Dynamic(root);
+                || value.TryGetNativeProperty(modern ? "click_event" : "clickEvent", out var click)
+                && ComponentReferenceRules.Click(click, modern ? MinecraftProfiles.SnbtGrammar(profile) : null, limits) is null) reader.Dynamic(root);
             if (value.TryGetNativeProperty(modern ? "hover_event" : "hoverEvent", out var hover)
                 && (hover.ValueKind != JsonValueKind.Object || !hover.TryGetNativeProperty("action", out var action) || action.ValueKind != JsonValueKind.String || NativeJsonStrings.Read(action) != "show_text")) reader.Dynamic(root);
         }
@@ -60,7 +61,7 @@ public static class NativeComponentReferences
             var fields = value.Entries.ToDictionary(item => item.Name, item => item.Value, StringComparer.Ordinal);
             if (fields.GetValueOrDefault("selector") is NbtString selector) reader.Selector(Child(root, "selector"), selector.Value);
             if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
-                || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, true, limits) is null) reader.Dynamic(root);
+                || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, MinecraftProfiles.SnbtGrammar(profile), limits) is null) reader.Dynamic(root);
             if (fields.TryGetValue("hover_event", out var hover))
             {
                 var actions = hover is NbtCompound compound ? compound.Entries.Where(item => item.Name == "action").Take(2).ToArray() : [];

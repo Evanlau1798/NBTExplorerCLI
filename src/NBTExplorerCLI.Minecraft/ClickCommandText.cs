@@ -12,7 +12,7 @@ public static class ClickCommandText
     internal sealed record Binding(string? Text = null, string? Prefix = null, byte[]? Component = null, TypedPath? Path = null);
     internal static readonly Binding NoText = new();
 
-    internal static Binding? Read(string command, bool modern, DecodeLimits limits)
+    internal static Binding? Read(string command, SnbtProfile? grammar, DecodeLimits limits)
     {
         if (!command.StartsWith('/') || command.Any(ch => ch is '\r' or '\n' or '\0')) return null;
         if (command.StartsWith("/kick @s ", StringComparison.Ordinal))
@@ -27,9 +27,9 @@ public static class ClickCommandText
             var start = tokens[2].Start;
             var bytes = Utf8.GetBytes(command[start..]);
             var path = TypedPath.Root;
-            if (modern)
+            if (grammar is { } snbt)
             {
-                var parsed = Snbt.ParseDocument(bytes, SnbtProfile.Java1215, limits);
+                var parsed = Snbt.ParseDocument(bytes, snbt, limits);
                 var value = parsed.Root.Value;
                 if (value is LogicalMinecraftList { Items.Length: 1 } list) { path = Child(path, PathSegment.ForIndex(0)); value = list.Items[0]; }
                 if (value is not LogicalMinecraftCompound compound || compound.Entries.Any(entry => !LiteralField(entry.Name))
@@ -48,23 +48,23 @@ public static class ClickCommandText
         catch (SnbtException error) when (error.Code != SnbtError.LimitExceeded) { return null; }
     }
 
-    public static string Rewrite(string command, string expected, string replacement, bool modern, DecodeLimits limits)
+    public static string Rewrite(string command, string expected, string replacement, SnbtProfile? grammar, DecodeLimits limits)
     {
-        var binding = Read(command, modern, limits);
+        var binding = Read(command, grammar, limits);
         if (binding?.Text is null || binding.Text != expected) throw new EditRejectedException(EditFailure.Precondition, "Click command message preimage differs");
         if (expected == replacement) return command;
         if (replacement.Any(ch => ch is '\r' or '\n' or '\0')) throw new EditRejectedException(EditFailure.Precondition, "Click commands require single-line messages");
         string output;
         if (binding.Component is not { } bytes) output = binding.Prefix + replacement;
-        else if (modern)
+        else if (grammar is { } snbt)
         {
-            var parsed = Snbt.ParseDocument(bytes, SnbtProfile.Java1215, limits);
+            var parsed = Snbt.ParseDocument(bytes, snbt, limits);
             var span = parsed.Resolve(binding.Path!).Span;
-            var literal = Snbt.Write(new LogicalMinecraftLeaf(new NbtString(replacement)), SnbtProfile.Java1215, limits);
+            var literal = Snbt.Write(new LogicalMinecraftLeaf(new NbtString(replacement)), snbt, limits);
             output = binding.Prefix + Utf8.GetString(bytes.AsSpan(0, span.StartByte)) + Utf8.GetString(literal) + Utf8.GetString(bytes.AsSpan(span.StartByte + span.LengthBytes));
         }
         else output = binding.Prefix + Utf8.GetString(NativeJsonEdits.ReplaceStrings(bytes, [(binding.Path!, expected, replacement)], limits));
-        if (Read(output, modern, limits)?.Text != replacement) throw new EditRejectedException(EditFailure.Precondition, "Click command candidate changes its supported grammar");
+        if (Read(output, grammar, limits)?.Text != replacement) throw new EditRejectedException(EditFailure.Precondition, "Click command candidate changes its supported grammar");
         return output;
     }
 

@@ -1,4 +1,5 @@
 using NBTExplorerCLI.Domain;
+using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Minecraft;
 using static NBTExplorerCLI.Verification.TextSlotTests;
 using static NBTExplorerCLI.Verification.CandidateIoTests;
@@ -56,6 +57,18 @@ internal static class WorldMetadataTests
         foreach (var (version, expected) in new[] { (3578, 18), (3839, 32), (3955, 34), (4189, 46) })
             Require(MinecraftProfiles.RequiredResourcePackFormat(version).Major == expected, "generated metadata uses the game's actual resource format");
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => MinecraftProfiles.RequiredResourcePackFormat(3818));
+        foreach (var (version, grammar, textVersion) in new[] {
+            (4298, SnbtProfile.JavaThrough1214, 1), (4304, SnbtProfile.JavaThrough1214, 1), (4307, SnbtProfile.JavaThrough1214, 1),
+            (4308, SnbtProfile.JavaMixedLists, 1), (4316, SnbtProfile.JavaMixedLists, 1),
+            (4317, SnbtProfile.Java1215, 1), (4535, SnbtProfile.Java1215, 1),
+            (4536, SnbtProfile.Java1215, 2), (4554, SnbtProfile.Java1215, 2), (4773, SnbtProfile.Java1215, 2)
+        })
+        {
+            var native = WorldMetadata.Read(Level(version, Dimensions)).Profile;
+            Require(native.Features[ProfileFacet.TextSchema] is { Schema: "java-text-nbt", Version: var actual }
+                && actual == textVersion && native.Lists.Encoding == LogicalListEncoding.CompoundWrapper
+                && MinecraftProfiles.SnbtGrammar(native) == grammar, $"DataVersion {version} selects independent binary text and SNBT formats");
+        }
         var modern = WorldMetadata.Read(Level(4774), Separate(4774, Dimensions));
         Require(modern.WorldGenDataVersion == 4774 && modern.DimensionDirectories["dimensions/minecraft/overworld"] == "minecraft:overworld"
             && !modern.DimensionDirectories.ContainsKey("") && modern.DimensionDirectories.Count == 4, "modern layout requires its separately versioned registry");

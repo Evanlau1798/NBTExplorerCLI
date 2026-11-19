@@ -17,22 +17,23 @@ internal static class WorldCommandKeyEdits
         var raw = encoding.GetString(bytes);
         if (conversions.Any(item => item.Expected is not NbtString value || value.Value != raw)) throw new EditRejectedException(EditFailure.Precondition, "Command component differs from its declared raw root");
         var modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
+        var grammar = MinecraftProfiles.SnbtGrammar(profile);
         if (conversion.Address.ComponentPath is not null)
         {
             if (conversions.Any(item => item.Address.ComponentPath is null) || translations.Any(item => item.Slot.Address.ComponentPath is null)) throw new EditRejectedException(EditFailure.Precondition, "Command encoded component layers differ");
-            var parsed = Snbt.ParseDocument(bytes, modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+            var parsed = Snbt.ParseDocument(bytes, grammar, limits);
             if (parsed.Root.Value is not LogicalMinecraftLeaf { Value: NbtString json }) throw new EditRejectedException(EditFailure.Precondition, "Command encoded JSON root is not a string");
             var keyed = NativeJsonKeyEdits.Convert(NativeJsonStrings.EncodeJavaDocument(json.Value, limits), conversions.Select(item => (item.Address.ComponentPath!, item.Slot.SourceText, item.Dependency.Key, item.Reply.Text.Contains('%'))), limits);
             var output = NativeJsonEdits.ReplaceStrings(keyed, WorldJsonEdits.LiteralChanges(keyed, translations, item => item.Slot.Address.ComponentPath!, limits), limits);
-            return Snbt.Write(new LogicalMinecraftLeaf(new NbtString(encoding.GetString(output))), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+            return Snbt.Write(new LogicalMinecraftLeaf(new NbtString(encoding.GetString(output))), grammar, limits);
         }
         if (conversions.Count != 1 || translations.Count != 0) throw new EditRejectedException(EditFailure.Precondition, "Direct command component roots overlap");
         if (!modern && conversion.Slot.Role.StartsWith("command.", StringComparison.Ordinal))
             return NativeJsonKeyEdits.Convert(bytes, [(TypedPath.Root, conversion.Slot.SourceText, conversion.Dependency.Key, conversion.Reply.Text.Contains('%'))], limits);
-        var component = Snbt.ParseDocument(bytes, modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+        var component = Snbt.ParseDocument(bytes, grammar, limits);
         var document = MinecraftNbtAdapter.Encode(new("", component.Root.Value), profile, limits);
         var converted = new NbtDocument("", WorldKeyEdits.Component(document.Root, conversion));
-        return Snbt.Write(MinecraftNbtAdapter.Decode(converted, profile, limits).Root, modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+        return Snbt.Write(MinecraftNbtAdapter.Decode(converted, profile, limits).Root, grammar, limits);
     }
     internal static SourceAddress Child(TranslationKeyConversion conversion, string role, params PathSegment[] segments)
     {

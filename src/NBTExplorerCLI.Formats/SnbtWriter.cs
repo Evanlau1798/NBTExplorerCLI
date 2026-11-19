@@ -54,8 +54,8 @@ internal sealed class SnbtWriter(DecodeLimits limits, SnbtProfile profile)
             case LogicalMinecraftList list:
                 if (list.Items.IsEmpty && list.EmptyElementType != NbtType.End)
                     throw new SnbtException(SnbtError.UnsupportedValue, _bytes, "SNBT cannot represent an empty list's non-End header");
-                if (profile != SnbtProfile.Java1215 && list.Items.Select(SnbtLiterals.Type).Distinct().Skip(1).Any())
-                    throw new SnbtException(SnbtError.MixedList, _bytes, "SNBT through Java 1.21.4 requires homogeneous lists");
+                    if (profile is SnbtProfile.JavaThrough1214 or SnbtProfile.Java181 && list.Items.Select(SnbtLiterals.Type).Distinct().Skip(1).Any())
+                        throw new SnbtException(SnbtError.MixedList, _bytes, "This SNBT profile requires homogeneous lists");
                 Add("[");
                 for (var index = 0; index < list.Items.Length; index++)
                 {
@@ -78,8 +78,8 @@ internal sealed class SnbtWriter(DecodeLimits limits, SnbtProfile profile)
             case NbtLong number: Add(number.Value.ToString(culture) + "L"); break;
             case NbtFloat number when float.IsFinite(number.Value) && number.RawBits != int.MinValue: Add(number.Value.ToString("R", culture) + "f"); break;
             case NbtDouble number when double.IsFinite(number.Value) && number.RawBits != long.MinValue: Add(number.Value.ToString("R", culture) + "d"); break;
-            case NbtFloat number when profile == SnbtProfile.JavaThrough1214 && float.IsInfinity(number.Value): Add((number.Value < 0 ? "-" : "") + "1e9999f"); break;
-            case NbtDouble number when profile == SnbtProfile.JavaThrough1214 && double.IsInfinity(number.Value): Add((number.Value < 0 ? "-" : "") + "1e9999d"); break;
+            case NbtFloat number when profile is SnbtProfile.JavaThrough1214 or SnbtProfile.JavaMixedLists && float.IsInfinity(number.Value): Add((number.Value < 0 ? "-" : "") + "1e9999f"); break;
+            case NbtDouble number when profile is SnbtProfile.JavaThrough1214 or SnbtProfile.JavaMixedLists && double.IsInfinity(number.Value): Add((number.Value < 0 ? "-" : "") + "1e9999d"); break;
             case NbtByteArray array: Array("B", array.Values.Select(number => (NbtValue)new NbtByte(number)), depth); break;
             case NbtIntArray array: Array("I", array.Values.Select(number => (NbtValue)new NbtInt(number)), depth); break;
             case NbtLongArray array: Array("L", array.Values.Select(number => (NbtValue)new NbtLong(number)), depth); break;
