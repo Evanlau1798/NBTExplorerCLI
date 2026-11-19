@@ -81,7 +81,7 @@ internal static class WorldCommandEdits
                             ? rawClick.Value : throw new EditRejectedException(EditFailure.Precondition, "Command click payload is not a string");
                     value = ClickCommandText.Rewrite(previous, first.Slot.SourceText, value, modern, limits);
                 }
-                if (profile == MinecraftProfiles.Java181 && first.Slot.Role == source.Address.SemanticRole + ".message")
+                if (MinecraftProfiles.IsVersionedClassic(profile) && first.Slot.Role == source.Address.SemanticRole + ".message")
                 {
                     static IEnumerable<string> Selectors(string text) => text.Split(' ').Where(token => token.StartsWith('@'));
                     if (!Selectors(first.Slot.SourceText).SequenceEqual(Selectors(value)))

@@ -34,6 +34,8 @@ public static class WorldLayoutLocator
             return new(artifact, WorldSourceRole.Irrelevant);
         var classic = profile == MinecraftProfiles.ClassicAnvil;
         if (classic && parts.Length == 2 && parts[0] == "players" && extension == "dat") return new(artifact, WorldSourceRole.Player);
+        if (classic && IsClassicChunkTickets(relativePath))
+            return new(artifact, WorldSourceRole.SavedData, dimensions.GetValueOrDefault(parts.Length == 1 ? "" : parts[0]));
         if (kind == ArtifactKind.Nbt && parts.Length >= 2 && parts[0] == (directoryLayout ? "playerdata" : "players")) return new(artifact, WorldSourceRole.Player);
         if (parts.Length >= 2 && parts[0] == "data" && kind is ArtifactKind.Nbt or ArtifactKind.Json) return new(artifact, WorldSourceRole.SavedData);
         var matches = new List<WorldSourceLocation>();
@@ -72,6 +74,7 @@ public static class WorldLayoutLocator
         }
         return new(artifact, WorldSourceRole.Unknown);
     }
+    internal static bool IsClassicChunkTickets(string path) => path is "forcedchunks.dat" or "DIM-1/forcedchunks.dat" or "DIM1/forcedchunks.dat";
     private static string? Under(string path, string directory)
         => directory.Length == 0 ? path : path.StartsWith(directory + "/", StringComparison.Ordinal) ? path[(directory.Length + 1)..] : null;
     private static IEnumerable<string> Ancestors(string path)

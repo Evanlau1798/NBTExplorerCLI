@@ -20,6 +20,7 @@ internal sealed partial class CommandTextReader
         }
         static string Verb(string token) => token.StartsWith('/') ? token[1..] : token;
         var verb = Verb(Word());
+        if (profile == MinecraftProfiles.Java164 && verb is not ("say" or "me" or "tell" or "msg" or "w" or "scoreboard")) return;
         for (var depth = 0; verb == "execute"; depth++)
         {
             if (depth >= limits.MaxDepth) Limit();

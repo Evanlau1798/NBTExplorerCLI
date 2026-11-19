@@ -35,11 +35,12 @@ public static class NbtTextExtractor
         var version = NbtLocator.Resolve(document.Root, versionPath);
         if (version.Status is ResolutionStatus.Ambiguous or ResolutionStatus.Invalid || version.Status == ResolutionStatus.Found && version.Value is not NbtInt)
             throw new CodecException(CodecError.InvalidTag, 0, "Invalid artifact DataVersion");
-        if (layoutProfile == MinecraftProfiles.Java181 && version.Status != ResolutionStatus.Missing)
-            throw new CodecException(CodecError.UnsupportedProfile, 0, "Versioned data cannot use the explicit 1.8.1 grammar");
-        if ((layoutProfile == MinecraftProfiles.ClassicAnvil || layoutProfile == MinecraftProfiles.Java181)
+        var explicitClassic = MinecraftProfiles.IsVersionedClassic(layoutProfile);
+        if (explicitClassic && version.Status != ResolutionStatus.Missing)
+            throw new CodecException(CodecError.UnsupportedProfile, 0, "Versioned data cannot use an explicit Classic Anvil grammar");
+        if ((layoutProfile == MinecraftProfiles.ClassicAnvil || explicitClassic)
             && version.Status == ResolutionStatus.Missing && source.Role is WorldSourceRole.Level or WorldSourceRole.Terrain or WorldSourceRole.Player or WorldSourceRole.SavedData)
-            return layoutProfile;
+            return layoutProfile!;
         return version.Value is NbtInt number && MinecraftProfiles.ForDataVersion(number.Value) is { } profile ? profile
             : throw new CodecException(CodecError.UnsupportedProfile, 0, "Missing or unknown artifact DataVersion");
     }
@@ -48,7 +49,7 @@ public static class NbtTextExtractor
 internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityProfile profile, CapabilityProfile layoutProfile, TextExtractionCollector output, DecodeLimits limits)
 {
     private readonly bool modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
-    private readonly bool classic = profile == MinecraftProfiles.ClassicAnvil || profile == MinecraftProfiles.Java181;
+    private readonly bool classic = profile == MinecraftProfiles.ClassicAnvil || MinecraftProfiles.IsVersionedClassic(profile);
     private NbtValue? Field(NbtValue value, string key, TypedPath path)
     {
         var resolution = NbtLocator.Resolve(value, new([PathSegment.ForKey(key)]));
@@ -70,7 +71,7 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
     internal void Component(NbtValue? value, TypedPath path, string role, bool classicEncoded = false)
     {
         if (value is null || !output.CouldInclude(role)) return;
-        if (classic && (profile == MinecraftProfiles.ClassicAnvil || !classicEncoded)) { Literal(value, path, role); return; }
+        if (classic && (profile != MinecraftProfiles.Java181 || !classicEncoded)) { Literal(value, path, role); return; }
         var source = new SourceAddress(binding.Artifact, path, role, binding.Dimension, binding.Chunk);
         if (modern) output.Merge(TextComponentExtractor.Nbt(source, value, profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
         else if (value is NbtString json)

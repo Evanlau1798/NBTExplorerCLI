@@ -36,8 +36,8 @@ public sealed partial class WorldTextExtraction
         }
         StorageRules = rules.ToImmutable(); Discovery = WorldDiscovery.Discover(inventory, request, cancellationToken);
         LayoutProfile = request.ClassicVersion is null ? Discovery.Metadata?.Profile
-            : request.ClassicVersion == MinecraftProfiles.ClassicGameVersion && Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil
-                ? MinecraftProfiles.Java181 : throw new CodecException(CodecError.UnsupportedProfile, 0, "Explicit Minecraft version requires recognized Classic Anvil metadata and a registered version");
+            : (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil ? MinecraftProfiles.ForClassicVersion(request.ClassicVersion) : null)
+                ?? throw new CodecException(CodecError.UnsupportedProfile, 0, "Explicit Minecraft version requires recognized Classic Anvil metadata and a registered version");
     }
     public IEnumerable<TextSourceExtraction> ReadSources() => ReadSourcesCore(Discovery.Sources);
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);

@@ -16,7 +16,7 @@ internal static class ScanCommands
                 new { dataVersion = version, profile = MinecraftProfiles.ForDataVersion(version)!.Id,
                     features = MinecraftProfiles.ForDataVersion(version)!.Features.OrderBy(pair => pair.Key).Select(pair => new { facet = pair.Key, pair.Value.Schema, pair.Value.Version, pair.Value.Operations }).ToArray() }).ToArray(),
                 storageProfiles = new[] { new { storageVersion = WorldMetadata.ClassicAnvilStorageVersion, profile = MinecraftProfiles.ClassicAnvil.Id, readOnly = true,
-                    explicitTranslationVersions = new[] { MinecraftProfiles.ClassicGameVersion } } } });
+                    explicitTranslationVersions = MinecraftProfiles.ClassicGameVersions } } });
         var options = new ScanOptions(request); var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.Input!));
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException("World directory not found");
         if (request.Get("output") is { } export) OutsideWorld(root, Path.GetFullPath(export));

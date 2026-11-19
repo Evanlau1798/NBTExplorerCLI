@@ -24,7 +24,9 @@ Run `nbtcli capabilities` at any time to inspect the registered command list and
 
 The `java-classic-anvil` entry under `capabilities.storageProfiles` covers read-only inspection of older Anvil saves with storage version `19133` and no `DataVersion`. This storage metadata cannot identify an exact game release or command grammar.
 
-For a world known to run on **Java 1.8.1**, pass `--minecraft-version 1.8.1` to `scan`, `extract`, or `translate start`. The session and its direct plan retain this version when reopened or applied. Choose world text roles with `--types` when a bundled classic resource pack is outside your translation scope. The profile supports direct literal edits to signs, books, display fields, and recognized command text arguments. Keep entity names used as selector identifiers unchanged. A scan of supported text fields does not validate the execution of every stored command.
+For an Anvil world known to run on **Java 1.6.4** or **Java 1.8.1**, pass the exact version with `--minecraft-version` to `scan`, `extract`, or `translate start`. The session and its direct plan retain this version when reopened or applied. Choose world text roles with `--types` when a bundled classic resource pack is outside your translation scope. Both profiles support direct literal edits to signs, books, display fields, and recognized command text arguments.
+
+In Java 1.6.4, signs and books store plain text. Translated sign lines must fit 15 UTF-16 code units each and contain no line breaks. Book titles and pages can hold 16 and 256 code units, respectively. Scoreboard display names can hold 32 code units, and team prefixes and suffixes can hold 16 each. Keep entity names used as selector identifiers unchanged. Use the matching vanilla game version to verify that the translated commands run.
 
 For shaped and shapeless crafting recipes, `scan` and `validate` can report `InvalidRecipeResult` for an absent, malformed, or air output item. The check follows the data pack's registered format. The matching Minecraft server verifies registry resolution, ingredients, stack sizes, and data pack interactions.
 

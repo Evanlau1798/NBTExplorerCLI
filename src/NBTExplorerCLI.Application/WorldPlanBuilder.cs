@@ -99,6 +99,7 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
                         var slot = translation.Slot;
                         if (!found.Add(occurrence.Address) || slot.SourceText != occurrence.Text || slot.Context != occurrence.Context || slot.AllowedEmpty != occurrence.AllowedEmpty) throw new EditRejectedException(EditFailure.Precondition, "Literal operation differs from its actual source slot");
                         ValidateLiteral(translation, snapshot.Manifest.SnapshotId.Digest);
+                        if (snapshot.Manifest.Versions.Profile == MinecraftProfiles.Java164.Id) ValidateJava164Text(translation);
                     }
                 comparisonTrace?.SetTag("comparisons", (long)(row.Text?.Occurrences.Length ?? 0));
             }
@@ -219,6 +220,24 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
             if (actual != input.Image) throw new ArtifactConflictException("A bound source changed");
         }
     }
+    private static void ValidateJava164Text(LiteralTranslation translation)
+    {
+        var slot = translation.Slot;
+        var value = translation.Reply.Text;
+        if (value == slot.SourceText) return;
+        var limit = slot.Role switch
+        {
+            "sign.front.line" => 15,
+            "book.title" or "scoreboard.team.prefix" or "scoreboard.team.suffix" => 16,
+            "scoreboard.objective.name" or "scoreboard.team.name" => 32,
+            "command.block.message" when slot.Address.Syntax?.NodePath?.Segments.LastOrDefault()?.Key == "scoreboard.message" => 32,
+            "book.page" => 256,
+            _ => int.MaxValue
+        };
+        if (value.Length > limit || slot.Role == "sign.front.line" && value.AsSpan().IndexOfAny('\r', '\n') >= 0)
+            throw new EditRejectedException(EditFailure.Precondition, $"Java 1.6.4 text exceeds the vanilla field limits for {slot.Role}");
+    }
+
     private static void ValidateLiteral(LiteralTranslation translation, Hash256 snapshot)
     {
         var slot = translation.Slot;

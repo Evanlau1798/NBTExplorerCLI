@@ -17,12 +17,12 @@ internal static class CliSessionWriteTests
         ["translate", action, world, "--session-id", id.ToString(), "--state-root", State(work), .. args]);
     private static void Start(string work, string world, Guid id)
     { using var started = Success(Call(work, world, id, "start", "--source-language", "en_us", "--target-language", "zh_tw")); }
-    private static long Submit(string work, string world, Guid id, bool unchanged = false)
+    private static long Submit(string work, string world, Guid id, bool unchanged = false, Func<SessionPageSlot, string>? translate = null)
     {
         using var exported = Success(Call(work, world, id, "export")); var page = SessionExchangeJson.ReadPage(exported.RootElement.GetProperty("data").GetProperty("page").GetRawText());
         var reply = SessionExchangeJson.ReadReply(exported.RootElement.GetProperty("data").GetProperty("replyTemplate").GetRawText());
         reply = reply with { Slots = reply.Slots.Select(slot => slot with { State = unchanged ? SessionReplyState.Unchanged : SessionReplyState.Translated,
-            Text = unchanged ? null : "譯文:" + page.Slots.Single(item => item.SlotId == slot.SlotId).SourceText }).ToImmutableArray() };
+            Text = unchanged ? null : (translate ?? (item => "譯文:" + item.SourceText))(page.Slots.Single(item => item.SlotId == slot.SlotId)) }).ToImmutableArray() };
         var file = Path.Combine(work, "reply.json"); File.WriteAllText(file, SessionExchangeJson.WriteReply(reply), new UTF8Encoding(false));
         using var submitted = Success(Call(work, world, id, "submit", "--reply", file));
         return submitted.RootElement.GetProperty("data").GetProperty("status").GetProperty("revision").GetInt64();
@@ -38,6 +38,115 @@ internal static class CliSessionWriteTests
     private static Invocation Seal(string work, string world, Guid id, long revision, Guid operation, Hash256 hash) => Call(work, world, id, "seal",
         "--revision", revision.ToString(), "--operation-id", operation.ToString(), "--plan-hash", hash.Hex);
     private static FileSystemTranslationSessionStore Store(string work) => new(Path.Combine(State(work), "sessions"));
+    public static void Java164PreservesPlainTextAndRejectsValuesVanillaCannotLoad()
+    {
+        var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
+        try
+        {
+            const string path = "region/r.0.0.mca";
+            const string force = "DIM-1/forcedchunks.dat";
+            const string opaque = "/title @a title {\"text\":\"Later syntax\"}";
+            static NbtCompound Data(params NbtEntry[] fields) => new(fields);
+            var sign = Data(new("id", new NbtString("Sign")), new("Text1", new NbtString("Welcome")));
+            var say = Data(new("id", new NbtString("Control")), new("Command", new NbtString("/say Hello miner")));
+            var title = Data(new("id", new NbtString("Control")), new("Command", new NbtString(opaque)));
+            var book = Data(new("id", new NbtShort(387)), new("tag", Data(new("title", new NbtString("Journal")),
+                new("author", new NbtString("Miner")), new("pages", new NbtList(NbtType.String, [new NbtString("\"Plain\" page")])))));
+            var chest = Data(new("id", new NbtString("Chest")), new("Items", new NbtList(NbtType.Compound, [book])));
+            var chunk = new NbtDocument("", Data(new NbtEntry("Level", Data(new("xPos", new NbtInt(0)), new("zPos", new NbtInt(0)),
+                new("TileEntities", new NbtList(NbtType.Compound, [sign, say, title, chest]))))));
+            var original = WorldDiscoveryTests.Region(chunk, [0]);
+            WorldDiscoveryTests.Put(world, path, original);
+            void PutDat(string relative, NbtDocument doc) => WorldDiscoveryTests.Put(world, relative, CompressedNbt.WriteDocument(doc, NbtCompression.GZip));
+            PutDat("level.dat", WorldMetadataTests.Classic());
+            var tickets = new NbtDocument("", Data(new NbtEntry("TicketList", new NbtList(NbtType.Byte, []))));
+            PutDat(force, tickets);
+            using var started = Success(Call(work, world, id, "start", "--minecraft-version", "1.6.4", "--source-language", "en_us", "--target-language", "zh_tw"));
+            var state = new TranslationSessionService(Store(work)).Read(id);
+            Require(state.Slots.Select(slot => slot.Slot.SourceText).Order().SequenceEqual(["\"Plain\" page", "Hello miner", "Journal", "Miner", "Welcome"]),
+                "1.6.4 exposes plain sign and book text, ignores empty chunk tickets, and leaves later commands opaque");
+            foreach (var (role, max) in new[] { ("sign.front.line", 15), ("book.title", 16), ("book.page", 256) })
+            {
+                var revision = Submit(work, world, id, translate: item => item.Context == role ? new string('x', max + 1) : item.SourceText);
+                var response = Call(work, world, id, "plan", "--direct", "--revision", revision.ToString());
+                Require(response.Exit == 3 && File.ReadAllBytes(Path.Combine(world, path)).SequenceEqual(original),
+                    "vanilla text length rejection occurs before world writes");
+            }
+            var accepted = Submit(work, world, id);
+            var (plan, file) = Plan(work, world, id, accepted);
+            Require(plan.ProfileVersion == "java-1.6.4", "explicit 1.6.4 binds the durable plan");
+            using var applied = Success(Apply(work, world, file));
+            using var completion = Success(Seal(work, world, id, accepted, Guid.NewGuid(), plan.PlanHash));
+            var stored = RegionFile.Read(File.ReadAllBytes(Path.Combine(world, path))).ReadChunk(0).Document;
+            NbtValue? Read(params PathSegment[] fields) => NbtLocator.Resolve(stored.Root,
+                new([PathSegment.ForKey("Level"), PathSegment.ForKey("TileEntities"), .. fields])).Value;
+            Require(Read(PathSegment.ForIndex(0), PathSegment.ForKey("Text1")) is NbtString { Value: "譯文:Welcome" }
+                && Read(PathSegment.ForIndex(1), PathSegment.ForKey("Command")) is NbtString { Value: "/say 譯文:Hello miner" }
+                && Read(PathSegment.ForIndex(2), PathSegment.ForKey("Command")) is NbtString { Value: opaque }
+                && Read(PathSegment.ForIndex(3), PathSegment.ForKey("Items"), PathSegment.ForIndex(0),
+                    PathSegment.ForKey("tag"), PathSegment.ForKey("pages"), PathSegment.ForIndex(0)) is NbtString { Value: "譯文:\"Plain\" page" },
+                "1.6.4 does not encode plain sign or book text as JSON and keeps later commands untouched");
+            var rollback = Run(work, "recover", world, "--plan-hash", plan.PlanHash.Hex, "--rollback", "--world-offline", "--state-root", State(work));
+            Require(rollback.Exit == 8 && File.ReadAllBytes(Path.Combine(world, path)).SequenceEqual(original), "rollback restores original region and padding");
+            PutDat(force, new("", Data(new NbtEntry("TicketList", new NbtList(NbtType.Compound, [Data(new NbtEntry("ModId", new NbtString("mod")))])))));
+            var unknown = Run(work, "scan", world, "--minecraft-version", "1.6.4", "--path", force, "--no-cache");
+            Require(unknown.Exit == 4 && unknown.Output.Contains("UnsupportedClassicChunkTickets", StringComparison.Ordinal),
+                "nonempty mod ticket state remains outside supported extraction coverage");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
+    public static void Java164ScoreboardUsesVanillaFieldsAndLengths()
+    {
+        var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();
+        try
+        {
+            const string regionPath = "region/r.0.0.mca", boardPath = "data/scoreboard.dat";
+            const string addObjective = "/scoreboard objectives add score dummy ", addTeam = "scoreboard teams add miners ";
+            const string execute = "execute @a ~ ~ ~ say Unsupported", option = "scoreboard teams option miners prefix Unsupported";
+            static NbtCompound Data(params NbtEntry[] fields) => new(fields);
+            static NbtEntry Text(string key, string value) => new(key, new NbtString(value));
+            static NbtEntry List(string key, params NbtCompound[] values) => new(key, new NbtList(NbtType.Compound, values));
+            static NbtCompound Command(string text) => Data(Text("id", "Control"), Text("Command", text));
+            var level = Data(new("xPos", new NbtInt(0)), new("zPos", new NbtInt(0)), List("TileEntities",
+                Command(addObjective + "New objective"), Command(addTeam + "New team"), Command(execute), Command(option)));
+            var region = WorldDiscoveryTests.Region(new NbtDocument("", Data(new NbtEntry("Level", level))), [0]);
+            WorldDiscoveryTests.Put(world, regionPath, region);
+            WorldDiscoveryTests.Put(world, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Classic(), NbtCompression.GZip));
+            var board = Data(List("Objectives", Data(Text("Name", "score"), Text("DisplayName", "Saved objective"))),
+                List("Teams", Data(Text("Name", "miners"), Text("DisplayName", "Saved team"), Text("Prefix", "Before"), Text("Suffix", "After"))));
+            var originalBoard = CompressedNbt.WriteDocument(new("", Data(new NbtEntry("data", board))), NbtCompression.GZip);
+            WorldDiscoveryTests.Put(world, boardPath, originalBoard);
+
+            using var started = Success(Call(work, world, id, "start", "--minecraft-version", "1.6.4", "--source-language", "en_us", "--target-language", "zh_tw"));
+            var state = new TranslationSessionService(Store(work)).Read(id);
+            var fields = new Dictionary<string, int> { ["New objective"] = 32, ["New team"] = 32, ["Saved objective"] = 32, ["Saved team"] = 32, ["Before"] = 16, ["After"] = 16 };
+            Require(state.Slots.Select(row => row.Slot.SourceText).Order().SequenceEqual(fields.Keys.Order()),
+                "1.6.4 enumerates real scoreboard fields and leaves unregistered command forms opaque");
+            foreach (var (source, limit) in fields)
+            {
+                var revision = Submit(work, world, id, translate: item => item.SourceText == source ? new string('譯', limit + 1) : item.SourceText);
+                var preview = Call(work, world, id, "plan", "--direct", "--revision", revision.ToString());
+                Require(preview.Exit == 3 && File.ReadAllBytes(Path.Combine(world, regionPath)).SequenceEqual(region)
+                    && File.ReadAllBytes(Path.Combine(world, boardPath)).SequenceEqual(originalBoard), $"1.6.4 must reject oversized scoreboard field {source} before writing");
+            }
+            var accepted = Submit(work, world, id, translate: item => new string('譯', fields[item.SourceText]));
+            var (plan, file) = Plan(work, world, id, accepted);
+            using var applied = Success(Apply(work, world, file));
+            var stored = RegionFile.Read(File.ReadAllBytes(Path.Combine(world, regionPath))).ReadChunk(0).Document;
+            var savedBoard = CompressedNbt.ReadDocument(File.ReadAllBytes(Path.Combine(world, boardPath)), NbtCompression.GZip).Document.Root;
+            string? CommandAt(int index) => (NbtLocator.Resolve(stored.Root, new([PathSegment.ForKey("Level"), PathSegment.ForKey("TileEntities"), PathSegment.ForIndex(index), PathSegment.ForKey("Command")])).Value as NbtString)?.Value;
+            string? BoardField(string collection, string key) => (NbtLocator.Resolve(savedBoard, new([PathSegment.ForKey("data"), PathSegment.ForKey(collection), PathSegment.ForIndex(0), PathSegment.ForKey(key)])).Value as NbtString)?.Value;
+            Require(CommandAt(0) == addObjective + new string('譯', 32) && CommandAt(1) == addTeam + new string('譯', 32)
+                && CommandAt(2) == execute && CommandAt(3) == option, "scoreboard commands retain identifiers and unregistered syntax stays opaque");
+            Require(BoardField("Objectives", "DisplayName") == new string('譯', 32) && BoardField("Teams", "DisplayName") == new string('譯', 32)
+                && BoardField("Teams", "Prefix") == new string('譯', 16) && BoardField("Teams", "Suffix") == new string('譯', 16)
+                && BoardField("Objectives", "Name") == "score" && BoardField("Teams", "Name") == "miners", "saved scoreboard values use vanilla field names and keep identifiers");
+            var rollback = Run(work, "recover", world, "--plan-hash", plan.PlanHash.Hex, "--rollback", "--world-offline", "--state-root", State(work));
+            Require(rollback.Exit == 8 && File.ReadAllBytes(Path.Combine(world, regionPath)).SequenceEqual(region)
+                && File.ReadAllBytes(Path.Combine(world, boardPath)).SequenceEqual(originalBoard), "scoreboard command and saved-data edits recover byte for byte");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
     public static void VersionlessAnvilUsesAnExplicitVersionForSessionApplyAndRollback()
     {
         var world = ScratchDirectory.CreateChild(); var work = ScratchDirectory.CreateChild(); var id = Guid.NewGuid();

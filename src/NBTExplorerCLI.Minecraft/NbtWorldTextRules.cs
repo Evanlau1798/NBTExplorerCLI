@@ -60,7 +60,7 @@ internal sealed partial class NbtTextReader
             }
         }
         if (identity == "minecraft:lectern" && Field(value, "Book", path) is { } book) Item(book, At(path, "Book"), "lectern.book");
-        if (identity == "minecraft:command_block" || profile == MinecraftProfiles.Java181 && identity == "minecraft:Control") StoredCommand(value, path);
+        if (identity == "minecraft:command_block" || MinecraftProfiles.IsVersionedClassic(profile) && identity == "minecraft:Control") StoredCommand(value, path);
         if (identity == "minecraft:mob_spawner")
         {
             SpawnedEntity(value, path, "SpawnData");
@@ -131,6 +131,12 @@ internal sealed partial class NbtTextReader
     }
     internal void SavedData(NbtValue root, string artifact, IReadOnlyList<StorageTextRule>? storageRules)
     {
+        if (classic && WorldLayoutLocator.IsClassicChunkTickets(artifact))
+        {
+            if (root is not NbtCompound { Entries: [{ Name: "TicketList", Value: NbtList { Items.IsEmpty: true } }] })
+                output.Diagnostic(TypedPath.Root, "UnsupportedClassicChunkTickets");
+            return;
+        }
         var filename = artifact[(artifact.LastIndexOf('/') + 1)..];
         if (!VanillaSavedDataPath(artifact, filename)) { output.Diagnostic(TypedPath.Root, "UnsupportedSavedData"); return; }
         if (classic && artifact == "data/idcounts.dat" && root is NbtCompound counters
@@ -147,11 +153,13 @@ internal sealed partial class NbtTextReader
         {
             foreach (var (objective, objectivePath) in Sequence(Field(data, "Objectives", path), At(path, "Objectives")))
                 Component(Field(objective, "DisplayName", objectivePath), At(objectivePath, "DisplayName"), "scoreboard.objective.name");
+            var prefix = profile == MinecraftProfiles.Java164 ? "Prefix" : "MemberNamePrefix";
+            var suffix = profile == MinecraftProfiles.Java164 ? "Suffix" : "MemberNameSuffix";
             foreach (var (team, teamPath) in Sequence(Field(data, "Teams", path), At(path, "Teams")))
             {
                 Component(Field(team, "DisplayName", teamPath), At(teamPath, "DisplayName"), "scoreboard.team.name");
-                Component(Field(team, "MemberNamePrefix", teamPath), At(teamPath, "MemberNamePrefix"), "scoreboard.team.prefix");
-                Component(Field(team, "MemberNameSuffix", teamPath), At(teamPath, "MemberNameSuffix"), "scoreboard.team.suffix");
+                Component(Field(team, prefix, teamPath), At(teamPath, prefix), "scoreboard.team.prefix");
+                Component(Field(team, suffix, teamPath), At(teamPath, suffix), "scoreboard.team.suffix");
             }
         }
         else if (!(classic && artifact == "data/" + filename && ClassicNonTextData(filename, data, path))
