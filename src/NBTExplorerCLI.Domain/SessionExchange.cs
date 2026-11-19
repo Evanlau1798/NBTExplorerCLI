@@ -8,7 +8,11 @@ public sealed record SessionPageSlot(Hash256 SlotId, Hash256 SourceTextHash, str
     ImmutableArray<string> Placeholders, PlaceholderFormat Format = PlaceholderFormat.Literal,
     bool ProtectVisibleText = false);
 public sealed record SessionPage(Guid SessionId, long Revision, Hash256 SnapshotId, int Page, Hash256 PageId,
-    string SourceLocale, string TargetLocale, string PolicyVersion, bool PreservePlaceholderOrder, ImmutableArray<SessionPageSlot> Slots);
+    string SourceLocale, string TargetLocale, string PolicyVersion, bool PreservePlaceholderOrder, ImmutableArray<SessionPageSlot> Slots)
+{
+    public const string GlyphProtectionPolicy = "literal-v2";
+    public static string PolicyFor(bool protectsPrivateUseGlyphs) => protectsPrivateUseGlyphs ? GlyphProtectionPolicy : "literal-v1";
+}
 public sealed record SessionReplySlot(Hash256 SlotId, Hash256 SourceTextHash, SessionReplyState State, string? Text);
 public sealed record SessionReply(Guid OperationId, Guid SessionId, long Revision, Hash256 SnapshotId, int Page, Hash256 PageId,
     string TargetLocale, ImmutableArray<SessionReplySlot> Slots);

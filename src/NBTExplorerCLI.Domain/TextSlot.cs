@@ -8,11 +8,15 @@ public sealed class PlaceholderPolicy
 {
     public ImmutableArray<string> Tokens { get; }
     public bool ProtectVisibleText { get; }
-    public PlaceholderPolicy(IEnumerable<string> tokens, bool protectVisibleText = false)
+    public bool ProtectPrivateUseGlyphs { get; }
+    public PlaceholderPolicy(IEnumerable<string> tokens, bool protectVisibleText = false, bool protectPrivateUseGlyphs = false)
     {
         ArgumentNullException.ThrowIfNull(tokens);
         Tokens = tokens.Take(257).ToImmutableArray();
         ProtectVisibleText = protectVisibleText;
+        ProtectPrivateUseGlyphs = protectPrivateUseGlyphs;
+        if (protectPrivateUseGlyphs && !protectVisibleText)
+            throw new ArgumentException("Private-use glyph protection requires visible text protection", nameof(protectPrivateUseGlyphs));
         if (Tokens.Length > 256 || Tokens.Any(string.IsNullOrEmpty) || Tokens.Distinct(StringComparer.Ordinal).Count() != Tokens.Length)
             throw new ArgumentException("Expected at most 256 distinct nonempty literal tokens", nameof(tokens));
     }
@@ -76,7 +80,7 @@ public sealed class TextSlot
         if (reply.TargetLocale != TargetLocale) return SlotValidation.WrongLocale;
         if (!AllowedEmpty && reply.Text.Length == 0) return SlotValidation.EmptyDisallowed;
         if (!Placeholders.Accepts(SourceText, reply.Text)) return SlotValidation.PlaceholderMismatch;
-        return Placeholders.ProtectVisibleText && !VisibleTextProtection.Equivalent(SourceText, reply.Text, Role)
+        return Placeholders.ProtectVisibleText && !VisibleTextProtection.Equivalent(SourceText, reply.Text, Role, Placeholders.ProtectPrivateUseGlyphs)
             ? SlotValidation.VisibleTextMismatch : SlotValidation.Valid;
     }
 }

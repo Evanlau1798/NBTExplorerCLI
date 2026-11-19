@@ -69,7 +69,7 @@ internal static class SessionCommands
             case "get":
                 var item = TranslationSessionService.Get(state, new(Required(request, "slot-id"))); var slot = item.Slot;
                 return new(new { slot = new { slotId = slot.Id.Digest, slot.SourceTextHash, slot.SourceText, slot.Context, slot.Role, slot.SourceLocale, slot.TargetLocale,
-                    slot.AllowedEmpty, placeholders = slot.Placeholders.Tokens, slot.Placeholders.ProtectVisibleText, item.Format, item.State, item.Reason,
+                    slot.AllowedEmpty, placeholders = slot.Placeholders.Tokens, slot.Placeholders.ProtectVisibleText, slot.Placeholders.ProtectPrivateUseGlyphs, item.Format, item.State, item.Reason,
                     reply = item.Reply is { } translation ? new { translation.TargetLocale, translation.Text } : null } });
             case "export":
                 var page = TranslationSessionService.Export(state, request.Number("page", state.Workspace?.CurrentPage ?? 0, 0, Math.Max(0, state.Pages.Length - 1)));

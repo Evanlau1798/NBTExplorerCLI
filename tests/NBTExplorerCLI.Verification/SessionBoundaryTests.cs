@@ -15,6 +15,37 @@ namespace NBTExplorerCLI.Verification;
 
 internal static class SessionBoundaryTests
 {
+    public static void ReplaysNumericOnlyHistoryWithEditedFontGlyph()
+    {
+        var root = ScratchDirectory.CreateChild();
+        try
+        {
+            var request = StartRequest(); var source = request.Slots[0];
+            var numericOnly = new TextSlot(source.Address, "\uE100Gem +5%", source.Context, "en_us", "zh_tw", false,
+                new([], protectVisibleText: true));
+            var service = new TranslationSessionService(new FileSystemTranslationSessionStore(root));
+            service.Start(request with { Slots = [numericOnly] }, Guid.NewGuid());
+            var initial = service.Read(SessionId); var page = service.Export(SessionId, 0);
+            const string originalReply = "寶石 +5%";
+            var reply = new SessionReply(Guid.NewGuid(), SessionId, 0, page.SnapshotId, 0, page.PageId, "zh_tw",
+                [new(numericOnly.Id.Digest, numericOnly.SourceTextHash, SessionReplyState.Translated, originalReply)]);
+            var input = Encoding.UTF8.GetBytes(SessionExchangeJson.WriteReply(reply));
+            var retained = new SessionOperationReceipt(reply.OperationId, Hash256.Compute(input), 0, 1, "reply", [numericOnly.Id.Digest],
+                Convert.ToBase64String(input));
+            var existing = initial with
+            {
+                Revision = 1, Operations = initial.Operations.Add(retained),
+                Slots = [initial.Slots[0] with { State = SessionSlotState.Translated,
+                    Reply = new(numericOnly.Id, numericOnly.SourceTextHash, "zh_tw", originalReply) }]
+            };
+            var persisted = TranslationSessionJson.WriteUtf8(existing);
+            Require(TranslationSessionJson.ReadUtf8(persisted).Slots.Single().Reply!.Text == originalReply
+                && TranslationSessionJson.WriteUtf8(TranslationSessionJson.ReadUtf8(persisted)).SequenceEqual(persisted),
+                "numeric-only history replays using its original protection contract and canonical bytes");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
     public static void InvalidPagesAndTamperedStateDoNotAdvance()
     {
         var root = ScratchDirectory.CreateChild();

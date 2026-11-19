@@ -70,7 +70,8 @@ public sealed partial class TranslationSessionService
     {
         var tokens = string.Concat(slot.Slot.Placeholders.Tokens.Order(StringComparer.Ordinal).Select(token => token.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + token));
         var placeholderPolicy = slot.Format + ":" + state.Policy.PreservePlaceholderOrder + ":" + TextRevision.Compute(tokens).Hex;
-        if (slot.Slot.Placeholders.ProtectVisibleText) placeholderPolicy += ":visible-text";
+        if (slot.Slot.Placeholders.ProtectPrivateUseGlyphs) placeholderPolicy += ":visible-text-glyphs";
+        else if (slot.Slot.Placeholders.ProtectVisibleText) placeholderPolicy += ":visible-text";
         return SourceIdentity.Memory(slot.Slot.SourceText, state.SourceLocale, state.TargetLocale, slot.Slot.Context, placeholderPolicy, glossaryVersion, state.Source.Versions.Profile);
     }
 }

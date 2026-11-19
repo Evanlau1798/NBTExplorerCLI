@@ -2,7 +2,6 @@ namespace NBTExplorerCLI.Verification;
 
 internal sealed record VerificationContext(string FixtureRoot, string? ArtifactRoot);
 internal sealed record VerificationCase(string Name, string Suite, Action<VerificationContext> Test);
-
 internal static class CaseRegistry
 {
     public static readonly VerificationCase[] Cases =
@@ -196,6 +195,7 @@ internal static class CaseRegistry
         new("cache-shared-store-concurrent-cas", "scan", _ => StateRepositoryConcurrencyTests.SharedCacheStoreCasIsAtomic()),
         new("session-concurrent-same-store-cas", "session", _ => SessionConcurrencyTests.SameStoreCannotCommitSameRevisionTwice()),
         new("session-invalid-page-tampered-state", "session", _ => SessionBoundaryTests.InvalidPagesAndTamperedStateDoNotAdvance()),
+        new("session-replays-numeric-only-history", "session", _ => SessionBoundaryTests.ReplaysNumericOnlyHistoryWithEditedFontGlyph()),
         new("session-payload-pages-oversized-slot", "session", _ => SessionBoundaryTests.SerializedPagingAndOversizedSlot()),
         new("session-flush-failure-foreign-root", "session", _ => SessionBoundaryTests.FlushFailureAndForeignRootPreserveInputs()),
         new("session-disk-restart-idempotency", "session", _ => TranslationSessionTests.DiskSaveAndRestartIdempotency()),

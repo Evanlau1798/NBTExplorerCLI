@@ -9,7 +9,8 @@ namespace NBTExplorerCLI.Verification;
 
 internal static class CliTranslationContextTests
 {
-    private const string Stat = "§c-1% damage and §a+5% speed";
+    private const string Glyphs = "\uE100\uE000\uE101§\U000F0001\U00100001";
+    private const string Stat = Glyphs + "§c-1% damage and §a+5% speed";
     private const string Dialogue = "Friends, lower all 4 beacons before you leave. The barrier will fall, but the passage stays open at − 2% power.";
 
     public static void ProtectsVisibleNumbersAndFormatting()
@@ -20,6 +21,8 @@ internal static class CliTranslationContextTests
             using var exported = Success(Call(work, world, session, "export"));
             var data = exported.RootElement.GetProperty("data");
             var page = SessionExchangeJson.ReadPage(data.GetProperty("page").GetRawText());
+            Require(page.PolicyVersion == SessionPage.GlyphProtectionPolicy && data.GetProperty("prompt").GetString()!.Contains("私用字元", StringComparison.Ordinal),
+                "new world pages bind and explain glyph protection");
             var slot = page.Slots.Single(item => item.SourceText == Stat);
             var template = SessionExchangeJson.ReadReply(data.GetProperty("replyTemplate").GetRawText());
             Invocation Submit(Hash256 id, string translation)
@@ -33,13 +36,22 @@ internal static class CliTranslationContextTests
             foreach (var invalid in new[] { "§c1% 傷害 §a+5% 速度", "§c-1 傷害 §a+5% 速度", "§c-11% 傷害 §a+5% 速度",
                 "§c-1% 傷害 §a+5% 速度 2", "§a-1% 傷害 §c+5% 速度", "-1% 傷害 §a+5% 速度", "§c+5% 傷害 §a-1% 速度" })
             {
-                var denied = Submit(slot.SlotId, invalid);
+                var denied = Submit(slot.SlotId, Glyphs + invalid);
                 Require(denied.Exit == 3 && denied.Output.Contains("VisibleTextMismatch", StringComparison.Ordinal), "damage to literal values or formatting must fail before state advances");
+            }
+            const string translated = "§c傷害 -1%，§a速度 +5%";
+            foreach (var damaged in new[] { Glyphs[1..], "\uE000\uE100\uE101\U000F0001\U00100001",
+                Glyphs.Replace("\U000F0001", "\U000F0002", StringComparison.Ordinal),
+                Glyphs.Replace("\U000F0001", "", StringComparison.Ordinal), Glyphs[..^2], Glyphs + "\uE101" })
+            {
+                var denied = Submit(slot.SlotId, damaged + translated);
+                Require(denied.Exit == 3 && denied.Output.Contains("VisibleTextMismatch", StringComparison.Ordinal),
+                    "removing, reordering, or adding a private-use font glyph must fail before state advances");
             }
             var dialogue = page.Slots.Single(item => item.SourceText == Dialogue);
             var droppedSign = Submit(dialogue.SlotId, Dialogue.Replace("− 2%", "2%", StringComparison.Ordinal));
             Require(droppedSign.Exit == 3 && droppedSign.Output.Contains("VisibleTextMismatch", StringComparison.Ordinal), "spaced minus signs are protected");
-            using var accepted = Success(Submit(slot.SlotId, "§c傷害 -1%，§a速度 +5%"));
+            using var accepted = Success(Submit(slot.SlotId, Glyphs + translated));
             using var plan = Success(Call(work, world, session, "plan", "--direct", "--revision", "1"));
         });
     }

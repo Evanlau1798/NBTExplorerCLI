@@ -49,6 +49,7 @@ public static class SessionExchangeJson
             + "需翻譯時將 state 設為 translated、text 設為譯文（允許空值者可為空字串）；明確不需翻譯才使用 unchanged、text=null。不得加入地址、AST、事件、樣式或操作種類。字面標記不具有替換功能。\n"
             + "format 為 percent 或 normalizedPercent 時，保留相同參數索引及次數，可用 %1$s 等索引調整語序。normalizedPercent 的數值格式會轉為字串參數。literal 只依明列的 placeholders 保護文字。\n"
             + (page.Slots.Any(slot => slot.ProtectVisibleText) ? "protectVisibleText 為 true 時，保留原數字、正負號、百分比與 § 格式碼的順序，不得加入額外標記。同一組的告示牌各行、書頁與對話片段應連同原文閱讀，回覆仍按各 slot 填寫。\n" : "")
+            + (page.PolicyVersion == SessionPage.GlyphProtectionPolicy ? "受保護的私用字元用於自訂字型圖示，請依原順序保留。\n" : "")
             + PromptContext(page, context)
             + "來源頁面：\n" + WritePage(page) + "\n回覆範本：\n" + ReplyTemplate(page, operationId);
     private static string PromptContext(SessionPage page, IReadOnlyDictionary<Hash256, SessionContextGroup>? context)

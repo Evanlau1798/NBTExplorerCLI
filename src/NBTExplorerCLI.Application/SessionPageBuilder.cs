@@ -21,6 +21,7 @@ internal static class SessionPageBuilder
             var byId = slots.ToDictionary(slot => slot.SlotId);
             slots = slots.Select(slot => context[slot.SlotId]).DistinctBy(group => group.GroupId.Digest).SelectMany(group => group.Slots.Select(id => byId[id])).ToArray();
         }
+        var glyphSlots = request.Slots.Where(slot => slot.Placeholders.ProtectPrivateUseGlyphs).Select(slot => slot.Id.Digest).ToHashSet();
         var pages = ImmutableArray.CreateBuilder<ImmutableArray<Hash256>>(); var offset = 0;
         while (offset < slots.Length)
         {
@@ -28,7 +29,10 @@ internal static class SessionPageBuilder
             while (low <= high)
             {
                 var count = low + (high - low) / 2;
-                var page = new SessionPage(request.SessionId, long.MaxValue, request.Source.SnapshotId.Digest, pages.Count, Hash256.Compute([]), request.SourceLocale, request.TargetLocale, "literal-v1", request.Policy.PreservePlaceholderOrder, slots.AsSpan(offset, count).ToArray().ToImmutableArray());
+                var members = slots.AsSpan(offset, count).ToArray().ToImmutableArray();
+                var policyVersion = SessionPage.PolicyFor(members.Any(slot => glyphSlots.Contains(slot.SlotId)));
+                var page = new SessionPage(request.SessionId, long.MaxValue, request.Source.SnapshotId.Digest, pages.Count, Hash256.Compute([]), request.SourceLocale, request.TargetLocale,
+                    policyVersion, request.Policy.PreservePlaceholderOrder, members);
                 var fits = false;
                 try { fits = Encoding.UTF8.GetByteCount(SessionExchangeJson.Prompt(SessionExchangeJson.SealPage(page), Guid.NewGuid(), context)) <= request.Policy.MaximumPageBytes; }
                 catch (JsonException) { }
