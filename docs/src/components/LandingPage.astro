@@ -155,27 +155,41 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
                 <div class="stage-pane stage-pane-world">
                   <div class="pane-caption">{copy.heroScenes[0].worldLabel}</div>
 
-                  <div class="mc-sign" aria-label={copy.heroTranslate.signHeader}>
-                    <div class="mc-sign-inner">
-                      <div class="mc-sign-layer mc-layer-en">
+                  <div class="slot-card slot-accent-grass" aria-label={copy.heroTranslate.signHeader}>
+                    <div class="slot-card-head">
+                      <svg class="slot-card-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <rect x="2" y="3" width="12" height="7" rx="1.5" />
+                        <path d="M8 10v4M5 6.5h6" stroke-linecap="round" />
+                      </svg>
+                      <span class="slot-card-meta">{copy.heroTranslate.signHeader}</span>
+                    </div>
+                    <div class="slot-card-stack">
+                      <div class="slot-layer mc-layer-en">
                         {copy.heroTranslate.signOriginal.map((line, i) => (
-                          <span class={i === 0 ? 'mc-sign-title' : 'mc-sign-line'}>{line}</span>
+                          <span class={i === 0 ? 'slot-title' : 'slot-line'}>{line}</span>
                         ))}
                       </div>
-                      <div class="mc-sign-layer mc-layer-zh">
+                      <div class="slot-layer mc-layer-zh">
                         {copy.heroTranslate.signTranslated.map((line, i) => (
-                          <span class={i === 0 ? 'mc-sign-title' : 'mc-sign-line'}>{line}</span>
+                          <span class={i === 0 ? 'slot-title' : 'slot-line'}>{line}</span>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div class="mc-tooltip">
-                    <div class="mc-tooltip-name">
+                  <div class="slot-card slot-accent-cyan" aria-label={copy.heroTranslate.itemHeader}>
+                    <div class="slot-card-head">
+                      <svg class="slot-card-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path d="M8 2.2 13 5.2v5.6L8 13.8 3 10.8V5.2L8 2.2Z" stroke-linejoin="round" />
+                        <path d="M8 8v5.8M8 8l5-2.8M8 8 3 5.2" stroke-linecap="round" />
+                      </svg>
+                      <span class="slot-card-meta">{copy.heroTranslate.itemHeader}</span>
+                    </div>
+                    <div class="slot-item-name">
                       <span class="mc-layer-en">{copy.heroTranslate.itemNameOriginal}</span>
                       <span class="mc-layer-zh">{copy.heroTranslate.itemNameTranslated}</span>
                     </div>
-                    <div class="mc-tooltip-lore">
+                    <div class="slot-item-lore">
                       <span class="mc-layer-en">{copy.heroTranslate.itemLoreOriginal}</span>
                       <span class="mc-layer-zh">{copy.heroTranslate.itemLoreTranslated}</span>
                     </div>
@@ -346,27 +360,38 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
                 </div>
 
                 <div class="translate-showcase">
-                  <div class="mc-sign mc-sign-compact">
-                    <div class="mc-sign-inner">
-                      <div class="mc-sign-layer b-en">
+                  <div class="slot-card slot-card-compact slot-accent-grass">
+                    <div class="slot-card-head">
+                      <svg class="slot-card-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <rect x="2" y="3" width="12" height="7" rx="1.5" />
+                        <path d="M8 10v4M5 6.5h6" stroke-linecap="round" />
+                      </svg>
+                      <span class="slot-card-meta">{copy.bentoTranslate.signMeta}</span>
+                    </div>
+                    <div class="slot-card-stack">
+                      <div class="slot-layer b-en">
                         {copy.bentoTranslate.signOriginal.map((line, i) => (
-                          <span class={i === 0 ? 'mc-sign-title' : 'mc-sign-line'}>{line}</span>
+                          <span class={i === 0 ? 'slot-title' : 'slot-line'}>{line}</span>
                         ))}
                       </div>
-                      <div class="mc-sign-layer b-zh">
+                      <div class="slot-layer b-zh">
                         {copy.bentoTranslate.signTranslated.map((line, i) => (
-                          <span class={i === 0 ? 'mc-sign-title' : 'mc-sign-line'}>{line}</span>
+                          <span class={i === 0 ? 'slot-title' : 'slot-line'}>{line}</span>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div class="mc-book">
-                    <div class="mc-book-header">
-                      <span class="b-en">{copy.bentoTranslate.bookTitleOriginal}</span>
-                      <span class="b-zh">{copy.bentoTranslate.bookTitleTranslated}</span>
+                  <div class="slot-card slot-card-compact slot-accent-cyan">
+                    <div class="slot-card-head">
+                      <svg class="slot-card-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path d="M3 3.2A1.2 1.2 0 0 1 4.2 2h7.6A1.2 1.2 0 0 1 13 3.2v9.6a1.2 1.2 0 0 1-1.2 1.2H4.2A1.2 1.2 0 0 1 3 12.8V3.2Z" />
+                        <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3.2" stroke-linecap="round" />
+                      </svg>
+                      <span class="slot-card-meta b-en">{copy.bentoTranslate.bookTitleOriginal}</span>
+                      <span class="slot-card-meta b-zh">{copy.bentoTranslate.bookTitleTranslated}</span>
                     </div>
-                    <p class="mc-book-body">
+                    <p class="slot-prose">
                       <span class="b-en">{copy.bentoTranslate.bookLineOriginal}</span>
                       <span class="b-zh">{copy.bentoTranslate.bookLineTranslated}</span>
                     </p>
@@ -772,38 +797,109 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
         nodes.forEach((node, idx) => node.addEventListener('click', () => selectStep(idx)));
       }
 
-      // 9. Cursor spotlight + gentle 3D tilt (desktop pointer only)
+      // 9. Cursor spotlight + responsive rAF-interpolated 3D tilt (zero transition-delay lag)
       const finePointer = window.matchMedia('(pointer: fine)').matches;
       if (finePointer && !prefersReducedMotion) {
+        const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
         document.querySelectorAll<HTMLElement>('[data-spotlight]').forEach((el) => {
-          el.addEventListener('pointermove', (event) => {
+          const hasTilt = el.hasAttribute('data-tilt');
+          let targetRx = 0;
+          let targetRy = 0;
+          let targetScale = 1;
+          let currentRx = 0;
+          let currentRy = 0;
+          let currentScale = 1;
+          let hovering = false;
+          let rafId = 0;
+
+          const tickTilt = () => {
+            const ease = hovering ? 0.3 : 0.16;
+            currentRx += (targetRx - currentRx) * ease;
+            currentRy += (targetRy - currentRy) * ease;
+            currentScale += (targetScale - currentScale) * ease;
+
+            el.style.setProperty('--rx', `${currentRx.toFixed(3)}deg`);
+            el.style.setProperty('--ry', `${currentRy.toFixed(3)}deg`);
+            el.style.setProperty('--card-scale', currentScale.toFixed(4));
+
+            const settled =
+              Math.abs(targetRx - currentRx) < 0.015 &&
+              Math.abs(targetRy - currentRy) < 0.015 &&
+              Math.abs(targetScale - currentScale) < 0.0005;
+
+            if (settled) {
+              currentRx = targetRx;
+              currentRy = targetRy;
+              currentScale = targetScale;
+              el.style.setProperty('--rx', `${currentRx.toFixed(2)}deg`);
+              el.style.setProperty('--ry', `${currentRy.toFixed(2)}deg`);
+              el.style.setProperty('--card-scale', currentScale.toFixed(3));
+              rafId = 0;
+              if (!hovering) el.classList.remove('is-tilting');
+              return;
+            }
+            rafId = requestAnimationFrame(tickTilt);
+          };
+
+          const startTiltLoop = () => {
+            if (!rafId) rafId = requestAnimationFrame(tickTilt);
+          };
+
+          const updateFromEvent = (event: PointerEvent) => {
             const rect = el.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
-            el.style.setProperty('--mx', `${x}px`);
-            el.style.setProperty('--my', `${y}px`);
-            if (el.hasAttribute('data-tilt')) {
-              const rx = ((y / rect.height) - 0.5) * -3.2;
-              const ry = ((x / rect.width) - 0.5) * 3.2;
-              el.style.setProperty('--rx', `${rx.toFixed(2)}deg`);
-              el.style.setProperty('--ry', `${ry.toFixed(2)}deg`);
+            el.style.setProperty('--mx', `${x.toFixed(1)}px`);
+            el.style.setProperty('--my', `${y.toFixed(1)}px`);
+            if (hasTilt && rect.width > 0 && rect.height > 0) {
+              const nx = clamp(x / rect.width - 0.5, -0.5, 0.5);
+              const ny = clamp(y / rect.height - 0.5, -0.5, 0.5);
+              targetRx = -ny * 8.4;
+              targetRy = nx * 8.4;
+              startTiltLoop();
             }
+          };
+
+          el.addEventListener('pointerenter', (event) => {
+            hovering = true;
+            if (hasTilt) {
+              el.classList.add('is-visible', 'is-revealed', 'is-tilting');
+              targetScale = 1.008;
+            }
+            updateFromEvent(event);
           });
-          el.addEventListener('pointerleave', () => {
-            el.style.setProperty('--rx', '0deg');
-            el.style.setProperty('--ry', '0deg');
-          });
+
+          el.addEventListener('pointermove', updateFromEvent);
+
+          const resetTilt = () => {
+            hovering = false;
+            if (hasTilt) {
+              targetRx = 0;
+              targetRy = 0;
+              targetScale = 1;
+              startTiltLoop();
+            }
+          };
+
+          el.addEventListener('pointerleave', resetTilt);
+          el.addEventListener('pointercancel', resetTilt);
         });
       }
 
       // 10. Scroll-triggered stagger reveal (also reveals elements passed when jumping straight to bottom)
       const revealNodes = [...document.querySelectorAll<HTMLElement>('[data-reveal]')];
       if (!prefersReducedMotion && 'IntersectionObserver' in window && revealNodes.length) {
+        const markVisible = (node: HTMLElement) => {
+          if (node.classList.contains('is-visible')) return;
+          node.classList.add('is-visible');
+          const delayMs = parseFloat(node.style.getPropertyValue('--reveal-delay')) || 0;
+          window.setTimeout(() => node.classList.add('is-revealed'), delayMs + 620);
+        };
         const revealPassed = () => {
           const thresholdY = window.innerHeight + 80;
           revealNodes.forEach((node) => {
             if (!node.classList.contains('is-visible') && node.getBoundingClientRect().top <= thresholdY) {
-              node.classList.add('is-visible');
+              markVisible(node);
             }
           });
         };
@@ -811,7 +907,7 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
           (entries) => {
             entries.forEach((entry) => {
               if (entry.isIntersecting) {
-                entry.target.classList.add('is-visible');
+                markVisible(entry.target as HTMLElement);
                 io.unobserve(entry.target);
               }
             });
@@ -838,7 +934,7 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
         );
         revealPassed();
       } else {
-        revealNodes.forEach((node) => node.classList.add('is-visible'));
+        revealNodes.forEach((node) => node.classList.add('is-visible', 'is-revealed'));
       }
 
       // 11. Lightweight floating digitized voxel pixels (Grass -> Cyan sparks)

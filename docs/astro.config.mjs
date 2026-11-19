@@ -30,6 +30,15 @@ export default defineConfig({
       },
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Evanlau1798/NBTExplorerCLI' }],
       customCss: ['./src/styles/custom.css'],
+      expressiveCode: {
+        styleOverrides: {
+          borderRadius: '0.625rem',
+          borderWidth: '1px',
+          frames: {
+            editorTabBorderRadius: '0.5rem',
+          },
+        },
+      },
       sidebar: [
         {
           label: 'Start Here',

@@ -1,4 +1,4 @@
-import { PRODUCT_META, type LocaleKey } from './cli-surface';
+import type { LocaleKey } from './cli-surface';
 
 export interface HeroSceneCopy {
   id: 'translate' | 'inspect' | 'pack';
@@ -36,6 +36,7 @@ export interface LandingCopy {
   heroScenes: HeroSceneCopy[];
   heroTranslate: {
     signHeader: string;
+    itemHeader: string;
     toggleOriginal: string;
     toggleTranslated: string;
     signOriginal: string[];
@@ -65,6 +66,7 @@ export interface LandingCopy {
     linkLabel: string;
     btnOriginal: string;
     btnTranslated: string;
+    signMeta: string;
     signOriginal: string[];
     signTranslated: string[];
     bookTitleOriginal: string;
@@ -140,16 +142,16 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     heroTitlePlain: 'Minecraft worlds,',
     heroTitleAccent: 'clearly decoded.',
     heroSubtitle:
-      'Inspect saves, translate entire adventure maps, and export resource packs on Windows — safely offline.',
-    ctaDownload: 'Download for Windows',
+      'Inspect saves, translate entire adventure maps, and export resource packs — safely offline.',
+    ctaDownload: 'Download',
     ctaDocs: 'Explore Docs',
     stageAriaLabel: 'Interactive world transformation preview',
     heroScenes: [
       {
         id: 'translate',
         label: 'Translate Map',
-        worldLabel: 'In-Game World',
-        outputLabel: 'Translated Slot',
+        worldLabel: 'Map Text Slots',
+        outputLabel: 'Translated Output',
         bridgeCmd: 'translate',
       },
       {
@@ -168,7 +170,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       },
     ],
     heroTranslate: {
-      signHeader: 'Oak Sign · 128, 64, -42',
+      signHeader: 'sign · 128, 64, -42',
+      itemHeader: 'item.lore · slot #14',
       toggleOriginal: 'Original',
       toggleTranslated: 'Translated',
       signOriginal: ['SUNKEN CITADEL', 'Enter the vault', 'to claim the key'],
@@ -216,10 +219,11 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       linkLabel: 'Map translation guide',
       btnOriginal: 'EN',
       btnTranslated: '繁中',
+      signMeta: 'sign · block_entity',
       signOriginal: ['ANCIENT GATE', 'Place the emerald', 'to awaken the bridge'],
       signTranslated: ['古老石門', '放上綠寶石', '喚醒沉睡之橋'],
-      bookTitleOriginal: 'Keeper Journal · p.1',
-      bookTitleTranslated: '守門人手記 · 第 1 頁',
+      bookTitleOriginal: 'book · p.1 · Keeper Journal',
+      bookTitleTranslated: 'book · p.1 · 守門人手記',
       bookLineOriginal: 'The lighthouse dims when night falls across the harbor.',
       bookLineTranslated: '當夜幕降臨海港，燈塔的光芒便會逐漸黯淡。',
       progressLabel: '142 / 142 slots ready',
@@ -295,8 +299,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     ctaTitle: 'Ready for your next world.',
-    ctaSubtitle: 'Unzip ' + PRODUCT_META.zipName + ' on Windows x64 — no .NET install needed.',
-    ctaPrimary: 'Download ' + PRODUCT_META.zipName,
+    ctaSubtitle: 'Get the latest standalone build on GitHub Releases — unzip and run, no .NET install needed.',
+    ctaPrimary: 'Go to Download Page',
     ctaQuickstart: 'Quickstart Guide',
     ctaAgents: 'AI Agent Manual (llms.txt)',
     footerNote:
@@ -324,15 +328,15 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     heroTitlePlain: '解碼方塊世界，',
     heroTitleAccent: '安全翻譯與編輯。',
     heroSubtitle:
-      '解壓縮即用的 Windows 工具，幫你唯讀查閱存檔、翻譯整張冒險地圖並打包資源包。',
-    ctaDownload: '下載 Windows 版',
+      '解壓縮即用的本地命令列工具，幫你唯讀查閱存檔、翻譯整張冒險地圖並打包資源包。',
+    ctaDownload: '前往下載頁面',
     ctaDocs: '瀏覽教學文件',
     stageAriaLabel: '互動式世界轉換預覽',
     heroScenes: [
       {
         id: 'translate',
         label: '翻譯地圖',
-        worldLabel: '遊戲內物件',
+        worldLabel: '地圖文字槽位',
         outputLabel: '轉換結果',
         bridgeCmd: 'translate',
       },
@@ -352,7 +356,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       },
     ],
     heroTranslate: {
-      signHeader: '橡木告示牌 · 128, 64, -42',
+      signHeader: 'sign · 128, 64, -42',
+      itemHeader: 'item.lore · slot #14',
       toggleOriginal: '原文',
       toggleTranslated: '譯文',
       signOriginal: ['SUNKEN CITADEL', 'Enter the vault', 'to claim the key'],
@@ -400,10 +405,11 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       linkLabel: '看地圖翻譯教學',
       btnOriginal: '原文',
       btnTranslated: '繁中',
+      signMeta: 'sign · 告示牌',
       signOriginal: ['ANCIENT GATE', 'Place the emerald', 'to awaken the bridge'],
       signTranslated: ['古老石門', '放上綠寶石', '喚醒沉睡之橋'],
-      bookTitleOriginal: 'Keeper Journal · p.1',
-      bookTitleTranslated: '守門人手記 · 第 1 頁',
+      bookTitleOriginal: 'book · p.1 · Keeper Journal',
+      bookTitleTranslated: 'book · 第 1 頁 · 守門人手記',
       bookLineOriginal: 'The lighthouse dims when night falls across the harbor.',
       bookLineTranslated: '當夜幕降臨海港，燈塔的光芒便會逐漸黯淡。',
       progressLabel: '142 / 142 筆譯文就緒',
@@ -479,8 +485,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     ctaTitle: '準備好整理你的世界了嗎？',
-    ctaSubtitle: '下載並解壓縮 ' + PRODUCT_META.zipName + '，免裝 .NET 直接開始。',
-    ctaPrimary: '下載 ' + PRODUCT_META.zipName,
+    ctaSubtitle: '前往 GitHub Releases 取得最新版執行檔，免裝 .NET，解壓縮即可開始使用。',
+    ctaPrimary: '前往下載頁面',
     ctaQuickstart: '新手快速入門',
     ctaAgents: 'AI Agent 專區 (llms.txt)',
     footerNote: 'MIT 授權條款釋出。隨附第三方授權聲明。非 Minecraft、Mojang 或 Microsoft 官方產品。',

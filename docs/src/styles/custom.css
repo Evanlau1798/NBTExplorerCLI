@@ -1,12 +1,24 @@
 :root {
   --sl-font: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
   --sl-font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --sl-sidebar-width: 16.5rem;
+  --sl-content-width: 56rem;
+  --nbt-toc-width: 13.5rem;
   --nbt-radius: 10px;
   --nbt-radius-sm: 6px;
   --nbt-grass: #4ade80;
   --nbt-cyan: #38bdf8;
   --nbt-amber: #fbbf24;
   --nbt-danger: #f87171;
+}
+
+@media (min-width: 50em) {
+  :root {
+    --sl-text-h1: 2.15rem;
+    --sl-text-h2: 1.5rem;
+    --sl-text-h3: 1.2rem;
+    --sl-text-h4: 1.05rem;
+  }
 }
 
 :root,
@@ -87,6 +99,41 @@ starlight-theme-select select::picker-icon {
     radial-gradient(ellipse 68% 360px at 50% -40px, rgba(56, 189, 248, 0.09), rgba(74, 222, 128, 0.04) 45%, transparent 78%);
 }
 
+/* Slimmer right TOC ("On this page") so docs content gets ample width */
+@media (min-width: 72rem) {
+  .right-sidebar-container {
+    width: var(--nbt-toc-width);
+    flex: 0 0 var(--nbt-toc-width);
+  }
+
+  .right-sidebar {
+    width: var(--nbt-toc-width);
+    inset-inline-end: 0;
+  }
+
+  .right-sidebar-panel {
+    padding: 1rem 0.9rem;
+  }
+
+  .right-sidebar-panel .sl-container {
+    width: auto;
+    max-width: 100%;
+  }
+
+  .right-sidebar-panel h2 {
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+    color: var(--sl-color-gray-2);
+  }
+
+  [data-has-sidebar][data-has-toc] .main-pane {
+    --sl-content-margin-inline: auto;
+    width: calc(100% - var(--nbt-toc-width));
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
 /* Smooth page enter animation */
 @keyframes docsFadeRise {
   from {
@@ -127,12 +174,17 @@ starlight-theme-select select::picker-icon {
   letter-spacing: -0.02em;
 }
 
-.sl-markdown-content pre,
+.sl-markdown-content pre:not(:where(.not-content *)),
 .sl-markdown-content table,
 .starlight-aside,
 .sl-markdown-content .card,
 .sl-markdown-content sl-file-tree {
   border-radius: var(--nbt-radius);
+}
+
+/* Ensure Expressive Code frame headers clip cleanly to the outer radius with zero corner seams */
+.expressive-code .frame .header {
+  overflow: hidden;
 }
 
 .sl-markdown-content .card {
@@ -152,9 +204,25 @@ starlight-theme-select select::picker-icon {
 }
 
 .sl-markdown-content code:not(:where(.not-content *)) {
+  font-size: 0.85em;
+  padding: 0.14em 0.38em;
   border-radius: 5px;
   font-weight: 500;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) code:not(:where(.not-content *)) {
+  font-size: 0.78em;
+  font-weight: 600;
+  padding: 0.14em 0.42em;
+  margin-inline: 0.08em;
+  vertical-align: 0.05em;
+}
+
+@media (min-width: 50em) {
+  .sl-markdown-content :is(h1, h2, h3, h4, h5, h6) code:not(:where(.not-content *)) {
+    white-space: nowrap;
+  }
 }
 
 /* Tables */
