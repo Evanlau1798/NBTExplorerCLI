@@ -47,6 +47,9 @@ public static class NbtTextExtractor
         if ((layoutProfile == MinecraftProfiles.ClassicAnvil || explicitClassic)
             && version.Status == ResolutionStatus.Missing && source.Role is WorldSourceRole.Level or WorldSourceRole.Terrain or WorldSourceRole.Player or WorldSourceRole.SavedData)
             return layoutProfile!;
+        if (MinecraftProfiles.IsReadOnlyAnvil(layoutProfile) && version.Status == ResolutionStatus.Missing
+            && source.Role is WorldSourceRole.Terrain or WorldSourceRole.Player or WorldSourceRole.SavedData)
+            return layoutProfile!;
         return dataVersion is { } number && MinecraftProfiles.ForDataVersion(number) is { } profile ? profile
             : throw new CodecException(CodecError.UnsupportedProfile, 0, "Missing or unknown artifact DataVersion");
     }
@@ -56,6 +59,7 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
 {
     private readonly bool modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
     private readonly bool classic = profile == MinecraftProfiles.ClassicAnvil || MinecraftProfiles.IsVersionedClassic(profile);
+    private readonly bool earlyAnvil = MinecraftProfiles.IsReadOnlyAnvil(profile);
     private NbtValue? Field(NbtValue value, string key, TypedPath path)
         => Field(value, key, path, out _);
     private NbtValue? Field(NbtValue value, string key, TypedPath path, out ResolutionStatus status)
@@ -80,14 +84,17 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
     internal void Component(NbtValue? value, TypedPath path, string role, bool classicEncoded = false)
     {
         if (value is null || !output.CouldInclude(role)) return;
-        if (classic && (profile != MinecraftProfiles.Java181 || !classicEncoded)) { Literal(value, path, role); return; }
+        if (classic && (profile != MinecraftProfiles.Java181 || !classicEncoded) || profile == MinecraftProfiles.EarlyAnvil && !classicEncoded)
+        { Literal(value, path, role); return; }
         var source = new SourceAddress(binding.Artifact, path, role, binding.Dimension, binding.Chunk);
         if (modern) output.Merge(TextComponentExtractor.Nbt(source, value, profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
         else if (value is NbtString json)
         {
-            var input = profile == MinecraftProfiles.Java181 ? ClassicTextJson.Normalize(json.Value, limits, storedComponent: true) : json.Value;
-            if (profile == MinecraftProfiles.Java181 && input == "null") return;
-            output.Merge(TextComponentExtractor.EmbeddedJsonString(source, input, profile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
+            var jsonProfile = earlyAnvil ? MinecraftProfiles.Java181 : profile;
+            var lenient = profile == MinecraftProfiles.Java181 || earlyAnvil && classicEncoded;
+            var input = lenient ? ClassicTextJson.Normalize(json.Value, limits, storedComponent: true) : json.Value;
+            if (lenient && input == "null") return;
+            output.Merge(TextComponentExtractor.EmbeddedJsonString(source, input, jsonProfile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
         }
         else output.Diagnostic(path, "InvalidJsonComponentString");
     }

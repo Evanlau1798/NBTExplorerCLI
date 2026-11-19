@@ -351,8 +351,35 @@ export interface ProfileMatrixRow {
 
 export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   {
+    profile: 'java-early-anvil',
+    dataVersionRange: '100–1457',
+    packFormat: null,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-tags-1.20.4',
+    textSchema: 'java-early-anvil-text (v1)',
+    packLayout: 'java-pack-plural',
+  },
+  {
+    profile: 'java-early-anvil-json-names',
+    dataVersionRange: '1458–1513',
+    packFormat: null,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-tags-1.20.4',
+    textSchema: 'java-early-anvil-json-names (v1)',
+    packLayout: 'java-pack-plural',
+  },
+  {
+    profile: 'java-1.13',
+    dataVersionRange: '1514–1802',
+    packFormat: null,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-tags-1.20.4',
+    textSchema: 'java-text-json (v1)',
+    packLayout: 'java-pack-plural',
+  },
+  {
     profile: 'java-1.14.4',
-    dataVersionRange: '1976–3462',
+    dataVersionRange: '1803–3462',
     packFormat: null,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-tags-1.20.4',

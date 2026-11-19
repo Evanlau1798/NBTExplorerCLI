@@ -18,7 +18,7 @@ internal sealed partial class NbtTextReader
     {
         var path = TypedPath.Root;
         var nested = Field(root, "Level", path);
-        var wrapped = classic || dataVersion is < FirstFlatTerrainDataVersion;
+        var wrapped = classic || earlyAnvil || dataVersion is < FirstFlatTerrainDataVersion;
         if (wrapped)
         {
             path = At(path, "Level");
@@ -62,11 +62,11 @@ internal sealed partial class NbtTextReader
         }
         if (!signsOnly)
         {
-            var role = identity == "minecraft:command_block" || classic && identity == "minecraft:Control" ? "command_block.name" : "container.name";
+            var role = identity == "minecraft:command_block" || (classic || earlyAnvil) && identity == "minecraft:Control" ? "command_block.name" : "container.name";
             Component(Field(value, "CustomName", path), At(path, "CustomName"), role);
             foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
         }
-        if (classic && identity == "minecraft:Sign")
+        if ((classic || earlyAnvil) && identity == "minecraft:Sign")
             foreach (var field in new[] { "Text1", "Text2", "Text3", "Text4" })
                 Component(Field(value, field, path), At(path, field), "sign.front.line", classicEncoded: true);
         if (signsOnly) return;
@@ -81,7 +81,7 @@ internal sealed partial class NbtTextReader
                 if (modern || identity != "minecraft:sign" || sign.Entries.Any(entry => entry.Name is "front_text" or "back_text"))
                 { output.Diagnostic(path, "UnsupportedSignSchema"); return; }
                 foreach (var field in legacyLines)
-                    Component(Field(value, field, path), At(path, field), "sign.front.line");
+                    Component(Field(value, field, path), At(path, field), "sign.front.line", classicEncoded: earlyAnvil);
                 return;
             }
             foreach (var side in new[] { "front", "back" })
@@ -94,7 +94,7 @@ internal sealed partial class NbtTextReader
             }
         }
         if (identity == "minecraft:lectern" && Field(value, "Book", path) is { } book) Item(book, At(path, "Book"), "lectern.book");
-        if (identity == "minecraft:command_block" || MinecraftProfiles.IsVersionedClassic(profile) && identity == "minecraft:Control") StoredCommand(value, path);
+        if (identity == "minecraft:command_block" || (earlyAnvil || MinecraftProfiles.IsVersionedClassic(profile)) && identity == "minecraft:Control") StoredCommand(value, path);
         if (identity == "minecraft:mob_spawner")
         {
             SpawnedEntity(value, path, "SpawnData");
@@ -113,7 +113,14 @@ internal sealed partial class NbtTextReader
     {
         if (Field(value, "Command", path) is { } command)
         {
-            if (command is NbtString text) output.Command(At(path, "Command"), text.Value);
+            if (earlyAnvil && command is NbtString raw)
+            {
+                if (!output.CouldInclude("command.block")) return;
+                var address = At(path, "Command");
+                output.Literal(address, raw.Value, "command.block.raw");
+                output.Diagnostic(address, "UnsupportedEarlyAnvilCommandGrammar");
+            }
+            else if (command is NbtString text) output.Command(At(path, "Command"), text.Value);
             else output.Diagnostic(At(path, "Command"), "InvalidCommand");
         }
     }
@@ -129,9 +136,9 @@ internal sealed partial class NbtTextReader
         };
         if (identity is null) { output.Diagnostic(path, "MissingEntityIdentity"); return; }
         if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingEntityIdentity"); return; }
-        var armorStand = identity == "minecraft:armor_stand" || classic && identity == "minecraft:ArmorStand";
+        var armorStand = identity == "minecraft:armor_stand" || (classic || earlyAnvil) && identity == "minecraft:ArmorStand";
         Component(Field(value, "CustomName", path), At(path, "CustomName"), armorStand ? "armor_stand.name" : "entity.name");
-        if (identity == "minecraft:command_block_minecart" || profile == MinecraftProfiles.Java181 && identity == "minecraft:MinecartCommandBlock") StoredCommand(value, path);
+        if (identity == "minecraft:command_block_minecart" || (earlyAnvil || profile == MinecraftProfiles.Java181) && identity == "minecraft:MinecartCommandBlock") StoredCommand(value, path);
         if (identity == "minecraft:text_display") Component(Field(value, "text", path), At(path, "text"), "text_display.text");
         Player(value, path);
         foreach (var (item, itemPath) in Sequence(Field(value, "Items", path), At(path, "Items"))) Item(item, itemPath);
@@ -176,7 +183,7 @@ internal sealed partial class NbtTextReader
         }
         var filename = artifact[(artifact.LastIndexOf('/') + 1)..];
         if (!VanillaSavedDataPath(artifact, filename)) { output.Diagnostic(TypedPath.Root, "UnsupportedSavedData"); return; }
-        if (classic && artifact == "data/idcounts.dat" && root is NbtCompound counters
+        if ((classic || earlyAnvil) && artifact == "data/idcounts.dat" && root is NbtCompound counters
             && counters.Entries.All(entry => entry.Value is NbtShort)) return;
         if (Field(root, "data", TypedPath.Root) is not { } data) { output.Diagnostic(TypedPath.Root, "MissingSavedDataRoot"); return; }
         var path = At(TypedPath.Root, "data");
@@ -194,19 +201,24 @@ internal sealed partial class NbtTextReader
         else if (filename == "custom_boss_events.dat") Bossbars(data, path);
         else if (filename == "scoreboard.dat")
         {
+            var plain = earlyAnvil || MinecraftProfiles.UsesClassicPlainText(profile);
+            void ScoreboardText(NbtValue? value, TypedPath field, string role)
+            {
+                if (plain) Literal(value, field, role);
+                else Component(value, field, role);
+            }
             foreach (var (objective, objectivePath) in Sequence(Field(data, "Objectives", path), At(path, "Objectives")))
-                Component(Field(objective, "DisplayName", objectivePath), At(objectivePath, "DisplayName"), "scoreboard.objective.name");
-            var plain = MinecraftProfiles.UsesClassicPlainText(profile);
+                ScoreboardText(Field(objective, "DisplayName", objectivePath), At(objectivePath, "DisplayName"), "scoreboard.objective.name");
             var prefix = plain ? "Prefix" : "MemberNamePrefix";
             var suffix = plain ? "Suffix" : "MemberNameSuffix";
             foreach (var (team, teamPath) in Sequence(Field(data, "Teams", path), At(path, "Teams")))
             {
-                Component(Field(team, "DisplayName", teamPath), At(teamPath, "DisplayName"), "scoreboard.team.name");
-                Component(Field(team, prefix, teamPath), At(teamPath, prefix), "scoreboard.team.prefix");
-                Component(Field(team, suffix, teamPath), At(teamPath, suffix), "scoreboard.team.suffix");
+                ScoreboardText(Field(team, "DisplayName", teamPath), At(teamPath, "DisplayName"), "scoreboard.team.name");
+                ScoreboardText(Field(team, prefix, teamPath), At(teamPath, prefix), "scoreboard.team.prefix");
+                ScoreboardText(Field(team, suffix, teamPath), At(teamPath, suffix), "scoreboard.team.suffix");
             }
         }
-        else if (!(classic && artifact == "data/" + filename && ClassicNonTextData(filename, data, path))
+        else if (!(artifact == "data/" + filename && ClassicNonTextData(filename, data, path))
             && !KnownNonTextData(artifact, filename)) output.Diagnostic(TypedPath.Root, "UnsupportedSavedData");
     }
     private void Bossbars(NbtValue value, TypedPath path)
@@ -214,6 +226,6 @@ internal sealed partial class NbtTextReader
         if (value is not NbtCompound bosses) { output.Diagnostic(path, "InvalidBossbars"); return; }
         if (bosses.Entries.Select(entry => entry.Name).Distinct(StringComparer.Ordinal).Count() != bosses.Entries.Length)
         { output.Diagnostic(path, "AmbiguousBossbars"); return; }
-        foreach (var entry in bosses.Entries) Component(Field(entry.Value, "Name", At(path, entry.Name)), At(At(path, entry.Name), "Name"), "bossbar.name");
+        foreach (var entry in bosses.Entries) Component(Field(entry.Value, "Name", At(path, entry.Name)), At(At(path, entry.Name), "Name"), "bossbar.name", classicEncoded: earlyAnvil);
     }
 }

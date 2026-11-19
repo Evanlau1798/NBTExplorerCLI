@@ -81,7 +81,9 @@ internal sealed partial class NbtTextReader
         {
             var displayPath = At(path, "display");
             Component(Field(display, "Name", displayPath), At(displayPath, "Name"), "item.name");
-            foreach (var (lore, lorePath) in Sequence(Field(display, "Lore", displayPath), At(displayPath, "Lore"))) Component(lore, lorePath, "item.lore");
+            foreach (var (lore, lorePath) in Sequence(Field(display, "Lore", displayPath), At(displayPath, "Lore")))
+                if (MinecraftProfiles.UsesPlainItemLore(profile)) Literal(lore, lorePath, "item.lore");
+                else Component(lore, lorePath, "item.lore");
         }
         if (Field(tag, "BlockEntityTag", path) is { } block && !(id == "minecraft:shield" && ShieldPatterns(block)))
             BlockEntity(block, At(path, "BlockEntityTag"), fallbackIdentity: TaggedBlockIdentity(id));

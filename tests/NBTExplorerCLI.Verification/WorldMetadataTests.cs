@@ -1,13 +1,26 @@
+using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using NBTExplorerCLI.Infrastructure;
 using NBTExplorerCLI.Minecraft;
 using static NBTExplorerCLI.Verification.TextSlotTests;
 using static NBTExplorerCLI.Verification.CandidateIoTests;
+using static NBTExplorerCLI.Verification.NbtItemTextTests;
 
 namespace NBTExplorerCLI.Verification;
 
 internal static class WorldMetadataTests
 {
+    internal static readonly VerificationCase[] Cases =
+    [
+        new("world-metadata-registry-dimensions", "discovery", _ => RegistryBackedDimensionRoots()),
+        new("world-metadata-early-anvil-scoreboards", "discovery", _ => EarlyAnvilVersionedScoreboards()),
+        new("world-metadata-early-anvil-terrain-text", "discovery", _ => EarlyAnvilTerrainText()),
+        new("world-metadata-early-anvil-independent-text-transitions", "discovery", _ => EarlyAnvilTextTransitions()),
+        new("prepare-world-early-anvil-mixed-write-boundary", "preparation", _ => EarlyAnvilArtifactIsReadOnly()),
+        new("world-metadata-missing-conflicting-unsafe", "discovery", _ => MissingConflictingAndUnsafeEvidence())
+    ];
+
     internal static NbtCompound Dimensions => new([
         new("minecraft:overworld", new NbtCompound([])), new("minecraft:the_nether", new NbtCompound([])),
         new("minecraft:the_end", new NbtCompound([])), new("models:tags/worldgen", new NbtCompound([]))]);
@@ -23,6 +36,37 @@ internal static class WorldMetadataTests
     internal static NbtDocument Classic(params NbtEntry[] extra) => new("", new NbtCompound([
         new("Data", new NbtCompound([new("version", new NbtInt(19133)), new("RandomSeed", new NbtLong(17)),
             new("SpawnX", new NbtInt(0)), new("SpawnZ", new NbtInt(0)), .. extra]))]));
+    public static void EarlyAnvilVersionedScoreboards()
+    {
+        var artifact = new ArtifactAddress(Guid.NewGuid(), "data/scoreboard.dat", ArtifactKind.Nbt);
+        var source = new WorldSourceLocation(artifact, WorldSourceRole.SavedData);
+        const string encoded = "{\"text\":\"Name\"}";
+        foreach (var (version, ownVersion, visible) in new[]
+        {
+            (100, false, encoded), (169, false, encoded), (1343, false, encoded), (1493, true, encoded), (1513, true, encoded),
+            (1514, true, "Name"), (1516, true, "Name"), (1519, true, "Name"), (1631, true, "Name"), (1975, true, "Name")
+        })
+        {
+            var world = WorldMetadata.Read(Classic(new NbtEntry("DataVersion", new NbtInt(version))));
+            Require(world.DataVersion == version && world.DimensionDirectories["DIM1"] == "minecraft:the_end", "early DataVersion keeps the original Anvil paths");
+            var objective = new NbtCompound([new("DisplayName", new NbtString(encoded))]);
+            var data = new NbtCompound([new("Objectives", new NbtList(NbtType.Compound, [objective]))]);
+            var entries = new List<NbtEntry> { new("data", data) };
+            if (ownVersion) entries.Insert(0, new("DataVersion", new NbtInt(version)));
+            var board = new NbtDocument("", new NbtCompound(entries));
+            var result = NbtTextExtractor.Extract(source, board, layoutProfile: world.Profile);
+            Require(result.Complete && result.Occurrences.Single().Text == visible, "old Anvil scoreboard schemas distinguish literals from JSON components by version evidence");
+        }
+        Require(Enumerable.Range(100, 1877).All(version => MinecraftProfiles.ForDataVersion(version) is not null), "versioned Anvil coverage has no numeric gaps before Java 1.14.4");
+
+        var village = source with { Artifact = new(artifact.WorldId, "data/villages_nether.dat", ArtifactKind.Nbt) };
+        NbtDocument Villages(NbtValue list) => new("", new NbtCompound([new("DataVersion", new NbtInt(1631)),
+            new("data", new NbtCompound([new("Villages", list), new("Tick", new NbtInt(12))]))]));
+        Require(NbtTextExtractor.Extract(village, Villages(new NbtList(NbtType.End, []))) is { Complete: true, Occurrences.IsEmpty: true },
+            "versioned village state is a known nontext artifact");
+        Require(!NbtTextExtractor.Extract(village, Villages(new NbtString("unexpected"))).Complete,
+            "an incorrect village list cannot claim nontext coverage");
+    }
     public static void RegistryBackedDimensionRoots()
     {
         foreach (var version in new[] { 1976, 2565 })
@@ -82,6 +126,68 @@ internal static class WorldMetadataTests
                 $"DataVersion {version} can use the same independently validated namespaced layout");
         }
     }
+    private static void EarlyAnvilTerrainText()
+    {
+        var sign = C(E("id", S("Sign")), E("Text1", Text("Guide sign", false)));
+        var bookTag = C(E("title", S("Guide title")), E("pages", L(Text("Guide page", false))));
+        var book = C(E("id", S("minecraft:written_book")), E("tag", bookTag));
+        var display = C(E("Name", S("Plain item")), E("Lore", L(S("Plain lore"))));
+        var paper = C(E("id", S("minecraft:paper")), E("tag", C(E("display", display))));
+        var chest = C(E("id", S("Chest")), E("CustomName", S("Plain chest")), E("Items", L(book, paper)));
+        var entity = C(E("id", S("ArmorStand")), E("CustomName", S("Plain entity")));
+        var level = C(E("xPos", new NbtInt(0)), E("zPos", new NbtInt(0)), E("TileEntities", L(sign, chest)), E("Entities", L(entity)));
+        var document = new NbtDocument("", C(E("DataVersion", new NbtInt(169)), E("Level", level)));
+        var source = new WorldSourceLocation(new(Guid.NewGuid(), "region/r.0.0.mca", ArtifactKind.Region), WorldSourceRole.Terrain, "minecraft:overworld");
+        var result = NbtTextExtractor.Extract(source, document, new(0, 0));
+        Require(result.Complete && result.Occurrences.Select(item => item.Text).Order(StringComparer.Ordinal).SequenceEqual(
+            new[] { "Guide page", "Guide sign", "Guide title", "Plain chest", "Plain entity", "Plain item", "Plain lore" }),
+            "early Anvil separates plain metadata from JSON book pages and sign lines");
+
+        var commandBlock = C(E("id", S("Control")), E("Command", S("tellraw @a {text:Guide}")));
+        var commandsLevel = C(E("xPos", new NbtInt(0)), E("zPos", new NbtInt(0)), E("TileEntities", L(commandBlock)));
+        var commands = NbtTextExtractor.Extract(source, new("", C(E("DataVersion", new NbtInt(169)), E("Level", commandsLevel))), new(0, 0));
+        Require(!commands.Complete && commands.Occurrences.Single().Address.SemanticRole == "command.block.raw" && commands.PendingCommands.IsEmpty,
+            "early command blocks expose raw text without claiming modern command semantics");
+    }
+    private static void EarlyAnvilArtifactIsReadOnly()
+    {
+        var root = WorldQueryTests.CreateWorld(); var cache = ScratchDirectory.CreateChild();
+        try
+        {
+            const string path = "playerdata/early.dat";
+            var display = C(E("Name", S("Plain item")));
+            var paper = C(E("id", S("minecraft:paper")), E("tag", C(E("display", display))));
+            var document = new NbtDocument("", C(E("DataVersion", new NbtInt(169)), E("Inventory", L(paper))));
+            var before = CompressedNbt.WriteDocument(document, NbtCompression.GZip);
+            WorldDiscoveryTests.Put(root, path, before);
+            var snapshot = WorldQueryTests.Query(root, cache);
+            var slot = snapshot.ReadSources().SelectMany(row => row.Text?.Occurrences ?? []).Single(item => item.Address.Artifact.RelativePath == path).ToSlot("en_us", "zh_tw");
+            var operation = new LiteralPatch("early-item", new(slot, new(slot.Id, slot.SourceTextHash, "zh_tw", "物品")));
+            var inventory = new WorldInventory(root, World);
+            var plan = new WorldPlanBuilder(inventory).Build(snapshot, [operation]);
+            BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () =>
+            {
+                using var candidate = new WorldPlanPreparation(inventory, new ArtifactStorage(root, World)).Prepare(snapshot, plan, true);
+            });
+            Require(File.ReadAllBytes(Path.Combine(root, path)).SequenceEqual(before), "the versioned artifact remains byte-identical");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+    }
+    private static void EarlyAnvilTextTransitions()
+    {
+        var source = new WorldSourceLocation(new(Guid.NewGuid(), "playerdata/example.dat", ArtifactKind.Nbt), WorldSourceRole.Player);
+        foreach (var (version, jsonName, jsonLore) in new[] { (1457, false, false), (1458, true, false), (1513, true, false),
+            (1514, true, false), (1631, true, false), (1802, true, false), (1803, true, true) })
+        {
+            var display = C(E("Name", jsonName ? Text("Item name", false) : S("Item name")),
+                E("Lore", L(jsonLore ? Text("Item lore", false) : S("Item lore"))));
+            var item = C(E("id", S("minecraft:paper")), E("tag", C(E("display", display))));
+            var document = new NbtDocument("", C(E("DataVersion", new NbtInt(version)), E("Inventory", L(item))));
+            var actual = NbtTextExtractor.Extract(source, document);
+            Require(actual.Complete && actual.Occurrences.Select(occurrence => occurrence.Text).SequenceEqual(new[] { "Item name", "Item lore" }),
+                $"DataVersion {version} uses independent item name and lore formats");
+        }
+    }
     public static void MissingConflictingAndUnsafeEvidence()
     {
         foreach (var marker in new NbtEntry[] { new("DataVersion", new NbtInt(9999)), new("Version", new NbtCompound([])), new("WorldGenSettings", new NbtCompound([])) })
@@ -90,6 +196,7 @@ internal static class WorldMetadataTests
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4775, Dimensions)));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4774)));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4774), Separate(999999, Dimensions)));
+        BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(4774), Separate(169, Dimensions)));
         BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => WorldMetadata.Read(Level(5130, Dimensions), Separate(5130, Dimensions)));
         BinaryNbtTests.RejectCodec(CodecError.InvalidTag, () => WorldMetadata.Read(Level(3953, Dimensions, claimedVersion: 4774)));
         Reject<ArgumentException>(() => WorldMetadata.Read(Level(3953, new([new("test:../escape", new NbtCompound([]))]))));

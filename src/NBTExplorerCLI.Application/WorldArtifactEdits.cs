@@ -34,6 +34,8 @@ internal static class WorldArtifactEdits
     internal static NbtDocument Transform(NbtDocument document, IReadOnlyList<PatchOperation> operations, DiscoveredSource source, DecodeLimits limits, CapabilityProfile? classic = null)
     {
         var profile = NbtTextExtractor.Profile(source.Location, document, out var originalVersion, classic);
+        if (MinecraftProfiles.IsReadOnlyAnvil(profile))
+            throw new CodecException(CodecError.UnsupportedProfile, 0, "Early versioned Anvil artifacts are read-only");
         var edits = operations.OfType<TypedPatch>().Select(operation => operation.Edit).ToList();
         var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
         var keyed = WorldKeyEdits.ApplyNative(document, conversions.Where(conversion => conversion.Address.Artifact == source.Location.Artifact && conversion.Rule != KeyConversionRule.EncodedTextToTranslate).ToArray());

@@ -15,13 +15,13 @@ Not sure whether your Minecraft version is supported, or ran into an error messa
 
 **NBTExplorerCLI** works exclusively with **Minecraft Java Edition** saves (Bedrock Edition is not supported). You can always run `.\nbtcli.exe capabilities` to check the exact built-in support matrix.
 
-### Modern Java Edition Versions (Detected Automatically)
+### Versioned Java Saves (Detected Automatically)
 
 `capabilities` reports each format family's inclusive `minimumDataVersion` and `maximumDataVersion`. For example, Java 1.20.2, 1.20.6, 1.21.1, and 1.21.4 use the corresponding families below. The table shows a representative game version and its resource pack format. If `create-pack` cannot verify the world's default resource format, provide the correct `--pack-format` for your game version.
 
 <ProfileTable lang="en" />
 
-Worlds from Java 1.14.4 through 1.19.x can contain older Anvil chunks where blocks and entities live under `Level`. The scanner reads the stored chunk layout, including older chunks retained in a newer world.
+Older Anvil chunks store blocks and entities under `Level`. The scanner uses the layout stored in each chunk, including older chunks retained in a newer world. DataVersion 100–1513 uses read-only early Anvil profiles and exposes command block contents as raw text. Custom names, scoreboard names, and item lore switched to JSON independently at DataVersion 1458, 1514, and 1803, respectively.
 
 The namespaced world layout introduced in 26.1 Snapshot 6 has an open upper bound in `capabilities` (`maximumDataVersion: null`). A later snapshot can reuse it when the save has the same layout and separate dimension registry. This has been verified on an original 26.4 Snapshot 10 save. Use `scan` to check coverage for the contents of a particular save.
 

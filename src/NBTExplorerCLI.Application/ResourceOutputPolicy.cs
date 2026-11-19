@@ -20,6 +20,8 @@ public static class ResourceOutputPolicy
             worldGen is null ? null : CompressedNbt.ReadDocument(worldGen, NbtCompression.GZip, limits).Document);
         if (metadata.Profile == MinecraftProfiles.ClassicAnvil)
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Classic Anvil is read-only");
+        if (MinecraftProfiles.IsReadOnlyAnvil(metadata.Profile))
+            throw new CodecException(CodecError.UnsupportedProfile, 0, "Early versioned Anvil is read-only");
         // Known profiles map every non-root dimension below DIM1, DIM-1 or dimensions.
         var protectedRoots = GameplayRoots.Concat(WorldFiles);
         foreach (var path in relativeOutputs)

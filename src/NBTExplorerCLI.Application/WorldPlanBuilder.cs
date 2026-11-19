@@ -28,6 +28,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     {
         ArgumentNullException.ThrowIfNull(snapshot); ArgumentNullException.ThrowIfNull(operations);
         var classicVersion = MinecraftProfiles.ClassicVersion(snapshot.Manifest.Versions.Profile);
+        if (MinecraftProfiles.IsReadOnlyAnvil(snapshot.Discovery.Metadata?.Profile))
+            throw new CodecException(CodecError.UnsupportedProfile, 0, "Early versioned Anvil supports inspection and extraction only");
         if (snapshot.Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && classicVersion is null)
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Classic Anvil supports inspection and extraction only");
         using var bindingTrace = NBTExplorerCLI.Formats.WorkDiagnostics.Start("plan.bind", phase: "bind", worldId: inventory.WorldId);

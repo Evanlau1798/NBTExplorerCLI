@@ -56,9 +56,14 @@ internal static class WorldRestorePreparationTests
                 Unchanged(root);
             }
             Unchanged(root); Require(!Directory.EnumerateFiles(root, "*.candidate").Any(), "Dispose removes every raw/deletion staging artifact without committing");
-            using (var prepared = service.Prepare(backup, plan, true))
+            foreach (var metadata in new[] { WorldMetadataTests.Classic(),
+                WorldMetadataTests.Classic(new NbtEntry("DataVersion", new NbtInt(1343))),
+                WorldMetadataTests.Classic(new NbtEntry("DataVersion", new NbtInt(1513))),
+                WorldMetadataTests.Level(100) })
             {
-                var level = CompressedNbt.WriteDocument(WorldMetadataTests.Classic(), NbtCompression.GZip);
+                File.Delete(Path.Combine(root, "level.dat"));
+                using var prepared = service.Prepare(backup, plan, true);
+                var level = CompressedNbt.WriteDocument(metadata, NbtCompression.GZip);
                 Put(root, "level.dat", level);
                 BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => new WorldPlanBuilder(inventory).Build(backup, Requests(backup)));
                 BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => service.Prepare(backup, plan, true));
@@ -73,7 +78,7 @@ internal static class WorldRestorePreparationTests
                     new Dictionary<ArtifactAddress, ArtifactImage> { [marker] = Present(0) }));
                 BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => new WorldPlanBuilder(inventory).Build(original, [requested]));
                 Require(File.ReadAllBytes(Path.Combine(root, marker.RelativePath)).SequenceEqual(new byte[] { 0 }),
-                    "restoring Classic metadata is refused even when the current marker is damaged");
+                    "restoring read-only Anvil metadata is refused even when the current marker is damaged");
             }
         }
         finally { Directory.Delete(root, true); Directory.Delete(state, true); }

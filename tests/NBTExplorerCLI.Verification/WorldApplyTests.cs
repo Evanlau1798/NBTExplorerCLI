@@ -82,8 +82,17 @@ internal static class WorldApplyTests
             Put(root, "a.dat", [9]); Put(root, "c.json", [7]);
             var current = new Dictionary<ArtifactAddress, ArtifactImage> { [artifact] = ArtifactImage.Present(Hash256.Compute(new byte[] { 9 })), [removed] = ArtifactImage.Present(Hash256.Compute(new byte[] { 7 })) };
             var plan = new WorldPlanBuilder(inventory).Build(backup, [new("explicit-restore", new(backup.ManifestHash, backup.Manifest.Artifacts, current))]);
-            var storage = new ArtifactStorage(root, World); using var prepared = new WorldPlanPreparation(inventory, storage).Prepare(backup, plan, true);
-            var applied = Engine(root, state, storage).Apply(prepared, true);
+            var storage = new ArtifactStorage(root, World, new FailReplace(1, after: false));
+            using var prepared = new WorldPlanPreparation(inventory, storage).Prepare(backup, plan, true);
+            var interrupted = Engine(root, state, storage).Apply(prepared, true);
+            Require(interrupted.Counts[OperationOutcome.RecoveryRequired] == 1, "interrupted restore needs forward recovery");
+            var readOnlyMetadata = WorldMetadataTests.Level(100);
+            Put(root, "level.dat", CompressedNbt.WriteDocument(readOnlyMetadata, NbtCompression.GZip));
+            BinaryNbtTests.RejectCodec(CodecError.UnsupportedProfile, () => Engine(root, state).Recover(plan.PlanHash, true));
+            Require(File.ReadAllBytes(Path.Combine(root, "a.dat")).SequenceEqual(new byte[] { 9 })
+                && File.ReadAllBytes(Path.Combine(root, "c.json")).SequenceEqual(new byte[] { 7 }), "forward recovery leaves read-only world images intact");
+            Put(root, "level.dat", [0]);
+            var applied = Engine(root, state).Recover(plan.PlanHash, true);
             Require(applied.Success && applied.Counts[OperationOutcome.Applied] == 1 && applied.Counts[OperationOutcome.RolledBack] == 0
                 && File.ReadAllBytes(Path.Combine(root, "a.dat")).SequenceEqual(new byte[] { 10, 255 }) && !File.Exists(Path.Combine(root, "c.json")), "independent raw restore is applied, preserving corrupt backup bytes and target absence");
             var rolledBack = Engine(root, state).Recover(plan.PlanHash, true, rollback: true);

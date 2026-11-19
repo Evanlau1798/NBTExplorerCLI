@@ -15,13 +15,13 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
 
 **NBTExplorerCLI** 專為 **Minecraft Java Edition** 存檔設計（不支援基岩版）。隨時可以執行 `.\nbtcli.exe capabilities` 查詢工具內建的完整支援清單。
 
-### 現代 Java 版存檔（自動辨識）
+### 含 DataVersion 的 Java 版存檔（自動辨識）
 
 `capabilities` 會列出各格式適用的 `minimumDataVersion` 與 `maximumDataVersion`，包含上下限。Java 1.20.2、1.20.6、1.21.1 與 1.21.4 可用下表對應的格式讀取。下表列出代表版本以及該版本的資源包格式。若 `create-pack` 無法驗證目標世界的資源包格式，請以 `--pack-format` 指定遊戲版本使用的格式。
 
 <ProfileTable lang="zh-tw" />
 
-Java 1.14.4 至 1.19.x 的世界可能含有把方塊與實體資料存放在 `Level` 底下的 Anvil 區塊。掃描器依照實際區塊結構讀取，也能辨識較新世界中保留的這類區塊。
+早期 Anvil 區塊會把方塊與實體資料存放在 `Level` 底下。掃描器依照每個區塊實際儲存的結構讀取，也能辨識較新世界中保留的這類區塊。DataVersion 100–1513 使用唯讀的早期 Anvil 設定檔，指令方塊提供原始文字。自訂名稱、計分板名稱與物品敘述分別自 DataVersion 1458、1514 與 1803 起改用 JSON。
 
 26.1 Snapshot 6 引入的命名空間世界結構在 `capabilities` 中使用 `maximumDataVersion: null`。後續快照沿用相同的儲存結構與獨立維度註冊表時，可以使用同一配置讀取，已用原版 26.4 Snapshot 10 存檔驗證。請用 `scan` 查核個別存檔內容的涵蓋範圍。
 

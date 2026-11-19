@@ -6,6 +6,7 @@ namespace NBTExplorerCLI.Minecraft;
 public sealed record WorldMetadata(CapabilityProfile Profile, int? DataVersion, int? WorldGenDataVersion, ImmutableDictionary<string, string> DimensionDirectories)
 {
     public const int ClassicAnvilStorageVersion = 19133;
+    private const int FirstDimensionRegistryDataVersion = 2566;
     private static readonly ImmutableDictionary<string, string> BuiltInDirectoryDimensions =
         ImmutableDictionary.CreateRange(StringComparer.Ordinal, new Dictionary<string, string>
         { [""] = "minecraft:overworld", ["DIM-1"] = "minecraft:the_nether", ["DIM1"] = "minecraft:the_end" });
@@ -28,7 +29,7 @@ public sealed record WorldMetadata(CapabilityProfile Profile, int? DataVersion, 
         if (directoryLayout)
         {
             var worldGen = At(level.Root, "Data", "WorldGenSettings");
-            if (worldGen is null && separateWorldGen is null && version < 2566 && HasAnvilSeed(level))
+            if (worldGen is null && separateWorldGen is null && version < FirstDimensionRegistryDataVersion && HasAnvilSeed(level))
                 return new(profile, version, null, BuiltInDirectoryDimensions);
             registry = At(level.Root, "Data", "WorldGenSettings", "dimensions");
         }
@@ -37,7 +38,7 @@ public sealed record WorldMetadata(CapabilityProfile Profile, int? DataVersion, 
             if (separateWorldGen is null || At(level.Root, "Data", "WorldGenSettings") is not null)
                 throw Unsupported("Expected a single separately stored dimension registry");
             registryVersion = Version(At(separateWorldGen.Root, "DataVersion"));
-            if (registryVersion > version || MinecraftProfiles.ForDataVersion(registryVersion) is null)
+            if (registryVersion < FirstDimensionRegistryDataVersion || registryVersion > version || MinecraftProfiles.ForDataVersion(registryVersion) is null)
                 throw Unsupported("Incompatible dimension-registry DataVersion");
             registry = At(separateWorldGen.Root, "data", "dimensions");
         }

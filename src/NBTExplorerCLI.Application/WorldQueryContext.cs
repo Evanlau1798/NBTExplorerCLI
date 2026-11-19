@@ -22,6 +22,8 @@ internal sealed class WorldQueryContext
         if (!Enum.IsDefined(request.Purpose)) throw new ArgumentOutOfRangeException(nameof(request));
         Execution = request.Execution ?? new(); Execution.Validate();
         Extraction = new(inventory, request.Scan, request.StorageRules, cancellationToken);
+        if (MinecraftProfiles.IsReadOnlyAnvil(Extraction.LayoutProfile) && request.Purpose is WorldQueryPurpose.Session or WorldQueryPurpose.Convert)
+            throw new CodecException(CodecError.UnsupportedProfile, 0, "Early versioned Anvil supports inspection and extraction only");
         if (Extraction.LayoutProfile == MinecraftProfiles.ClassicAnvil && request.Purpose == WorldQueryPurpose.Session
             || Extraction.Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && request.Purpose == WorldQueryPurpose.Convert)
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Classic Anvil supports inspection and extraction only");
@@ -31,7 +33,7 @@ internal sealed class WorldQueryContext
         var policyRules = Extraction.StorageRules.SelectMany(pair => pair.Value.Select(rule => SourceIdentity.Occurrence(new(pair.Key, rule.Path, "policy.storage." + rule.Kind)).Digest.Hex)).Order(StringComparer.Ordinal).ToArray();
         var policy = Hash256.Compute(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { limits = Extraction.Limits, request.Scan.MaximumSources, Execution.InFlightBytes, storageRules = policyRules })));
         var layout = Extraction.LayoutProfile?.Id;
-        var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-3" : "world-text-command-20";
+        var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-3" : "world-text-command-21";
         var baseline = new InterpretationVersions("nbt-snbt-json-zip-1", MinecraftProfiles.IsVersionedClassic(Extraction.LayoutProfile) ? layout! : "minecraft-known-3", extractor, "scan-2." + policy.Hex);
         static IEnumerable<CacheSourceBinding> Bindings(IEnumerable<DiscoveredSource> sources) => sources.Select(source => new CacheSourceBinding(source.Location, source.Chunk, source.PackMetadataHash));
         Versions = baseline with { Policy = baseline.Policy + "." + ScanCacheJson.BindingHash(layout, Bindings(Groups.Values.SelectMany(group => group))).Hex };

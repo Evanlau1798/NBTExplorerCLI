@@ -60,7 +60,7 @@ public sealed partial class WorldApplyEngine
         {
             WorldPlanBuilder.RequireReferencePolicy(prepared.Plan);
             if (prepared.Plan.Operations.Any(operation => operation is RestorePatch))
-                WorldRestorePlans.RejectClassicWorld(inventory);
+                WorldRestorePlans.RejectReadOnlyWorld(inventory);
             if (prepared.Candidates.Count != prepared.Manifest.Artifacts.Length) throw new ArgumentException("Incomplete prepared candidate set", nameof(prepared));
             for (var index = 0; index < prepared.Candidates.Count; index++)
             {
@@ -130,7 +130,12 @@ public sealed partial class WorldApplyEngine
             }
             return previous;
         }
-        if (direction == ApplyDirection.Forward) WorldPlanBuilder.RequireReferencePolicy(active.Header.Plan);
+        if (direction == ApplyDirection.Forward)
+        {
+            WorldPlanBuilder.RequireReferencePolicy(active.Header.Plan);
+            if (active.Header.Plan.Operations.Any(operation => operation is RestorePatch))
+                WorldRestorePlans.RejectReadOnlyWorld(inventory);
+        }
         if (pending.Current is null) BeginPending(pending, active.Header.Plan.PlanHash, active.Hash);
         var candidates = new List<IArtifactCandidate>();
         try

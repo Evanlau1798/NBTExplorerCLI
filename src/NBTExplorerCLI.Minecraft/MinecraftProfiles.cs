@@ -8,6 +8,7 @@ public static class MinecraftProfiles
 {
     public static CapabilityProfile? ForId(string id) => id switch
     {
+        "java-early-anvil" => EarlyAnvil, "java-early-anvil-json-names" => EarlyJsonNames, "java-1.13" => HistoricalPlainLore,
         "java-1.14.4" => HistoricalJson, "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-1.20.5" => Java1205, "java-1.21" => Java121, "java-1.21.5" => Java1215,
         "java-nbt-text-initial-hover" => InitialNativeText, "java-nbt-text-homogeneous" => EarlyNativeText,
         "java-nbt-text-mixed-lists" => MixedListText, "java-1.21.9" => Java1219,
@@ -58,6 +59,9 @@ public static class MinecraftProfiles
             _ => null
         };
     }
+    internal static CapabilityProfile EarlyAnvil { get; } = Create("java-early-anvil", "java-dimensions-directory", "java-item-tags-1.20.4", "java-early-anvil-text", "java-early-anvil-commands", LogicalListEncoding.Homogeneous, "java-pack-plural");
+    private static readonly CapabilityProfile EarlyJsonNames = Create("java-early-anvil-json-names", "java-dimensions-directory", "java-item-tags-1.20.4", "java-early-anvil-json-names", "java-early-anvil-commands", LogicalListEncoding.Homogeneous, "java-pack-plural");
+    private static readonly CapabilityProfile HistoricalPlainLore = Create("java-1.13", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile HistoricalJson = Create("java-1.14.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1201 = Create("java-1.20.1", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1204 = Create("java-1.20.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.4", LogicalListEncoding.Homogeneous, "java-pack-plural");
@@ -87,10 +91,16 @@ public static class MinecraftProfiles
     public static string? ClassicVersion(string profile) => ClassicProfiles.FirstOrDefault(pair => pair.Value.Id == profile).Key;
     public static bool IsVersionedClassic(CapabilityProfile? profile) => profile is not null && ClassicProfiles.ContainsValue(profile);
     public static bool UsesClassicPlainText(CapabilityProfile? profile) => profile == Java125 || profile == Java152 || profile == Java164;
+    public static bool IsReadOnlyAnvil(CapabilityProfile? profile) => profile == EarlyAnvil || profile == EarlyJsonNames;
+    internal static bool UsesPlainItemLore(CapabilityProfile profile) => IsReadOnlyAnvil(profile) || profile == HistoricalPlainLore;
 
     public static ImmutableArray<(int DataVersion, int Minimum, int? Maximum, CapabilityProfile Profile)> DataVersionRanges { get; } =
     [
-        (1976, 1976, 3462, HistoricalJson),
+        // Separate vanilla data fixes cover stored names, scoreboard names and item lore.
+        (169, 100, 1457, EarlyAnvil),
+        (1513, 1458, 1513, EarlyJsonNames),
+        (1631, 1514, 1802, HistoricalPlainLore),
+        (1976, 1803, 3462, HistoricalJson),
         (3465, 3463, 3689, Java1201),
         (3700, 3690, 3818, Java1204),
         // 24w09a introduced item components. 24w21a renamed datapack directories.
