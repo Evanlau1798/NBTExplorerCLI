@@ -7,12 +7,12 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
-    private void ComponentReferences(byte[] bytes, int start, int end, TypedPath grammarPath, bool snbt, SnbtSpan? enclosingString = null, bool itemTree = false)
+    private void ComponentReferences(byte[] bytes, int start, int end, TypedPath grammarPath, bool snbt, SnbtSpan? enclosingString = null, bool itemTree = false, bool commandTag = false)
     {
         if (snbt)
         {
             var grammar = MinecraftProfiles.SnbtGrammar(profile);
-            var parsed = Snbt.ParseDocument(bytes, grammar, limits);
+            var parsed = commandTag ? Snbt.ParseCommandTag(bytes, grammar, limits) : Snbt.ParseDocument(bytes, grammar, limits);
             if (itemTree)
             {
                 if (PotentialReferences(parsed.Root.Value)) Unknown(grammarPath, start, end - start, "UnresolvedItemComponentReferences");

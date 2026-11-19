@@ -13,6 +13,79 @@ namespace NBTExplorerCLI.Verification;
 
 internal static class CommandKeyPreparationTests
 {
+    internal static readonly VerificationCase[] Cases =
+    [
+        new("prepare-world-command-key-components", "preparation", _ => CommandComponentsKeepFramingAndReferences()),
+        new("prepare-world-command-key-encoded-batch", "preparation", _ => EncodedCommandKeysAndLiteralsShareOneLeaf()),
+        new("prepare-world-command-effective-tag-text", "preparation", _ => DuplicateCommandTagUsesEffectiveText())
+    ];
+
+    public static void OlderItemTagsUseVanillaItemIdentity()
+    {
+        foreach (var (item, field, data) in new[]
+        {
+            ("spawner", "BlockEntityTag", """{SpawnData:{entity:{id:"minecraft:pig",CustomName:'{"text":"Example"}'}}}"""),
+            ("painting", "EntityTag", """{CustomName:'{"text":"Example"}'}""")
+        })
+        {
+            CommandExtractionResult Read(string identity, string payload)
+            {
+                var address = new SourceAddress(new(World, "test.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+                return CommandTextExtractor.Extract(new(address, $"give @s {identity}{{{field}:{payload}}}"), MinecraftProfiles.ForDataVersion(3465)!);
+            }
+            var result = Read(item, data);
+            Require(result.Complete && result.Text.Occurrences.Single().Text == "Example", "vanilla item IDs identify their corresponding nested tag when its id is absent");
+            Require(!Read("custom:" + item, data).Complete && !Read(item, data.Insert(1, "id:1b,id:2b,")).Complete,
+                "custom items and ambiguous nested identities cannot inherit a vanilla schema");
+        }
+    }
+
+    public static void DuplicateCommandTagUsesEffectiveText()
+    {
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var address = new SourceAddress(new(World, "items.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        const string painting = """painting{EntityTag:{CustomName:'{"selector":"@e[name=Shadowed]"}',CustomName:'{"text":"Visible"}'}}""";
+        foreach (var itemCommand in new[] { "give @s " + painting, "item replace block ~ ~ ~ container.0 with " + painting,
+            """data modify block ~ ~ ~ Items append value {id:"minecraft:paper",Count:1b,tag:{display:{Name:'{"selector":"@e[name=Shadowed]"}',Name:'{"text":"Visible"}'}}}""" })
+        {
+            var result = CommandTextExtractor.Extract(new(address, itemCommand), profile);
+            Require(result.Complete && result.References.IsEmpty && result.Text.Occurrences.Single().Text == "Visible",
+                "command item tags and stacks read only effective text and references: " + itemCommand);
+        }
+
+        var root = WorldQueryTests.CreateWorld(); var cache = ScratchDirectory.CreateChild();
+        try
+        {
+            const string command = """setblock ~ ~ ~ chest{CustomName:'{"text":"Shadowed"}',Lock:"keep",CustomName:'{"text":"Visible"}'}""";
+            var path = WorldQueryTests.Function(0);
+            Put(root, "datapacks/p/pack.mcmeta", "{\"pack\":{\"pack_format\":15,\"description\":\"Test\"}}"u8.ToArray());
+            Put(root, path, Encoding.UTF8.GetBytes(command));
+            var snapshot = WorldQueryTests.Query(root, cache);
+            var row = snapshot.ReadSources().Single(item => item.Source.Location.Artifact.RelativePath == path);
+            Require(row is { Outcome: SourceOutcome.Success, Text.Complete: true } && row.Text.Occurrences.Select(item => item.Text).SequenceEqual(new[] { "Visible" }),
+                "command compounds expose only the final effective value for each duplicated field");
+            var slot = row.Text!.Occurrences.Single().ToSlot("en_us", "zh_tw");
+            var operation = new LiteralPatch("visible", new(slot, new(slot.Id, slot.SourceTextHash, "zh_tw", "顯示")));
+            var inventory = new WorldInventory(root, World);
+            var plan = new WorldPlanBuilder(inventory).Build(snapshot, [operation]);
+            using var candidate = new WorldPlanPreparation(inventory, new ArtifactStorage(root, World)).Prepare(snapshot, plan, true);
+            var output = File.ReadAllText(candidate.Manifest.Artifacts.Single().CandidatePath!);
+            var span = slot.Address.Syntax!;
+            var actual = CommandTextExtractor.Extract(new(new(slot.Address.Artifact, TypedPath.Root, "command.function"), output), profile);
+            Require(output.StartsWith(command[..(int)span.StartByte], StringComparison.Ordinal)
+                && output.EndsWith(command[(int)(span.StartByte + span.LengthBytes)..], StringComparison.Ordinal)
+                && actual.Text.Occurrences.Single().Text == "顯示" && File.ReadAllText(Path.Combine(root, path)) == command,
+                "command preparation rewrites only the effective token while preserving shadowed bytes and the live source");
+
+            const string summon = """summon pig ~ ~ ~ {CustomName:'{"text":"Shadowed"}',CustomName:'{"text":"Visible"}'}""";
+            var templates = new List<CommandNameTemplate>();
+            var summonResult = CommandTextExtractor.Extract(new(new(slot.Address.Artifact, TypedPath.Root, "command.function"), summon),
+                profile, nameTemplate: templates.Add);
+            Require(summonResult.Complete && templates.Single().Name == "Visible", "reference synchronization receives only the active summon name");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+    }
+
     public static void EncodedCommandKeysAndLiteralsShareOneLeaf()
     {
         var root = WorldQueryTests.CreateWorld(); var cache = ScratchDirectory.CreateChild();

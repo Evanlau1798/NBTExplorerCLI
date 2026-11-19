@@ -92,7 +92,8 @@ internal sealed partial class NbtTextReader
             const string suffix = "_spawn_egg";
             var name = profile.Id is ("java-1.20.1" or "java-1.20.4") && id is not null && id.StartsWith(vanilla, StringComparison.Ordinal) && id.EndsWith(suffix, StringComparison.Ordinal)
                 ? id[vanilla.Length..^suffix.Length] : null;
-            var fallback = name is not null && Java1204SpawnEggEntities.Contains(name) && (name != "breeze" || profile.Id == "java-1.20.4") ? vanilla + name : null;
+            var fallback = id == "minecraft:painting" ? id
+                : name is not null && Java1204SpawnEggEntities.Contains(name) && (name != "breeze" || profile.Id == "java-1.20.4") ? vanilla + name : null;
             Entity(entity, At(path, "EntityTag"), fallbackIdentity: fallback);
         }
         if (id is null && tag is NbtCompound compound && compound.Entries.Any(entry => entry.Name switch
@@ -118,6 +119,7 @@ internal sealed partial class NbtTextReader
     private static string? TaggedBlockIdentity(string? item) => item switch
     {
         "minecraft:chest" => "minecraft:chest",
+        "minecraft:spawner" => "minecraft:mob_spawner",
         "minecraft:white_banner" or "minecraft:orange_banner" or "minecraft:magenta_banner" or "minecraft:light_blue_banner"
             or "minecraft:yellow_banner" or "minecraft:lime_banner" or "minecraft:pink_banner" or "minecraft:gray_banner"
             or "minecraft:light_gray_banner" or "minecraft:cyan_banner" or "minecraft:purple_banner" or "minecraft:blue_banner"

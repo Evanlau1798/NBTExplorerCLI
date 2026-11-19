@@ -11,12 +11,13 @@ internal sealed class SnbtReader
     private readonly SnbtProfile _profile;
     private readonly DecodeLimits _limits;
     private readonly SnbtBudget _budget;
+    private readonly bool _commandTag;
     private bool Modern => _profile == SnbtProfile.Java1215;
     private bool Java181 => _profile == SnbtProfile.Java181;
     private int _pos, _mappedChar, _mappedByte;
-    public SnbtReader(ImmutableArray<byte> source, SnbtProfile profile, DecodeLimits limits)
+    public SnbtReader(ImmutableArray<byte> source, SnbtProfile profile, DecodeLimits limits, bool commandTag)
     {
-        (_source, _profile, _limits, _budget) = (source, profile, limits, new(limits));
+        (_source, _profile, _limits, _budget, _commandTag) = (source, profile, limits, new(limits), commandTag);
         try { _text = Snbt.Utf8.GetString(source.AsSpan()); }
         catch (DecoderFallbackException error) { throw new SnbtException(SnbtError.InvalidToken, Math.Max(0, error.Index), "SNBT requires valid UTF-8"); }
     }
@@ -52,7 +53,7 @@ internal sealed class SnbtReader
             White();
             if (_pos != _text.Length) throw Error(SnbtError.TrailingInput, "Data follows the complete SNBT root");
         }
-        return new(_source, _profile, root, new(startByte, Offset() - startByte), _limits, complete);
+        return new(_source, _profile, root, new(startByte, Offset() - startByte), _limits, complete, _commandTag);
     }
     private SnbtNode Value(int depth, NbtType context = NbtType.End)
     {
@@ -89,6 +90,7 @@ internal sealed class SnbtReader
         _pos++;
         var entries = new List<LogicalMinecraftEntry>();
         var children = new List<SnbtChild>();
+        var effective = _commandTag ? new Dictionary<string, int>(StringComparer.Ordinal) : null;
         if (!Take('}'))
         {
             do
@@ -99,7 +101,12 @@ internal sealed class SnbtReader
                 if (key.Length == 0) throw new SnbtException(SnbtError.InvalidToken, keyStart, "Java SNBT keys cannot be empty");
                 _budget.Text(key, keyStart); Expect(':');
                 var child = Value(depth + 1);
-                entries.Add(new(key, child.Value)); children.Add(new(PathSegment.ForKey(key), keySpan, child));
+                var entry = new LogicalMinecraftEntry(key, child.Value);
+                var syntax = new SnbtChild(PathSegment.ForKey(key), keySpan, child);
+                // Vanilla keeps the final command value. Retain duplicate identities for explicit rejection.
+                if (effective is not null && key != "id" && !effective.TryAdd(key, entries.Count))
+                { var index = effective[key]; entries[index] = entry; children[index] = syntax; }
+                else { entries.Add(entry); children.Add(syntax); }
                 if (!Take(',')) break;
                 White();
             } while (_pos < _text.Length && _text[_pos] != '}');

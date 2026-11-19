@@ -32,8 +32,9 @@ public sealed class SnbtDocument
     public SnbtSpan ConsumedSpan { get; }
     public DecodeLimits Limits { get; }
     public bool IsComplete { get; }
-    internal SnbtDocument(ImmutableArray<byte> source, SnbtProfile profile, SnbtNode root, SnbtSpan consumed, DecodeLimits limits, bool complete)
-        => (Source, SourceHash, Profile, Root, ConsumedSpan, Limits, IsComplete) = (source, Hash256.Compute(source.AsSpan()), profile, root, consumed, limits, complete);
+    internal bool CommandTag { get; }
+    internal SnbtDocument(ImmutableArray<byte> source, SnbtProfile profile, SnbtNode root, SnbtSpan consumed, DecodeLimits limits, bool complete, bool commandTag)
+        => (Source, SourceHash, Profile, Root, ConsumedSpan, Limits, IsComplete, CommandTag) = (source, Hash256.Compute(source.AsSpan()), profile, root, consumed, limits, complete, commandTag);
     public SnbtNode Resolve(TypedPath path)
     {
         ArgumentNullException.ThrowIfNull(path);

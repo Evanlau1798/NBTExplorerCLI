@@ -11,21 +11,22 @@ internal static class SnbtTextExtractor
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemComponent(name, root, TypedPath.Root), false, componentRoot);
     internal static TextExtractionResult Component(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
         => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Component(root, TypedPath.Root, source.SemanticRole), false, componentRoot);
-    internal static TextExtractionResult ItemNbtTag(SourceAddress source, string syntax, CapabilityProfile profile, string? itemId, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemTag(root, itemId), componentRoot: componentRoot);
+    internal static TextExtractionResult ItemNbtTag(SourceAddress source, string syntax, CapabilityProfile profile, string? itemId, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null, bool commandTag = false)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.ItemTag(root, itemId), componentRoot: componentRoot, commandTag: commandTag);
     internal static TextExtractionResult ItemStack(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Item(root, TypedPath.Root), componentRoot: componentRoot);
-    internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.BlockEntity(root, TypedPath.Root, knownIdentity), componentRoot: componentRoot);
-    internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null, string? fallbackIdentity = null)
-        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Entity(root, TypedPath.Root, knownIdentity, fallbackIdentity), componentRoot: componentRoot);
-    private static TextExtractionResult Read(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<NbtTextReader, NbtValue> extract, bool compound = true, Action<SourceAddress>? componentRoot = null)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Item(root, TypedPath.Root), componentRoot: componentRoot, commandTag: true);
+    internal static TextExtractionResult BlockEntity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null, bool commandTag = false)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.BlockEntity(root, TypedPath.Root, knownIdentity), componentRoot: componentRoot, commandTag: commandTag);
+    internal static TextExtractionResult Entity(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, string? knownIdentity = null, Action<SourceAddress>? componentRoot = null, string? fallbackIdentity = null, bool commandTag = false)
+        => Read(source, syntax, profile, limits, scope, (reader, root) => reader.Entity(root, TypedPath.Root, knownIdentity, fallbackIdentity), componentRoot: componentRoot, commandTag: commandTag);
+    private static TextExtractionResult Read(SourceAddress source, string syntax, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<NbtTextReader, NbtValue> extract, bool compound = true, Action<SourceAddress>? componentRoot = null, bool commandTag = false)
     {
         if (source.Syntax is not null || source.ComponentPath is not null) throw new CodecException(CodecError.UnsupportedProfile, 0, "Nested syntax binding is unsupported");
         var encoding = new UTF8Encoding(false, true);
         if (encoding.GetByteCount(syntax) > limits.MaxDecodedBytes) throw new SnbtException(SnbtError.LimitExceeded, 0, "SNBT string exceeds decode budget");
         var grammar = MinecraftProfiles.SnbtGrammar(profile);
-        var parsed = Snbt.ParseDocument(encoding.GetBytes(syntax), grammar, limits);
+        var bytes = encoding.GetBytes(syntax);
+        var parsed = commandTag ? Snbt.ParseCommandTag(bytes, grammar, limits) : Snbt.ParseDocument(bytes, grammar, limits);
         var document = MinecraftNbtAdapter.Encode(new("", parsed.Root.Value), profile, limits);
         if (compound && document.Root is not NbtCompound) throw new SnbtException(SnbtError.InvalidToken, 0, "Item tag requires an SNBT compound");
         var binding = new SourceAddress(source.Artifact, TypedPath.Root, source.SemanticRole, source.Dimension, source.Chunk);

@@ -24,7 +24,7 @@ internal sealed partial class CommandTextReader
             var result = SnbtTextExtractor.ItemStack(binding, token.Text, profile, limits, scope, ComponentCallback(grammarPath, token.Start, true));
             var tokenEnd = token.Start + token.Text.Length;
             MergeComponent(result, grammarPath, token.Start, tokenEnd, true);
-            if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(token.Text), token.Start, tokenEnd, grammarPath, true, itemTree: true);
+            if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(token.Text), token.Start, tokenEnd, grammarPath, true, itemTree: true, commandTag: true);
             return;
         }
         if (profile.Id == "java-1.20.1" && tokens.Count == index + 8

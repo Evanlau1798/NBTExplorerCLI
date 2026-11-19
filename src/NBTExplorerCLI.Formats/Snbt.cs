@@ -11,12 +11,14 @@ public static class Snbt
         => Read(source, 0, true, profile, limits);
     public static SnbtDocument ParseFragment(byte[] source, int startByte, SnbtProfile profile = SnbtProfile.JavaThrough1214, DecodeLimits? limits = null)
         => Read(source, startByte, false, profile, limits);
-    private static SnbtDocument Read(byte[] source, int startByte, bool complete, SnbtProfile profile, DecodeLimits? limits)
+    public static SnbtDocument ParseCommandTag(byte[] source, SnbtProfile profile, DecodeLimits limits)
+        => Read(source, 0, true, profile, limits, commandTag: profile == SnbtProfile.JavaThrough1214);
+    private static SnbtDocument Read(byte[] source, int startByte, bool complete, SnbtProfile profile, DecodeLimits? limits, bool commandTag = false)
     {
         ArgumentNullException.ThrowIfNull(source);
         var policy = Checked(profile, limits);
         if (source.Length > policy.MaxDecodedBytes) SnbtBudget.Limit(0);
-        return new SnbtReader(ImmutableArray.CreateRange(source), profile, policy).Read(startByte, complete);
+        return new SnbtReader(ImmutableArray.CreateRange(source), profile, policy, commandTag).Read(startByte, complete);
     }
     public static byte[] Write(LogicalMinecraftValue value, SnbtProfile profile = SnbtProfile.JavaThrough1214, DecodeLimits? limits = null)
     {
@@ -48,8 +50,7 @@ public static class Snbt
         document.Source.AsSpan(0, target.Span.StartByte).CopyTo(output);
         encoded.CopyTo(output.AsSpan(target.Span.StartByte));
         document.Source.AsSpan()[target.Span.EndByte..].CopyTo(output.AsSpan(target.Span.StartByte + encoded.Length));
-        var parsed = document.IsComplete ? ParseDocument(output, document.Profile, document.Limits)
-            : ParseFragment(output, document.ConsumedSpan.StartByte, document.Profile, document.Limits);
+        var parsed = Reparse(document, output);
         if (parsed.Root.Value != changed || parsed.Root.Span.StartByte != document.Root.Span.StartByte
             || parsed.Root.Span.LengthBytes != document.Root.Span.LengthBytes - target.Span.LengthBytes + encoded.Length)
             throw new SnbtException(SnbtError.Precondition, target.Span.StartByte, "Replacement changes syntax outside its exact node");
@@ -88,13 +89,14 @@ public static class Snbt
             edit.Bytes.CopyTo(output.AsSpan(to)); to += edit.Bytes.Length; from = edit.Span.EndByte;
         }
         document.Source.AsSpan()[from..].CopyTo(output.AsSpan(to));
-        var parsed = document.IsComplete ? ParseDocument(output, document.Profile, document.Limits)
-            : ParseFragment(output, document.ConsumedSpan.StartByte, document.Profile, document.Limits);
+        var parsed = Reparse(document, output);
         if (parsed.Root.Value != changed || parsed.Root.Span.StartByte != document.Root.Span.StartByte
             || parsed.Root.Span.LengthBytes != document.Root.Span.LengthBytes + length - document.Source.Length)
             throw new SnbtException(SnbtError.Precondition, document.Root.Span.StartByte, "Batch changed syntax outside its authorized nodes");
         return output;
     }
+    private static SnbtDocument Reparse(SnbtDocument document, byte[] output)
+        => Read(output, document.IsComplete ? 0 : document.ConsumedSpan.StartByte, document.IsComplete, document.Profile, document.Limits, document.CommandTag);
     private static LogicalMinecraftValue ReplaceValue(LogicalMinecraftValue value, TypedPath path, int depth,
         LogicalMinecraftValue expected, LogicalMinecraftValue replacement)
     {

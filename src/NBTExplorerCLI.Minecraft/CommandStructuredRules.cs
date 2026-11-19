@@ -10,10 +10,10 @@ internal sealed partial class CommandTextReader
         if (!identity.StartsWith("minecraft:", StringComparison.Ordinal)) { Unknown(path, start, end - start, "UnknownCommandNbtSchema"); return; }
         var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, block ? "block.data" : "entity.data", source.Address.Dimension, source.Address.Chunk);
         var callback = ComponentCallback(path, start, true);
-        var result = block ? SnbtTextExtractor.BlockEntity(binding, source.Command[start..end], profile, limits, scope, identity, callback)
-            : SnbtTextExtractor.Entity(binding, source.Command[start..end], profile, limits, scope, identity, callback);
+        var result = block ? SnbtTextExtractor.BlockEntity(binding, source.Command[start..end], profile, limits, scope, identity, callback, commandTag: true)
+            : SnbtTextExtractor.Entity(binding, source.Command[start..end], profile, limits, scope, identity, callback, commandTag: true);
         MergeComponent(result, path, start, end, true);
-        if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(source.Command[start..end]), start, end, path, true, itemTree: true);
+        if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(source.Command[start..end]), start, end, path, true, itemTree: true, commandTag: true);
         if (summonTemplate && nameTemplate is not null && result.Diagnostics.IsEmpty) ReadSummonNameTemplate(start, end, path, identity, result);
     }
     private void BlockArgument(CommandToken token, TypedPath path)
