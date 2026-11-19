@@ -4,6 +4,8 @@ using System.Text.Json;
 
 namespace NBTExplorerCLI.Formats;
 
+public sealed class DuplicateJsonMemberException() : JsonException("Duplicate JSON member");
+
 public static class BoundedJson
 {
     public static JsonDocument ReadDecoded(byte[] source, DecodeLimits? limits = null)
@@ -35,7 +37,7 @@ public static class BoundedJson
                 if (type == JsonTokenType.PropertyName)
                 {
                     Check(++entries, limits.MaxContainerEntries, offset);
-                    if (!containers.Peek()!.Add(value)) throw new JsonException("Duplicate JSON member");
+                    if (!containers.Peek()!.Add(value)) throw new DuplicateJsonMemberException();
                     continue;
                 }
             }

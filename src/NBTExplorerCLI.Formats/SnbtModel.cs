@@ -20,6 +20,7 @@ public sealed class SnbtNode
     public LogicalMinecraftValue Value { get; }
     public SnbtSpan Span { get; }
     public ImmutableArray<SnbtChild> Children { get; }
+    public bool ContainsStringValues => Value is LogicalMinecraftLeaf { Value: NbtString } || Children.Any(child => child.Node.ContainsStringValues);
     internal SnbtNode(LogicalMinecraftValue value, SnbtSpan span, IEnumerable<SnbtChild> children)
         => (Value, Span, Children) = (value, span, children.ToImmutableArray());
 }

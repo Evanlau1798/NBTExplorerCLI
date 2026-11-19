@@ -22,7 +22,29 @@ internal sealed partial class CommandTextReader
         switch (name)
         {
             case "tp" or "teleport":
-                return count == 5 && EntityTarget(Arg(1)) && Position(2);
+                if (count is 2 or 3) return EntityTarget(Arg(1)) && (count == 2 || EntityTarget(Arg(2)));
+                if (count == 4) return Position(1);
+                if (!EntityTarget(Arg(1)) || !Position(2)) return false;
+                return count == 5 || count == 7 && Angle(Arg(5)) && Angle(Arg(6))
+                    || Arg(5) == "facing" && (count == 9 && Position(6)
+                        || count is 8 or 9 && Arg(6) == "entity" && EntityTarget(Arg(7)) && (count == 8 || Arg(8) is "eyes" or "feet"));
+            case "clone":
+                return (count == 10 || count is 11 or 12 && Arg(10) is "replace" or "masked"
+                    && (count == 11 || Arg(11) is "normal" or "force" or "move")
+                    || count is 12 or 13 && Arg(10) == "filtered" && ResourceOrTag(Arg(11))
+                    && (count == 12 || Arg(12) is "normal" or "force" or "move"))
+                    && Enumerable.Range(0, 3).All(group => BlockCoordinates(Arg(1 + 3 * group), Arg(2 + 3 * group), Arg(3 + 3 * group)));
+            case "advancement":
+                if (Arg(1) is not ("grant" or "revoke") || !EntityTarget(Arg(2))) return false;
+                if (Arg(2).StartsWith('@') && Arg(2)[1] is not ('a' or 'p' or 'r' or 's')
+                    && selectorTypes.GetValueOrDefault(tokens[index + 2].Start) != "minecraft:player") return false;
+                return Arg(3) switch
+                {
+                    "everything" => count == 4,
+                    "from" or "until" or "through" => count == 5 && ResourceLocation(Arg(4)),
+                    "only" => count is 5 or 6 && ResourceLocation(Arg(4)) && (count == 5 || PlainControlToken(Arg(5))),
+                    _ => false
+                };
             case "tag":
                 return EntityTarget(Arg(1)) && (count == 3 && Arg(2) == "list" || count == 4 && Arg(2) is "add" or "remove" && PlainControlToken(Arg(3)));
             case "effect":
@@ -37,29 +59,28 @@ internal sealed partial class CommandTextReader
                     && ResourceLocation(Arg(1)) && Arg(2) is "master" or "music" or "record" or "weather" or "block" or "hostile" or "neutral" or "player" or "ambient" or "voice"
                     && EntityTarget(Arg(3));
             case "fill":
-                return (count == 8 || count == 9 && Arg(8) is "replace" or "destroy" or "keep" or "hollow" or "outline")
+                return (count == 8 || count == 9 && Arg(8) is "replace" or "destroy" or "keep" or "hollow" or "outline"
+                    || count == 10 && Arg(8) == "replace" && ResourceOrTag(Arg(9)))
                     && BlockCoordinates(Arg(1), Arg(2), Arg(3)) && BlockCoordinates(Arg(4), Arg(5), Arg(6)) && ResourceLocation(Arg(7));
+            case "damage":
+                return count is 3 or 4 && EntityTarget(Arg(1)) && Decimal(Arg(2), out var amount) && amount >= 0
+                    && (count == 3 || ResourceLocation(Arg(3)));
             case "particle":
                 var particle = DefaultNamespace(Arg(1));
+                var positionalPayload = profile.Id == "java-1.20.1";
                 var position = particle switch
                 {
-                    "minecraft:flame" or "minecraft:smoke" or "minecraft:dragon_breath" => 2,
-                    _ when profile.Id == "java-1.20.1" => particle switch
-                    {
-                        "minecraft:block" or "minecraft:block_marker" or "minecraft:falling_dust" when ResourceLocation(Arg(2)) => 3,
-                        "minecraft:dust" when count >= 6 && tokens.Skip(index + 2).Take(4).All(token => Decimal(token.Text, out _)) => 6,
-                        "minecraft:dust_color_transition" when count >= 9 && tokens.Skip(index + 2).Take(7).All(token => Decimal(token.Text, out _)) => 9,
-                        "minecraft:squid_ink" or "minecraft:explosion" or "minecraft:flash" or "minecraft:portal" or "minecraft:sneeze"
-                            or "minecraft:cloud" or "minecraft:end_rod" or "minecraft:electric_spark" or "minecraft:campfire_cosy_smoke"
-                            or "minecraft:totem_of_undying" => 2,
-                        _ => -1
-                    },
-                    _ => -1
+                    "minecraft:block" or "minecraft:block_marker" or "minecraft:falling_dust" =>
+                        positionalPayload && ResourceLocation(Arg(2)) ? 3 : -1,
+                    "minecraft:dust" => positionalPayload && count >= 6 && tokens.Skip(index + 2).Take(4).All(token => Decimal(token.Text, out _)) ? 6 : -1,
+                    "minecraft:dust_color_transition" => positionalPayload && count >= 9 && tokens.Skip(index + 2).Take(7).All(token => Decimal(token.Text, out _)) ? 9 : -1,
+                    "minecraft:item" or "minecraft:vibration" or "minecraft:shriek" or "minecraft:sculk_charge" => -1,
+                    _ => ResourceLocation(Arg(1)) ? 2 : -1
                 };
                 return position >= 0 && (count == position || count == position + 3 && Position(position)
                     || count >= position + 8 && count <= position + 10 && Position(position)
                     && tokens.Skip(index + position + 3).Take(3).All(token => Decimal(token.Text, out _))
-                    && Decimal(Arg(position + 6), out var speed) && speed >= 0 && Integer(Arg(position + 7), out var amount) && amount >= 0
+                    && Decimal(Arg(position + 6), out var speed) && speed >= 0 && Integer(Arg(position + 7), out var particleCount) && particleCount >= 0
                     && (count == position + 8 || Arg(position + 8) is "normal" or "force")
                     && (count < position + 10 || EntityTarget(Arg(position + 9))));
             case "title":
@@ -133,6 +154,7 @@ internal sealed partial class CommandTextReader
     private static bool BlockCoordinates(string x, string y, string z) => x.StartsWith('^')
         ? Coordinates(x, y, z) : BlockCoordinate(x) && BlockCoordinate(y) && BlockCoordinate(z);
     private static bool BlockCoordinate(string text) => text.StartsWith('~') ? Coordinate(text) : Integer(text, out _);
+    private static bool Angle(string text) => !text.StartsWith('^') && Coordinate(text);
 
     internal static bool Coordinate(string value)
     {

@@ -17,8 +17,42 @@ internal static class CommandKeyPreparationTests
     [
         new("prepare-world-command-key-components", "preparation", _ => CommandComponentsKeepFramingAndReferences()),
         new("prepare-world-command-key-encoded-batch", "preparation", _ => EncodedCommandKeysAndLiteralsShareOneLeaf()),
-        new("prepare-world-command-effective-tag-text", "preparation", _ => DuplicateCommandTagUsesEffectiveText())
+        new("prepare-world-command-effective-tag-text", "preparation", _ => DuplicateCommandTagUsesEffectiveText()),
+        new("prepare-world-command-sign-message-write", "preparation", _ => SignMessageWritesApplyAndRollBack())
     ];
+
+    private static void SignMessageWritesApplyAndRollBack()
+    {
+        var root = WorldQueryTests.CreateWorld(); var state = ScratchDirectory.CreateChild();
+        try
+        {
+            const string command = """data modify block ~ ~ ~ front_text.messages set value ['{"text":"翻訳前"}', '{"text":"Second","bold":true}', '{"text":"Third"}', '{"text":"Fourth"}']""";
+            var path = WorldQueryTests.Function(0);
+            var original = Encoding.UTF8.GetBytes(command + "\r\n");
+            Put(root, "datapacks/p/pack.mcmeta", """{"pack":{"pack_format":15,"description":"Test"}}"""u8.ToArray());
+            Put(root, path, original);
+            var snapshot = WorldQueryTests.Query(root, Path.Combine(state, "cache"));
+            var row = snapshot.ReadSources().Single(item => item.Source.Location.Artifact.RelativePath == path);
+            Require(row.Outcome == SourceOutcome.Success && row.Text!.Occurrences.Length == 4, "four sign lines are available for translation");
+            var slot = row.Text!.Occurrences.Single(item => item.Text == "Second").ToSlot("en_us", "zh_tw");
+            var inventory = new WorldInventory(root, World);
+            var operation = new LiteralPatch("sign-line", new(slot, new(slot.Id, slot.SourceTextHash, "zh_tw", "第二行")));
+            var plan = new WorldPlanBuilder(inventory).Build(snapshot, [operation]);
+            using var prepared = new WorldPlanPreparation(inventory, new ArtifactStorage(root, World)).Prepare(snapshot, plan, true);
+            var engine = WorldApplyTests.Engine(root, state);
+            var file = Path.Combine(root, path);
+            var span = slot.Address.Syntax!;
+            var replacement = Snbt.Write(new LogicalMinecraftLeaf(new NbtString("""{"text":"第二行","bold":true}""")));
+            byte[] expected = [.. original[..(int)span.StartByte], .. replacement, .. original[(int)(span.StartByte + span.LengthBytes)..]];
+            Require(engine.Apply(prepared, true).Success
+                && File.ReadAllBytes(file).SequenceEqual(expected),
+                "apply rewrites the chosen line after a multibyte sibling and preserves formatting, framing and other lines");
+            var reverted = engine.Recover(plan.PlanHash, true, rollback: true);
+            Require(reverted.Counts[OperationOutcome.RolledBack] == 1 && File.ReadAllBytes(file).SequenceEqual(original),
+                "rollback restores the exact original function bytes");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(state, true); }
+    }
 
     public static void OlderItemTagsUseVanillaItemIdentity()
     {

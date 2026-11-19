@@ -53,6 +53,10 @@ public static partial class PackTextExtractor
             }
             else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "loot_tables" : "loot_table")) Loot(root, TypedPath.Root, output, Component, profile, RawComponent);
             else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "item_modifiers" : "item_modifier")) Modifier(root, TypedPath.Root, output, Component, profile, RawComponent);
+            else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "predicates" : "predicate"))
+            {
+                if (!KnownStaticPredicate(root, profile, limits)) output.Diagnostic(TypedPath.Root, "UnsupportedPredicateSchema");
+            }
             else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "recipes" : "recipe") && parts[^1].EndsWith(".json", StringComparison.Ordinal))
             {
                 var resultPath = At(TypedPath.Root, "result");

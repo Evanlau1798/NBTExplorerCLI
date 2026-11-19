@@ -107,8 +107,10 @@ internal static class CommandTextExtractionTests
             var syntax = extracted.Text.Occurrences[0].Address.Syntax!;
             Require(Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(commands).AsSpan((int)syntax.StartByte, (int)syntax.LengthBytes)) == "\"Pink mode\"",
                 "nested text remains editable through its exact original byte span");
+            var stored = CommandTextExtractor.Extract(new(source, "execute store result storage golden:data field int 1 run time query gametime"), profile);
+            Require(stored.Complete && stored.Text.Occurrences.IsEmpty, "a typed numeric storage result carries no literal reference text");
             foreach (var unknown in new[] { "execute if score @s mode matches .. run tellraw @s \"text\"", "execute if score @s mode not_a_comparator @s mode run tellraw @s \"text\"",
-                "execute store result storage golden:data field int 1 run time query gametime", "bossbar set golden:mode color rainbow", "function golden:titles/update with storage golden:data", "loot give @s fish golden:book" })
+                "execute store result storage golden:data field string 1 run time query gametime", "bossbar set golden:mode color rainbow", "function golden:titles/update with storage golden:data", "loot give @s fish golden:book" })
             {
                 var rejected = CommandTextExtractor.Extract(new(source, unknown), profile);
                 Require(!rejected.Complete && rejected.Text.Occurrences.IsEmpty, "unrecognized or dynamic shapes still fail closed: " + unknown);
@@ -190,6 +192,10 @@ internal static class CommandTextExtractionTests
         var profile = MinecraftProfiles.ForDataVersion(4671)!;
         foreach (var command in new[] {
             "/tp @e[type=minecraft:fox,name=Rocky] -71.45 74.00 -113.17",
+            "/teleport @e[type=minecraft:fox,name=Rocky] ~ ~ ~ ~10 ~",
+            "/tp @s ~ ~ ~ facing entity @e[type=minecraft:fox,name=Rocky,limit=1] eyes",
+            "/advancement revoke @a[name=Rocky] only test:example",
+            "/data get entity @e[type=minecraft:fox,name=Rocky,limit=1] Rotation[0] 1",
             "/tag @e[type=minecraft:fox,name=Rocky] add checkpointOne",
             "/execute as @e[type=minecraft:fox,name=Rocky] run effect give @s minecraft:darkness 15 1 true",
             "/playsound minecraft:block.anvil.land master @e[type=minecraft:fox,name=Rocky] ~ ~ ~ 1 0.1"
@@ -201,6 +207,22 @@ internal static class CommandTextExtractionTests
         }
         foreach (var (command, expected) in new[] {
             ("/fill 84 59 26 84 61 28 air destroy", true), ("/fill 84 59 26 84 61 28 oak_sign{front_text:{}}", false),
+            ("/tp ~ ~-49 ~", true), ("/tp @s @p", true), ("/tp @s ~ ~ ~ ^10 ~", false),
+            ("/clone -2 79 -7 2 91 -3 -2 209 -1 replace", true), ("/clone ~ ~ ~ ~ ~1 ~ ~ ~2 ~ masked force", true),
+            ("/clone 0 0 0 0 0 0 1 0 0 filtered minecraft:stone", true), ("/clone ~ ~ ~ ~ ~1 ~ ~ ~2 ~ filtered #test:blocks force", true),
+            ("/clone ~ ~ ~ ~ ~1 ~ ~ ~2 ~ filtered oak_sign{CustomName:'Example'}", false),
+            ("/advancement grant @p everything", true), ("/advancement revoke @s from test:chapter extra", false),
+            ("/data get storage test:state documents[0].name 1", true), ("/data remove storage test:state documents[]", true),
+            ("/data get block ~ ~ ~", true), ("/data remove block ~ ~ ~ Items[-1].tag", true),
+            ("/data remove storage test:state", false), ("/data get storage test:state documents[broken]", false),
+            ("/data get storage test:state documents[{CustomName:'Rocky'}]", false),
+            ("/execute if data storage test:state documents[0].name", true),
+            ("/execute store result storage test:state scores[0] int 0.5 run data get entity @s Rotation[0]", true),
+            ("/execute store success block ~ ~ ~ Items[0] string 1 run kill @s", false),
+            ("/data modify storage test:state timers set value {cooldown:30,values:[I;1,4]}", true),
+            ("/data modify storage test:state timers.values insert 0 value 12", true),
+            ("/data modify storage test:state timers.name set value 'Possible text'", false),
+            ("/data modify storage test:state timers set from storage test:other timers", false),
             ("/tp @s ~ nope ~", false), ("/effect give @p minecraft:darkness 15 1 maybe", false),
             ("/playsound minecraft:block.anvil.land master @p ~ bad ~", false), ("/tag @s add", false),
             ("/tag @ add checkpointOne", false), ("/tp * ~ ~ ~", false), ("/effect clear @", false),
@@ -386,6 +408,7 @@ internal static class CommandTextExtractionTests
     }
     public static void ConditionalDataAndItemCommands()
     {
+        SignMessageWritesUseTheStoredComponentSchema();
         foreach (var (version, modern) in new[] { (3953, false), (4325, true), (4774, true) })
         {
             var entity = modern ? "{text:'Entity'}" : "'{\"text\":\"Entity\"}'";
@@ -402,6 +425,28 @@ internal static class CommandTextExtractionTests
             var unknown = CommandTextExtractor.Extract(new(source, "data merge storage test:arbitrary {value:'Protected'}"), MinecraftProfiles.ForDataVersion(version)!);
             Require(!unknown.Complete && unknown.Text.Occurrences.IsEmpty && unknown.Text.Diagnostics.Single().Code == "UnknownDataTextSchema", "arbitrary storage data does not inherit text schema from a field name");
         }
+    }
+    private static void SignMessageWritesUseTheStoredComponentSchema()
+    {
+        var source = new SourceAddress(new(World, "sign.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        const string json = """'{"text":"告示牌","extra":[{"selector":"@e[name=Guard]"}]}'""";
+        var command = "data modify block ~ ~ ~ front_text.messages set value [" + json + "," + json + "," + json + "," + json + "]";
+        var result = CommandTextExtractor.Extract(new(source, command), MinecraftProfiles.ForDataVersion(3465)!);
+        Require(result.Complete && result.References.Length == 4 && result.References.All(value => value.Name == "Guard")
+            && result.Text.Occurrences.Length == 4 && result.Text.Occurrences.All(value => value.Text == "告示牌" && value.Address.SemanticRole == "sign.front.line")
+            && result.Text.Occurrences.Select(value => value.Address.Syntax!.StartByte).Distinct().Count() == 4,
+            "four stored JSON lines retain distinct source bytes and selector references");
+        var native = CommandTextExtractor.Extract(new(source, "data modify block 0 0 0 back_text.filtered_messages[2] set value {text:'Second side'}"),
+            MinecraftProfiles.ForDataVersion(4325)!);
+        Require(native.Complete && native.Text.Occurrences.Single() is { Text: "Second side", Address.SemanticRole: "sign.back.line" },
+            "native indexed writes use the back-side role");
+        var other = CommandTextExtractor.Extract(new(source, command.Replace("block ~ ~ ~", "storage test:other", StringComparison.Ordinal)),
+            MinecraftProfiles.ForDataVersion(3465)!);
+        Require(!other.Complete && other.Text.Occurrences.IsEmpty, "the same path in arbitrary storage has no inferred sign schema");
+        var duplicate = CommandTextExtractor.Extract(new(source,
+            """data modify block ~ ~ ~ front_text.messages[0] set value '{"text":"Notice","italic":false,"italic":false}'"""), MinecraftProfiles.ForDataVersion(3465)!);
+        Require(!duplicate.Complete && duplicate.Text.Occurrences.IsEmpty && duplicate.Text.Diagnostics.Single().Code == "UnsupportedSignCommandComponent",
+            "duplicate JSON members remain protected without classifying a vanilla-accepted sign as malformed");
     }
     public static void GrammarBindingsAndEncodedReferences()
     {

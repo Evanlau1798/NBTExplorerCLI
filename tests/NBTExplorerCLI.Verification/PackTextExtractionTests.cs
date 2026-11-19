@@ -125,6 +125,17 @@ internal static class PackTextExtractionTests
         var meta = new WorldSourceLocation(new(World, "packs/p/pack.mcmeta", ArtifactKind.Json), WorldSourceRole.PackMetadata, PackRoot: "packs/p", PackKind: PackSourceKind.ResourcePack);
         var description = PackTextExtractor.Extract(meta, Encoding.UTF8.GetBytes("{\"pack\":{\"pack_format\":34,\"description\":\"Pack name\"}}"), Metadata(34, PackSourceKind.ResourcePack));
         Require(description.Complete && description.Occurrences.Single().Address.NodePath.ToJsonPointer() == "/pack/description" && description.Occurrences.Single().Text == "Pack name", "pack description is exact native component field");
+
+        var predicate = new WorldSourceLocation(new(World, "datapacks/p/data/test/predicates/gate.json", ArtifactKind.Json),
+            WorldSourceRole.PackJson, PackRoot: "datapacks/p", PackKind: PackSourceKind.Datapack);
+        const string staticCondition = """{"condition":"minecraft:entity_properties","entity":"this","predicate":{"nbt":"{Tags:[\"checkpoint\"]}","equipment":{"mainhand":{"items":["minecraft:stick"],"nbt":"{Progress:2b}"}}}}""";
+        var nested = "{\"condition\":\"minecraft:all_of\",\"terms\":[" + staticCondition + "]}";
+        TextExtractionResult ReadCondition(string value) => PackTextExtractor.Extract(predicate, Encoding.UTF8.GetBytes(value), Metadata(15));
+        Require(ReadCondition(nested) is { Complete: true, Occurrences.IsEmpty: true }, "a vanilla item and entity predicate is recognized without creating editable text");
+        const string nameCondition = """{"condition":"minecraft:entity_properties","entity":"this","predicate":{"nbt":"{CustomName:'{\"text\":\"Guard\"}'}"}}""";
+        Require(!ReadCondition(nameCondition).Complete
+            && !ReadCondition(nested.Replace("minecraft:entity_properties", "test:unknown", StringComparison.Ordinal)).Complete,
+            "name-bearing NBT and unknown predicate dispatch remain unresolved");
     }
     public static void UnknownNativeKeysStayProtected()
     {

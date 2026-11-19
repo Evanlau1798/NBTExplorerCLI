@@ -91,13 +91,10 @@ public static class SelectorNames
         try
         {
             var root = Snbt.ParseDocument(Encoding.UTF8.GetBytes(spelling.ToString()), limits: limits).Root;
-            return root.Value is LogicalMinecraftCompound && NoStringLeaves(root);
+            return root.Value is LogicalMinecraftCompound && !root.ContainsStringValues;
         }
         catch (SnbtException error) when (error.Code != SnbtError.LimitExceeded) { return false; }
     }
-    private static bool NoStringLeaves(SnbtNode node)
-        => node.Value is not LogicalMinecraftLeaf { Value: NbtString } && node.Children.All(child => NoStringLeaves(child.Node));
-
     private static string Decode(string spelling)
     {
         if (spelling.Length == 0) return "";

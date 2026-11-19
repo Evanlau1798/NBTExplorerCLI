@@ -12,6 +12,29 @@ namespace NBTExplorerCLI.Verification;
 internal static class CommandReviewTests
 {
     private static SourceAddress Source => new(new(World, "review.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+    public static void StaticCoordinateControls()
+    {
+        const string commands = """
+            execute as @e[name=Guard] run damage @s 2.5 magic
+            fill ~-0.5 ~-0.5 ~-0.5 ~0.05 ~0.05 ~0.05 air replace stone
+            particle minecraft:snowflake ~ ~ ~ 0 0 0 0.01 4 normal
+            tellraw @s {"text":"Visible"}
+            """;
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var result = CommandTextExtractor.Extract(new(Source, commands), profile);
+        Require(result.Complete && result.Text.Occurrences.Single().Text == "Visible" && result.References.Single().Name == "Guard",
+            "static damage, fill filters and simple particles protect selectors and leave adjacent text editable");
+        foreach (var unsupported in new[]
+        {
+            "damage @s -2 magic",
+            "tp 0 64 1 45 10",
+            """fill ~ ~ ~ ~ ~ ~ air replace furnace{CustomName:'{"text":"Guard"}'}""",
+            """particle custom:effect{payload:'{"text":"Hidden"}'} ~ ~ ~ 0 0 0 0 1"""
+        })
+            Require(!CommandTextExtractor.Extract(new(Source, unsupported), profile).Complete,
+                "negative damage and structured particle or fill arguments remain unresolved: " + unsupported);
+    }
+
     public static void InertFieldsCannotBecomeReferences()
     {
         foreach (var (version, modern) in new[] { (3953, false), (4325, true), (4774, true) })

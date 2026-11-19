@@ -258,6 +258,7 @@ internal static class CaseRegistry
         new("command-static-click-reference-policy", "discovery", _ => CommandTextExtractionTests.StaticClickActionsDoNotClaimDynamicNameReferences()),
         new("command-function-tags-and-click-payloads", "discovery", _ => CommandTextExtractionTests.FunctionTagsAndClickPayloads()),
         new("command-static-map-controls", "discovery", _ => CommandTextExtractionTests.StaticMapControlsKeepExactSelectorNames()),
+        new("command-static-coordinate-controls", "discovery", _ => CommandReviewTests.StaticCoordinateControls()),
         new("command-static-particle-keeps-visible-text", "discovery", _ => CommandTextExtractionTests.StaticParticleDoesNotBlockAdjacentTranslation()),
         new("command-self-score-reference-policy", "discovery", _ => CommandTextExtractionTests.SelfScoreComponentsKeepAdjacentTextAndProtectOtherSelectors()),
         new("command-execute-json-components-references", "discovery", _ => CommandTextExtractionTests.ExecuteJsonComponentsAndReferences()),

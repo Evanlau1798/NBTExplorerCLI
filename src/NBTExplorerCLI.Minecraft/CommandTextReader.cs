@@ -118,10 +118,22 @@ internal sealed partial class CommandTextReader
                 if (clause is "if" or "unless" && cursor + 1 < tokens.Count && tokens[cursor].Text == "entity") operands = 2;
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "score") operands = ScoreCondition(tokens, cursor);
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text is "block" or "items") operands = BlockOrItemCondition(tokens, cursor);
+                if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "data")
+                {
+                    var dataPath = DataTargetEnd(tokens, cursor + 1);
+                    if (dataPath >= 0 && dataPath < tokens.Count && PlainDataPath(tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
+                }
                 if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "score"
                     && ScoreHolder(tokens[cursor + 2].Text, allowWildcard: true) && PlainControlToken(tokens[cursor + 3].Text)) operands = 4;
                 if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "bossbar"
                     && MinecraftIdentifier.ResourceLocation(tokens[cursor + 2].Text) && tokens[cursor + 3].Text is "value" or "max") operands = 4;
+                if (clause == "store" && operands < 0 && cursor < tokens.Count && tokens[cursor].Text is "result" or "success")
+                {
+                    var dataPath = DataTargetEnd(tokens, cursor + 1);
+                    if (dataPath >= 0 && dataPath + 2 < tokens.Count && PlainDataPath(tokens[dataPath].Text)
+                        && tokens[dataPath + 1].Text is "byte" or "short" or "int" or "long" or "float" or "double"
+                        && Decimal(tokens[dataPath + 2].Text, out _)) operands = dataPath + 3 - cursor;
+                }
                 if (cursor < tokens.Count && clause is "positioned" or "rotated" && tokens[cursor].Text == "as") operands = 2;
                 if (operands < 0 || cursor + operands > tokens.Count) { Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownExecuteGrammar"); return; }
                 cursor += operands;
