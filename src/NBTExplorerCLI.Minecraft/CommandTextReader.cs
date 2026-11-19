@@ -123,6 +123,7 @@ internal sealed partial class CommandTextReader
                 if (cursor < tokens.Count && clause is "positioned" or "rotated" && tokens[cursor].Text == "as") operands = 2;
                 if (operands < 0 || cursor + operands > tokens.Count) { Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownExecuteGrammar"); return; }
                 cursor += operands;
+                if (cursor == tokens.Count && clause is "if" or "unless") return;
             }
             throw new CommandSyntaxException();
         }

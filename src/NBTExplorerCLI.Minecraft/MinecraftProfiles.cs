@@ -27,7 +27,7 @@ public static class MinecraftProfiles
         if (!metadata.DeclaresSupport(version)) return null;
         return (metadata.Kind, version.Major, version.Minor) switch
         {
-            (PackSourceKind.Datapack or PackSourceKind.ResourcePack, 15, 0) => Java1201,
+            (PackSourceKind.Datapack, >= 4 and <= 15, 0) or (PackSourceKind.ResourcePack, 15, 0) => Java1201,
             (PackSourceKind.Datapack, 26, 0) or (PackSourceKind.ResourcePack, 22, 0) => Java1204,
             (PackSourceKind.Datapack, 48, 0) or (PackSourceKind.ResourcePack, 34, 0) => Java121,
             (PackSourceKind.Datapack, 71, 0) or (PackSourceKind.ResourcePack, 55, 0) => Java1215,

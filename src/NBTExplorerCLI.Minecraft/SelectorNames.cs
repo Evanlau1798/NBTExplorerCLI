@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using NBTExplorerCLI.Domain;
+using NBTExplorerCLI.Formats;
 using System.Text;
 
 namespace NBTExplorerCLI.Minecraft;
@@ -71,7 +72,11 @@ public static class SelectorNames
                     if (!identity.StartsWith('!') && identity.Length != 0 && identity.All(unit => char.IsAsciiLetterLower(unit) || char.IsAsciiDigit(unit) || unit is '_' or '.' or ':' or '/' or '-'))
                     { type = hasType ? null : MinecraftIdentifier.DefaultNamespace(identity); hasType = true; }
                 }
-                else if (option == "nbt") Unknown(member, argument, end - argument, "DynamicNbtSelectorReference");
+                else if (option == "nbt")
+                {
+                    if (!NameFreeNbt(selector.AsSpan(argument, end - argument), limits))
+                        Unknown(member, argument, end - argument, "DynamicNbtSelectorReference");
+                }
                 else if (option is not ("tag" or "team" or "scores" or "advancements" or "predicate" or "limit" or "sort" or "x" or "y" or "z" or "dx" or "dy" or "dz" or "distance" or "level" or "gamemode" or "x_rotation" or "y_rotation"))
                     Unknown(member, argument, end - argument, "UnknownSelectorOption");
                 start = cursor + 1; member++;
@@ -80,6 +85,19 @@ public static class SelectorNames
         catch (CommandSyntaxException) { Unknown(-1, 0, selector.Length, "InvalidCommandSyntax"); }
         return Finish();
     }
+    private static bool NameFreeNbt(ReadOnlySpan<char> spelling, DecodeLimits limits)
+    {
+        if (spelling.StartsWith("!")) spelling = spelling[1..].TrimStart();
+        try
+        {
+            var root = Snbt.ParseDocument(Encoding.UTF8.GetBytes(spelling.ToString()), limits: limits).Root;
+            return root.Value is LogicalMinecraftCompound && NoStringLeaves(root);
+        }
+        catch (SnbtException error) when (error.Code != SnbtError.LimitExceeded) { return false; }
+    }
+    private static bool NoStringLeaves(SnbtNode node)
+        => node.Value is not LogicalMinecraftLeaf { Value: NbtString } && node.Children.All(child => NoStringLeaves(child.Node));
+
     private static string Decode(string spelling)
     {
         if (spelling.Length == 0) return "";

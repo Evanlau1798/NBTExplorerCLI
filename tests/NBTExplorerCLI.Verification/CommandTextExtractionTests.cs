@@ -196,6 +196,9 @@ internal static class CommandTextExtractionTests
         foreach (var command in new[] {
             "scoreboard players set $timer countdown 4",
             "execute if score $timer countdown matches 1.. run function p:advance",
+            "execute store result score $count counts if entity @e[nbt={HurtTime:10s}]",
+            "execute store result score $pass counts if score $count counts matches 27..",
+            "execute store result score $pass counts unless block ~0.8 ~ ~ #example:solid",
             "particle block minecraft:sculk ~ ~ ~ 0.3 0.5 0.3 0.01 2 normal",
             "particle dust 0.3 0.4 0 1 ~ ~ ~ 0 0 0 0 1 force",
             "particle dust_color_transition 0.3 0.4 0 1 0.9 0.1 0.2 ~ ~ ~ 0 0 0 0 1 force",
@@ -208,6 +211,8 @@ internal static class CommandTextExtractionTests
         }
         foreach (var command in new[] {
             "scoreboard players set $ countdown 4", "particle block oak_sign{CustomName:'Guide'} ~ ~ ~ 0 0 0 0 1 normal",
+            "execute store result score $count counts", "execute positioned ~ ~ ~",
+            "execute store result score $pass counts if block 0.8 0 0 stone",
             "particle dust ~ ~ ~ 0 0 0 0 1 force",
             "particle dust_color_transition 0.3 0.4 0 1 0.9 0.1 ~ ~ ~ 0 0 0 0 1 force",
             "data modify entity @s CustomNameVisible set value 'Guide'"

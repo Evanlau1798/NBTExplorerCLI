@@ -61,6 +61,15 @@ internal sealed partial class NbtTextReader
         if (identity is "minecraft:sign" or "minecraft:hanging_sign")
         {
             var signRole = identity == "minecraft:sign" ? "sign" : "hanging_sign";
+            var legacyLines = new[] { "Text1", "Text2", "Text3", "Text4", "FilteredText1", "FilteredText2", "FilteredText3", "FilteredText4" };
+            if (value is NbtCompound sign && sign.Entries.Any(entry => legacyLines.Contains(entry.Name)))
+            {
+                if (modern || identity != "minecraft:sign" || sign.Entries.Any(entry => entry.Name is "front_text" or "back_text"))
+                { output.Diagnostic(path, "UnsupportedSignSchema"); return; }
+                foreach (var field in legacyLines)
+                    Component(Field(value, field, path), At(path, field), "sign.front.line");
+                return;
+            }
             foreach (var side in new[] { "front", "back" })
             {
                 var sideField = side + "_text";

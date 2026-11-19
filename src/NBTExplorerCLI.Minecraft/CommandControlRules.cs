@@ -132,7 +132,7 @@ internal sealed partial class CommandTextReader
         && x.StartsWith('^') == y.StartsWith('^') && x.StartsWith('^') == z.StartsWith('^');
     private static bool BlockCoordinates(string x, string y, string z) => x.StartsWith('^')
         ? Coordinates(x, y, z) : BlockCoordinate(x) && BlockCoordinate(y) && BlockCoordinate(z);
-    private static bool BlockCoordinate(string text) => text == "~" || Integer(text.StartsWith('~') ? text[1..] : text, out _);
+    private static bool BlockCoordinate(string text) => text.StartsWith('~') ? Coordinate(text) : Integer(text, out _);
 
     internal static bool Coordinate(string value)
     {

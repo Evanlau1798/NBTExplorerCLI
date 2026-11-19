@@ -20,6 +20,11 @@ internal static class NativeReferenceTests
             Require(!SelectorNames.Parse(selector).Complete, "unknown/dynamic/malformed selectors cannot claim complete coverage: " + selector);
         Require(SelectorNames.Parse("@a[name=Player]").Kind == 'a', "player selectors remain distinguishable from entity name selectors");
         Require(SelectorNames.Parse("@e[tag=guard]").Complete && SelectorNames.Parse("@e[tag=guard]").Names.IsEmpty, "absence of name references is a valid parsed result");
+        var numeric = SelectorNames.Parse("@e[nbt=!{HurtTime:10s,ActiveEffects:[{Id:12}],UUID:[I;1,2,3,4]},name=Guard]");
+        Require(numeric.Complete && numeric.Names.Single().Name == "Guard",
+            "numeric compound predicates never match translated strings and preserve independent name references");
+        foreach (var selector in new[] { "@e[nbt={SelectedItem:{tag:{display:{Name:'Visible'}}}}]", "@e[nbt=[1]]", "@e[nbt={HurtTime:}]" })
+            Require(!SelectorNames.Parse(selector).Complete, "dynamic or malformed NBT filters stay incomplete: " + selector);
     }
     public static void NativeSelectorsUseOriginalAddresses()
     {

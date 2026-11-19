@@ -11,6 +11,25 @@ internal static class PackTextExtractionTests
         => new(kind, format, new(format, 0), new(format, int.MaxValue));
     public static void IndependentPackAndItemTagProfiles()
     {
+        foreach (var format in new[] { 4, 6, 10, 12, 13, 15 })
+        {
+            var path = "datapacks/example/data/example/advancements/start.json";
+            var source = new WorldSourceLocation(new(World, path, ArtifactKind.Json), WorldSourceRole.PackJson,
+                PackRoot: "datapacks/example", PackKind: PackSourceKind.Datapack);
+            var result = PackTextExtractor.Extract(source, "{\"display\":{\"title\":{\"text\":\"Older pack\"}}}"u8.ToArray(), Metadata(format));
+            Require(result.Complete && result.Occurrences.Single().Text == "Older pack",
+                $"historical datapack format {format} retains plural directories and native JSON text");
+        }
+        Require(MinecraftProfiles.ForPackMetadata(Metadata(3)) is null,
+            "metadata predating Java datapacks must not inherit a datapack grammar");
+        var olderPack = MinecraftProfiles.ForPackMetadata(Metadata(6))!;
+        var function = new SourceAddress(new(World, "datapacks/example/data/example/functions/start.mcfunction", ArtifactKind.McFunction),
+            TypedPath.Root, "command.function");
+        var sign = CommandTextExtractor.Extract(new(function, """setblock ~ ~ ~ oak_sign{Text1:'{"text":"Older sign"}',FilteredText1:'{"text":"Filtered sign"}'}"""), olderPack);
+        Require(sign.Complete && sign.Text.Occurrences.Select(row => row.Text).SequenceEqual(new[] { "Older sign", "Filtered sign" }),
+            "pre-1.20 signed JSON lines use their original SNBT string spans");
+        var mixedSign = CommandTextExtractor.Extract(new(function, """setblock ~ ~ ~ oak_sign{Text1:'{"text":"Older sign"}',front_text:{messages:[]}}"""), olderPack);
+        Require(!mixedSign.Complete, "conflicting single-sided and two-sided sign fields cannot claim complete coverage");
         var old = MinecraftProfiles.ForDataVersion(3700);
         Require(old is not null && old.Id == "java-1.20.4" && old.Features[ProfileFacet.ItemSchema].Schema == "java-item-tags-1.20.4"
             && old.Features[ProfileFacet.PackLayout].Schema == "java-pack-plural" && old.Lists.Encoding == LogicalListEncoding.Homogeneous, "official 1.20.4 DV3700 has pre-components items and plural pack directories");
