@@ -9,7 +9,7 @@ internal static class StaticNbtMatch
         && root.Children.All(field => !field.Node.ContainsStringValues || field.Selector.Key switch
         {
             "Tags" => field.Node.Value is LogicalMinecraftList tags && tags.Items.All(item => item is LogicalMinecraftLeaf { Value: NbtString }),
-            "SelectedItem" => ItemStack(field.Node),
+            "Item" or "SelectedItem" => ItemStack(field.Node),
             "Inventory" or "EnderItems" or "ArmorItems" or "HandItems" => field.Node.Value is LogicalMinecraftList
                 && field.Node.Children.All(item => ItemStack(item.Node)),
             _ => false

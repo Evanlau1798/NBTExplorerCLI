@@ -29,10 +29,13 @@ internal static class WorldCommandExtractionTests
                 data modify storage test:state {} merge value {phase:3b}
                 execute if blocks 0 64 0 0 64 0 1 64 0 all if predicate test:gate run tellraw @a[name=Guard] [{"text":"Function"}]
                 execute if data storage test:state stages[{Progress:2b}] run return 7
+                execute unless data entity @s {Item:{id:"minecraft:barrier"}} run return 1
                 """;
             Put(root, "datapacks/p/data/test/function/main.mcfunction", Encoding.UTF8.GetBytes(functionBody));
             Put(root, "datapacks/p/data/test/function/dynamic.mcfunction", Encoding.UTF8.GetBytes("$tellraw @s $(message)\n"));
             Put(root, "datapacks/p/data/test/function/invalid.mcfunction", Encoding.UTF8.GetBytes("tellraw @s {\"selector\":42}\n"));
+            Put(root, "datapacks/p/data/test/function/unsafe.mcfunction",
+                """execute if data entity @s {Item:{tag:{display:{Name:'Guard'}}}} run return 1"""u8.ToArray());
             var block = C(E("id", S("minecraft:command_block")), E("Command", S("title @a[name=!Guard] title {\"text\":\"Block\"}")));
             var item = C(E("id", S("minecraft:command_block")), E("components", C(E("minecraft:block_entity_data", block))));
             Put(root, "playerdata/p.dat", CompressedNbt.WriteDocument(new("", C(E("DataVersion", new NbtInt(3953)), E("Inventory", L(item)))), NbtCompression.GZip));
@@ -58,6 +61,9 @@ internal static class WorldCommandExtractionTests
             var invalid = rows.Single(row => row.Source.Location.Artifact.RelativePath.EndsWith("/invalid.mcfunction", StringComparison.Ordinal));
             Require(invalid.Outcome == SourceOutcome.Failed && invalid.DiagnosticCode == "InvalidComponent" && invalid.Text!.Occurrences.IsEmpty,
                 "actual function adapter preserves invalid selector type as a source failure instead of irrelevant empty success");
+            var unsafeMatch = rows.Single(row => row.Source.Location.Artifact.RelativePath.EndsWith("/unsafe.mcfunction", StringComparison.Ordinal));
+            Require(unsafeMatch.Outcome == SourceOutcome.Unsupported && unsafeMatch.DiagnosticCode == "UnknownExecuteGrammar",
+                "a root item predicate with a display name still requires reference analysis");
         }
         finally { Directory.Delete(root, true); }
     }
@@ -65,6 +71,9 @@ internal static class WorldCommandExtractionTests
     {
         var source = new SourceAddress(new(World, "rules.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
         var native = new SourceAddress(new(World, "data/scoreboard.dat", ArtifactKind.Nbt), TypedPath.Root, "scoreboard.objective.name");
+        var itemSelector = SelectorNames.Parse("""@e[type=item,nbt={Item:{id:"minecraft:paper"}}]""");
+        var namedItemSelector = SelectorNames.Parse("""@e[type=item,nbt={Item:{tag:{display:{Name:'Guard'}}}}]""");
+        Require(itemSelector.Complete && !namedItemSelector.Complete, "a stored item ID can be matched without authorizing display-name filters");
         foreach (var (version, itemCondition, nearest) in new[]
         {
             (3465, false, false), (3820, false, false), (3821, true, false), (3945, true, false), (3946, true, true), (3953, true, true)

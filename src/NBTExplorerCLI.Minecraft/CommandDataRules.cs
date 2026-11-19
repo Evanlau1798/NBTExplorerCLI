@@ -138,7 +138,12 @@ internal sealed partial class CommandTextReader
         if (!StaticDataControlPath(tokens[index + 2].Text, tokens[path].Text)) return false;
         return tokens.Count == path + 1 || read && tokens.Count == path + 2 && Decimal(tokens[path + 1].Text, out _);
     }
-    private bool StaticDataControlPath(string target, string path) => StaticDataPath(path) || StaticItemSource(target, path);
+    private bool StaticDataControlPath(string target, string path)
+    {
+        if (target == "entity" && path.StartsWith('{') && CompoundEnd(path, 0) == path.Length)
+            return StaticNbtMatch.Entity(Snbt.ParseDocument(Utf8.GetBytes(path), MinecraftProfiles.SnbtGrammar(profile), limits).Root);
+        return StaticDataPath(path) || StaticItemSource(target, path);
+    }
     private static int DataTargetEnd(List<CommandToken> tokens, int target)
     {
         if (target + 1 >= tokens.Count) return -1;
