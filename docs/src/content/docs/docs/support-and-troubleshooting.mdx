@@ -22,6 +22,8 @@ Run `nbtcli capabilities` at any time to inspect the registered command list and
 
 <ProfileTable lang="en" />
 
+For shaped and shapeless crafting recipes, `scan` and `validate` can report `InvalidRecipeResult` for an absent, malformed, or air output item. The check follows the data pack's registered format. The matching Minecraft server verifies registry resolution, ingredients, stack sizes, and data pack interactions.
+
 ### Reading the `capabilities` Output
 
 For each profile, `capabilities` reports five operations (`read`, `extract`, `plan`, `write`, `recover`) across six facets (`layout`, `itemSchema`, `textSchema`, `commandGrammar`, `compression`, `packLayout`):

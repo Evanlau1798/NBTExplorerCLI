@@ -1,4 +1,5 @@
 using System.Globalization;
+using static NBTExplorerCLI.Minecraft.MinecraftIdentifier;
 
 namespace NBTExplorerCLI.Minecraft;
 
@@ -108,15 +109,6 @@ internal sealed partial class CommandTextReader
     private static bool PlainControlToken(string text) => text.Length != 0 && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '_' or '-' or '.' or ':' or '#');
 
     internal static bool ResourceOrTag(string text) => ResourceLocation(text.StartsWith('#') ? text[1..] : text);
-    private static bool ResourceLocation(string text)
-    {
-        var separator = text.IndexOf(':');
-        if (separator >= 0 && !text.AsSpan(0, separator).ToString().All(ResourceCharacter)) return false;
-        var resource = text[(separator + 1)..];
-        return resource.Length != 0 && resource.All(ch => ch == '/' || ResourceCharacter(ch));
-    }
-
-    private static bool ResourceCharacter(char ch) => char.IsAsciiLetterLower(ch) || char.IsAsciiDigit(ch) || ch is '_' or '-' or '.';
 
     private static bool Coordinates(string x, string y, string z) => Coordinate(x) && Coordinate(y) && Coordinate(z)
         && x.StartsWith('^') == y.StartsWith('^') && x.StartsWith('^') == z.StartsWith('^');

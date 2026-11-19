@@ -53,16 +53,24 @@ public static partial class PackTextExtractor
             }
             else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "loot_tables" : "loot_table")) Loot(root, TypedPath.Root, output, Component, profile, RawComponent);
             else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "item_modifiers" : "item_modifier")) Modifier(root, TypedPath.Root, output, Component, profile, RawComponent);
-            else if (parts.Length >= 4 && parts[0] == "data" && profile.Id == "java-1.21.11" && parts[2] == "recipe")
+            else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "recipes" : "recipe") && parts[^1].EndsWith(".json", StringComparison.Ordinal))
             {
                 var resultPath = At(TypedPath.Root, "result");
                 if (!root.TryGetNativeProperty("type", out var type) || type.ValueKind != JsonValueKind.String
                     || MinecraftIdentifier.DefaultNamespace(NativeJsonStrings.Read(type)) is not ("minecraft:crafting_shaped" or "minecraft:crafting_shapeless"))
                     output.Diagnostic(TypedPath.Root, "UnsupportedPackRecipe");
-                else if (!root.TryGetNativeProperty("result", out var result) || !result.TryGetNativeProperty("id", out var id)
-                    || id.ValueKind != JsonValueKind.String || MinecraftIdentifier.DefaultNamespace(NativeJsonStrings.Read(id)) == "minecraft:air")
-                    output.Diagnostic(resultPath, "InvalidRecipeResult");
-                else JsonItem(result, resultPath, output, Component, RawComponent, profile);
+                else
+                {
+                    var usesItemField = profile.Id == "java-1.20.4";
+                    root.TryGetNativeProperty("result", out var result);
+                    var id = result.ValueKind == JsonValueKind.String && profile.Id == "java-26.1-snapshot-6" ? result
+                        : result.TryGetNativeProperty(usesItemField ? "item" : "id", out var field) ? field : default;
+                    var item = id.ValueKind == JsonValueKind.String ? NativeJsonStrings.Read(id) : "";
+                    if (!MinecraftIdentifier.ResourceLocation(item) || MinecraftIdentifier.DefaultNamespace(item) == "minecraft:air")
+                        output.Diagnostic(resultPath, "InvalidRecipeResult");
+                    else if (!usesItemField && result.ValueKind == JsonValueKind.Object)
+                        JsonItem(result, resultPath, output, Component, RawComponent, profile);
+                }
             }
             else if (parts.Length >= 4 && parts[0] == "data" && profile.Id == "java-1.21.11" && parts[2] == "enchantment")
             {

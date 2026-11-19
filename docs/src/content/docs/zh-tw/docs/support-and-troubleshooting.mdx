@@ -22,6 +22,8 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 
 <ProfileTable lang="zh-tw" />
 
+對於有序及無序工作台配方，`scan` 和 `validate` 會依資料包已登錄的格式檢查產物物品欄位。若該欄位缺漏、格式無效或指定為空氣，會回報 `InvalidRecipeResult`。物品是否存在、材料與堆疊數量是否合法，以及資料包間的交互作用，仍由對應版本的 Minecraft 伺服器驗證。
+
 ### 如何解讀 `capabilities` 的支援宣告
 
 針對每一個版本組合，`capabilities` 會分別回報五種操作階段（`read`、`extract`、`plan`、`write`、`recover`）與六種資料面向（`layout`、`itemSchema`、`textSchema`、`commandGrammar`、`compression`、`packLayout`）：

@@ -40,6 +40,49 @@ internal static class LootTextExtractionTests
             "an unproved enchantment effect cannot be claimed as fully extracted");
     }
 
+    public static void CraftingResultProfiles()
+    {
+        foreach (var (major, minor, idField, directory) in new[]
+        {
+            (26, 0, "item", "recipes"), (48, 0, "id", "recipe"), (71, 0, "id", "recipe"),
+            (94, 1, "id", "recipe"), (99, 0, "id", "recipe")
+        })
+        {
+            var metadata = new PackMetadata(PackSourceKind.Datapack, major < 65 ? major : null, new(major, minor), new(major, minor));
+            foreach (var shape in new[] { "shaped", "shapeless" })
+            {
+                var input = major <= 48 ? """{"item":"minecraft:stone"}""" : "\"minecraft:stone\"";
+                var ingredients = shape == "shaped" ? "\"pattern\":[\"X\"],\"key\":{\"X\":" + input + "}" : "\"ingredients\":[" + input + "]";
+                TextExtractionResult Read(string result, string? type = null, string? folder = null) => PackTextExtractor.Extract(
+                    Location($"{folder ?? directory}/nested/test.json"),
+                    Encoding.UTF8.GetBytes($$"""{"type":"{{type ?? "crafting_" + shape}}",{{ingredients}},"result":{{result}} }"""), metadata);
+                var valid = $$"""{"{{idField}}":"stone"}""";
+                var parsed = Read(valid);
+                Require(parsed.Complete && parsed.Occurrences.IsEmpty, $"{major}/{shape}: valid item identifier is protected nontext");
+                Require(Read($$"""{"{{idField}}":":stone"}""", ":crafting_" + shape).Complete,
+                    $"{major}/{shape}: vanilla resolves leading-colon item and recipe identifiers under minecraft");
+                foreach (var invalid in new[] { "{}", "null", $$"""{"{{(idField == "item" ? "id" : "item")}}":"stone"}""",
+                    $$"""{"{{idField}}":"minecraft:air"}""", $$"""{"{{idField}}":":air"}""", $$"""{"{{idField}}":"Bad Id"}""" })
+                {
+                    var rejected = Read(invalid);
+                    Require(!rejected.Complete && rejected.Diagnostics.Single().Code == "InvalidRecipeResult"
+                        && rejected.Diagnostics.Single().Address.NodePath.ToJsonPointer() == "/result", $"{major}/{shape}: invalid result {invalid}");
+                }
+                Require(Read(valid, "probe:crafting_" + shape).Diagnostics.Single().Code == "UnsupportedPackRecipe"
+                    && Read(valid, folder: directory == "recipes" ? "recipe" : "recipes").Diagnostics.Single().Code == "UnsupportedPackJson",
+                    $"{major}/{shape}: unverified serializer and wrong directory remain incomplete");
+                var shorthand = Read("\"stone\"");
+                Require(shorthand.Complete == (major == 99) && Read("\"air\"").Diagnostics.Single().Code == "InvalidRecipeResult",
+                    $"{major}/{shape}: scalar result form is version-specific and air is rejected");
+                if (major != 26)
+                {
+                    var withName = Read("""{"id":"stone","components":{"minecraft:custom_name":{"text":"Prize"}}}""");
+                    Require(withName.Complete && withName.Occurrences.Single().Text == "Prize", $"{major}/{shape}: result keeps native component text extraction");
+                }
+            }
+        }
+    }
+
     public static void NestedLootNamesLoreAndBooks()
     {
         var bytes = Encoding.UTF8.GetBytes("""

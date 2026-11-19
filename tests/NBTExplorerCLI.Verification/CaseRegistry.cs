@@ -282,6 +282,7 @@ internal static class CaseRegistry
         new("loot-cover-title-type-rejection", "discovery", _ => LootTextExtractionTests.BookCoverRejectsComponentTitle()),
         new("loot-profile-official-registry", "discovery", context => LootTextExtractionTests.ExactOfficialRegistry(context.FixtureRoot)),
         new("pack-java-12111-crafting-enchantment-text", "discovery", _ => LootTextExtractionTests.Java12111CraftingAndEmptyEffectEnchantmentText()),
+        new("pack-crafting-result-profiles", "discovery", _ => LootTextExtractionTests.CraftingResultProfiles()),
         new("loot-nested-names-lore-books", "discovery", _ => LootTextExtractionTests.NestedLootNamesLoreAndBooks()),
         new("loot-modifiers-components-unknown", "discovery", _ => LootTextExtractionTests.NestedModifiersComponentsAndUnknown()),
         new("text-known-nontext-data-and-poi", "discovery", _ => NonTextSourceTests.KnownSavedDataAndPoiRemainNontext()),
