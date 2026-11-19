@@ -26,6 +26,7 @@ internal static class CliReferencePlanTests
             var source = page.Slots.Single(item => item.SlotId == slot.SlotId); string? text = null;
             if (source.Context == "armor_stand.name" && (source.SourceText == "Guard" || merge && source.SourceText == "Other") && (!partial || selected == 0)) { text = "Sentinel"; selected++; }
             else if (bothTypes && source.Context == "entity.name") text = "Undead";
+            else if (source.Context == "command.click.message" && source.SourceText == "Clicked") text = "Opened";
             return slot with { State = text is null ? SessionReplyState.Unchanged : SessionReplyState.Translated, Text = text };
         }).ToImmutableArray() };
         var file = Path.Combine(work, "names-reply.json"); File.WriteAllText(file, SessionExchangeJson.WriteReply(reply));
@@ -69,6 +70,54 @@ internal static class CliReferencePlanTests
             }
             finally { Directory.Delete(world, true); Directory.Delete(work, true); }
         }
+    }
+
+    public static void CommandSummonTemplatesAndLiveNamesCommitInOneTranslationPlan()
+    {
+        var world = WorldReferenceTests.CreateWorld(); var work = ScratchDirectory.CreateChild();
+        try
+        {
+            var function = Path.Combine(world, WorldQueryTests.Function(0));
+            File.AppendAllText(function, "summon minecraft:armor_stand ~ ~ ~ {CustomName:'{\"text\":\"Guard\",\"color\":\"gold\"}',ShowArms:1b}\n");
+            var before = File.ReadAllBytes(function);
+            var (id, revision) = Session(world, work); var output = Path.Combine(work, "name-template-plan.json");
+            using var preview = Success(Plan(world, work, id, revision, output, true));
+            var plan = PatchPlanJson.Read(File.ReadAllText(output));
+            Require(plan.Operations.OfType<ReferencePatch>().Single().Synchronization.Members.Length == 4 && File.ReadAllBytes(function).SequenceEqual(before),
+                "one bounded group covers a spawned entity, its exact summon template and both real selectors");
+            ApplyAndSeal(world, work, id, revision, output, plan);
+            var changed = File.ReadAllText(function);
+            Require(changed.Contains("type=minecraft:armor_stand,name=\"Sentinel\"", StringComparison.Ordinal)
+                && changed.Contains("summon minecraft:armor_stand ~ ~ ~ {CustomName:", StringComparison.Ordinal)
+                && changed.Split('\n').Single(line => line.StartsWith("summon ", StringComparison.Ordinal)).Contains("Sentinel", StringComparison.Ordinal)
+                && changed.Contains("ShowArms:1b", StringComparison.Ordinal) && changed.Contains("{\"text\":\"Guard\"}", StringComparison.Ordinal),
+                "live selector and spawn template use the translated name while literal chat and unrelated summon data survive");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
+    public static void StaticClickMessageTranslatesWithoutRewritingItsCommand()
+    {
+        var world = WorldReferenceTests.CreateWorld(); var work = ScratchDirectory.CreateChild();
+        try
+        {
+            var function = Path.Combine(world, WorldQueryTests.Function(1));
+            const string component = """{"text":"Open","clickEvent":{"action":"run_command","value":"/tellraw @p {\"text\":\"Clicked\",\"color\":\"red\"}"}}""";
+            var direct = "tellraw @s " + component;
+            var book = "give @s written_book[written_book_content={title:'Title',author:'Author',pages:['" + component.Replace("\\", "\\\\", StringComparison.Ordinal) + "']}]";
+            File.WriteAllText(function, direct + "\n" + book + "\n");
+            var (id, revision) = Session(world, work); var output = Path.Combine(work, "click-message-plan.json");
+            using var preview = Success(Plan(world, work, id, revision, output, true));
+            ApplyAndSeal(world, work, id, revision, output, PatchPlanJson.Read(File.ReadAllText(output)));
+            var lines = File.ReadAllLines(function);
+            Require(lines.Length == 2 && lines[0] == direct.Replace("Clicked", "Opened", StringComparison.Ordinal)
+                && lines[1].StartsWith("give @s written_book[written_book_content={title:'Title',author:'Author',pages:[", StringComparison.Ordinal),
+                "the direct click stays byte exact outside the message; the book retains its command and cover: " + string.Join("\n", lines));
+            var page = Snbt.ParseDocument(Encoding.UTF8.GetBytes(lines[1].Split("pages:[", StringSplitOptions.None)[1][..^3]),
+                SnbtProfile.JavaThrough1214, DecodeLimits.Default);
+            Require(page.Root.Value is LogicalMinecraftLeaf { Value: NbtString value } && value.Value == component.Replace("Clicked", "Opened", StringComparison.Ordinal),
+                "the book page preserves its exact decoded component outside the translated message");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
     }
     public static void MissingMembersFilteredScopeAndUntypedUsesPreserveAllWork()
     {

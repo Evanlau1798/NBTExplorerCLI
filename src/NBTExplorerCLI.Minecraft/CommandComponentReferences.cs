@@ -31,7 +31,9 @@ internal sealed partial class CommandTextReader
                 var fields = compound.Entries.ToDictionary(entry => entry.Name, entry => entry.Value, StringComparer.Ordinal);
                 if (fields.TryGetValue("selector", out var selector) && selector is LogicalMinecraftLeaf { Value: NbtString text })
                     Selector(text.Value, At(path, "selector"), parsed.Resolve(At(path, "selector")).Span);
-                if (fields.ContainsKey("nbt") || fields.ContainsKey("score") || fields.ContainsKey("click_event")) Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
+                if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
+                    || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, true, limits) is null)
+                    Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
                 if (fields.TryGetValue("extra", out var extra)) VisitNbt(extra, At(path, "extra"));
                 if (fields.ContainsKey("translate") && fields.TryGetValue("with", out var arguments)) VisitNbt(arguments, At(path, "with"));
                 if ((fields.ContainsKey("selector") || fields.ContainsKey("nbt")) && fields.TryGetValue("separator", out var separator)) VisitNbt(separator, At(path, "separator"));
@@ -52,7 +54,8 @@ internal sealed partial class CommandTextReader
                 if (value.ValueKind != JsonValueKind.Object) return;
                 if (value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
                     Selector(NativeJsonStrings.Read(selector), At(path, "selector"), spans[At(path, "selector")]);
-                if (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out _) || value.TryGetNativeProperty("clickEvent", out _))
+                if (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
+                    || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, false, limits) is null)
                     Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
                 if (value.TryGetNativeProperty("extra", out var extra)) VisitJson(extra, At(path, "extra"));
                 if (value.TryGetNativeProperty("translate", out _) && value.TryGetNativeProperty("with", out var arguments)) VisitJson(arguments, At(path, "with"));
@@ -75,8 +78,15 @@ internal sealed partial class CommandTextReader
     {
         if (value is LogicalMinecraftList list) return list.Items.Any(PotentialReferences);
         if (value is LogicalMinecraftCompound compound)
-            return compound.Entries.Any(entry => entry.Name is "selector" or "nbt" or "score" or "click_event" or "clickEvent"
-                || entry.Name is not ("minecraft:custom_data" or "custom_data" or "title" or "filtered_title" or "author" or "generation" or "resolved" or "id" or "count" or "Count" or "slot" or "Slot") && PotentialReferences(entry.Value));
+            return compound.Entries.Any(entry => entry.Name switch
+            {
+                "selector" or "nbt" => true,
+                "score" => !ComponentReferenceRules.IsSelfScore(entry.Value),
+                "click_event" => ComponentReferenceRules.Click(entry.Value, true, limits) is null,
+                "clickEvent" => ComponentReferenceRules.Click(entry.Value, false, limits) is null,
+                "minecraft:custom_data" or "custom_data" or "title" or "filtered_title" or "author" or "generation" or "resolved" or "id" or "count" or "Count" or "slot" or "Slot" => false,
+                _ => PotentialReferences(entry.Value)
+            });
         if (value is LogicalMinecraftLeaf { Value: NbtString text } && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json")
         {
             try
@@ -87,8 +97,14 @@ internal sealed partial class CommandTextReader
             catch (JsonException) { return false; }
         }
         return false;
-        static bool Contains(JsonElement element)
+        bool Contains(JsonElement element)
             => element.ValueKind == JsonValueKind.Array ? element.EnumerateArray().Any(Contains)
-                : element.ValueKind == JsonValueKind.Object && element.EnumerateObject().Any(property => NativeJsonStrings.PropertyName(property) is "selector" or "nbt" or "score" or "clickEvent" || Contains(property.Value));
+                : element.ValueKind == JsonValueKind.Object && element.EnumerateObject().Any(property => NativeJsonStrings.PropertyName(property) switch
+                {
+                    "selector" or "nbt" => true,
+                    "score" => !ComponentReferenceRules.IsSelfScore(property.Value),
+                    "clickEvent" => ComponentReferenceRules.Click(property.Value, false, limits) is null,
+                    _ => Contains(property.Value)
+                });
     }
 }

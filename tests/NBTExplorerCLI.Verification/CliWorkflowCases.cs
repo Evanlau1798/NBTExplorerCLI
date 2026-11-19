@@ -35,6 +35,8 @@ internal static class CliWorkflowCases
         new("cli-reference-plan-combined-core-guard", "cli-reference", _ => CliReferencePlanTests.IndividuallyValidGroupsCannotBypassCombinedPlanValidation()),
         new("cli-reference-plan-cross-group-merge", "cli-reference", _ => CliReferencePlanTests.DistinctOldIdentifiersCannotMergeThroughIndependentGroups()),
         new("cli-reference-plan-typed-groups", "cli-reference", _ => CliReferencePlanTests.ExplicitAuthorityBuildsCompleteSingleAndMultipleTypedGroups()),
+        new("cli-reference-plan-static-summon-template", "cli-reference", _ => CliReferencePlanTests.CommandSummonTemplatesAndLiveNamesCommitInOneTranslationPlan()),
+        new("cli-reference-plan-static-click-message", "cli-reference", _ => CliReferencePlanTests.StaticClickMessageTranslatesWithoutRewritingItsCommand()),
         new("cli-reference-plan-missing-scope-untyped", "cli-reference", _ => CliReferencePlanTests.MissingMembersFilteredScopeAndUntypedUsesPreserveAllWork()),
         new("cli-reference-plan-fragmented-target", "cli-reference", _ => CliReferencePlanTests.FragmentedNamesAreGroupedByTheWholeTypedTarget()),
         new("cli-session-write-unchanged-no-write-contract", "cli-session-write", _ => CliSessionWriteTests.ExplicitUnchangedSlotsKeepTheirAcceptedNoWriteCompletionContract()),

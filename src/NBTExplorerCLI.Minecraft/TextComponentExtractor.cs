@@ -87,6 +87,9 @@ public static class TextComponentExtractor
         }
         if (fields.TryGetValue("extra", out var extra)) JsonList(extra, At(path, "extra"), role, schema, output);
         if ((fields.ContainsKey("selector") || fields.ContainsKey("nbt")) && fields.TryGetValue("separator", out var separator)) JsonValue(separator, At(path, "separator"), role, schema, output);
+        var clickKey = modern ? "click_event" : "clickEvent";
+        if (fields.TryGetValue(clickKey, out var click) && ComponentReferenceRules.Click(click, modern, output.Limits)?.Text is { } message)
+            output.Literal(At(At(path, clickKey), ComponentReferenceRules.CommandField(modern)), message, ClickCommandText.Role);
         var hoverKey = modern ? "hover_event" : "hoverEvent";
         if (fields.TryGetValue(hoverKey, out var hover) && hover.ValueKind == JsonValueKind.Object)
         {
@@ -149,6 +152,8 @@ public static class TextComponentExtractor
         }
         if (fields.TryGetValue("extra", out var extra)) WalkNbtList(extra, At(path, "extra"), role, profile, output);
         if ((fields.ContainsKey("selector") || fields.ContainsKey("nbt")) && fields.TryGetValue("separator", out var separator)) WalkNbt(separator, At(path, "separator"), role, profile, output);
+        if (fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, true, output.Limits)?.Text is { } message)
+            output.Literal(At(At(path, "click_event"), "command"), message, ClickCommandText.Role);
         if (fields.TryGetValue("hover_event", out var hover) && hover is NbtCompound hoverFields)
         {
             var eventFields = new Dictionary<string, NbtValue>(StringComparer.Ordinal);

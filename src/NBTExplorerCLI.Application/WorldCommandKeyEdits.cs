@@ -23,7 +23,7 @@ internal static class WorldCommandKeyEdits
             var parsed = Snbt.ParseDocument(bytes, modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
             if (parsed.Root.Value is not LogicalMinecraftLeaf { Value: NbtString json }) throw new EditRejectedException(EditFailure.Precondition, "Command encoded JSON root is not a string");
             var keyed = NativeJsonKeyEdits.Convert(NativeJsonStrings.EncodeJavaDocument(json.Value, limits), conversions.Select(item => (item.Address.ComponentPath!, item.Slot.SourceText, item.Dependency.Key, item.Reply.Text.Contains('%'))), limits);
-            var output = NativeJsonEdits.ReplaceStrings(keyed, translations.Select(item => (item.Slot.Address.ComponentPath!, item.Slot.SourceText, item.Reply.Text)), limits);
+            var output = NativeJsonEdits.ReplaceStrings(keyed, WorldJsonEdits.LiteralChanges(keyed, translations, item => item.Slot.Address.ComponentPath!, limits), limits);
             return Snbt.Write(new LogicalMinecraftLeaf(new NbtString(encoding.GetString(output))), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
         }
         if (conversions.Count != 1 || translations.Count != 0) throw new EditRejectedException(EditFailure.Precondition, "Direct command component roots overlap");

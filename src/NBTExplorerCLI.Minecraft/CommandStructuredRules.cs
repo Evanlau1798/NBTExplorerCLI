@@ -5,7 +5,7 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
-    private void Structured(int start, int end, TypedPath path, string identity, bool block)
+    private void Structured(int start, int end, TypedPath path, string identity, bool block, bool summonTemplate = false)
     {
         if (!identity.StartsWith("minecraft:", StringComparison.Ordinal)) { Unknown(path, start, end - start, "UnknownCommandNbtSchema"); return; }
         var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, block ? "block.data" : "entity.data", source.Address.Dimension, source.Address.Chunk);
@@ -14,6 +14,7 @@ internal sealed partial class CommandTextReader
             : SnbtTextExtractor.Entity(binding, source.Command[start..end], profile, limits, scope, identity, callback);
         MergeComponent(result, path, start, end, true);
         if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(source.Command[start..end]), start, end, path, true, itemTree: true);
+        if (summonTemplate && nameTemplate is not null && result.Diagnostics.IsEmpty) ReadSummonNameTemplate(start, end, path, identity, result);
     }
     private void BlockArgument(CommandToken token, TypedPath path)
     {

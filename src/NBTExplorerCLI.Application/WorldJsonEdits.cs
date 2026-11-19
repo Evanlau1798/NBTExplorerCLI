@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using NBTExplorerCLI.Minecraft;
 
 namespace NBTExplorerCLI.Application;
 
@@ -21,8 +22,8 @@ internal static class WorldJsonEdits
     internal static PreparedArtifactBytes CreateLiterals(byte[] bytes, IReadOnlyList<LiteralTranslation> literals, DecodeLimits limits)
     {
         if (literals.Any(item => item.Slot.Address.JsonTarget != JsonTargetKind.Value)) throw new NotSupportedException("JSON preparation requires literal value slots");
-        var changes = literals.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null)
-            .Select(item => (Path: item.Slot.Address.NodePath, Expected: item.Slot.SourceText, Replacement: item.Reply.Text)).ToList();
+        var changes = LiteralChanges(bytes, literals.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null),
+            item => item.Slot.Address.NodePath, limits).ToList();
         var encoded = literals.Where(item => item.Slot.Address.Syntax is not null || item.Slot.Address.ComponentPath is not null).GroupBy(item => item.Slot.Address.NodePath).ToArray();
         var spans = encoded.Length == 0 ? null : NativeJsonStringSpans.Read(bytes, limits);
         long retainedCharacters = 0;
@@ -44,8 +45,29 @@ internal static class WorldJsonEdits
     {
         if (translations.All(item => item.Slot.SourceText == item.Reply.Text)) return original;
         var bytes = NativeJsonStrings.EncodeJavaDocument(original, limits);
-        var changed = NativeJsonEdits.ReplaceStrings(bytes, translations.Select(item => (item.Slot.Address.ComponentPath!, item.Slot.SourceText, item.Reply.Text)), limits);
+        var changed = NativeJsonEdits.ReplaceStrings(bytes, LiteralChanges(bytes, translations, item => item.Slot.Address.ComponentPath!, limits), limits);
         return new UTF8Encoding(false, true).GetString(changed);
+    }
+    internal static IEnumerable<(TypedPath Path, string Expected, string Replacement)> LiteralChanges(byte[] bytes,
+        IEnumerable<LiteralTranslation> translations, Func<LiteralTranslation, TypedPath> locate, DecodeLimits limits)
+    {
+        Dictionary<TypedPath, SnbtSpan>? spans = null;
+        foreach (var item in translations)
+        {
+            var path = locate(item);
+            if (item.Slot.Role != ClickCommandText.Role) { yield return (path, item.Slot.SourceText, item.Reply.Text); continue; }
+            spans ??= NativeJsonStringSpans.Read(bytes, limits);
+            if (!spans.TryGetValue(path, out var span)) throw new EditRejectedException(EditFailure.Precondition, "JSON click command is not a string");
+            var original = ReadString(bytes.AsSpan(span.StartByte, span.LengthBytes));
+            yield return (path, original, ClickCommandText.Rewrite(original, item.Slot.SourceText, item.Reply.Text,
+                path.Segments[^1].Key == "command", limits));
+        }
+    }
+    internal static string ReadString(ReadOnlySpan<byte> bytes)
+    {
+        var reader = new Utf8JsonReader(bytes);
+        if (!reader.Read() || reader.TokenType != JsonTokenType.String) throw new EditRejectedException(EditFailure.Precondition, "Expected a JSON string");
+        return NativeJsonStrings.ReadToken(ref reader);
     }
     private static void Retain(ref long characters, int additional, DecodeLimits limits)
     {

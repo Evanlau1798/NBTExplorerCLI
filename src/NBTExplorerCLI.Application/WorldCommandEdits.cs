@@ -56,15 +56,26 @@ internal static class WorldCommandEdits
                 if (group.Any(item => item.Slot.Address.ComponentPath is null)) throw new EditRejectedException(EditFailure.Precondition, "Command syntax layers conflict");
                 var parsed = Snbt.ParseFragment(bytes, checked((int)span.StartByte), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
                 if (parsed.Root.Span.LengthBytes != span.LengthBytes || parsed.Root.Value is not LogicalMinecraftLeaf { Value: NbtString text }) throw new EditRejectedException(EditFailure.Precondition, "Command embedded JSON span differs");
-                var json = NativeJsonEdits.ReplaceStrings(NativeJsonStrings.EncodeJavaDocument(text.Value, limits), group.Select(item => (item.Slot.Address.ComponentPath!, item.Slot.SourceText, item.Reply.Text)), limits);
-                replacement = Snbt.Write(new LogicalMinecraftLeaf(new NbtString(encoding.GetString(json))), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+                var json = WorldJsonEdits.RewriteJson(text.Value, group.ToArray(), limits);
+                replacement = Snbt.Write(new LogicalMinecraftLeaf(new NbtString(json)), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
             }
             else
             {
                 if (group.Count() != 1) throw new EditRejectedException(EditFailure.Precondition, "Command slot scope overlaps");
-                replacement = first.Slot.Role == "reference.selector.name" || !modern && first.Slot.Role.StartsWith(source.Address.SemanticRole + ".text", StringComparison.Ordinal)
-                    ? NativeJsonEdits.ReplaceStrings("\"\""u8.ToArray(), [(TypedPath.Root, "", first.Reply.Text)], limits)
-                    : Snbt.Write(new LogicalMinecraftLeaf(new NbtString(first.Reply.Text)), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
+                var jsonString = first.Slot.Role == "reference.selector.name" || !modern && (first.Slot.Role == ClickCommandText.Role
+                    || first.Slot.Role.StartsWith(source.Address.SemanticRole + ".text", StringComparison.Ordinal));
+                var value = first.Reply.Text;
+                if (first.Slot.Role == ClickCommandText.Role)
+                {
+                    var token = bytes.AsSpan(checked((int)span.StartByte), checked((int)span.LengthBytes));
+                    var previous = jsonString ? WorldJsonEdits.ReadString(token)
+                        : Snbt.ParseDocument(token.ToArray(), SnbtProfile.Java1215, limits).Root.Value is LogicalMinecraftLeaf { Value: NbtString rawClick }
+                            ? rawClick.Value : throw new EditRejectedException(EditFailure.Precondition, "Command click payload is not a string");
+                    value = ClickCommandText.Rewrite(previous, first.Slot.SourceText, value, modern, limits);
+                }
+                replacement = jsonString
+                    ? NativeJsonEdits.ReplaceStrings("\"\""u8.ToArray(), [(TypedPath.Root, "", value)], limits)
+                    : Snbt.Write(new LogicalMinecraftLeaf(new NbtString(value)), modern ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214, limits);
             }
             if (replacement.Contains((byte)'\r') || replacement.Contains((byte)'\n')) throw new NotSupportedException("This command profile cannot encode a literal line break inside a syntax token");
             replacementBytes = checked(replacementBytes + replacement.Length);

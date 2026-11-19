@@ -58,7 +58,17 @@ internal static class WorldArtifactEdits
                 conversions.Where(conversion => conversion.Address.Syntax is not null && conversion.Address.NodePath.Equals(path)).ToArray());
             edits.Add(TypedEdit.Replace(path, new NbtString(pending.Command), new NbtString(new UTF8Encoding(false, true).GetString(changed))));
         }
-        foreach (var item in literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null)) edits.Add(TypedEdit.Replace(item.Slot.Address.NodePath, new NbtString(item.Slot.SourceText), new NbtString(item.Reply.Text)));
+        foreach (var item in literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null))
+        {
+            var path = item.Slot.Address.NodePath;
+            if (item.Slot.Role == ClickCommandText.Role)
+            {
+                if (NbtLocator.Resolve(document.Root, path).Value is not NbtString raw)
+                    throw new EditRejectedException(EditFailure.Precondition, "NBT click command is not a string");
+                edits.Add(TypedEdit.Replace(path, raw, new NbtString(ClickCommandText.Rewrite(raw.Value, item.Slot.SourceText, item.Reply.Text, true, limits))));
+            }
+            else edits.Add(TypedEdit.Replace(path, new NbtString(item.Slot.SourceText), new NbtString(item.Reply.Text)));
+        }
         var expected = TypedTreeEdits.Apply(keyed, edits);
         if (NbtTextExtractor.Profile(source.Location, expected).Id != profile.Id) throw new NotSupportedException("Data version migration requires its explicit profile conversion");
         return expected;

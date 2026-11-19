@@ -56,6 +56,134 @@ internal static class CommandTextExtractionTests
                 "unknown grammar and macro never become zero-item complete or a global text guess");
         }
     }
+
+    public static void StaticScoreControlPreservesNestedTextAndSelectors()
+    {
+        foreach (var version in new[] { 3953, 4774 })
+        {
+            const string commands = "execute if score @e[type=sheep,name=Rainbow,limit=1] mode matches ..2 run bossbar set golden:mode name {\"text\":\"Pink mode\"}\n"
+                + "execute unless score @s mode = #expected mode run scoreboard players add @s mode 1\n"
+                + "execute store result score @s mode run time query gametime\n"
+                + "title @a times 10 70 20\nscoreboard objectives add mode dummy\nscoreboard objectives setdisplay sidebar mode\n"
+                + "scoreboard players operation @s mode %= #modulus mode\nbossbar set golden:mode color purple\n"
+                + "bossbar set golden:mode max 100\nbossbar set golden:mode value 75\nbossbar set golden:mode visible true\n"
+                + "bossbar set golden:mode players @a\nbossbar set golden:mode style notched_10\nkill @e[tag=arena_preview]\n"
+                + "loot give @s loot golden:book\nfunction golden:titles/update\n";
+            var source = new SourceAddress(new(World, "score-actions.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+            var profile = MinecraftProfiles.ForDataVersion(version)!;
+            var extracted = CommandTextExtractor.Extract(new(source, commands), profile);
+            Require(extracted.Complete && extracted.Text.Occurrences.Single().Text == "Pink mode" && extracted.References.Single().Name == "Rainbow",
+                "static scoreboard control exposes the nested bossbar text and selector without classifying the source as unknown");
+            var syntax = extracted.Text.Occurrences[0].Address.Syntax!;
+            Require(Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(commands).AsSpan((int)syntax.StartByte, (int)syntax.LengthBytes)) == "\"Pink mode\"",
+                "nested text remains editable through its exact original byte span");
+            foreach (var unknown in new[] { "execute if score @s mode matches .. run tellraw @s \"text\"", "execute if score @s mode not_a_comparator @s mode run tellraw @s \"text\"",
+                "execute store result storage golden:data field int 1 run time query gametime", "bossbar set golden:mode color rainbow", "function golden:titles/update with storage golden:data", "loot give @s fish golden:book" })
+            {
+                var rejected = CommandTextExtractor.Extract(new(source, unknown), profile);
+                Require(!rejected.Complete && rejected.Text.Occurrences.IsEmpty, "unrecognized or dynamic shapes still fail closed: " + unknown);
+            }
+        }
+    }
+
+    public static void StaticClickActionsDoNotClaimDynamicNameReferences()
+    {
+        var command = new SourceAddress(new(World, "clicks.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var json = new SourceAddress(new(World, "clicks.json", ArtifactKind.Json), TypedPath.Root, "book.page");
+        var nbt = new SourceAddress(new(World, "clicks.dat", ArtifactKind.Nbt), TypedPath.Root, "book.page");
+        foreach (var version in new[] { 3953, 4774 })
+        {
+            var profile = MinecraftProfiles.ForDataVersion(version)!;
+            var clickField = version == 3953 ? "clickEvent" : "click_event";
+            foreach (var (action, body, expected) in new[] {
+                ("open_url", version == 3953 ? "\"value\":\"https://example.com\"" : "\"url\":\"https://example.com\"", true),
+                ("change_page", version == 3953 ? "\"value\":\"1\"" : "\"page\":1", true),
+                ("copy_to_clipboard", "\"value\":\"@e[name=Guard]\"", true),
+                ("run_command", version == 3953 ? "\"value\":\"/kill @e[name=Guard]\"" : "\"command\":\"/kill @e[name=Guard]\"", false),
+                ("unknown_action", "\"value\":\"unused\"", false)
+            })
+            {
+                var component = "{\"text\":\"Open\",\"" + clickField + "\":{\"action\":\"" + action + "\"," + body + "}}";
+                var parsed = CommandTextExtractor.Extract(new(command, "tellraw @s " + component), profile);
+                Require(parsed.Complete == expected && parsed.Text.Occurrences.Single().Text == "Open" && parsed.References.IsEmpty,
+                    "a known non-command click action has no name reference; command and unknown clicks remain unresolved");
+                Require((NativeComponentReferences.Json(json, Encoding.UTF8.GetBytes(component), profile).Completeness == ReferenceCompleteness.Complete) == expected,
+                    "standalone JSON names and command components agree on supported static clicks");
+                var page = version == 3953 ? "'" + component + "'" : component;
+                var book = CommandTextExtractor.Extract(new(command, "give @s written_book[written_book_content={title:'Title',author:'Author',pages:[" + page + "]}]"), profile);
+                Require(book.Complete == expected && book.Text.Occurrences.Any(occurrence => occurrence.Text == "Open"),
+                    "nested book click actions follow the same static policy");
+                if (version == 4774)
+                {
+                    var modern = new NbtCompound([new("text", new NbtString("Open")), new("click_event", new NbtCompound([new("action", new NbtString(action))]))]);
+                    Require((NativeComponentReferences.Nbt(nbt, modern, profile).Completeness == ReferenceCompleteness.Complete) == expected,
+                        "native NBT uses the same click action reference policy as command and JSON components");
+                }
+            }
+        }
+    }
+
+    public static void FunctionTagsAndClickPayloads()
+    {
+        var source = new SourceAddress(new(World, "click-payloads.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        foreach (var version in new[] { 3953, 4774 })
+        {
+            var profile = MinecraftProfiles.ForDataVersion(version)!;
+            string Click(string payload) => "tellraw @s {\"text\":\"Open\","
+                + (version == 3953 ? "\"clickEvent\":{\"action\":\"run_command\",\"value\":" : "\"click_event\":{\"action\":\"run_command\",\"command\":")
+                + System.Text.Json.JsonSerializer.Serialize(payload) + "}}";
+            CommandExtractionResult Extract(string command) => CommandTextExtractor.Extract(new(source, command), profile);
+            foreach (var (command, complete) in new[] {
+                ("function #golden:load", true), ("function golden:load", true), ("function #", false),
+                ("function ##golden:load", false), ("function #golden:load with storage golden:data", false)
+            })
+            {
+                Require(Extract(command).Complete == complete && Extract(Click("/" + command)).Complete == complete, "function resource/tag and click coverage: " + command);
+            }
+            foreach (var (payload, complete, message) in new[] {
+                ("/tp @s ~ ~10 ~", true, (string?)null), ("/tp @e[name=Guard] ~ ~10 ~", false, null),
+                ("/kick @s Goodbye", true, "Goodbye"), ("/kick @s Hello @e[name=Guard]", false, null)
+            })
+            {
+                var result = Extract(Click(payload));
+                Require(result.Complete == complete && result.Text.Occurrences.SingleOrDefault(row => row.Context == "command.click.message")?.Text == message,
+                    "only proven click commands extract their editable message: " + payload);
+            }
+            Require(!Extract("loot give @s loot #golden:load").Complete, "only the function argument accepts a tag");
+        }
+    }
+
+    public static void SelfScoreComponentsKeepAdjacentTextAndProtectOtherSelectors()
+    {
+        var command = new SourceAddress(new(World, "self-score.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var json = new SourceAddress(new(World, "self-score.json", ArtifactKind.Json), TypedPath.Root, "book.page");
+        var nbt = new SourceAddress(new(World, "self-score.dat", ArtifactKind.Nbt), TypedPath.Root, "book.page");
+        foreach (var version in new[] { 3953, 4774 })
+        {
+            var profile = MinecraftProfiles.ForDataVersion(version)!;
+            foreach (var name in new[] { "@s", "@e[type=sheep,name=Guard,limit=1]", "@s[name=Guard]" })
+            {
+                var isSelf = name == "@s";
+                var score = "{\"score\":{\"name\":\"" + name + "\",\"objective\":\"temp_display\"}}";
+                var component = "[{\"text\":\"Current: \"}," + score + "]";
+                var text = CommandTextExtractor.Extract(new(command, "tellraw @s " + component), profile);
+                Require(text.Complete == isSelf && text.Text.Occurrences.Single().Text == "Current: " && text.References.IsEmpty,
+                    "plain self scores cannot use an entity name; a score with a selector predicate stays unresolved");
+                Require((NativeComponentReferences.Json(json, Encoding.UTF8.GetBytes(component), profile).Completeness == ReferenceCompleteness.Complete) == isSelf,
+                    "native JSON does not confuse the executor's score with a dynamic entity-name reference");
+                var page = version == 3953 ? "'" + component + "'" : component;
+                var book = CommandTextExtractor.Extract(new(command, "give @s written_book[written_book_content={title:'Title',author:'Author',pages:[" + page + "]}]"), profile);
+                Require(book.Complete == isSelf && book.Text.Occurrences.Any(occurrence => occurrence.Text == "Current: "),
+                    "nested item components preserve the same self score reference boundary");
+                if (version == 4774)
+                {
+                    var modern = new NbtCompound([new("score", new NbtCompound([new("name", new NbtString(name)), new("objective", new NbtString("temp_display"))]))]);
+                    Require((NativeComponentReferences.Nbt(nbt, modern, profile).Completeness == ReferenceCompleteness.Complete) == isSelf,
+                        "native NBT distinguishes a self score from a potentially name-dependent score");
+                }
+            }
+        }
+    }
     public static void ItemComponentFragments()
     {
         foreach (var (version, modern) in new[] { (3953, false), (4325, true), (4774, true) })

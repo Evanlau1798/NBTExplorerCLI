@@ -84,12 +84,25 @@ internal sealed class WorldReferenceScan
         foreach (var command in text.PendingCommands)
         {
             var grammar = profile.Features[ProfileFacet.CommandGrammar];
+            var declared = new HashSet<SourceAddress>();
             var result = CommandTextExtractor.Extract(command, profile, limits, selectorReference: binding =>
             {
                 var reference = binding.Reference; Charge(reference.Address, binding.Selector);
                 Uses.Add(new(reference.Address, reference.Name, binding.Kind, binding.EntityType, binding.Selector, true, binding.Direct, grammar));
+            }, nameTemplate: template =>
+            {
+                var target = new WorldNamedTarget(template.Root, template.EntityType, template.Name, template.Parts, grammar);
+                if (!targetRoots.Add(target.Root)) Reject("An identifying summon declaration occurs more than once");
+                Charge(target.Root, target.Name);
+                foreach (var part in target.Parts)
+                {
+                    if (!declared.Add(part.Address)) Reject("A name part belongs to multiple summon declarations");
+                    Charge(part.Address, part.Text);
+                }
+                Targets.Add(target);
             });
-            if (!result.Complete || result.Text.Occurrences.Any(item => Identifying(item.Address.SemanticRole))) Reject("Command reference domain is dynamic or contains unsupported named templates");
+            if (!result.Complete || result.Text.Occurrences.Any(item => Identifying(item.Address.SemanticRole) && !declared.Contains(item.Address)))
+                Reject("Command reference domain is dynamic or contains unsupported named templates");
         }
         if (text.Occurrences.Any(item => Identifying(item.Address.SemanticRole) && (document is null || item.Address.Syntax is not null))) Reject("Named templates require their explicit reference grammar");
         if (document is not null)

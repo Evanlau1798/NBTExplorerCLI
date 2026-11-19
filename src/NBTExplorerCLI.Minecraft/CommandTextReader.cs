@@ -16,6 +16,7 @@ internal sealed partial class CommandTextReader
     private readonly SnapshotScope scope;
     private readonly Action<SourceAddress>? componentRoot;
     private readonly Action<CommandSelectorReference>? selectorReference;
+    private readonly Action<CommandNameTemplate>? nameTemplate;
     private readonly Hash256 hash;
     private readonly int byteBase;
     private readonly string newline;
@@ -28,11 +29,12 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
         this.componentRoot = componentRoot;
         this.selectorReference = selectorReference;
+        this.nameTemplate = nameTemplate;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
         byteBase = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 } ? 3 : 0;
@@ -84,7 +86,7 @@ internal sealed partial class CommandTextReader
         {
             if (tokens.Count != index + 6) throw new CommandSyntaxException();
             var identity = MinecraftIdentifier.DefaultNamespace(tokens[index + 1].Text);
-            Structured(tokens[index + 5].Start, tokens[index + 5].Start + tokens[index + 5].Text.Length, At(path, "summon.nbt"), identity, false); return;
+            Structured(tokens[index + 5].Start, tokens[index + 5].Start + tokens[index + 5].Text.Length, At(path, "summon.nbt"), identity, false, summonTemplate: true); return;
         }
         if (name == "setblock" && tokens.Count >= index + 5)
         {
@@ -100,12 +102,16 @@ internal sealed partial class CommandTextReader
                 if (clause == "run") { Command(tokens, cursor, At(path, "run"), end); return; }
                 var operands = clause switch { "as" or "at" or "in" or "anchored" or "align" or "on" or "summon" => 1, "positioned" => 3, "rotated" => 2, "facing" => 3, _ => -1 };
                 if (clause is "if" or "unless" && cursor + 1 < tokens.Count && tokens[cursor].Text == "entity") operands = 2;
+                if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "score") operands = ScoreCondition(tokens, cursor);
+                if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "score"
+                    && ScoreHolder(tokens[cursor + 2].Text) && PlainControlToken(tokens[cursor + 3].Text)) operands = 4;
                 if (cursor < tokens.Count && clause is "positioned" or "rotated" && tokens[cursor].Text == "as") operands = 2;
                 if (operands < 0 || cursor + operands > tokens.Count) { Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownExecuteGrammar"); return; }
                 cursor += operands;
             }
             throw new CommandSyntaxException();
         }
+        if (StaticControlCommand(tokens, index, name)) return;
         var argument = name switch
         {
             "tellraw" when tokens.Count >= index + 3 => index + 2,

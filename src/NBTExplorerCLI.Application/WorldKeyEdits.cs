@@ -31,7 +31,7 @@ internal static class WorldKeyEdits
             throw new EditRejectedException(EditFailure.Precondition, "Encoded component differs from its declared physical string");
         var output = NativeJsonKeyEdits.Convert(NativeJsonStrings.EncodeJavaDocument(source, limits), conversions.Select(conversion =>
             (conversion.Address.ComponentPath!, conversion.Slot.SourceText, conversion.Dependency.Key, conversion.Reply.Text.Contains('%'))), limits);
-        var mixed = NativeJsonEdits.ReplaceStrings(output, translations.Select(item => (item.Slot.Address.ComponentPath!, item.Slot.SourceText, item.Reply.Text)), limits);
+        var mixed = NativeJsonEdits.ReplaceStrings(output, WorldJsonEdits.LiteralChanges(output, translations, item => item.Slot.Address.ComponentPath!, limits), limits);
         return new UTF8Encoding(false, true).GetString(mixed);
     }
     internal static string RewriteSnbt(string source, IReadOnlyList<TranslationKeyConversion> conversions, DecodeLimits limits, IReadOnlyList<LiteralTranslation>? translations = null)
@@ -96,8 +96,10 @@ internal static class WorldKeyEdits
             if (group.All(item => item.Slot.Address.ComponentPath is not null)) replacement = WorldJsonEdits.RewriteJson(text.Value, group.ToArray(), limits);
             else
             {
-                if (group.Count() != 1 || group.First().Slot.SourceText != text.Value) throw new EditRejectedException(EditFailure.Precondition, "SNBT literal preimage or scope differs");
-                replacement = group.First().Reply.Text;
+                var item = group.Single();
+                replacement = item.Slot.Role == ClickCommandText.Role
+                    ? ClickCommandText.Rewrite(text.Value, item.Slot.SourceText, item.Reply.Text, syntax.NodePath!.Segments[^1].Key == "command", limits)
+                    : item.Slot.SourceText == text.Value ? item.Reply.Text : throw new EditRejectedException(EditFailure.Precondition, "SNBT literal preimage differs");
             }
             Retain(replacement.Length); changes.Add((syntax.NodePath!, target.Value, new LogicalMinecraftLeaf(new NbtString(replacement))));
         }
