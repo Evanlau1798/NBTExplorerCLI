@@ -53,6 +53,25 @@ public static partial class PackTextExtractor
             }
             else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "loot_tables" : "loot_table")) Loot(root, TypedPath.Root, output, Component, profile, RawComponent);
             else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "item_modifiers" : "item_modifier")) Modifier(root, TypedPath.Root, output, Component, profile, RawComponent);
+            else if (parts.Length >= 4 && parts[0] == "data" && profile.Id == "java-1.21.11" && parts[2] == "recipe")
+            {
+                var resultPath = At(TypedPath.Root, "result");
+                if (!root.TryGetNativeProperty("type", out var type) || type.ValueKind != JsonValueKind.String
+                    || MinecraftIdentifier.DefaultNamespace(NativeJsonStrings.Read(type)) is not ("minecraft:crafting_shaped" or "minecraft:crafting_shapeless"))
+                    output.Diagnostic(TypedPath.Root, "UnsupportedPackRecipe");
+                else if (!root.TryGetNativeProperty("result", out var result) || !result.TryGetNativeProperty("id", out var id)
+                    || id.ValueKind != JsonValueKind.String || MinecraftIdentifier.DefaultNamespace(NativeJsonStrings.Read(id)) == "minecraft:air")
+                    output.Diagnostic(resultPath, "InvalidRecipeResult");
+                else JsonItem(result, resultPath, output, Component, RawComponent, profile);
+            }
+            else if (parts.Length >= 4 && parts[0] == "data" && profile.Id == "java-1.21.11" && parts[2] == "enchantment")
+            {
+                if (root.TryGetNativeProperty("description", out var description))
+                    Component(description, At(TypedPath.Root, "description"), "enchantment.description");
+                else output.Diagnostic(TypedPath.Root, "InvalidEnchantmentDescription");
+                if (root.TryGetNativeProperty("effects", out var effects) && (effects.ValueKind != JsonValueKind.Object || effects.EnumerateObject().Any()))
+                    output.Diagnostic(At(TypedPath.Root, "effects"), "UnsupportedEnchantmentEffects");
+            }
             else if (parts.Length < 4 || parts[0] != "data" || parts[2] != "tags") output.Diagnostic(TypedPath.Root, "UnsupportedPackJson");
         }
         else output.Diagnostic(TypedPath.Root, "UnsupportedPackSource");

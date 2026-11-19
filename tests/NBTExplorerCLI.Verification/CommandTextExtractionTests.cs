@@ -183,6 +183,40 @@ internal static class CommandTextExtractionTests
             Require(CommandTextExtractor.Extract(new(source, command), profile).Complete == expected, "static control grammar boundary: " + command);
     }
 
+    public static void StaticParticleDoesNotBlockAdjacentTranslation()
+    {
+        var source = new SourceAddress(new(World, "particles.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var profile = MinecraftProfiles.ForDataVersion(4671)!;
+        var input = "tellraw @a {text:'The aura has dissipated'}\nexecute at @a run particle flame ~ ~ ~ 0.5 1 0.5 0.05 150 normal\n";
+        var parsed = CommandTextExtractor.Extract(new(source, input), profile);
+        Require(parsed.Complete && parsed.Text.Occurrences.Single().Text == "The aura has dissipated", "a particle without a structured payload does not block the function's literal");
+        foreach (var command in new[] { "particle minecraft:item{item:{id:'minecraft:paper'}} ~ ~ ~ 0 0 0 0 1 normal", "particle flame ~ ~ ~ 0 0 0 0 -1 normal" })
+            Require(!CommandTextExtractor.Extract(new(source, command), profile).Complete, "unknown particle payload or invalid particle arguments remain unresolved");
+        foreach (var command in new[] {
+            "execute if block 353 125 -115 minecraft:honey_block run tellraw @a {text:'Test'}",
+            "execute if items block 132 60 -31 contents minecraft:music_disc_wait run tellraw @a {text:'Test'}",
+            "execute if items entity @s weapon.offhand #minecraft:shulker_boxes run tellraw @a {text:'Test'}"
+        })
+        {
+            var conditional = CommandTextExtractor.Extract(new(source, command), profile);
+            Require(conditional.Complete && conditional.Text.Occurrences.Single().Text == "Test", "simple block/item predicates preserve the exact nested command");
+        }
+        Require(!CommandTextExtractor.Extract(new(source, "execute if items entity @s weapon.offhand paper[custom_name='Guard'] run function golden:load"), profile).Complete,
+            "component predicate remains unresolved");
+        var staticallyStored = CommandTextExtractor.Extract(new(source,
+            """setblock 313 144 -90 repeating_command_block[conditional=false]{Command:"/execute as @a at @p run effect give @p minecraft:wither 15 3"}"""), profile);
+        Require(staticallyStored.Complete && staticallyStored.Text.Occurrences.IsEmpty, "a verified literal-free stored command needs no nested rewrite");
+        foreach (var command in new[] {
+            """setblock 313 144 -90 repeating_command_block{Command:"/tellraw @s {text:'Visible'}"}""",
+            """setblock 313 144 -90 repeating_command_block{Command:"/kill @e[type=fox,name=Rocky]"}"""
+        })
+            Require(!CommandTextExtractor.Extract(new(source, command), profile).Complete, "stored commands with text or named references stay unresolved");
+        var macro = CommandTextExtractor.Extract(new(source,
+            "$item replace entity @s $(slot) with white_shulker_box[container=[\\\r\n{slot:1,item:{id:'minecraft:paper'}}\\\r\n]]\r\ntellraw @s {text:'After the macro'}"), profile);
+        Require(!macro.Complete && macro.Text.Diagnostics is [{ Code: "DynamicCommandMacro" }]
+            && macro.Text.Occurrences.Single().Text == "After the macro", "multiline macro stays unresolved while the following command keeps its address");
+    }
+
     public static void SelfScoreComponentsKeepAdjacentTextAndProtectOtherSelectors()
     {
         var command = new SourceAddress(new(World, "self-score.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");

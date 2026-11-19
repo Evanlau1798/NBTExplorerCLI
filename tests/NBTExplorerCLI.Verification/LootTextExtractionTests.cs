@@ -24,6 +24,22 @@ internal static class LootTextExtractionTests
         Require(!LootFunctionProfiles.IsKnown(MinecraftProfiles.ForDataVersion(3953)!, "minecraft:discard")
             && !LootFunctionProfiles.IsKnown(MinecraftProfiles.ForDataVersion(4774)!, "minecraft:set_nbt"), "removed/future functions remain profile-specific");
     }
+    public static void Java12111CraftingAndEmptyEffectEnchantmentText()
+    {
+        var pack = new PackMetadata(PackSourceKind.Datapack, null, new(94, 1), new(94, 1));
+        TextExtractionResult Read(string file, string json) => PackTextExtractor.Extract(Location(file), Encoding.UTF8.GetBytes(json), pack);
+        var recipe = Read("recipe/example.json", """{"type":"minecraft:crafting_shaped","group":"Protected","pattern":["X"],"key":{"X":"minecraft:paper"},"result":{"id":"minecraft:paper","components":{"minecraft:custom_name":{"text":"Prize"}}}}""");
+        Require(recipe.Complete && recipe.Occurrences.Single().Text == "Prize" && recipe.Occurrences.Single().Address.NodePath.ToJsonPointer() == "/result/components/minecraft:custom_name/text",
+            "crafting recognizes the declared result item and preserves the machine group name");
+        var air = Read("recipe/invalid.json", """{"type":"minecraft:crafting_shapeless","ingredients":["minecraft:copper_block"],"result":{"id":"minecraft:air"}}""");
+        Require(!air.Complete, "an air result is invalid and remains unresolved");
+        var enchantment = Read("enchantment/example.json", """{"description":{"translate":"Tax Evasion","fallback":"Tax Evasion"},"effects":{}}""");
+        Require(enchantment.Complete && enchantment.Occurrences.Single().Text == "Tax Evasion"
+            && enchantment.TranslationKeys.Single().Key == "Tax Evasion", "extract the description fallback while preserving the exact translation key");
+        Require(!Read("enchantment/unknown.json", """{"description":"Name","effects":{"unknown":{"text":"Nested"}}}""").Complete,
+            "an unproved enchantment effect cannot be claimed as fully extracted");
+    }
+
     public static void NestedLootNamesLoreAndBooks()
     {
         var bytes = Encoding.UTF8.GetBytes("""

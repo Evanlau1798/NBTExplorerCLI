@@ -17,6 +17,7 @@ internal sealed partial class CommandTextReader
     private readonly Action<SourceAddress>? componentRoot;
     private readonly Action<CommandSelectorReference>? selectorReference;
     private readonly Action<CommandNameTemplate>? nameTemplate;
+    private readonly bool inspectNested;
     private readonly Hash256 hash;
     private readonly int byteBase;
     private readonly string newline;
@@ -29,12 +30,13 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
         this.componentRoot = componentRoot;
         this.selectorReference = selectorReference;
         this.nameTemplate = nameTemplate;
+        this.inspectNested = inspectNested;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
         byteBase = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 } ? 3 : 0;
@@ -45,7 +47,7 @@ internal sealed partial class CommandTextReader
     }
     internal CommandExtractionResult Read()
     {
-        var line = 0; var start = 0;
+        var line = 0; var start = 0; var macroContinuation = false;
         for (var index = 0; index <= source.Command.Length; index++)
         {
             if (index < source.Command.Length && source.Command[index] is not ('\r' or '\n')) continue;
@@ -53,7 +55,14 @@ internal sealed partial class CommandTextReader
             if (index < source.Command.Length && source.Command[index] == '\r' && index + 1 < source.Command.Length && source.Command[index + 1] == '\n') index++;
             var body = source.Command[start..end]; var path = new TypedPath([PathSegment.ForIndex(line++)]);
             lineStart = start;
-            if (body.TrimStart(' ', '\t').StartsWith('#')) body = "";
+            var trimmed = body.TrimStart(' ', '\t');
+            if (source.Address.SemanticRole == "command.function" && (macroContinuation || trimmed.StartsWith('$')))
+            {
+                if (!macroContinuation) Unknown(path, start, end - start, "DynamicCommandMacro");
+                macroContinuation = body.TrimEnd(' ', '\t').EndsWith('\\');
+                body = "";
+            }
+            else if (trimmed.StartsWith('#')) body = "";
             try
             {
                 var tokens = CommandTokens.Read(body, start, limits);
@@ -103,6 +112,7 @@ internal sealed partial class CommandTextReader
                 var operands = clause switch { "as" or "at" or "in" or "anchored" or "align" or "on" or "summon" => 1, "positioned" => 3, "rotated" => 2, "facing" => 3, _ => -1 };
                 if (clause is "if" or "unless" && cursor + 1 < tokens.Count && tokens[cursor].Text == "entity") operands = 2;
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "score") operands = ScoreCondition(tokens, cursor);
+                if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text is "block" or "items") operands = BlockOrItemCondition(tokens, cursor);
                 if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "score"
                     && ScoreHolder(tokens[cursor + 2].Text, allowWildcard: true) && PlainControlToken(tokens[cursor + 3].Text)) operands = 4;
                 if (cursor < tokens.Count && clause is "positioned" or "rotated" && tokens[cursor].Text == "as") operands = 2;
@@ -147,7 +157,15 @@ internal sealed partial class CommandTextReader
         foreach (var text in result.Occurrences) { var address = Bind(text.Address); Charge(address, text.Text); texts.Add(text with { Address = address }); }
         foreach (var key in result.TranslationKeys) { var address = Bind(key.Address); Charge(address, key.Key); keys.Add(key with { Address = address }); }
         foreach (var diagnostic in result.Diagnostics) Unknown(grammarPath, start, end - start, diagnostic.Code);
-        foreach (var pending in result.PendingCommands) Unknown(grammarPath, start, end - start, "NestedCommandGrammarPending");
+        foreach (var pending in result.PendingCommands)
+            if (!inspectNested || !IsLiteralFreeStoredCommand(pending)) Unknown(grammarPath, start, end - start, "NestedCommandGrammarPending");
+    }
+    private bool IsLiteralFreeStoredCommand(CommandCandidate pending)
+    {
+        var address = pending.Address;
+        var nested = new CommandCandidate(new(address.Artifact, address.NodePath, address.SemanticRole, address.Dimension, address.Chunk), pending.Command);
+        var parsed = new CommandTextReader(nested, profile, limits, SnapshotScope.All, null, null, null, inspectNested: false).Read();
+        return parsed.Complete && parsed.Text.Occurrences.IsEmpty && parsed.Text.TranslationKeys.IsEmpty && parsed.References.IsEmpty;
     }
     private SourceAddress BindComponent(SourceAddress address, TypedPath grammarPath, int start, bool syntaxResult, Dictionary<TypedPath, SnbtSpan>? spans)
     {

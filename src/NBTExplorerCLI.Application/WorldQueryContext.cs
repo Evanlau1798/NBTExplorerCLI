@@ -26,7 +26,7 @@ internal sealed class WorldQueryContext
         Inputs = Groups.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => Input(pair.Value)).ToImmutableArray();
         var policyRules = Extraction.StorageRules.SelectMany(pair => pair.Value.Select(rule => SourceIdentity.Occurrence(new(pair.Key, rule.Path, "policy.storage." + rule.Kind)).Digest.Hex)).Order(StringComparer.Ordinal).ToArray();
         var policy = Hash256.Compute(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { limits = Extraction.Limits, request.Scan.MaximumSources, Execution.InFlightBytes, storageRules = policyRules })));
-        var baseline = new InterpretationVersions("nbt-snbt-json-zip-1", "minecraft-known-3", "world-text-command-8", "scan-2." + policy.Hex);
+        var baseline = new InterpretationVersions("nbt-snbt-json-zip-1", "minecraft-known-3", "world-text-command-10", "scan-2." + policy.Hex);
         var layout = Extraction.Discovery.Metadata?.Profile.Id;
         static IEnumerable<CacheSourceBinding> Bindings(IEnumerable<DiscoveredSource> sources) => sources.Select(source => new CacheSourceBinding(source.Location, source.Chunk, source.PackMetadataHash));
         Versions = baseline with { Policy = baseline.Policy + "." + ScanCacheJson.BindingHash(layout, Bindings(Groups.Values.SelectMany(group => group))).Hex };

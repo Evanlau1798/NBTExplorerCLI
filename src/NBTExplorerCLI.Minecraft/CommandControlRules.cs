@@ -17,12 +17,11 @@ internal sealed partial class CommandTextReader
     {
         var count = tokens.Count - index;
         string Arg(int offset) => offset < count ? tokens[index + offset].Text : "";
-        bool Coordinates(int offset) => Coordinate(Arg(offset)) && Coordinate(Arg(offset + 1)) && Coordinate(Arg(offset + 2))
-            && Arg(offset).StartsWith('^') == Arg(offset + 1).StartsWith('^') && Arg(offset).StartsWith('^') == Arg(offset + 2).StartsWith('^');
+        bool Position(int offset) => Coordinates(Arg(offset), Arg(offset + 1), Arg(offset + 2));
         switch (name)
         {
             case "tp" or "teleport":
-                return count == 5 && EntityTarget(Arg(1)) && Coordinates(2);
+                return count == 5 && EntityTarget(Arg(1)) && Position(2);
             case "tag":
                 return EntityTarget(Arg(1)) && (count == 3 && Arg(2) == "list" || count == 4 && Arg(2) is "add" or "remove" && PlainControlToken(Arg(3)));
             case "effect":
@@ -32,19 +31,25 @@ internal sealed partial class CommandTextReader
                     && (count < 6 || Integer(Arg(5), out var amplifier) && amplifier is >= 0 and <= 255)
                     && (count < 7 || Arg(6) is "true" or "false"));
             case "playsound":
-                return (count == 4 || count is >= 7 and <= 10 && Coordinates(4)
+                return (count == 4 || count is >= 7 and <= 10 && Position(4)
                     && tokens.Skip(index + 7).All(token => Decimal(token.Text, out var value) && value >= 0))
                     && ResourceLocation(Arg(1)) && Arg(2) is "master" or "music" or "record" or "weather" or "block" or "hostile" or "neutral" or "player" or "ambient" or "voice"
                     && EntityTarget(Arg(3));
             case "fill":
                 return (count == 8 || count == 9 && Arg(8) is "replace" or "destroy" or "keep" or "hollow" or "outline")
-                    && Coordinates(1) && Coordinates(4) && ResourceLocation(Arg(7));
+                    && BlockCoordinates(Arg(1), Arg(2), Arg(3)) && BlockCoordinates(Arg(4), Arg(5), Arg(6)) && ResourceLocation(Arg(7));
+            case "particle":
+                return MinecraftIdentifier.DefaultNamespace(Arg(1)) is "minecraft:flame" or "minecraft:smoke" or "minecraft:dragon_breath"
+                    && (count == 2 || count == 5 && Position(2) || count is >= 10 and <= 12 && Position(2)
+                    && tokens.Skip(index + 5).Take(3).All(token => Decimal(token.Text, out _))
+                    && Decimal(Arg(8), out var speed) && speed >= 0 && Integer(Arg(9), out var amount) && amount >= 0
+                    && (count == 10 || Arg(10) is "normal" or "force") && (count < 12 || EntityTarget(Arg(11))));
             case "title":
                 return count == 6 && EntityTarget(Arg(1)) && Arg(2) == "times" && Integer(Arg(3), out _) && Integer(Arg(4), out _) && Integer(Arg(5), out _);
             case "kill":
                 return count == 2 && EntityTarget(Arg(1));
             case "function":
-                return count == 2 && FunctionLocation(Arg(1));
+                return count == 2 && ResourceOrTag(Arg(1));
             case "loot":
                 return count == 5 && Arg(1) == "give" && EntityTarget(Arg(2)) && Arg(3) == "loot" && ResourceLocation(Arg(4));
             case "time":
@@ -83,6 +88,16 @@ internal sealed partial class CommandTextReader
         }
     }
 
+    private static int BlockOrItemCondition(List<CommandToken> tokens, int cursor)
+    {
+        string Arg(int offset) => cursor + offset < tokens.Count ? tokens[cursor + offset].Text : "";
+        bool Item(string text) => text == "*" || ResourceOrTag(text);
+        if (Arg(0) == "block" && BlockCoordinates(Arg(1), Arg(2), Arg(3)) && ResourceOrTag(Arg(4))) return 5;
+        if (Arg(0) != "items") return -1;
+        if (Arg(1) == "block" && BlockCoordinates(Arg(2), Arg(3), Arg(4)) && PlainControlToken(Arg(5)) && Item(Arg(6))) return 7;
+        return Arg(1) == "entity" && EntityTarget(Arg(2)) && PlainControlToken(Arg(3)) && Item(Arg(4)) ? 5 : -1;
+    }
+
     private static bool SelectorTarget(string text) => text.Length >= 2 && text[0] == '@'
         && text[1] is 'a' or 'e' or 'n' or 'p' or 'r' or 's' && (text.Length == 2 || text[2] == '[');
     private static bool EntityTarget(string text) => text.StartsWith('@')
@@ -92,7 +107,7 @@ internal sealed partial class CommandTextReader
         => SelectorTarget(text) || allowWildcard && text == "*" || PlainControlToken(text);
     private static bool PlainControlToken(string text) => text.Length != 0 && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '_' or '-' or '.' or ':' or '#');
 
-    internal static bool FunctionLocation(string text) => ResourceLocation(text.StartsWith('#') ? text[1..] : text);
+    internal static bool ResourceOrTag(string text) => ResourceLocation(text.StartsWith('#') ? text[1..] : text);
     private static bool ResourceLocation(string text)
     {
         var separator = text.IndexOf(':');
@@ -102,6 +117,12 @@ internal sealed partial class CommandTextReader
     }
 
     private static bool ResourceCharacter(char ch) => char.IsAsciiLetterLower(ch) || char.IsAsciiDigit(ch) || ch is '_' or '-' or '.';
+
+    private static bool Coordinates(string x, string y, string z) => Coordinate(x) && Coordinate(y) && Coordinate(z)
+        && x.StartsWith('^') == y.StartsWith('^') && x.StartsWith('^') == z.StartsWith('^');
+    private static bool BlockCoordinates(string x, string y, string z) => x.StartsWith('^')
+        ? Coordinates(x, y, z) : BlockCoordinate(x) && BlockCoordinate(y) && BlockCoordinate(z);
+    private static bool BlockCoordinate(string text) => text == "~" || Integer(text.StartsWith('~') ? text[1..] : text, out _);
 
     internal static bool Coordinate(string value)
     {
