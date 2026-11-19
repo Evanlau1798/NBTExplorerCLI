@@ -3,6 +3,7 @@ using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Infrastructure;
+using NBTExplorerCLI.Minecraft;
 using static NBTExplorerCLI.Verification.TextSlotTests;
 using static NBTExplorerCLI.Verification.WorldDiscoveryTests;
 using static NBTExplorerCLI.Verification.NbtItemTextTests;
@@ -13,11 +14,21 @@ internal static class WorldCommandExtractionTests
 {
     public static void FunctionsAndPhysicalNbtCommands()
     {
+        CommandsRespectGrammarTransitions();
         var root = ScratchDirectory.CreateChild();
         try
         {
             Level(root, false); Put(root, "datapacks/p/pack.mcmeta", Encoding.UTF8.GetBytes(Format48Pack));
-            Put(root, "datapacks/p/data/test/function/main.mcfunction", Encoding.UTF8.GetBytes("tellraw @a[name=Guard] [{\"text\":\"Function\"}]\n"));
+            Put(root, "datapacks/p/data/test/predicate/gate.json", """{"condition":"minecraft:location_check","predicate":{"dimension":"minecraft:overworld"}}"""u8.ToArray());
+            const string functionBody = """
+                damage @s 2 magic by @e[limit=1,tag=anchor]
+                fill ~ ~ ~ ~ ~ ~ light[level=3] keep
+                item modify entity @s armor.head test:restore
+                data get storage test:state stages[{Progress:2b}].Progress
+                execute if blocks 0 64 0 0 64 0 1 64 0 all if predicate test:gate run tellraw @a[name=Guard] [{"text":"Function"}]
+                execute if data storage test:state stages[{Progress:2b}] run return 7
+                """;
+            Put(root, "datapacks/p/data/test/function/main.mcfunction", Encoding.UTF8.GetBytes(functionBody));
             Put(root, "datapacks/p/data/test/function/dynamic.mcfunction", Encoding.UTF8.GetBytes("$tellraw @s $(message)\n"));
             Put(root, "datapacks/p/data/test/function/invalid.mcfunction", Encoding.UTF8.GetBytes("tellraw @s {\"selector\":42}\n"));
             var block = C(E("id", S("minecraft:command_block")), E("Command", S("title @a[name=!Guard] title {\"text\":\"Block\"}")));
@@ -47,5 +58,29 @@ internal static class WorldCommandExtractionTests
                 "actual function adapter preserves invalid selector type as a source failure instead of irrelevant empty success");
         }
         finally { Directory.Delete(root, true); }
+    }
+    private static void CommandsRespectGrammarTransitions()
+    {
+        var source = new SourceAddress(new(World, "rules.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var native = new SourceAddress(new(World, "data/scoreboard.dat", ArtifactKind.Nbt), TypedPath.Root, "scoreboard.objective.name");
+        foreach (var (version, itemCondition, nearest) in new[]
+        {
+            (3465, false, false), (3820, false, false), (3821, true, false), (3945, true, false), (3946, true, true), (3953, true, true)
+        })
+        {
+            var profile = MinecraftProfiles.ForDataVersion(version)!;
+            var items = CommandTextExtractor.Extract(new(source, "execute if items entity @s weapon.mainhand minecraft:diamond"), profile).Complete;
+            var select = CommandTextExtractor.Extract(new(source, "damage @n 2"), profile).Complete;
+            var component = NativeComponentReferences.EmbeddedJson(native, """{"selector":"@n[name=Guard]"}""", profile).Completeness == ReferenceCompleteness.Complete;
+            Require(items == itemCondition && select == nearest && component == nearest,
+                $"grammar transition at {version}: expected item/selector/component {itemCondition}/{nearest}/{nearest}, got {items}/{select}/{component}");
+        }
+        foreach (var (format, kind, expected) in new[] { (33, PackSourceKind.Datapack, false), (34, PackSourceKind.Datapack, true), (28, PackSourceKind.ResourcePack, false) })
+        {
+            var metadata = PackMetadata.Read(Encoding.UTF8.GetBytes($$$"""{"pack":{"pack_format":{{{format}}},"description":"Test"}}"""), kind);
+            var profile = MinecraftProfiles.ForPackMetadata(metadata)!;
+            Require(CommandTextExtractor.Extract(new(source, "execute if items entity @s armor.* *"), profile).Complete == expected,
+                "a pack declaration must establish the item condition grammar before allowing slot ranges");
+        }
     }
 }

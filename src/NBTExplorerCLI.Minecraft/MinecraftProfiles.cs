@@ -9,7 +9,8 @@ public static class MinecraftProfiles
     public static CapabilityProfile? ForId(string id) => id switch
     {
         "java-early-anvil" => EarlyAnvil, "java-early-anvil-json-names" => EarlyJsonNames, "java-1.13" => HistoricalPlainLore,
-        "java-1.14.4" => HistoricalJson, "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-1.20.5" => Java1205, "java-1.21" => Java121, "java-1.21.5" => Java1215,
+        "java-1.14.4" => HistoricalJson, "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-item-components-initial" => InitialItemComponents,
+        "java-1.20.5" => Java1205, "java-1.21" => Java121, "java-1.21.5" => Java1215,
         "java-nbt-text-initial-hover" => InitialNativeText, "java-nbt-text-homogeneous" => EarlyNativeText,
         "java-nbt-text-mixed-lists" => MixedListText, "java-1.21.9" => Java1219,
         "java-1.21.11" => Java12111, "java-26.1-snapshot-6" => Snapshot2616, "java-classic-anvil" => ClassicAnvil,
@@ -46,7 +47,9 @@ public static class MinecraftProfiles
         {
             (PackSourceKind.Datapack, >= 4 and <= 23, 0) or (PackSourceKind.ResourcePack, >= 15 and <= 20, 0) => Java1201,
             (PackSourceKind.Datapack, >= 24 and <= 32, 0) or (PackSourceKind.ResourcePack, >= 21 and <= 27, 0) => Java1204,
-            (PackSourceKind.Datapack, >= 33 and <= 44, 0) or (PackSourceKind.ResourcePack, >= 28 and <= 33, 0) => Java1205,
+            // Resource format 28 was shared before and after item conditions arrived.
+            (PackSourceKind.Datapack, 33, 0) or (PackSourceKind.ResourcePack, 28, 0) => InitialItemComponents,
+            (PackSourceKind.Datapack, >= 34 and <= 44, 0) or (PackSourceKind.ResourcePack, >= 29 and <= 33, 0) => Java1205,
             (PackSourceKind.Datapack, >= 45 and <= 61, 0) or (PackSourceKind.ResourcePack, >= 34 and <= 46, 0) => Java121,
             (PackSourceKind.Datapack, 62, 0) or (PackSourceKind.ResourcePack, 47, 0) => InitialNativeText,
             (PackSourceKind.Datapack, 63, 0) or (PackSourceKind.ResourcePack, 48, 0) => EarlyNativeText,
@@ -65,7 +68,8 @@ public static class MinecraftProfiles
     private static readonly CapabilityProfile HistoricalJson = Create("java-1.14.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1201 = Create("java-1.20.1", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1204 = Create("java-1.20.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.4", LogicalListEncoding.Homogeneous, "java-pack-plural");
-    private static readonly CapabilityProfile Java1205 = Create("java-1.20.5", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.21", LogicalListEncoding.Homogeneous, "java-pack-plural");
+    private static readonly CapabilityProfile InitialItemComponents = Create("java-item-components-initial", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-item-components-initial", LogicalListEncoding.Homogeneous, "java-pack-plural");
+    private static readonly CapabilityProfile Java1205 = Create("java-1.20.5", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.20.5", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java121 = Create("java-1.21", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.21", LogicalListEncoding.Homogeneous);
     private static readonly CapabilityProfile InitialNativeText = Create("java-nbt-text-initial-hover", "java-dimensions-directory", "java-item-components-1.21.5", "java-text-nbt", "java-commands-nbt-text-homogeneous", LogicalListEncoding.CompoundWrapper);
     private static readonly CapabilityProfile EarlyNativeText = Create("java-nbt-text-homogeneous", "java-dimensions-directory", "java-item-components-1.21.5", "java-text-nbt", "java-commands-nbt-text-homogeneous", LogicalListEncoding.CompoundWrapper);
@@ -103,8 +107,9 @@ public static class MinecraftProfiles
         (1976, 1803, 3462, HistoricalJson),
         (3465, 3463, 3689, Java1201),
         (3700, 3690, 3818, Java1204),
-        // 24w09a introduced item components. 24w21a renamed datapack directories.
-        (3837, 3819, 3945, Java1205),
+        // 24w10a added item conditions, after item components. 24w21a added @n and singular pack directories.
+        (3819, 3819, 3820, InitialItemComponents),
+        (3837, 3821, 3945, Java1205),
         (3953, 3946, 4297, Java121),
         // Native text, the hover field rename, mixed lists and extended literals arrived separately.
         (4298, 4298, 4303, InitialNativeText),
@@ -129,6 +134,9 @@ public static class MinecraftProfiles
                 ? SnbtProfile.Java1215 : SnbtProfile.JavaThrough1214;
 
     internal static string NativeHoverField(CapabilityProfile profile) => profile == InitialNativeText ? "text" : "value";
+    internal static bool SupportsItemConditions(CapabilityProfile profile) => profile != InitialItemComponents
+        && profile.Features[ProfileFacet.ItemSchema].Schema.StartsWith("java-item-components-", StringComparison.Ordinal);
+    internal static bool SupportsNearestSelector(CapabilityProfile profile) => profile.Features[ProfileFacet.PackLayout].Schema == "java-pack-singular";
 
     internal static bool UsesCompoundEquipment(CapabilityProfile profile)
         => profile != InitialNativeText && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";

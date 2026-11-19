@@ -17,9 +17,57 @@ internal static class WorldMetadataTests
         new("world-metadata-early-anvil-scoreboards", "discovery", _ => EarlyAnvilVersionedScoreboards()),
         new("world-metadata-early-anvil-terrain-text", "discovery", _ => EarlyAnvilTerrainText()),
         new("world-metadata-early-anvil-independent-text-transitions", "discovery", _ => EarlyAnvilTextTransitions()),
+        new("world-metadata-versioned-map-banners", "discovery", _ => VersionedMapBanners()),
         new("prepare-world-early-anvil-mixed-write-boundary", "preparation", _ => EarlyAnvilArtifactIsReadOnly()),
         new("world-metadata-missing-conflicting-unsafe", "discovery", _ => MissingConflictingAndUnsafeEvidence())
     ];
+
+    private static void VersionedMapBanners()
+    {
+        foreach (var (version, native) in new[] { (2580, false), (4774, true) })
+        {
+            var path = native ? "dimensions/minecraft/overworld/data/minecraft/map_24.dat" : "data/map_24.dat";
+            var source = new WorldSourceLocation(new(World, path, ArtifactKind.Nbt), WorldSourceRole.SavedData, "minecraft:overworld");
+            var nameKey = native ? "name" : "Name";
+            var banner = C(E(native ? "pos" : "Pos", native ? new NbtIntArray([2, 64, 3]) :
+                C(E("X", new NbtInt(2)), E("Y", new NbtInt(64)), E("Z", new NbtInt(3)))),
+                E(native ? "color" : "Color", S("red")), E(nameKey, Text("Market", native)));
+            var data = C(E("dimension", S("minecraft:overworld")), E("scale", new NbtByte(0)),
+                E("xCenter", new NbtInt(0)), E("zCenter", new NbtInt(0)), E("colors", new NbtByteArray([0])),
+                E("banners", L(banner)), E("frames", L()));
+            var document = new NbtDocument("", C(E("DataVersion", new NbtInt(version)), E("data", data)));
+            var result = NbtTextExtractor.Extract(source, document);
+            var name = result.Occurrences.SingleOrDefault();
+            Require(result.Complete && name is { Text: "Market", Address.SemanticRole: "map.banner.name" }
+                && name.Address.NodePath.ToJsonPointer() == "/data/banners/0/" + nameKey + (native ? "/text" : ""),
+                "versioned map banner name uses its exact physical field and text format");
+            if (!native) MapBannerWriteRollsBack(path, document);
+        }
+    }
+    private static void MapBannerWriteRollsBack(string path, NbtDocument document)
+    {
+        var root = WorldQueryTests.CreateWorld(); var state = ScratchDirectory.CreateChild();
+        try
+        {
+            var original = CompressedNbt.WriteDocument(document, NbtCompression.GZip);
+            WorldDiscoveryTests.Put(root, path, original);
+            var snapshot = WorldQueryTests.Query(root, Path.Combine(state, "cache"));
+            var row = snapshot.ReadSources().Single(item => item.Source.Location.Artifact.RelativePath == path);
+            var slot = row.Text!.Occurrences.Single().ToSlot("en_us", "zh_tw");
+            var inventory = new WorldInventory(root, World);
+            var plan = new WorldPlanBuilder(inventory).Build(snapshot, [new LiteralPatch("map-banner", new(slot, new(slot.Id, slot.SourceTextHash, "zh_tw", "市集")))]);
+            using var prepared = new WorldPlanPreparation(inventory, new ArtifactStorage(root, World)).Prepare(snapshot, plan, true);
+            var engine = WorldApplyTests.Engine(root, state);
+            var file = Path.Combine(root, path);
+            Require(engine.Apply(prepared, true).Success && NbtTextExtractor.Extract(row.Source.Location,
+                CompressedNbt.ReadDocument(File.ReadAllBytes(file), NbtCompression.GZip).Document).Occurrences.Single().Text == "市集",
+                "an embedded map banner name is rewritten and read through its original schema");
+            var rolledBack = engine.Recover(plan.PlanHash, true, rollback: true);
+            Require(rolledBack.Counts[OperationOutcome.RolledBack] == 1 && File.ReadAllBytes(file).SequenceEqual(original),
+                "map banner rollback restores the exact original bytes");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(state, true); }
+    }
 
     internal static NbtCompound Dimensions => new([
         new("minecraft:overworld", new NbtCompound([])), new("minecraft:the_nether", new NbtCompound([])),

@@ -23,7 +23,7 @@ internal sealed class ScanOptions
     };
     private static readonly string[] Roles = [.. Categories.Values.SelectMany(items => items), "sign.front.line", "sign.back.line", "hanging_sign.front.line", "hanging_sign.back.line",
         "scoreboard.team.name", "scoreboard.team.prefix", "scoreboard.team.suffix", "scoreboard.objective.name", "advancement.title", "advancement.description",
-        "lectern.book.page", "command_storage.literal", "command_storage.component", "language.key"];
+        "lectern.book.page", "command_storage.literal", "command_storage.component", "language.key", "map.banner.name"];
     internal ScanOptions(CliArguments request)
     {
         Offset = request.Number("offset", 0, 0, 2_000_000); Limit = request.Number("limit", 100, 1, 10_000); Workers = request.Number("workers", 2, 1, 8);

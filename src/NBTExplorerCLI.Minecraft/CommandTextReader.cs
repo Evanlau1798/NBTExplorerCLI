@@ -117,11 +117,13 @@ internal sealed partial class CommandTextReader
                 var operands = clause switch { "as" or "at" or "in" or "anchored" or "align" or "on" or "summon" => 1, "positioned" => 3, "rotated" => 2, "facing" => 3, _ => -1 };
                 if (clause is "if" or "unless" && cursor + 1 < tokens.Count && tokens[cursor].Text == "entity") operands = 2;
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "score") operands = ScoreCondition(tokens, cursor);
-                if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text is "block" or "items") operands = BlockOrItemCondition(tokens, cursor);
+                if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text is "block" or "blocks" or "items") operands = BlockOrItemCondition(tokens, cursor);
+                if (clause is "if" or "unless" && cursor + 1 < tokens.Count && tokens[cursor].Text == "predicate"
+                    && MinecraftIdentifier.ResourceLocation(tokens[cursor + 1].Text)) operands = 2;
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "data")
                 {
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
-                    if (dataPath >= 0 && dataPath < tokens.Count && PlainDataPath(tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
+                    if (dataPath >= 0 && dataPath < tokens.Count && StaticDataPath(tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
                 }
                 if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "score"
                     && ScoreHolder(tokens[cursor + 2].Text, allowWildcard: true) && PlainControlToken(tokens[cursor + 3].Text)) operands = 4;
@@ -130,7 +132,7 @@ internal sealed partial class CommandTextReader
                 if (clause == "store" && operands < 0 && cursor < tokens.Count && tokens[cursor].Text is "result" or "success")
                 {
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
-                    if (dataPath >= 0 && dataPath + 2 < tokens.Count && PlainDataPath(tokens[dataPath].Text)
+                    if (dataPath >= 0 && dataPath + 2 < tokens.Count && StaticDataPath(tokens[dataPath].Text)
                         && tokens[dataPath + 1].Text is "byte" or "short" or "int" or "long" or "float" or "double"
                         && Decimal(tokens[dataPath + 2].Text, out _)) operands = dataPath + 3 - cursor;
                 }

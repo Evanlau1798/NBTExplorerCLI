@@ -12,7 +12,8 @@ internal sealed partial class CommandTextReader
         {
             var token = tokens[index];
             if (token.Text.Length < 2 || token.Text[0] != '@') continue;
-            var parsed = SelectorNames.Parse(token.Text, limits); selectorTypes[token.Start] = parsed.EntityType;
+            var parsed = SelectorNames.Parse(token.Text, limits, MinecraftProfiles.SupportsNearestSelector(profile));
+            selectorTypes[token.Start] = parsed.EntityType;
             TypedPath Member(int member) => member < 0 ? path : At(At(At(path, "selector"), index), member);
             foreach (var name in parsed.Names)
             {

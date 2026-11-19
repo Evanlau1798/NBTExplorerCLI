@@ -1,5 +1,6 @@
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using System.Text;
 using static NBTExplorerCLI.Minecraft.TextExtractionCollector;
 
 namespace NBTExplorerCLI.Minecraft;
@@ -83,7 +84,7 @@ internal sealed partial class CommandTextReader
     {
         if (index + 2 >= tokens.Count || tokens[index + 1].Text != "modify") return false;
         var path = DataTargetEnd(tokens, index + 2);
-        if (path < 0 || path + 3 >= tokens.Count || !PlainDataPath(tokens[path].Text)) return false;
+        if (path < 0 || path + 3 >= tokens.Count || !StaticDataPath(tokens[path].Text)) return false;
         var value = path + 2;
         if (tokens[path + 1].Text == "insert")
         {
@@ -94,14 +95,14 @@ internal sealed partial class CommandTextReader
         var parsed = Snbt.ParseDocument(Utf8.GetBytes(tokens[value + 1].Text), MinecraftProfiles.SnbtGrammar(profile), limits);
         return !parsed.Root.ContainsStringValues;
     }
-    private static bool DataControl(List<CommandToken> tokens, int index)
+    private bool DataControl(List<CommandToken> tokens, int index)
     {
         if (index + 2 >= tokens.Count || tokens[index + 1].Text is not ("get" or "remove")) return false;
         var read = tokens[index + 1].Text == "get";
         var path = DataTargetEnd(tokens, index + 2);
         if (path < 0) return false;
         if (tokens.Count == path) return read;
-        if (!PlainDataPath(tokens[path].Text)) return false;
+        if (!StaticDataPath(tokens[path].Text)) return false;
         return tokens.Count == path + 1 || read && tokens.Count == path + 2 && Decimal(tokens[path + 1].Text, out _);
     }
     private static int DataTargetEnd(List<CommandToken> tokens, int target)
@@ -131,8 +132,51 @@ internal sealed partial class CommandTextReader
         }
         return true;
     }
+    private bool StaticDataPath(string path)
+    {
+        var start = path.IndexOf('{');
+        if (start < 0) return PlainDataPath(path);
+        var structural = new StringBuilder(path.Length);
+        var copied = 0;
+        while (start >= 0)
+        {
+            if (start == 0 || path[start - 1] != '[') return false;
+            var end = CompoundEnd(path, start);
+            if (end >= path.Length || path[end] != ']') return false;
+            var root = Snbt.ParseDocument(Utf8.GetBytes(path[start..end]), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+            if (root.Value is not LogicalMinecraftCompound || root.ContainsStringValues) return false;
+            structural.Append(path, copied, start - copied);
+            copied = end;
+            start = path.IndexOf('{', copied);
+        }
+        return PlainDataPath(structural.Append(path, copied, path.Length - copied).ToString());
+    }
+    private static int CompoundEnd(string path, int start)
+    {
+        char quote = '\0';
+        var depth = 0;
+        for (var index = start; index < path.Length; index++)
+        {
+            var current = path[index];
+            if (quote != '\0')
+            {
+                if (current == '\\') index++;
+                else if (current == quote) quote = '\0';
+            }
+            else if (current is '\'' or '"') quote = current;
+            else if (current == '{') depth++;
+            else if (current == '}' && --depth == 0) return index + 1;
+        }
+        return path.Length;
+    }
     private void ItemCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
+        if (index + 2 < tokens.Count && tokens[index + 1].Text == "modify" && tokens[index + 2].Text is "entity" or "block")
+        {
+            var slot = DataTargetEnd(tokens, index + 2);
+            if (slot >= 0 && tokens.Count == slot + 2 && PlainControlToken(tokens[slot].Text)
+                && MinecraftIdentifier.ResourceLocation(tokens[slot + 1].Text)) return;
+        }
         if (tokens.Count >= index + 7 && tokens[index + 1].Text == "replace" && tokens[index + 2].Text == "entity" && tokens[index + 5].Text == "with")
         { CountArgument(tokens, index + 7); ItemArgument(tokens[index + 6], At(path, "item.replace")); return; }
         if (tokens.Count >= index + 9 && tokens[index + 1].Text == "replace" && tokens[index + 2].Text == "block" && tokens[index + 7].Text == "with")

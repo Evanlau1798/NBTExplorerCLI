@@ -405,8 +405,17 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
     packLayout: 'java-pack-plural',
   },
   {
+    profile: 'java-item-components-initial',
+    dataVersionRange: '3819–3820',
+    packFormat: 28,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-components-1.20.5',
+    textSchema: 'java-text-json (v1)',
+    packLayout: 'java-pack-plural',
+  },
+  {
     profile: 'java-1.20.5',
-    dataVersionRange: '3819–3945',
+    dataVersionRange: '3821–3945',
     packFormat: 32,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-components-1.20.5',

@@ -218,8 +218,32 @@ internal sealed partial class NbtTextReader
                 ScoreboardText(Field(team, suffix, teamPath), At(teamPath, suffix), "scoreboard.team.suffix");
             }
         }
-        else if (!(artifact == "data/" + filename && ClassicNonTextData(filename, data, path))
+        else if (!(!classic && !earlyAnvil && MapFilename(filename) && ReadMapData(data, path))
+            && !(artifact == "data/" + filename && ClassicNonTextData(filename, data, path))
             && !KnownNonTextData(artifact, filename)) output.Diagnostic(TypedPath.Root, "UnsupportedSavedData");
+    }
+    private bool ReadMapData(NbtValue data, TypedPath path)
+    {
+        var dimension = Field(data, "dimension", path);
+        if (dimension is not (NbtByte or NbtInt) && (dimension is not NbtString id || !MinecraftIdentifier.ResourceLocation(id.Value))
+            || Field(data, "xCenter", path) is not NbtInt || Field(data, "zCenter", path) is not NbtInt
+            || Field(data, "scale", path) is not NbtByte || Field(data, "colors", path) is not NbtByteArray) return false;
+        foreach (var (banner, bannerPath) in Sequence(Field(data, "banners", path), At(path, "banners")))
+        {
+            var position = Field(banner, "pos", bannerPath);
+            var oldPosition = Field(banner, "Pos", bannerPath);
+            var lower = position is not null;
+            var validPosition = lower ? oldPosition is null && position is NbtIntArray { Values.Length: 3 }
+                : oldPosition is NbtCompound && Field(oldPosition, "X", At(bannerPath, "Pos")) is NbtInt
+                    && Field(oldPosition, "Y", At(bannerPath, "Pos")) is NbtInt && Field(oldPosition, "Z", At(bannerPath, "Pos")) is NbtInt;
+            var color = Field(banner, lower ? "color" : "Color", bannerPath);
+            var name = lower ? "name" : "Name";
+            if (!validPosition || color is not NbtString dye || !MinecraftIdentifier.ResourceLocation(dye.Value)
+                || Field(banner, lower ? "Name" : "name", bannerPath) is not null)
+                output.Diagnostic(bannerPath, "UnsupportedMapBannerSchema");
+            else Component(Field(banner, name, bannerPath), At(bannerPath, name), "map.banner.name");
+        }
+        return true;
     }
     private void Bossbars(NbtValue value, TypedPath path)
     {

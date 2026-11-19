@@ -14,7 +14,7 @@ public sealed record SelectorNameResult(char Kind, string? EntityType, Immutable
 
 public static class SelectorNames
 {
-    public static SelectorNameResult Parse(string selector, DecodeLimits? limits = null)
+    public static SelectorNameResult Parse(string selector, DecodeLimits? limits = null, bool allowNearest = true)
     {
         ArgumentNullException.ThrowIfNull(selector);
         limits ??= DecodeLimits.Default; limits.Validate();
@@ -33,7 +33,8 @@ public static class SelectorNames
         {
             var tokens = CommandTokens.Read(selector, 0, limits);
             if (tokens.Count != 1 || tokens[0].Text != selector) throw new CommandSyntaxException();
-            if (!"paresn".Contains(kind)) { Unknown(-1, 0, selector.Length, "UnknownSelectorGrammar"); return Finish(); }
+            if (!"paresn".Contains(kind) || kind == 'n' && !allowNearest)
+            { Unknown(-1, 0, selector.Length, "UnknownSelectorGrammar"); return Finish(); }
             if (selector.Length == 2) return Finish();
             if (selector[2] != '[' || selector[^1] != ']') throw new CommandSyntaxException();
             var start = 3; var depth = 0; char quote = '\0'; var member = 0;

@@ -147,10 +147,30 @@ internal static class PackTextExtractionTests
     }
     public static void TypesSelectActualPackFields()
     {
+        WorldgenSchemasProtectData();
         var source = new WorldSourceLocation(new(World, "datapacks/p/data/models/advancement/a.json", ArtifactKind.Json), WorldSourceRole.PackJson, PackRoot: "datapacks/p", PackKind: PackSourceKind.Datapack);
         var bytes = Encoding.UTF8.GetBytes("{\"display\":{\"title\":{\"unknown\":\"Excluded\"},\"description\":{\"text\":\"Selected\"}}}");
         var scope = new SnapshotScope([], [], ["advancement.description"], []);
         var result = PackTextExtractor.Extract(source, bytes, Metadata(48), scope: scope);
         Require(result.Complete && result.Occurrences.Single().Text == "Selected" && result.Occurrences.Single().Address.SemanticRole == "advancement.description", "pack type filter reaches selected component before schema parsing");
+    }
+    private static void WorldgenSchemasProtectData()
+    {
+        foreach (var (kind, valid, unknown) in new[]
+        {
+            ("dimension", """{"type":"minecraft:overworld","generator":{"type":"minecraft:flat","settings":{"biome":"minecraft:plains","layers":[{"block":"minecraft:bedrock","height":1}],"lakes":false,"features":false}}}""",
+             """{"type":"minecraft:overworld","generator":{"type":"test:generator","text":"Unknown payload"}}"""),
+            ("dimension_type", """{"ultrawarm":false,"natural":true,"has_skylight":true,"effects":"minecraft:overworld","infiniburn":"#minecraft:infiniburn_overworld","min_y":-64,"height":384,"logical_height":384}""",
+             """{"ultrawarm":"not a flag","height":384,"effects":{"text":"Unknown payload"}}"""),
+            ("worldgen/biome", """{"temperature":0.5,"downfall":0.4,"has_precipitation":true,"effects":{"fog_color":0,"water_color":1,"water_fog_color":2,"sky_color":3,"music":{"sound":"","min_delay":1,"max_delay":2,"replace_current_music":true},"particle":{"options":{"type":"minecraft:snowflake"},"probability":0.1}},"carvers":{"air":[]},"features":[],"spawners":{},"spawn_costs":{}}""",
+             """{"effects":{"fog_color":0,"water_color":1,"water_fog_color":2,"sky_color":3,"particle":{"options":{"type":"test:particle","text":"Unknown payload"},"probability":0.1}}}""")
+        })
+        {
+            var source = new WorldSourceLocation(new(World, "datapacks/p/data/test/" + kind + "/entry.json", ArtifactKind.Json),
+                WorldSourceRole.PackJson, PackRoot: "datapacks/p", PackKind: PackSourceKind.Datapack);
+            TextExtractionResult Read(string value) => PackTextExtractor.Extract(source, Encoding.UTF8.GetBytes(value), Metadata(15));
+            Require(Read(valid) is { Complete: true, Occurrences.IsEmpty: true }, "known vanilla worldgen has no display text: " + kind);
+            Require(Read(unknown) is { Complete: false, Occurrences.IsEmpty: true }, "unknown worldgen remains protected: " + kind);
+        }
     }
 }

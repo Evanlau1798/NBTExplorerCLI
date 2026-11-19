@@ -31,7 +31,7 @@ public static class NativeComponentReferences
     {
         ArgumentNullException.ThrowIfNull(profile);
         using var document = BoundedJson.ReadDecoded(bytes, limits);
-        var reader = new Reader(limits);
+        var reader = new Reader(limits, profile);
         void Visit(SourceAddress root)
         {
             var local = root.ComponentPath ?? new TypedPath(root.NodePath.Segments.Skip(source.NodePath.Segments.Length));
@@ -53,7 +53,7 @@ public static class NativeComponentReferences
     public static ComponentReferenceResult Nbt(SourceAddress source, NbtValue component, CapabilityProfile profile, DecodeLimits? limits = null)
     {
         Check(source); limits ??= DecodeLimits.Default;
-        var reader = new Reader(limits);
+        var reader = new Reader(limits, profile);
         var result = TextComponentExtractor.Nbt(source, component, profile, limits, componentRoot: root =>
         {
             var local = new TypedPath(root.NodePath.Segments.Skip(source.NodePath.Segments.Length));
@@ -88,7 +88,7 @@ public static class NativeComponentReferences
         }
         return root;
     }
-    private sealed class Reader(DecodeLimits limits)
+    private sealed class Reader(DecodeLimits limits, CapabilityProfile profile)
     {
         private readonly List<ComponentSelectorReference> selectors = [];
         private readonly List<ExtractionDiagnostic> diagnostics = [];
@@ -100,7 +100,7 @@ public static class NativeComponentReferences
         }
         internal void Selector(SourceAddress address, string text)
         {
-            var parsed = SelectorNames.Parse(text, limits);
+            var parsed = SelectorNames.Parse(text, limits, MinecraftProfiles.SupportsNearestSelector(profile));
             Charge(address, text.Length);
             foreach (var name in parsed.Names) Charge(address, name.Name.Length);
             foreach (var diagnostic in parsed.Diagnostics) Charge(address, diagnostic.Code.Length);

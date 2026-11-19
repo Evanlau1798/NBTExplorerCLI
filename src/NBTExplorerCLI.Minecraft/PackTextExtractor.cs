@@ -57,6 +57,11 @@ public static partial class PackTextExtractor
             {
                 if (!KnownStaticPredicate(root, profile, limits)) output.Diagnostic(TypedPath.Root, "UnsupportedPredicateSchema");
             }
+            else if (parts.Length >= 4 && parts[0] == "data" && (parts[2] is "dimension" or "dimension_type"
+                || parts.Length >= 5 && parts[2] == "worldgen" && parts[3] == "biome"))
+            {
+                if (!KnownWorldgen(parts[2], root)) output.Diagnostic(TypedPath.Root, "UnsupportedWorldgenSchema");
+            }
             else if (parts.Length >= 4 && parts[0] == "data" && parts[2] == (plural ? "recipes" : "recipe") && parts[^1].EndsWith(".json", StringComparison.Ordinal))
             {
                 var resultPath = At(TypedPath.Root, "result");
