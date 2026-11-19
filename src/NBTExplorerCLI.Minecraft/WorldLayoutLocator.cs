@@ -24,6 +24,10 @@ public static class WorldLayoutLocator
         if (kind == ArtifactKind.Text) return new(artifact, WorldSourceRole.Irrelevant);
         if (kind == ArtifactKind.Archive) return new(artifact, WorldSourceRole.Archive, PackRoot: relativePath);
         var directoryLayout = layout.Schema == "java-dimensions-directory";
+        if (parts.Length >= 4 && parts[0] == "generated" && parts[2] == (directoryLayout ? "structures" : "structure") && extension == "nbt"
+            && name[..^4] is not ("" or "." or "..")
+            && MinecraftIdentifier.ResourceLocation(parts[1] + ":" + string.Join("/", parts, 3, parts.Length - 3)[..^4]))
+            return new(artifact, WorldSourceRole.Structure);
         var progress = directoryLayout ? parts.Length == 2 && parts[0] is "advancements" or "stats"
             : parts.Length == 3 && parts[0] == "players" && parts[1] is "advancements" or "stats";
         if (progress && name.EndsWith(".json", StringComparison.Ordinal) && Guid.TryParseExact(name[..^5], "D", out _))

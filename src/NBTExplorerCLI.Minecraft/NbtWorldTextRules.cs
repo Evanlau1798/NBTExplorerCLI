@@ -43,6 +43,19 @@ internal sealed partial class NbtTextReader
         }
         if (identity == "minecraft:lectern" && Field(value, "Book", path) is { } book) Item(book, At(path, "Book"), "lectern.book");
         if (identity == "minecraft:command_block") StoredCommand(value, path);
+        if (identity == "minecraft:mob_spawner")
+        {
+            SpawnedEntity(value, path, "SpawnData");
+            foreach (var (potential, potentialPath) in Sequence(Field(value, "SpawnPotentials", path), At(path, "SpawnPotentials")))
+                SpawnedEntity(potential, potentialPath, "data");
+        }
+    }
+    private void SpawnedEntity(NbtValue value, TypedPath path, string field)
+    {
+        var dataPath = At(path, field);
+        if (Field(value, field, path) is { } data && Field(data, "entity", dataPath) is { } entity
+            && entity is not NbtCompound { Entries.IsEmpty: true })
+            Entity(entity, At(dataPath, "entity"));
     }
     private void StoredCommand(NbtValue value, TypedPath path)
     {
@@ -52,11 +65,15 @@ internal sealed partial class NbtTextReader
             else output.Diagnostic(At(path, "Command"), "InvalidCommand");
         }
     }
-    internal void Entity(NbtValue value, TypedPath path, string? knownIdentity = null)
+    internal void Entity(NbtValue value, TypedPath path, string? knownIdentity = null, string? fallbackIdentity = null)
     {
-        var rawIdentity = Field(value, "id", path);
-        if (rawIdentity is not NbtString && (rawIdentity is not null || knownIdentity is null)) { output.Diagnostic(path, "MissingEntityIdentity"); return; }
-        var identity = rawIdentity is NbtString id ? MinecraftIdentifier.DefaultNamespace(id.Value) : knownIdentity!;
+        var identity = Field(value, "id", path) switch
+        {
+            NbtString id => MinecraftIdentifier.DefaultNamespace(id.Value),
+            null => knownIdentity ?? fallbackIdentity,
+            _ => null
+        };
+        if (identity is null) { output.Diagnostic(path, "MissingEntityIdentity"); return; }
         if (knownIdentity is not null && identity != knownIdentity) { output.Diagnostic(path, "ConflictingEntityIdentity"); return; }
         Component(Field(value, "CustomName", path), At(path, "CustomName"), identity == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name");
         if (identity == "minecraft:command_block_minecart") StoredCommand(value, path);
@@ -79,7 +96,9 @@ internal sealed partial class NbtTextReader
         else
         {
             foreach (var field in new[] { "HandItems", "ArmorItems" })
-                foreach (var (item, itemPath) in Sequence(Field(value, field, path), At(path, field))) Item(item, itemPath);
+                foreach (var (item, itemPath) in Sequence(Field(value, field, path), At(path, field)))
+                    if (item is not NbtCompound { Entries: [{ Name: "Count", Value: NbtByte or NbtInt }] })
+                        Item(item, itemPath);
             foreach (var field in new[] { "ArmorItem", "body_armor_item", "SaddleItem", "DecorItem" })
                 if (Field(value, field, path) is { } item) Item(item, At(path, field));
         }

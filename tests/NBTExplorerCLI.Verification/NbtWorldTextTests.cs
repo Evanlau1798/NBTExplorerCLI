@@ -38,18 +38,44 @@ internal static class NbtWorldTextTests
         foreach (var (version, modern) in new[] { (3953, false), (4774, true) })
         {
             var item = C(E("id", S("minecraft:stick")), E("components", C(E("minecraft:custom_name", Text("Equipment", modern)))));
+            var emptySlot = C(E("Count", new NbtInt(1)));
             var passenger = C(E("id", S("minecraft:text_display")), E("text", Text("Display", modern)), E("transformation", C(E("value", S("Protected")))));
             var entity = C(E("id", S("minecraft:armor_stand")), E("CustomName", Text("Stand", modern)), E("Passengers", L(passenger)),
-                modern ? E("equipment", C(E("mainhand", item))) : E("HandItems", L(item)), E("Tags", L(S("Protected"))));
+                modern ? E("equipment", C(E("mainhand", item))) : E("HandItems", L(item, emptySlot)), E("Tags", L(S("Protected"))));
             var root = C(E("DataVersion", new NbtInt(version)), E("Entities", L(entity)));
             var result = NbtTextExtractor.Extract(Region(entities: true), new("", root), new(-32, 0));
             var suffix = modern ? "/text|<physical>|" : "|/text|";
-            var equipment = modern ? "/Entities/0/equipment/mainhand" : "/Entities/0/HandItems/0";
+            var equipment = modern ? "/equipment/mainhand" : "/HandItems/0";
             Require(result.Complete && result.Occurrences.Select(Row).Order(StringComparer.Ordinal).SequenceEqual(new[] {
                 "/Entities/0/CustomName" + suffix + "armor_stand.name|Stand",
                 "/Entities/0/Passengers/0/text" + suffix + "text_display.text|Display",
-                equipment + "/components/minecraft:custom_name" + suffix + "item.name|Equipment" }.Order(StringComparer.Ordinal)), "entity name/display/passenger/equipment fields follow their own artifact profile and protect tags/transform");
+                "/Entities/0" + equipment + "/components/minecraft:custom_name" + suffix + "item.name|Equipment" }.Order(StringComparer.Ordinal)), "entity fields preserve their own profile and treat a count-only equipment slot as empty");
+
+            var spawnData = C(E("entity", entity), E("custom_spawn_rules", C(E("text", S("Protected")))));
+            var spawner = C(E("id", S("minecraft:mob_spawner")), E("SpawnData", spawnData),
+                E("SpawnPotentials", L(C(E("data", spawnData), E("weight", new NbtInt(1))))));
+            var template = C(E("DataVersion", new NbtInt(version)), E("blocks", L(C(E("nbt", spawner)))));
+            var source = new WorldSourceLocation(new(World, $"generated/test/{(modern ? "structure" : "structures")}/example.nbt", ArtifactKind.Nbt), WorldSourceRole.Structure);
+            var spawned = NbtTextExtractor.Extract(source, new("", template));
+            var fields = new[] { "/CustomName" + suffix + "armor_stand.name|Stand", "/Passengers/0/text" + suffix + "text_display.text|Display",
+                equipment + "/components/minecraft:custom_name" + suffix + "item.name|Equipment" };
+            var expected = new[] { "/blocks/0/nbt/SpawnData/entity", "/blocks/0/nbt/SpawnPotentials/0/data/entity" };
+            Require(spawned.Complete && spawned.Occurrences.Select(Row).Order(StringComparer.Ordinal).SequenceEqual(
+                expected.SelectMany(prefix => fields.Select(field => prefix + field)).Order(StringComparer.Ordinal)),
+                "both mob spawner payloads expose native entity and item text at exact template paths, preserving spawn rules and weight");
+
+            var blank = C(E("id", S("minecraft:mob_spawner")), E("SpawnData", C(E("entity", C()))));
+            var unconfigured = C(E("DataVersion", new NbtInt(version)), E("blocks", L(C(E("nbt", blank)))));
+            var empty = NbtTextExtractor.Extract(source, new("", unconfigured));
+            Require(empty.Complete && empty.Occurrences.IsEmpty, "an unconfigured spawner's empty entity compound is a valid nontext source");
         }
+
+        var unbound = C(E("Count", new NbtInt(1)), E("components", C(E("minecraft:custom_name", Text("Unbound", false)))));
+        var equipped = C(E("id", S("minecraft:armor_stand")), E("HandItems", L(unbound)));
+        var invalid = C(E("DataVersion", new NbtInt(3953)), E("Entities", L(equipped)));
+        var resultWithUnboundText = NbtTextExtractor.Extract(Region(entities: true), new("", invalid), new(-32, 0));
+        Require(!resultWithUnboundText.Complete && resultWithUnboundText.Diagnostics.Single().Code == "MissingItemIdentity",
+            "an equipment item that carries text still requires an item identity");
     }
     public static void BossbarScoreboardAndCommandCandidates()
     {

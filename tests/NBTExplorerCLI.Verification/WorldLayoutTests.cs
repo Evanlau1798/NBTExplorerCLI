@@ -39,6 +39,24 @@ internal static class WorldLayoutTests
         var a = WorldLayoutLocator.Locate(World, "pack-a.zip", directoryLayout, directoryDimensions, packs);
         var b = WorldLayoutLocator.Locate(World, "pack-b.zip", directoryLayout, directoryDimensions, packs);
         Require(a.Role == WorldSourceRole.Archive && b.Role == WorldSourceRole.Archive && a.Artifact != b.Artifact, "multiple archive basenames never become resources.zip");
+
+        foreach (var version in new[] { 3700, 3953, 4325, 4671, 4774 })
+        {
+            var profile = MinecraftProfiles.ForDataVersion(version)!;
+            var snapshot = version == 4774;
+            var prefix = snapshot ? "structure" : "structures";
+            var path = $"generated/test/{prefix}/nested/template.nbt";
+            WorldSourceLocation Locate(string file) => WorldLayoutLocator.Locate(World, file, profile, snapshot ? modernDimensions : directoryDimensions, packs);
+            var template = Locate(path);
+            Require(template.Role == WorldSourceRole.Structure && template.Artifact.RelativePath == path
+                && template.PackRoot is null && template.Dimension is null, $"{version}: generated templates use their own world-level structure directory");
+            var other = snapshot ? "structures" : "structure";
+            Require(Locate($"generated/test/{other}/template.nbt").Role == WorldSourceRole.Unknown
+                && Locate($"generated/INVALID/{prefix}/template.nbt").Role == WorldSourceRole.Unknown
+                && Locate($"generated/test/{prefix}/nested/.nbt").Role == WorldSourceRole.Unknown
+                && Locate($"generated/test/{prefix}/template.dat").Role == WorldSourceRole.Unknown,
+                $"{version}: unrecognized generated paths stay unsupported");
+        }
     }
     public static void UnknownAndInvalidAreExplicit()
     {

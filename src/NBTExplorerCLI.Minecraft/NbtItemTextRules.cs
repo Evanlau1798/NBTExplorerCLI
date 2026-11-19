@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using NBTExplorerCLI.Domain;
 using static NBTExplorerCLI.Minecraft.TextExtractionCollector;
 
@@ -5,6 +6,23 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class NbtTextReader
 {
+    private static readonly FrozenSet<string> Java1204SpawnEggEntities = new[]
+    {
+        "allay", "axolotl", "bat", "bee", "blaze", "breeze",
+        "camel", "cat", "cave_spider", "chicken", "cod", "cow",
+        "creeper", "dolphin", "donkey", "drowned", "elder_guardian", "ender_dragon",
+        "enderman", "endermite", "evoker", "fox", "frog", "ghast",
+        "glow_squid", "goat", "guardian", "hoglin", "horse", "husk",
+        "iron_golem", "llama", "magma_cube", "mooshroom", "mule", "ocelot",
+        "panda", "parrot", "phantom", "pig", "piglin", "piglin_brute",
+        "pillager", "polar_bear", "pufferfish", "rabbit", "ravager", "salmon",
+        "sheep", "shulker", "silverfish", "skeleton", "skeleton_horse", "slime",
+        "sniffer", "snow_golem", "spider", "squid", "stray", "strider",
+        "tadpole", "trader_llama", "tropical_fish", "turtle", "vex", "villager",
+        "vindicator", "wandering_trader", "warden", "witch", "wither", "wither_skeleton",
+        "wolf", "zoglin", "zombie", "zombie_horse", "zombie_villager", "zombified_piglin"
+    }.ToFrozenSet(StringComparer.Ordinal);
+
     private void Item(NbtValue value, TypedPath path, string bookRole = "book")
     {
         if (value is NbtCompound { Entries.Length: 0 }) return;
@@ -53,7 +71,16 @@ internal sealed partial class NbtTextReader
             foreach (var (lore, lorePath) in Sequence(Field(display, "Lore", displayPath), At(displayPath, "Lore"))) Component(lore, lorePath, "item.lore");
         }
         if (Field(tag, "BlockEntityTag", path) is { } block) BlockEntity(block, At(path, "BlockEntityTag"));
-        if (Field(tag, "EntityTag", path) is { } entity) Entity(entity, At(path, "EntityTag"));
+        if (Field(tag, "EntityTag", path) is { } entity)
+        {
+            // Java 1.20.4 vanilla spawn eggs use their registered entity when EntityTag omits id.
+            const string vanilla = "minecraft:";
+            const string suffix = "_spawn_egg";
+            var name = profile.Id == "java-1.20.4" && id is not null && id.StartsWith(vanilla, StringComparison.Ordinal) && id.EndsWith(suffix, StringComparison.Ordinal)
+                ? id[vanilla.Length..^suffix.Length] : null;
+            var fallback = name is not null && Java1204SpawnEggEntities.Contains(name) ? vanilla + name : null;
+            Entity(entity, At(path, "EntityTag"), fallbackIdentity: fallback);
+        }
         if (id is null && tag is NbtCompound compound && compound.Entries.Any(entry => entry.Name switch
         {
             "pages" or "filtered_pages" => output.CouldInclude(bookRole + ".page"),
