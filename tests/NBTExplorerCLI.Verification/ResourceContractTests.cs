@@ -51,7 +51,7 @@ internal static class ResourceContractTests
     {
         (string Path, bool Physical, bool Entry)[] cases =
         [
-            ("a", true, true), ("雪/\ud83d\ude00.json", true, true), ("assets/\ud800", true, true), ("CON.txt", true, true),
+            ("a", true, true), ("雪/\ud840\udc00.json", true, true), ("assets/\ud800", true, true), ("CON.txt", true, true),
             ("a ", false, true), ("a.", false, true), ("folder/1:name", false, true), ("folder/a:b", false, true),
             ("<file>", false, true), ("\u0001", false, true), ("", false, false), ("/x", false, false),
             ("a//b", false, false), ("a/", false, false), ("a/../b", false, false), ("a/./b", false, false),

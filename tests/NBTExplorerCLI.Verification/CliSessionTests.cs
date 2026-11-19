@@ -86,7 +86,7 @@ internal static class CliSessionTests
             var page = SessionExchangeJson.ReadPage(exported.RootElement.GetProperty("data").GetProperty("page").GetRawText());
             Require(page.SourceLocale == "en_us" && page.TargetLocale == "zh_tw" && page.Slots.Length == 2
                 && File.ReadAllText(prompt).TrimEnd('\r', '\n') == exported.RootElement.GetProperty("data").GetProperty("prompt").GetString(), "page and human prompt are distinct exports with complete schema identities");
-            var reply = Reply(exported); reply = reply with { Slots = reply.Slots.Select(slot => slot with { State = SessionReplyState.Translated, Text = "譯文🙂" }).ToImmutableArray() };
+            var reply = Reply(exported); reply = reply with { Slots = reply.Slots.Select(slot => slot with { State = SessionReplyState.Translated, Text = "譯文\U00020000" }).ToImmutableArray() };
             var file = FileInput(work, "reply.json", SessionExchangeJson.WriteReply(reply));
             using var advanced = Success(Call(work, world, id, "advance", "--reply", file));
             var revision = advanced.RootElement.GetProperty("data").GetProperty("status").GetProperty("revision").GetInt64();
@@ -100,7 +100,7 @@ internal static class CliSessionTests
             var projected = get.RootElement.GetProperty("data").GetProperty("slot");
             Require(projected.TryGetProperty("slotId", out var publicId) && publicId.ValueKind == JsonValueKind.String && !projected.TryGetProperty("slot", out _)
                 && !projected.TryGetProperty("address", out _), "slot lookup exposes opaque IDs and text, with canonical local write addresses retained locally");
-            Require(projected.GetProperty("reply").GetProperty("text").GetString() == "譯文🙂"
+            Require(projected.GetProperty("reply").GetProperty("text").GetString() == "譯文\U00020000"
                 && File.ReadAllBytes(Path.Combine(world, WorldQueryTests.Function(0))).SequenceEqual(before), "local validated replies remain separate from world writes");
         }
         finally { Directory.Delete(world, true); Directory.Delete(work, true); }
@@ -135,11 +135,11 @@ internal static class CliSessionTests
         try
         {
             using var started = Start(work, world, id, "--page-size", "1"); using var page = Success(Call(work, world, id, "export")); var reply = Reply(page);
-            var command = new SessionCommand(Guid.NewGuid(), id, 0, SessionCommandKind.Note, SlotId: reply.Slots[0].SlotId, Text: "附註🙂", Origin: "user", Confirmed: true, ResetSlots: []);
+            var command = new SessionCommand(Guid.NewGuid(), id, 0, SessionCommandKind.Note, SlotId: reply.Slots[0].SlotId, Text: "附註\U00020000", Origin: "user", Confirmed: true, ResetSlots: []);
             var file = FileInput(work, "command.json", SessionCommandJson.Write(command)); using var note = Success(Call(work, world, id, "note", "--request", file));
             using var replay = Success(Call(work, world, id, "note", "--request", file));
             using var listed = Success(Call(work, world, id, "note"));
-            Require(listed.RootElement.GetProperty("data").GetProperty("notes")[0].GetProperty("text").GetString() == "附註🙂", "note survives restart and exact resend");
+            Require(listed.RootElement.GetProperty("data").GetProperty("notes")[0].GetProperty("text").GetString() == "附註\U00020000", "note survives restart and exact resend");
             var stale = command with { OperationId = Guid.NewGuid() }; Require(Call(work, world, id, "note", "--request", FileInput(work, "stale.json", SessionCommandJson.Write(stale))).Exit == 3, "new command with old revision cannot overwrite work");
             var jump = new SessionCommand(Guid.NewGuid(), id, 1, SessionCommandKind.Jump, Page: 2, ResetSlots: []);
             using var moved = Success(Call(work, world, id, "jump", "--request", FileInput(work, "jump.json", SessionCommandJson.Write(jump))));

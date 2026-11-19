@@ -9,7 +9,7 @@ internal static class SnbtMalformedTests
 {
     public static void TruncatedAndSeededMalformed()
     {
-        var complete = Bytes("{text:'雪😀',array:[I;-1,2],list:[{keep:3}]} ");
+        var complete = Bytes("{text:'雪\U00020000',array:[I;-1,2],list:[{keep:3}]} ");
         var rootLength = complete.Length - 1;
         foreach (var profile in Enum.GetValues<SnbtProfile>())
             for (var count = 0; count < rootLength; count++)
@@ -45,7 +45,7 @@ internal static class SnbtMalformedTests
         {
             case 0: return Leaf(new NbtInt(random.Next(int.MinValue, int.MaxValue)));
             case 1: return Leaf(new NbtByte((sbyte)random.Next(-128, 128)));
-            case 2: return Leaf(new NbtString(profile == SnbtProfile.Java1215 ? "雪\ud800\n\"😀" : "雪\n\"😀"));
+            case 2: return Leaf(new NbtString(profile == SnbtProfile.Java1215 ? "雪\ud800\n\"\U00020000" : "雪\n\"\U00020000"));
             case 3: return Leaf(new NbtIntArray([random.Next(), -1]));
             case 4: return Leaf(new NbtDouble(SampleBits(random)));
             case 5: return Leaf(new NbtLongArray([long.MinValue, random.NextInt64()]));

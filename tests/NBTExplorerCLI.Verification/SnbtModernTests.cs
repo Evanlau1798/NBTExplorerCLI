@@ -17,7 +17,7 @@ internal static class SnbtModernTests
         var document = Snbt.ParseFragment(source, start, Modern);
         var path = new TypedPath([PathSegment.ForKey("extra"), PathSegment.ForIndex(1), PathSegment.ForKey("text")]);
         var span = document.Resolve(path).Span;
-        var replacement = Leaf(new NbtString("new\n\ud800😀"));
+        var replacement = Leaf(new NbtString("new\n\ud800\U00020000"));
         var changed = Snbt.Replace(document, path, Leaf(new NbtString("same")), replacement);
         var delta = changed.Length - source.Length;
         Require(changed.AsSpan(0, span.StartByte).SequenceEqual(source.AsSpan(0, span.StartByte))
@@ -36,14 +36,14 @@ internal static class SnbtModernTests
     }
     public static void UnicodeAndLimits()
     {
-        (string Name, string Value)[] names = [("snowman", "☃"), ("CJK UNIFIED IDEOGRAPHS 4E00", "一"),
+        (string Name, string Value)[] names = [("latin small letter e with acute", "\u00e9"), ("CJK UNIFIED IDEOGRAPHS 4E00", "一"),
             ("HIGH SURROGATES D800", "\ud800"), ("PRIVATE USE AREA E000", "\ue000"), ("NULL", "\0")];
         foreach (var item in names)
             Require(Snbt.ParseDocument(Bytes("'\\N{" + item.Name + "}'"), Modern).Root.Value == Leaf(new NbtString(item.Value)), "固定Java21 Unicode15 name table與code units需一致");
         Reject(SnbtError.InvalidEscape, () => Snbt.ParseDocument(Bytes("'\\Uffffffff'"), Modern));
         Reject(SnbtError.InvalidEscape, () => Snbt.ParseDocument(Bytes("'\\N{not a name}'"), Modern));
-        Reject(SnbtError.LimitExceeded, () => Snbt.ParseDocument(Bytes("'\\U0001F600'"), Modern, new(MaxMutf8StringBytes: 5)));
-        Require(Snbt.ParseDocument(Bytes("'\\U0001F600'"), Modern, new(MaxMutf8StringBytes: 6)).Root.Value == Leaf(new NbtString("😀")), "supplementary codepoint為兩個MUTF8 code units");
+        Reject(SnbtError.LimitExceeded, () => Snbt.ParseDocument(Bytes("'\\U00020000'"), Modern, new(MaxMutf8StringBytes: 5)));
+        Require(Snbt.ParseDocument(Bytes("'\\U00020000'"), Modern, new(MaxMutf8StringBytes: 6)).Root.Value == Leaf(new NbtString("\U00020000")), "supplementary codepoint為兩個MUTF8 code units");
         Reject(SnbtError.LimitExceeded, () => Snbt.ParseDocument(Bytes("bool(0)"), Modern, new(MaxNodes: 1)));
         Reject(SnbtError.UnsupportedValue, () => Snbt.Write(Leaf(NbtDouble.FromValue(double.PositiveInfinity)), Modern));
         Reject(SnbtError.InvalidNumber, () => Snbt.ParseDocument(Bytes("18446744073709551616ul"), Modern));

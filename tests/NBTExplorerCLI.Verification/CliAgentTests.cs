@@ -13,7 +13,7 @@ internal static class CliAgentTests
     private static JsonNode Answer(JsonDocument setup)
     {
         var node = JsonNode.Parse(setup.RootElement.GetProperty("data").GetProperty("questionnaire").GetRawText())!;
-        var configuration = node["data"]!["configuration"]!; configuration["agentName"] = "外部 agent🙂";
+        var configuration = node["data"]!["configuration"]!; configuration["agentName"] = "外部 agent\U00020000";
         configuration["sourceLanguage"] = "en_us"; configuration["targetLanguage"] = "ja_jp"; configuration["preferredItemsPerPage"] = 2;
         return node;
     }
@@ -30,7 +30,7 @@ internal static class CliAgentTests
             using var accepted = Success(Call(work, world, "submit", "--request", file));
             using var replay = Success(Call(work, world, "submit", "--request", file));
             using var status = Success(Call(work, world, "status")); var data = status.RootElement.GetProperty("data");
-            Require(data.GetProperty("revision").GetInt64() == 0 && data.GetProperty("configuration").GetProperty("agentName").GetString() == "外部 agent🙂"
+            Require(data.GetProperty("revision").GetInt64() == 0 && data.GetProperty("configuration").GetProperty("agentName").GetString() == "外部 agent\U00020000"
                 && replay.RootElement.GetProperty("data").GetProperty("receipt").GetProperty("revision").GetInt64() == 0, "restart and exact resend retain one accepted configuration revision");
             Require(!Directory.Exists(Path.Combine(work, "state", "sessions")) && File.ReadAllBytes(file).SequenceEqual(original) && File.Exists(questionnaire), "submit retains input files and does not silently start translation");
             using var stored = JsonDocument.Parse(File.ReadAllText(Path.Combine(work, "state", "agent", "configuration.json")));

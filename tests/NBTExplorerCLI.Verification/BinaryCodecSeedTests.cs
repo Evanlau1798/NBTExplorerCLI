@@ -32,7 +32,7 @@ internal static class BinaryCodecSeedTests
         3 => new NbtLong(random.NextInt64()),
         4 => new NbtFloat(random.Next()),
         5 => new NbtDouble(random.NextInt64()),
-        6 => new NbtString("值\0\ud800😀" + random.Next()),
+        6 => new NbtString("值\0\ud800\U00020000" + random.Next()),
         7 => new NbtByteArray(Enumerable.Range(0, random.Next(8)).Select(_ => (sbyte)random.Next(-128, 128))),
         8 => new NbtIntArray(Enumerable.Range(0, random.Next(8)).Select(_ => random.Next())),
         9 => new NbtLongArray(Enumerable.Range(0, random.Next(8)).Select(_ => random.NextInt64())),

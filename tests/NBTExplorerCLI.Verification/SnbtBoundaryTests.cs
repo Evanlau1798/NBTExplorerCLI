@@ -16,7 +16,7 @@ internal static class SnbtBoundaryTests
         var exceeded = new[] { exact with { MaxDecodedBytes = source.Length - 1 }, exact with { MaxDepth = 1 }, exact with { MaxNodes = 4 },
             exact with { MaxContainerEntries = 1 }, exact with { MaxCollectionElements = 1 }, exact with { MaxStringBytes = 2 } };
         foreach (var limits in exceeded) Reject(SnbtError.LimitExceeded, () => Snbt.ParseDocument(source, limits: limits));
-        Reject(SnbtError.LimitExceeded, () => Snbt.ParseDocument(Bytes("'😀'"), limits: new(MaxMutf8StringBytes: 1)));
+        Reject(SnbtError.LimitExceeded, () => Snbt.ParseDocument(Bytes("'\U00020000'"), limits: new(MaxMutf8StringBytes: 1)));
         Require(Snbt.ParseDocument(Bytes("42"), limits: new(MaxStringBytes: 0, MaxMutf8StringBytes: 0)).Root.Value == Leaf(new NbtInt(42)),
             "數字字面值不應消耗decoded string budget");
         var canonical = Snbt.Write(parsed.Root.Value);
