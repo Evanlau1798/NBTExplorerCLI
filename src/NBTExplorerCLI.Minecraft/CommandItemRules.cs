@@ -14,7 +14,7 @@ internal sealed partial class CommandTextReader
             var tag = value.IndexOf('{');
             if (tag < 0) return;
             var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, "item.tag", source.Address.Dimension, source.Address.Chunk);
-            var extracted = SnbtTextExtractor.ItemNbtTag(binding, value[tag..], profile, MinecraftIdentifier.DefaultNamespace(value[..tag]), limits, scope, ComponentCallback(path, token.Start + tag, true), commandTag: true);
+            var extracted = SnbtTextExtractor.ItemNbtTag(binding, value[tag..], profile, MinecraftIdentifier.DefaultNamespace(value[..tag]), limits, scope, StoredComponentCallback(path, token.Start + tag, token.Start + value.Length), commandTag: true);
             MergeComponent(extracted, path, token.Start + tag, token.Start + value.Length, true);
             if (extracted.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(value[tag..]), token.Start + tag, token.Start + value.Length, path, true, itemTree: true, commandTag: true);
             return;

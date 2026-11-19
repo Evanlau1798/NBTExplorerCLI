@@ -6,14 +6,14 @@ namespace NBTExplorerCLI.Application;
 
 public sealed partial class WorldTextExtraction
 {
-    private CommandExtractionResult ExtractCommands(ImmutableArray<CommandCandidate> pending, CapabilityProfile profile)
+    private CommandExtractionResult ExtractCommands(ImmutableArray<CommandCandidate> pending, CapabilityProfile profile, Action<CommandStorageAccess>? storageAccess)
     {
         var texts = ImmutableArray.CreateBuilder<TextOccurrence>(); var keys = ImmutableArray.CreateBuilder<TranslationKeyReference>();
         var diagnostics = ImmutableArray.CreateBuilder<ExtractionDiagnostic>(); var references = ImmutableArray.CreateBuilder<NameReferenceCandidate>();
         var completeness = ReferenceCompleteness.Complete; long retained = 0;
         foreach (var candidate in pending)
         {
-            var result = CommandTextExtractor.Extract(candidate, profile, request.Limits, request.Scope);
+            var result = CommandTextExtractor.Extract(candidate, profile, request.Limits, request.Scope, storageAccess: storageAccess);
             retained = checked(retained + CheckRetention(result.Text, result.References));
             if (retained > (request.Limits ?? DecodeLimits.Default).MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Combined commands exceed retention budget");
             texts.AddRange(result.Text.Occurrences); keys.AddRange(result.Text.TranslationKeys); diagnostics.AddRange(result.Text.Diagnostics); references.AddRange(result.References);

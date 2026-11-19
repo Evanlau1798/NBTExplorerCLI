@@ -63,7 +63,7 @@ internal sealed partial class CommandTextReader
                     && (count == 2 || SoundChannel(Arg(2)) || count == 4 && Arg(2) == "*")
                     && (count < 4 || ResourceLocation(Arg(3)));
             case "gamerule":
-                return count is 2 or 3 && profile.Id == "java-1.20.1" && KnownGameRule(Arg(1), count == 2 ? null : Arg(2));
+                return count is 2 or 3 && MinecraftProfiles.UsesEarlyTaggedItemCommands(profile) && KnownGameRule(Arg(1), count == 2 ? null : Arg(2));
             case "clear":
                 return count is >= 1 and <= 4 && (count == 1 || EntityTarget(Arg(1)))
                     && (count < 3 || ResourceOrTag(Arg(2)))
@@ -91,7 +91,7 @@ internal sealed partial class CommandTextReader
                 return count == 2 && Integer(Arg(1), out _);
             case "particle":
                 var particle = DefaultNamespace(Arg(1));
-                var positionalPayload = profile.Id == "java-1.20.1";
+                var positionalPayload = MinecraftProfiles.UsesEarlyTaggedItemCommands(profile);
                 var position = particle switch
                 {
                     "minecraft:block" or "minecraft:block_marker" or "minecraft:falling_dust" =>
@@ -216,7 +216,7 @@ internal sealed partial class CommandTextReader
         : text.Length is >= 1 and <= 16 && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') || Guid.TryParseExact(text, "D", out _);
     private bool ScoreHolder(string text, bool allowWildcard = false)
         => SelectorTarget(text) || allowWildcard && text == "*" || PlainControlToken(text)
-            || profile.Id == "java-1.20.1" && text.StartsWith('$') && PlainControlToken(text[1..]);
+            || MinecraftProfiles.UsesEarlyTaggedItemCommands(profile) && text.StartsWith('$') && PlainControlToken(text[1..]);
     private static bool PlainControlToken(string text) => text.Length != 0 && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '_' or '-' or '.' or ':' or '#');
 
     internal static bool ResourceOrTag(string text) => ResourceLocation(text.StartsWith('#') ? text[1..] : text);

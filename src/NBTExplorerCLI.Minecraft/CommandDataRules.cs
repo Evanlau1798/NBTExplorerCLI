@@ -9,6 +9,7 @@ internal sealed partial class CommandTextReader
 {
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
+        if (storageAccess is not null) ObserveDataStorage(tokens, index, path);
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;
         if (tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"
@@ -29,8 +30,8 @@ internal sealed partial class CommandTextReader
         {
             var token = tokens[^1]; var grammarPath = At(path, blockItems ? "data.block.Items" : "data.entity.Item");
             var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, "item.stack", source.Address.Dimension, source.Address.Chunk);
-            var result = SnbtTextExtractor.ItemStack(binding, token.Text, profile, limits, scope, ComponentCallback(grammarPath, token.Start, true));
             var tokenEnd = token.Start + token.Text.Length;
+            var result = SnbtTextExtractor.ItemStack(binding, token.Text, profile, limits, scope, StoredComponentCallback(grammarPath, token.Start, tokenEnd));
             MergeComponent(result, grammarPath, token.Start, tokenEnd, true);
             if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(token.Text), token.Start, tokenEnd, grammarPath, true, itemTree: true, commandTag: true);
             return;

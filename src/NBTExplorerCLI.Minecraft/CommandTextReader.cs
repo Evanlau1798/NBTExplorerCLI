@@ -17,6 +17,7 @@ internal sealed partial class CommandTextReader
     private readonly Action<SourceAddress>? componentRoot;
     private readonly Action<CommandSelectorReference>? selectorReference;
     private readonly Action<CommandNameTemplate>? nameTemplate;
+    private readonly Action<CommandStorageAccess>? storageAccess;
     private readonly bool inspectNested;
     private readonly Hash256 hash;
     private readonly int byteBase;
@@ -30,12 +31,13 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
         this.componentRoot = componentRoot;
         this.selectorReference = selectorReference;
         this.nameTemplate = nameTemplate;
+        this.storageAccess = storageAccess;
         this.inspectNested = inspectNested;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
@@ -123,7 +125,11 @@ internal sealed partial class CommandTextReader
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "data")
                 {
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
-                    if (dataPath >= 0 && dataPath < tokens.Count && StaticDataControlPath(tokens[cursor + 1].Text, tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
+                    if (dataPath >= 0 && dataPath < tokens.Count)
+                    {
+                        ObserveStorageOperand(tokens, cursor + 1, path);
+                        if (StaticDataControlPath(tokens[cursor + 1].Text, tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
+                    }
                 }
                 if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "score"
                     && ScoreHolder(tokens[cursor + 2].Text, allowWildcard: true) && PlainControlToken(tokens[cursor + 3].Text)) operands = 4;
@@ -132,9 +138,16 @@ internal sealed partial class CommandTextReader
                 if (clause == "store" && operands < 0 && cursor < tokens.Count && tokens[cursor].Text is "result" or "success")
                 {
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
-                    if (dataPath >= 0 && dataPath + 2 < tokens.Count && StaticDataPath(tokens[dataPath].Text)
-                        && tokens[dataPath + 1].Text is "byte" or "short" or "int" or "long" or "float" or "double"
-                        && Decimal(tokens[dataPath + 2].Text, out _)) operands = dataPath + 3 - cursor;
+                    if (dataPath >= 0 && dataPath + 2 < tokens.Count)
+                    {
+                        var staticPath = StaticDataPath(tokens[dataPath].Text);
+                        if (tokens[dataPath + 1].Text is "byte" or "short" or "int" or "long" or "float" or "double"
+                            && Decimal(tokens[dataPath + 2].Text, out _))
+                        {
+                            ObserveStorageOperand(tokens, cursor + 1, path);
+                            if (staticPath) operands = dataPath + 3 - cursor;
+                        }
+                    }
                 }
                 if (cursor < tokens.Count && clause is "positioned" or "rotated" && tokens[cursor].Text == "as") operands = 2;
                 if (operands < 0 || cursor + operands > tokens.Count) { Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownExecuteGrammar"); return; }
@@ -142,6 +155,13 @@ internal sealed partial class CommandTextReader
                 if (cursor == tokens.Count && clause is "if" or "unless") return;
             }
             throw new CommandSyntaxException();
+        }
+        if (storageAccess is not null && name == "function" && MinecraftProfiles.SupportsFunctionMacros(profile)
+            && index + 4 < tokens.Count && ResourceOrTag(tokens[index + 1].Text)
+            && tokens[index + 2].Text == "with")
+        {
+            var sourceEnd = DataTargetEnd(tokens, index + 3);
+            if (sourceEnd >= 0 && tokens.Count <= sourceEnd + 1) ObserveStorageOperand(tokens, index + 3, path);
         }
         if (StaticControlCommand(tokens, index, name)) return;
         var argument = name switch

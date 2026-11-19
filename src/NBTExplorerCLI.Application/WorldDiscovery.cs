@@ -181,7 +181,7 @@ public static class WorldDiscovery
                 }
                 if (location.Role is WorldSourceRole.Terrain or WorldSourceRole.Entities or WorldSourceRole.PointOfInterest)
                 {
-                    if (bytes.Length == 0 && (location.Role != WorldSourceRole.Terrain || metadata.Profile.Id == "java-1.20.1"))
+                    if (bytes.Length == 0 && (location.Role != WorldSourceRole.Terrain || metadata.Profile.Id is "java-1.20.1" or "java-1.20.2"))
                     {
                         if (!Add(new(location, null, SourceOutcome.Irrelevant, "EmptyRegion", hash, new()))) break;
                         continue;

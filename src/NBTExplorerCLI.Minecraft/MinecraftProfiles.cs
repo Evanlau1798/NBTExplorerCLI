@@ -6,10 +6,12 @@ namespace NBTExplorerCLI.Minecraft;
 
 public static class MinecraftProfiles
 {
+    private const int FunctionMacrosDataVersion = 3567;
+
     public static CapabilityProfile? ForId(string id) => id switch
     {
         "java-early-anvil" => EarlyAnvil, "java-early-anvil-json-names" => EarlyJsonNames, "java-1.13" => HistoricalPlainLore,
-        "java-1.14.4" => HistoricalJson, "java-1.20.1" => Java1201, "java-1.20.4" => Java1204, "java-item-components-initial" => InitialItemComponents,
+        "java-1.14.4" => HistoricalJson, "java-1.20.1" => Java1201, "java-1.20.2" => Java1202, "java-1.20.4" => Java1204, "java-item-components-initial" => InitialItemComponents,
         "java-1.20.5" => Java1205, "java-1.21" => Java121, "java-1.21.5" => Java1215,
         "java-nbt-text-initial-hover" => InitialNativeText, "java-nbt-text-homogeneous" => EarlyNativeText,
         "java-nbt-text-mixed-lists" => MixedListText, "java-1.21.9" => Java1219,
@@ -45,7 +47,8 @@ public static class MinecraftProfiles
         if (!metadata.DeclaresSupport(version)) return null;
         return (metadata.Kind, version.Major, version.Minor) switch
         {
-            (PackSourceKind.Datapack, >= 4 and <= 23, 0) or (PackSourceKind.ResourcePack, >= 4 and <= 20, 0) => Java1201,
+            (PackSourceKind.Datapack, >= 4 and <= 15, 0) or (PackSourceKind.ResourcePack, >= 4 and <= 20, 0) => Java1201,
+            (PackSourceKind.Datapack, >= 16 and <= 23, 0) => Java1202,
             (PackSourceKind.Datapack, >= 24 and <= 32, 0) or (PackSourceKind.ResourcePack, >= 21 and <= 27, 0) => Java1204,
             // Resource format 28 was shared before and after item conditions arrived.
             (PackSourceKind.Datapack, 33, 0) or (PackSourceKind.ResourcePack, 28, 0) => InitialItemComponents,
@@ -67,6 +70,7 @@ public static class MinecraftProfiles
     private static readonly CapabilityProfile HistoricalPlainLore = Create("java-1.13", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile HistoricalJson = Create("java-1.14.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1201 = Create("java-1.20.1", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.1", LogicalListEncoding.Homogeneous, "java-pack-plural");
+    private static readonly CapabilityProfile Java1202 = Create("java-1.20.2", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.2", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1204 = Create("java-1.20.4", "java-dimensions-directory", "java-item-tags-1.20.4", "java-text-json", "java-commands-1.20.4", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile InitialItemComponents = Create("java-item-components-initial", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-item-components-initial", LogicalListEncoding.Homogeneous, "java-pack-plural");
     private static readonly CapabilityProfile Java1205 = Create("java-1.20.5", "java-dimensions-directory", "java-item-components-1.20.5", "java-text-json", "java-commands-1.20.5", LogicalListEncoding.Homogeneous, "java-pack-plural");
@@ -105,7 +109,9 @@ public static class MinecraftProfiles
         (1513, 1458, 1513, EarlyJsonNames),
         (1631, 1514, 1802, HistoricalPlainLore),
         (1976, 1803, 3462, HistoricalJson),
-        (3465, 3463, 3689, Java1201),
+        (3465, 3463, FunctionMacrosDataVersion - 1, Java1201),
+        // 23w31a added function macros in data pack format 16.
+        (3578, FunctionMacrosDataVersion, 3689, Java1202),
         (3700, 3690, 3818, Java1204),
         // 24w10a added item conditions, after item components. 24w21a added @n and singular pack directories.
         (3819, 3819, 3820, InitialItemComponents),
@@ -137,6 +143,9 @@ public static class MinecraftProfiles
     internal static bool SupportsItemConditions(CapabilityProfile profile) => profile != InitialItemComponents
         && profile.Features[ProfileFacet.ItemSchema].Schema.StartsWith("java-item-components-", StringComparison.Ordinal);
     internal static bool SupportsNearestSelector(CapabilityProfile profile) => profile.Features[ProfileFacet.PackLayout].Schema == "java-pack-singular";
+    internal static bool SupportsFunctionMacros(CapabilityProfile profile)
+        => DataVersionRanges.Any(range => range.Minimum >= FunctionMacrosDataVersion && range.Profile.Id == profile.Id);
+    internal static bool UsesEarlyTaggedItemCommands(CapabilityProfile profile) => profile == Java1201 || profile == Java1202;
 
     internal static bool UsesCompoundEquipment(CapabilityProfile profile)
         => profile != InitialNativeText && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";

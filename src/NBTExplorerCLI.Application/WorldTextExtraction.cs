@@ -40,8 +40,13 @@ public sealed partial class WorldTextExtraction
                 ?? throw new CodecException(CodecError.UnsupportedProfile, 0, "Explicit Minecraft version requires recognized Classic Anvil metadata and a registered version");
     }
     public IEnumerable<TextSourceExtraction> ReadSources() => ReadSourcesCore(Discovery.Sources);
+    public IEnumerable<TextSourceExtraction> ReadSources(Action<CommandStorageAccess> storageAccess)
+    {
+        ArgumentNullException.ThrowIfNull(storageAccess);
+        return ReadSourcesCore(Discovery.Sources, storageAccess);
+    }
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
-    private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected)
+    private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected, Action<CommandStorageAccess>? storageAccess = null)
     {
         foreach (var group in selected.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
         {
@@ -73,10 +78,10 @@ public sealed partial class WorldTextExtraction
                 continue;
             }
             using (archive)
-                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive);
+                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess);
         }
     }
-    private TextSourceExtraction ReadOne(DiscoveredSource source, byte[] bytes, RegionFile? region, ZipArchive? archive)
+    private TextSourceExtraction ReadOne(DiscoveredSource source, byte[] bytes, RegionFile? region, ZipArchive? archive, Action<CommandStorageAccess>? storageAccess)
     {
         if (source.Outcome != SourceOutcome.Success) return Forward(source);
         if (source.Location.Role == WorldSourceRole.Archive || region is not null && source.Chunk is null)
@@ -134,7 +139,7 @@ public sealed partial class WorldTextExtraction
             if (!text.PendingCommands.IsEmpty)
             {
                 if (commandProfile is null) return new(source, SourceOutcome.Unsupported, text, "CommandGrammarPending");
-                commands = ExtractCommands(text.PendingCommands, commandProfile);
+                commands = ExtractCommands(text.PendingCommands, commandProfile, storageAccess);
                 text = text with { Occurrences = text.Occurrences.AddRange(commands.Text.Occurrences), TranslationKeys = text.TranslationKeys.AddRange(commands.Text.TranslationKeys),
                     Diagnostics = text.Diagnostics.AddRange(commands.Text.Diagnostics), PendingCommands = commands.Text.PendingCommands };
                 CheckRetention(text, commands.References);

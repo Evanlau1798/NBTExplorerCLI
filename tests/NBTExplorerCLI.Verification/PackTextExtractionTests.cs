@@ -48,7 +48,7 @@ internal static class PackTextExtractionTests
             "Java 1.20.1 binds DataVersion 3465 and resource format 15");
         foreach (var (kind, format, expected) in new[] { (PackSourceKind.Datapack, 15, "java-1.20.1"), (PackSourceKind.ResourcePack, 15, "java-1.20.1"),
             (PackSourceKind.Datapack, 26, "java-1.20.4"), (PackSourceKind.ResourcePack, 22, "java-1.20.4"),
-            (PackSourceKind.Datapack, 18, "java-1.20.1"), (PackSourceKind.ResourcePack, 18, "java-1.20.1"),
+            (PackSourceKind.Datapack, 18, "java-1.20.2"), (PackSourceKind.ResourcePack, 18, "java-1.20.1"),
             (PackSourceKind.Datapack, 41, "java-1.20.5"), (PackSourceKind.ResourcePack, 32, "java-1.20.5"),
             (PackSourceKind.Datapack, 45, "java-1.21"), (PackSourceKind.ResourcePack, 46, "java-1.21"),
             (PackSourceKind.Datapack, 48, "java-1.21"), (PackSourceKind.ResourcePack, 34, "java-1.21"),

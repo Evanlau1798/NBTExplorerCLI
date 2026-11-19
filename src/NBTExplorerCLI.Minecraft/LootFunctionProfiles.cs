@@ -17,7 +17,7 @@ public static class LootFunctionProfiles
         var name = identifier[10..];
         return profile.Features.GetValueOrDefault(ProfileFacet.ItemSchema)?.Schema switch
         {
-            "java-item-tags-1.20.4" when profile.Id is "java-1.20.1" or "java-1.20.4" => NbtTags.Contains(name),
+            "java-item-tags-1.20.4" when profile.Id is "java-1.20.1" or "java-1.20.2" or "java-1.20.4" => NbtTags.Contains(name),
             "java-item-components-1.20.5" or "java-item-components-1.21.5" => Components.Contains(name),
             "java-item-components-1.21.11" => name == "discard" || Components.Contains(name),
             "java-item-components-26.1-snapshot-6" => Snapshot.Contains(name),

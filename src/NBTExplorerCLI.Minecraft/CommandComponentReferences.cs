@@ -7,7 +7,7 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
-    private void ComponentReferences(byte[] bytes, int start, int end, TypedPath grammarPath, bool snbt, SnbtSpan? enclosingString = null, bool itemTree = false, bool commandTag = false)
+    private void ComponentReferences(byte[] bytes, int start, int end, TypedPath grammarPath, bool snbt, SnbtSpan? enclosingString = null, bool itemTree = false, bool commandTag = false, bool observeStorageOnly = false)
     {
         if (snbt)
         {
@@ -31,6 +31,13 @@ internal sealed partial class CommandTextReader
                 var fields = compound.Entries.ToDictionary(entry => entry.Name, entry => entry.Value, StringComparer.Ordinal);
                 if (fields.TryGetValue("selector", out var selector) && selector is LogicalMinecraftLeaf { Value: NbtString text })
                     Selector(text.Value, At(path, "selector"), parsed.Resolve(At(path, "selector")).Span);
+                if (storageAccess is not null && fields.GetValueOrDefault("nbt") is LogicalMinecraftLeaf { Value: NbtString nbtPath }
+                    && fields.GetValueOrDefault("storage") is LogicalMinecraftLeaf { Value: NbtString storage })
+                {
+                    var interpreted = fields.GetValueOrDefault("interpret") is LogicalMinecraftLeaf { Value: NbtByte { Value: 1 } }
+                        && !OtherComponentContent(fields.ContainsKey);
+                    ReportStorage(storage.Value, nbtPath.Value, interpreted, path);
+                }
                 if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
                     || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, grammar, limits) is null)
                     Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
@@ -48,15 +55,24 @@ internal sealed partial class CommandTextReader
         }
         else
         {
-            using var document = BoundedJson.ReadDecoded(bytes, limits); var spans = NativeJsonStringSpans.Read(bytes, limits); VisitJson(document.RootElement, TypedPath.Root);
+            using var document = BoundedJson.ReadDecoded(bytes, limits);
+            var spans = observeStorageOnly ? null : NativeJsonStringSpans.Read(bytes, limits);
+            VisitJson(document.RootElement, TypedPath.Root);
             void VisitJson(JsonElement value, TypedPath path)
             {
                 if (value.ValueKind == JsonValueKind.Array) { var index = 0; foreach (var child in value.EnumerateArray()) VisitJson(child, At(path, index++)); return; }
                 if (value.ValueKind != JsonValueKind.Object) return;
-                if (value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
-                    Selector(NativeJsonStrings.Read(selector), At(path, "selector"), spans[At(path, "selector")]);
-                if (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
-                    || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null)
+                if (!observeStorageOnly && value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
+                    Selector(NativeJsonStrings.Read(selector), At(path, "selector"), spans![At(path, "selector")]);
+                if (storageAccess is not null && value.TryGetNativeProperty("nbt", out var nbtPath) && nbtPath.ValueKind == JsonValueKind.String
+                    && value.TryGetNativeProperty("storage", out var storage) && storage.ValueKind == JsonValueKind.String)
+                {
+                    var interpreted = value.TryGetNativeProperty("interpret", out var flag) && flag.ValueKind == JsonValueKind.True
+                        && !OtherComponentContent(field => value.TryGetNativeProperty(field, out _));
+                    ReportStorage(NativeJsonStrings.Read(storage), NativeJsonStrings.Read(nbtPath), interpreted, path);
+                }
+                if (!observeStorageOnly && (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
+                    || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null))
                     Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
                 if (value.TryGetNativeProperty("extra", out var extra)) VisitJson(extra, At(path, "extra"));
                 if (value.TryGetNativeProperty("translate", out _) && value.TryGetNativeProperty("with", out var arguments)) VisitJson(arguments, At(path, "with"));
@@ -68,6 +84,12 @@ internal sealed partial class CommandTextReader
                 }
             }
         }
+        void ReportStorage(string storage, string path, bool interpreted, TypedPath component)
+        {
+            var address = Address(new(grammarPath.Segments.Concat(component.Segments)), start, end - start, source.Address.SemanticRole,
+                enclosingString?.StartByte, enclosingString?.LengthBytes);
+            ObserveStorage(storage, path, interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay, address);
+        }
         void Selector(string selector, TypedPath path, SnbtSpan span)
         {
             var node = new TypedPath(grammarPath.Segments.Concat(path.Segments));
@@ -75,6 +97,10 @@ internal sealed partial class CommandTextReader
                 (enclosingString ?? span).StartByte, (enclosingString ?? span).LengthBytes, enclosingString is null ? null : path));
         }
     }
+    private static bool OtherComponentContent(Func<string, bool> hasField)
+        => hasField("text") || hasField("translate") || hasField("selector") || hasField("score") || hasField("keybind")
+            || hasField("entity") || hasField("block");
+
     private bool PotentialReferences(LogicalMinecraftValue value)
     {
         if (value is LogicalMinecraftList list) return list.Items.Any(PotentialReferences);

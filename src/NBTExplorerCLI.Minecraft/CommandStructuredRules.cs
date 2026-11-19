@@ -9,7 +9,7 @@ internal sealed partial class CommandTextReader
     {
         if (!identity.StartsWith("minecraft:", StringComparison.Ordinal)) { Unknown(path, start, end - start, "UnknownCommandNbtSchema"); return; }
         var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, block ? "block.data" : "entity.data", source.Address.Dimension, source.Address.Chunk);
-        var callback = ComponentCallback(path, start, true);
+        var callback = StoredComponentCallback(path, start, end);
         var result = block ? SnbtTextExtractor.BlockEntity(binding, source.Command[start..end], profile, limits, scope, identity, callback, commandTag: true)
             : SnbtTextExtractor.Entity(binding, source.Command[start..end], profile, limits, scope, identity, callback, commandTag: true);
         MergeComponent(result, path, start, end, true);

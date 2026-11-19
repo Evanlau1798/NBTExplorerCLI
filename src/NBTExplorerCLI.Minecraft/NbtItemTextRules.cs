@@ -92,7 +92,7 @@ internal sealed partial class NbtTextReader
             // Tagged vanilla spawn eggs use their registered entity when EntityTag omits id.
             const string vanilla = "minecraft:";
             const string suffix = "_spawn_egg";
-            var name = profile.Id is ("java-1.20.1" or "java-1.20.4") && id is not null && id.StartsWith(vanilla, StringComparison.Ordinal) && id.EndsWith(suffix, StringComparison.Ordinal)
+            var name = profile.Id is ("java-1.20.1" or "java-1.20.2" or "java-1.20.4") && id is not null && id.StartsWith(vanilla, StringComparison.Ordinal) && id.EndsWith(suffix, StringComparison.Ordinal)
                 ? id[vanilla.Length..^suffix.Length] : null;
             var fallback = id == "minecraft:painting" ? id
                 : name is not null && Java1204SpawnEggEntities.Contains(name) && (name != "breeze" || profile.Id == "java-1.20.4") ? vanilla + name : null;
