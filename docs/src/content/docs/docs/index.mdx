@@ -3,92 +3,20 @@ title: Documentation Overview
 description: Plain-language guide to inspecting, translating, and safely editing Minecraft Java Edition worlds with NBTExplorerCLI on Windows.
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
-import SafetyBanner from '../../../components/SafetyBanner.astro';
+import DocsHub from '../../../components/DocsHub.astro';
 
-**NBTExplorerCLI** (`nbtcli.exe`, version `1.0.0`) is a free, ready-to-run Windows command-line tool for **Minecraft Java Edition** worlds. You do not need to install .NET or Java separately — just download the ZIP from GitHub Releases, unzip it, and run commands in PowerShell.
+**NBTExplorerCLI** (`nbtcli.exe`, v1.0.0) is a ready-to-run Windows command-line tool for **Minecraft Java Edition** saves. Unzip the release, open PowerShell, and inspect worlds, translate adventure maps, or build resource packs — no extra .NET or Java install needed.
 
-Whether you want to peek inside a save file, translate an entire adventure map into another language, package a resource pack, or let an AI assistant help you edit a world safely, this documentation walks you through every step in plain language.
+<DocsHub lang="en" />
 
-<SafetyBanner tier="safe" lang="en" />
+:::note[Two Ground Rules Before Modifying Any Save]
+Always test on a **copy** of your world (such as `D:\WorldCopy`) and **close Minecraft** before running `apply` or `--apply`. Read-only and preview commands never touch your world folder.
+:::
 
-## Who Is This Tool For?
+<details>
+<summary>Reading Command Output (JSON) & Switching UI Language</summary>
 
-<CardGrid>
-  <Card title="Great For">
-    - **Adventure Map Translators & Players**: Automatically collect text from signs, books, items, entities, scoreboards, bossbars, command blocks, and datapacks into clean pages — translate by hand or with AI.
-    - **Mapmakers & Server Admins**: Check or update `level.dat`, region chunks (`.mca`), entities, and datapacks while Minecraft is closed, with built-in previews and automatic backups.
-    - **AI Assistants & PowerShell Scripts**: Every command outputs clean JSON, making it easy for Claude, ChatGPT, Codex, Cursor, or your own scripts to inspect and translate worlds accurately.
-  </Card>
-  <Card title="Not Built For">
-    - **Editing While Minecraft Is Running**: Always close Minecraft (and other map tools) before applying changes so your save never gets corrupted.
-    - **3D Visual Block Building**: This is a text-based command-line tool, not a 3D map viewer.
-    - **Minecraft Bedrock Edition Saves**: Only **Minecraft Java Edition** worlds are supported. Run `nbtcli capabilities` to check exact version support.
-  </Card>
-</CardGrid>
-
-## Safety Labels Used Across This Guide
-
-Every page and command shows one of three color-coded labels so you always know if an action can touch your Minecraft save:
-
-| Safety Label | What Happens to Your World Folder |
-| --- | --- |
-| **Read Only** | Only reads data or checks status. Your world folder is never modified. |
-| **Preview Only** | Creates a reviewable plan file or saves translation progress in a separate folder outside your world. Your world folder stays untouched. |
-| **Modifies World** | Writes changes into your world folder. Always test on a copy first, close Minecraft, and pass `--world-offline`. |
-
-## Where Should I Start?
-
-Pick the guide that matches what you want to do right now:
-
-<CardGrid>
-  <Card title="1. Install & First Run">
-    Download the ZIP, unzip it, open PowerShell in that folder, make a safe copy of your Minecraft world, and run your first read-only checks.
-
-    [Start here ->](./getting-started/)
-  </Card>
-  <Card title="2. Common Tasks (Recipes)">
-    Want to rename a world, see all map text, translate a map, or make a backup right away? Follow short copy-paste recipes for everyday goals.
-
-    [Browse recipes ->](./recipes/)
-  </Card>
-  <Card title="3. FAQ & Plain-Language Glossary">
-    New to PowerShell or terms like NBT, `level.dat`, JSON Pointer, or Patch Plan? Every common question and technical word is explained simply here.
-
-    [Read FAQ & Glossary ->](./faq/)
-  </Card>
-  <Card title="4. Map Translation Guide">
-    Translate a full adventure map step by step: start a translation project, export pages, fill in translations, and apply them cleanly to your map.
-
-    [Read Map Translation Guide ->](./translation-workflow/)
-  </Card>
-  <Card title="5. Resource Packs & Language Files">
-    Choose between writing translations directly into your map, using translation keys, or exporting a standalone `.zip` client resource pack.
-
-    [Read Resource Packs Guide ->](./resources-and-packs/)
-  </Card>
-  <Card title="6. Editing Worlds & Crash Recovery">
-    Learn the two-step "Preview first, Apply second" editing flow, and what to do if a write is ever interrupted midway.
-
-    [Read Editing & Recovery ->](./safe-editing/)
-  </Card>
-  <Card title="7. Backups & Where Files Live">
-    Back up a world before experimenting, restore a whole map or one broken file, and see where temporary caches and backups are stored.
-
-    [Read Backups Guide ->](./backups-and-state/)
-  </Card>
-  <Card title="8. AI Agent Quickstart">
-    Using Claude, ChatGPT, Codex, or Cursor? Grab the ready-to-paste prompt and our high-density [`llms.txt`](../llms.txt) manual built specifically for AI agents.
-
-    [Open AI Agent Quickstart ->](./ai-agents/)
-  </Card>
-</CardGrid>
-
-Need to look up every flag or troubleshoot an error code? Jump to **[Command Reference](./command-reference/)** or **[Supported Versions & Troubleshooting](./support-and-troubleshooting/)**.
-
-## Reading Command Output in 10 Seconds
-
-Every command prints one clean block of JSON text. You only need to look at **three fields**:
+Every command prints one clean line of JSON with three key fields:
 
 ```json title="Example output"
 {
@@ -97,28 +25,28 @@ Every command prints one clean block of JSON text. You only need to look at **th
   "success": true,
   "command": "version",
   "outcome": "Success",
-  "data": {
-    "product": "nbtcli",
-    "version": "1.0.0"
-  },
+  "data": { "product": "nbtcli", "version": "1.0.0" },
   "error": null
 }
 ```
 
-1. **`success`**: `true` means it worked; `false` means something stopped it.
-2. **`data`**: The answer you asked for (for example, your world name, version number, or translation progress).
-3. **`error`**: When `success` is `false`, `error.message` explains in plain language what went wrong.
+- **`success`**: `true` means it worked; `false` means it stopped safely.
+- **`data`**: The value, summary, or plan metadata you requested.
+- **`error`**: When `success` is `false`, `error.message` explains what went wrong.
 
-### Switching Message Language (`--ui-locale`)
+Add `--ui-locale en-US` or `--ui-locale zh-TW` to switch help and error text language at any time (this never changes your world's translation languages).
 
-You can add `--ui-locale en-US` or `--ui-locale zh-TW` to any command to choose whether help and error messages appear in English or Traditional Chinese. This only changes tool messages — it never changes your Minecraft world language settings (`--source-language` / `--target-language`).
+</details>
 
-## License and Third-Party Notices
+<details>
+<summary>License & Third-Party Notices</summary>
 
-NBTExplorerCLI is licensed under the **MIT License** (`LICENSE`). Bundled third-party components keep their own licenses and notices:
+NBTExplorerCLI is released under the **MIT License** (`LICENSE`). Bundled third-party notices are included in the Windows release under `licenses/`:
 
 - **SharpZipLib** (`licenses/SharpZipLib.md`)
 - **Unicode Character Database** (`licenses/Unicode.md`)
-- **.NET Runtime Licenses and Third-Party Notices** (included in the Windows x64 download under `licenses/`)
+- **.NET Runtime Licenses and Third-Party Notices**
 
 Minecraft assets and user-created worlds belong to their respective owners.
+
+</details>

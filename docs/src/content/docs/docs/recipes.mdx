@@ -11,8 +11,6 @@ Know what you want to accomplish and just want the shortest clear steps? Pick a 
 
 ## Recipe 1: Check What Minecraft Version a Save Uses
 
-<SafetyBanner tier="safe" lang="en" />
-
 ```powershell title="PowerShell"
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 ```
@@ -66,8 +64,6 @@ For more editing examples and crash recovery steps, see **[Editing Worlds & Cras
 
 ## Recipe 3: See All Text Inside an Adventure Map
 
-<SafetyBanner tier="safe" lang="en" />
-
 Want to preview every sign, book, item name, dialogue line, and scoreboard title before translating?
 
 ```powershell title="PowerShell"
@@ -84,8 +80,6 @@ Open `D:\Exports\map-text.json` in Notepad or VS Code to browse all the text.
 ---
 
 ## Recipe 4: Translate an Adventure Map Into Another Language
-
-<SafetyBanner tier="preview" lang="en" />
 
 Here is the big-picture loop for translating an English map (`en_us`) into Traditional Chinese (`zh_tw`):
 
@@ -116,8 +110,6 @@ Read the full walkthrough in **[Map Translation Guide](../translation-workflow/)
 
 ## Recipe 5: Export a Client Resource Pack (`.zip`) Without Editing the Map
 
-<SafetyBanner tier="preview" lang="en" />
-
 Once your translation session has `pending: 0`, you can build a standalone `.zip` resource pack outside the world folder (replace `--pack-format 34` with the number matching your Minecraft version — see [Supported Versions](../support-and-troubleshooting/)):
 
 ```powershell title="PowerShell"
@@ -142,8 +134,6 @@ See **[Resource Packs & Language Files](../resources-and-packs/)** for merging i
 ---
 
 ## Recipe 6: Back Up a World and Restore It Later
-
-<SafetyBanner tier="safe" lang="en" />
 
 ```powershell title="PowerShell"
 # Create a backup outside your world folder
@@ -171,8 +161,6 @@ See **[Backups & Where Files Live](../backups-and-state/)** for full details.
 ---
 
 ## Recipe 7: Check If a Map Has Corrupted Files or Bad Datapack JSON
-
-<SafetyBanner tier="safe" lang="en" />
 
 ```powershell title="PowerShell"
 # Fast structure check

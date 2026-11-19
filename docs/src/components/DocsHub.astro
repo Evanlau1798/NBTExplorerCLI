@@ -1,0 +1,128 @@
+---
+import type { LocaleKey } from '../data/cli-surface';
+
+interface Props {
+  lang?: LocaleKey;
+}
+
+const { lang = 'en' } = Astro.props;
+
+const hub =
+  lang === 'zh-tw'
+    ? {
+        primary: [
+          {
+            href: './getting-started/',
+            icon: 'start',
+            title: '一分鐘安裝與初次使用',
+            desc: '下載解壓縮、打開 PowerShell、安全複製世界副本，並完成第一次唯讀檢查。',
+          },
+          {
+            href: './translation-workflow/',
+            icon: 'translate',
+            title: '冒險地圖翻譯教學',
+            desc: '把告示牌、書本、道具與劇情對話整理成分頁，自己翻或搭配 AI 翻都不會破壞格式。',
+          },
+          {
+            href: './safe-editing/',
+            icon: 'shield',
+            title: '安全修改與中斷復原',
+            desc: '先預覽計畫、自動在世界外備份，離線寫入更安心，中斷也能一鍵回復。',
+          },
+          {
+            href: './ai-agents/',
+            icon: 'agent',
+            title: 'AI Agent 快速整合',
+            desc: '直接把單檔高密度 llms.txt 交給 Claude、ChatGPT、Codex 或 Cursor 自動操作。',
+          },
+        ],
+        quick: [
+          { href: './recipes/', label: '常見任務速查' },
+          { href: './resources-and-packs/', label: '資源包與語言檔' },
+          { href: './backups-and-state/', label: '備份與檔案位置' },
+          { href: './command-reference/', label: '完整命令參考' },
+          { href: './faq/', label: '常見問題與名詞詞典' },
+          { href: './support-and-troubleshooting/', label: '支援版本與疑難排解' },
+        ],
+      }
+    : {
+        primary: [
+          {
+            href: './getting-started/',
+            icon: 'start',
+            title: 'Install & First Run',
+            desc: 'Unzip on Windows, open PowerShell, copy a world safely, and run your first read-only checks.',
+          },
+          {
+            href: './translation-workflow/',
+            icon: 'translate',
+            title: 'Map Translation Guide',
+            desc: 'Collect signs, books, items, and dialogue into clean pages while preserving all formatting.',
+          },
+          {
+            href: './safe-editing/',
+            icon: 'shield',
+            title: 'Safe Edits & Recovery',
+            desc: 'Preview every change first, keep automatic external backups, and roll back cleanly anytime.',
+          },
+          {
+            href: './ai-agents/',
+            icon: 'agent',
+            title: 'AI Agent Quickstart',
+            desc: 'Hand our single-file llms.txt manual to Claude, ChatGPT, Codex, or Cursor to drive nbtcli.',
+          },
+        ],
+        quick: [
+          { href: './recipes/', label: 'Common Recipes' },
+          { href: './resources-and-packs/', label: 'Resource Packs' },
+          { href: './backups-and-state/', label: 'Backups & Files' },
+          { href: './command-reference/', label: 'Command Reference' },
+          { href: './faq/', label: 'FAQ & Glossary' },
+          { href: './support-and-troubleshooting/', label: 'Versions & Troubleshooting' },
+        ],
+      };
+---
+
+<div class="nbt-hub-grid not-content">
+  {hub.primary.map((item) => (
+    <a class="nbt-hub-card" href={item.href}>
+      <span class="nbt-hub-icon" aria-hidden="true">
+        {item.icon === 'start' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+            <path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        )}
+        {item.icon === 'translate' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+            <path d="M4 6h10M9 4v2m-3 0c0 4 2.5 7 6 8.5M12 6c-1 3.5-3.5 6.5-7 8.5M13 20l3.5-9 3.5 9M14.3 17h4.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        )}
+        {item.icon === 'shield' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+            <path d="M12 3 5 6v6c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9V6l-7-3Z" stroke-linejoin="round" />
+            <path d="m9.5 12 1.8 1.8 3.6-3.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        )}
+        {item.icon === 'agent' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+            <rect x="4" y="5" width="16" height="14" rx="3" />
+            <path d="m8.5 10 2.5 2-2.5 2M13 14h3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        )}
+      </span>
+      <span class="nbt-hub-title">
+        <span>{item.title}</span>
+        <svg class="nbt-hub-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </span>
+      <p class="nbt-hub-desc">{item.desc}</p>
+    </a>
+  ))}
+</div>
+
+<div class="nbt-quick-strip not-content">
+  {hub.quick.map((item) => (
+    <a class="nbt-quick-pill" href={item.href}>{item.label}</a>
+  ))}
+</div>
