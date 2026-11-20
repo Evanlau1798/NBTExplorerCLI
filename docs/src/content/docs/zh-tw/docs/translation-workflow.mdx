@@ -248,7 +248,7 @@ NBT 檔可以用 `--pointer` 選標籤，省略時會讀取根標籤。讀取區
 一般地圖翻譯不需要用到以下功能，但在翻譯超大型地圖時非常實用：
 
 - **只翻地圖的一部分**：在 `translate start` 加上 `--dimension`、`--region`、`--types`、`--path` 或 `--match-pattern`（例如 `--types Sign,Book` 只翻告示牌跟書本）。
-- **翻譯經典舊版地圖（1.2.5 / 1.5.2 / 1.6.4 / 1.8.1）**：在 `translate start` 加上 `--minecraft-version 1.8.1`（或 `1.2.5`、`1.5.2`、`1.6.4`）。純文字字數上限請看 **[支援版本與疑難排解](../support-and-troubleshooting/)**。
+- **翻譯經典地圖**時，在 `translate start` 指定遊戲版本，例如 `--minecraft-version 1.8.9`。可用版本與純文字字數上限見[支援版本與疑難排解](../support-and-troubleshooting/)。
 - **隨時查進度或看關聯文本**：
   - 查進度：`.\nbtcli.exe translate status 'D:\WorldCopy' --session-id <id>`
   - 查單筆文字：`.\nbtcli.exe translate get 'D:\WorldCopy' --session-id <id> --slot-id <slot-id>`

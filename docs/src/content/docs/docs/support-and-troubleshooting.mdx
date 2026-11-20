@@ -27,11 +27,11 @@ The namespaced world layout introduced in 26.1 Snapshot 6 has an open upper boun
 
 Later datapacks and resource packs can reuse the same readers when their metadata and content follow the existing format. If `create-pack` cannot infer the output format, specify a verified format with `--pack-format`.
 
-### Classic Older Anvil Worlds (`1.2.5`, `1.5.2`, `1.6.4`, `1.8.1`)
+### Classic Anvil Worlds
 
 Older Minecraft Java Edition Anvil saves (storage version `19133`, before Minecraft added `DataVersion`) do not store an exact version number inside `level.dat`:
 - **Read-only inspection** works automatically (`java-classic-anvil`).
-- **Translating or direct editing**: Tell `nbtcli` the exact game version using `--minecraft-version` on `scan`, `extract`, `validate`, or `translate start` — supported versions are **`1.2.5`**, **`1.5.2`**, **`1.6.4`**, and **`1.8.1`**:
+- **Translating or direct editing**. Tell `nbtcli` the game version using `--minecraft-version` on `scan`, `extract`, `validate`, or `translate start`. The supported releases are **`1.2.5`**, **`1.5.2`**, **`1.6.4`**, and **`1.8` through `1.8.9`**.
 
 ```powershell title="Example: start translating a Java 1.8.1 adventure map"
 .\nbtcli.exe translate start 'D:\ClassicWorldCopy' `
@@ -40,14 +40,14 @@ Older Minecraft Java Edition Anvil saves (storage version `19133`, before Minecr
   --target-language zh_tw
 ```
 
-The chosen version is automatically remembered by the translation session and its direct update plan.
+The translation session and its direct update plan record the format profile for the supplied release.
 
 <details>
-<summary>Important Limits for Classic Versions (1.2.5, 1.5.2, 1.6.4, 1.8.1) & Crafting Recipes</summary>
+<summary>Limits for Classic Versions and Crafting Recipes</summary>
 
 - **Java 1.2.5**: Supports direct edits to vanilla signs (plain text, up to 15 UTF-16 code units per line, no line breaks).
 - **Java 1.5.2 and 1.6.4**: Supports signs (15 UTF-16 code units/line, no line breaks), plain-text books (title up to 16, each page up to 256 code units), display fields, scoreboard display names (up to 32), team prefixes/suffixes (up to 16 each), and recognized command text arguments.
-- **Java 1.8.1**: Supports signs, books, display fields, and recognized command text arguments.
+- **Java 1.8 through 1.8.9** supports signs, books, display fields, and recognized command text arguments.
 - Keep entity names used as command selector identifiers unchanged, use `--types` if a bundled classic resource pack is outside your scope, and always test in the matching vanilla Minecraft version.
 - **Crafting Recipes**: For shaped and shapeless crafting recipes in datapacks, `scan` and `validate` report `InvalidRecipeResult` if the output item is missing, malformed, or air. Registry resolution, ingredients, and stack sizes are still verified by the matching Minecraft server.
 

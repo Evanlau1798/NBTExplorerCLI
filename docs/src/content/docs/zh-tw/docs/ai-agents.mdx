@@ -55,7 +55,7 @@ description: 專為 Claude、ChatGPT、Codex、Cursor 等 AI 助手準備的高�
 | `1` | `InternalFailure` | 檢查 `error.code`/`details`；切勿盲目重試寫入。 |
 | `2` | `InvalidArguments` | 透過 `<cmd> [<subcmd>] --help` 校正旗標。未動任何檔案。 |
 | `3` | `Conflict` | 建立計畫後世界或工作階段已變更，或重複 `operationId` 帶入不同內容。重新讀取／規劃，或開新工作階段後用 `translate memory` 沿用譯文。 |
-| `4` | `Unsupported` | 檢查 `capabilities`；改用 `--path`/`--dimension`/`--types` 縮小範圍，或對無 `DataVersion` 的舊 Anvil 世界傳入 `--minecraft-version`（`1.2.5`、`1.5.2`、`1.6.4`、`1.8.1`）。 |
+| `4` | `Unsupported` | 檢查 `capabilities`，以 `--path`/`--dimension`/`--types` 縮小範圍，或對經典 Anvil 世界傳入 `--minecraft-version`。 |
 | `5` | `IoOrValidation` | 檔案遺失、被鎖定或 NBT/JSON 損壞。確認 Minecraft 已關閉；執行 `validate` 定位損壞的相對路徑。 |
 | `6` | `ResourceLimit` | 超過 64 MiB、100,000 筆槽位／操作、256 層深度或 100 ms 正規表示式上限。縮小範圍或調降 `--page-size`/`--page-bytes`。 |
 | `7` | `RecoveryRequired` | 寫入途中中斷。**切勿開啟遊戲或發起新寫入**。先執行 `status --plan-hash <hash>`（或 `data.pendingPlanHash`），再執行 `recover`（退出 `0`）或 `recover --rollback`（退出 `8`）。 |

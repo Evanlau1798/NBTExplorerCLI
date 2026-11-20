@@ -27,11 +27,11 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
 
 後續資料包與資源包若沿用同一套中繼資料與內容格式，讀取時可沿用既有解析器。若 `create-pack` 無法推得輸出格式，請用 `--pack-format` 指定已驗證的格式。
 
-### 經典舊版 Anvil 存檔（`1.2.5`、`1.5.2`、`1.6.4`、`1.8.1`）
+### 經典 Anvil 存檔
 
 在 Minecraft 導入 `DataVersion` 之前的舊版 Anvil 存檔（儲存版本 `19133`）裡，檔案本身沒有標記確切的遊戲版本：
 - **純讀取查閱**會自動支援（`java-classic-anvil`）。
-- **翻譯或直接編輯**：在 `scan`、`extract`、`validate` 或 `translate start` 加上 `--minecraft-version` 告訴工具確切版本即可——支援 **`1.2.5`**、**`1.5.2`**、**`1.6.4`** 與 **`1.8.1`**：
+- **翻譯或直接編輯**時，在 `scan`、`extract`、`validate` 或 `translate start` 加上 `--minecraft-version` 指定遊戲版本。目前支援 **`1.2.5`**、**`1.5.2`**、**`1.6.4`** 與 **`1.8` 至 `1.8.9`**。
 
 ```powershell title="範例：開始翻譯 Java 1.8.1 的經典冒險地圖"
 .\nbtcli.exe translate start 'D:\ClassicWorldCopy' `
@@ -40,14 +40,14 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
   --target-language zh_tw
 ```
 
-選定版本後，翻譯進度與直接更新計畫會自動記住這個版本。
+翻譯工作階段及其直接更新計畫會記錄指定版本使用的格式設定。
 
 <details>
-<summary>經典舊版（1.2.5 / 1.5.2 / 1.6.4 / 1.8.1）字數限制與工作台配方檢查細節</summary>
+<summary>經典版本的字數限制與工作台配方檢查</summary>
 
 - **Java 1.2.5**：支援直接修改原版告示牌（純文字，每行最多 15 個 UTF-16 碼元，不可換行）。
 - **Java 1.5.2 與 1.6.4**：支援告示牌（每行最多 15 碼元、不可換行）、純文字書本（書名最多 16、每頁最多 256 碼元）、顯示欄位、計分板顯示名稱（最多 32）、隊伍前綴／後綴（各最多 16），以及可辨識的指令文字參數。
-- **Java 1.8.1**：支援告示牌、書本、顯示欄位與可辨識的指令文字參數。
+- **Java 1.8 至 1.8.9** 支援告示牌、書本、顯示欄位與可辨識的指令文字參數。
 - 若實體名稱被當作指令選擇器的識別值，請保留原名；舊式內附資源包若不在翻譯範圍內，可用 `--types` 排除。套用後請務必用對應版本的原版遊戲實際測試。
 - **工作台配方檢查**：對於資料包中的有序與無序工作台配方，若產物物品欄位缺漏、格式無效或設為空氣，`scan` 與 `validate` 會回報 `InvalidRecipeResult`。物品是否合法、材料與堆疊上限仍由對應版本的 Minecraft 伺服器驗證。
 

@@ -55,7 +55,7 @@ For the full exhaustive flag matrix, all 6 schema templates, classic Anvil limit
 | `1` | `InternalFailure` | Inspect `error.code`/`details`; stop before retrying writes. |
 | `2` | `InvalidArguments` | Check exact flags via `<cmd> [<subcmd>] --help`. Zero files touched. |
 | `3` | `Conflict` | Target world/session changed since preview/start, or `operationId` reused with different payload. Re-read & re-plan (or start new session + query `translate memory`). |
-| `4` | `Unsupported` | Check `capabilities`; scope with `--path`/`--dimension`/`--types`, or specify `--minecraft-version` (`1.2.5`, `1.5.2`, `1.6.4`, `1.8.1`) for versionless classic Anvil saves. |
+| `4` | `Unsupported` | Check `capabilities`, narrow the scope with `--path`/`--dimension`/`--types`, or specify `--minecraft-version` for classic Anvil saves. |
 | `5` | `IoOrValidation` | Missing/locked file or malformed NBT/JSON. Confirm Minecraft is closed; run `validate` to pinpoint failing relative paths. |
 | `6` | `ResourceLimit` | Exceeded 64 MiB output, 100k slots/ops, 256-segment depth, or 100 ms regex timeout. Narrow scope or lower `--page-size`/`--page-bytes`. |
 | `7` | `RecoveryRequired` | Interrupted write. Do **not** open Minecraft or start new writes. Run `status --plan-hash <hash>` (or `data.pendingPlanHash`), then `recover` (exit `0`) or `recover --rollback` (exit `8`). |

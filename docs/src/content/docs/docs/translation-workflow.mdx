@@ -248,7 +248,7 @@ The result contains the translated snippet in `data.content`. The CLI matches th
 You do not need any of these to finish a map translation, but they are handy on large projects:
 
 - **Translate only part of a map**: Add `--dimension`, `--region`, `--types`, `--path`, or `--match-pattern` to `translate start` (for example, `--types Sign,Book` to translate only signs and books).
-- **Old classic Minecraft maps (1.2.5 / 1.5.2 / 1.6.4 / 1.8.1)**: Pass `--minecraft-version 1.8.1` (or `1.2.5`, `1.5.2`, `1.6.4`) to `translate start`. See **[Supported Versions](../support-and-troubleshooting/)** for plain-text character limits.
+- **Classic Minecraft maps**. Pass the game's release to `translate start`, for example `--minecraft-version 1.8.9`. See [Supported Versions](../support-and-troubleshooting/) for accepted releases and plain-text character limits.
 - **Check progress or view related lines**:
   - Progress: `.\nbtcli.exe translate status 'D:\WorldCopy' --session-id <id>`
   - One specific slot: `.\nbtcli.exe translate get 'D:\WorldCopy' --session-id <id> --slot-id <slot-id>`

@@ -18,9 +18,22 @@ internal static class WorldMetadataTests
         new("world-metadata-early-anvil-terrain-text", "discovery", _ => EarlyAnvilTerrainText()),
         new("world-metadata-early-anvil-independent-text-transitions", "discovery", _ => EarlyAnvilTextTransitions()),
         new("world-metadata-versioned-map-banners", "discovery", _ => VersionedMapBanners()),
+        new("world-metadata-classic-18-release-family", "discovery", _ => ClassicReleaseFamily()),
         new("prepare-world-early-anvil-mixed-write-boundary", "preparation", _ => EarlyAnvilArtifactIsReadOnly()),
         new("world-metadata-missing-conflicting-unsafe", "discovery", _ => MissingConflictingAndUnsafeEvidence())
     ];
+
+    private static void ClassicReleaseFamily()
+    {
+        string[] stable = ["1.8", .. Enumerable.Range(1, 9).Select(patch => $"1.8.{patch}")];
+        Require(stable.All(version => MinecraftProfiles.ForClassicVersion(version) == MinecraftProfiles.Java181),
+            "all 1.8 releases use the same classic text and command profile");
+        Require(stable.All(MinecraftProfiles.ClassicGameVersions.Contains)
+            && MinecraftProfiles.ClassicVersion(MinecraftProfiles.Java181.Id) == "1.8.1",
+            "capabilities advertise the release family and existing plans retain their canonical profile");
+        Require(new[] { "1.8.0", "1.8.10", "1.8.01", "1.8-pre1", "1.8.9-pre1", " 1.8.9" }
+            .All(version => MinecraftProfiles.ForClassicVersion(version) is null), "similar but unverified version labels are rejected");
+    }
 
     private static void VersionedMapBanners()
     {

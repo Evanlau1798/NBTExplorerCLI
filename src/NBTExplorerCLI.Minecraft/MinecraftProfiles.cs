@@ -7,6 +7,7 @@ namespace NBTExplorerCLI.Minecraft;
 public static class MinecraftProfiles
 {
     private const int FunctionMacrosDataVersion = 3567;
+    private const int LastClassic18Patch = 9;
 
     public static CapabilityProfile? ForId(string id) => id switch
     {
@@ -94,8 +95,13 @@ public static class MinecraftProfiles
         ["1.6.4"] = Java164,
         ["1.8.1"] = Java181
     };
-    public static IEnumerable<string> ClassicGameVersions => ClassicProfiles.Keys;
-    public static CapabilityProfile? ForClassicVersion(string version) => ClassicProfiles.GetValueOrDefault(version);
+    public static IEnumerable<string> ClassicGameVersions => ClassicProfiles.Keys.Append("1.8")
+        .Concat(Enumerable.Range(2, LastClassic18Patch - 1).Select(patch => $"1.8.{patch}"));
+
+    public static CapabilityProfile? ForClassicVersion(string version)
+        => version == "1.8" || version.Length == 5 && version.StartsWith("1.8.", StringComparison.Ordinal)
+            && version[^1] >= '1' && version[^1] <= '0' + LastClassic18Patch
+            ? Java181 : ClassicProfiles.GetValueOrDefault(version);
     public static string? ClassicVersion(string profile) => ClassicProfiles.FirstOrDefault(pair => pair.Value.Id == profile).Key;
     public static bool IsVersionedClassic(CapabilityProfile? profile) => profile is not null && ClassicProfiles.ContainsValue(profile);
     public static bool UsesClassicPlainText(CapabilityProfile? profile) => profile == Java125 || profile == Java152 || profile == Java164;
