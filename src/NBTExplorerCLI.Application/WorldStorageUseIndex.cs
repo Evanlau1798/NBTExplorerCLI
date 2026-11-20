@@ -143,6 +143,8 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         var storage = GetStorage(access.Storage);
         switch (access.Use)
         {
+            case CommandStorageUse.Presence:
+                break;
             case CommandStorageUse.InterpretedDisplay when access.Path.EndsWith("[]", StringComparison.Ordinal) && PlainPath(access.Path[..^2]):
                 GetList(storage, access.Storage, access.Path[..^2]).Display = true;
                 break;
@@ -164,8 +166,9 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
                 }
                 break;
             default:
-                if (!PlainPath(access.Path)) storage.Ambiguous = true;
-                else if (storage.OtherPaths.Add(access.Path)) Charge(access.Path.Length);
+                var prefix = PlainAncestor(access.Path);
+                if (prefix.Length == 0) storage.Ambiguous = true;
+                else if (storage.OtherPaths.Add(prefix)) Charge(prefix.Length);
                 break;
         }
     }
@@ -259,8 +262,21 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
     private static TypedPath SeedPath(string id, string path)
         => new(new[] { "data", "contents", id }.Concat(path.Split('.')).Select(PathSegment.ForKey));
 
-    private static bool PlainPath(string path) => path.Split('.').All(segment => segment.Length > 0
-        && segment.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or ':' or '#'));
+    private static bool PlainPath(string path) => path.Length != 0 && PlainAncestor(path) == path;
+
+    private static string PlainAncestor(string path)
+    {
+        var segment = 0;
+        for (var index = 0; index < path.Length; index++)
+        {
+            var character = path[index];
+            if (char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or ':' or '#') continue;
+            if (index > segment && character == '.') { segment = index + 1; continue; }
+            if (index > segment && character is '[' or '{') return path[..index];
+            return segment == 0 ? "" : path[..(segment - 1)];
+        }
+        return segment == path.Length && segment > 0 ? path[..(segment - 1)] : path;
+    }
 
     private static bool RelatedPath(string path, ICollection<string> paths, string[] ordered)
     {

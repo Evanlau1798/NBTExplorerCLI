@@ -113,12 +113,13 @@ internal sealed partial class CommandTextReader
         return true;
     }
 
-    private void ObserveStorageOperand(List<CommandToken> tokens, int index, TypedPath path, int? pathIndex = null)
+    private void ObserveStorageOperand(List<CommandToken> tokens, int index, TypedPath path, int? pathIndex = null,
+        CommandStorageUse use = CommandStorageUse.Other)
     {
         if (storageAccess is null || tokens[index].Text != "storage") return;
         var id = tokens[index + 1];
         var member = pathIndex is { } field && field < tokens.Count ? tokens[field].Text : "";
-        ObserveStorage(id.Text, member, CommandStorageUse.Other, Address(path, id.Start, id.Text.Length, source.Address.SemanticRole));
+        ObserveStorage(id.Text, member, use, Address(path, id.Start, id.Text.Length, source.Address.SemanticRole));
     }
 
     private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address, bool hasUnclassifiedReferences = false, NbtType? listElementType = null)

@@ -137,7 +137,9 @@ internal sealed partial class CommandTextReader
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
                     if (dataPath >= 0 && dataPath < tokens.Count)
                     {
-                        ObserveStorageOperand(tokens, cursor + 1, path, dataPath);
+                        var use = runtimeDataVersion >= StorageDataVersion && tokens[dataPath].Text.Split('.').All(PlainControlToken)
+                            ? CommandStorageUse.Presence : CommandStorageUse.Other;
+                        ObserveStorageOperand(tokens, cursor + 1, path, dataPath, use);
                         if (StaticDataControlPath(tokens[cursor + 1].Text, tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
                     }
                 }

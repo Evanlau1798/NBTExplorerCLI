@@ -3,7 +3,7 @@ using NBTExplorerCLI.Formats;
 
 namespace NBTExplorerCLI.Minecraft;
 
-public enum CommandStorageUse { InterpretedDisplay, LiteralDisplay, ListElementWrite, Other, ListReplacement, ListCopy }
+public enum CommandStorageUse { InterpretedDisplay, LiteralDisplay, ListElementWrite, Other, ListReplacement, ListCopy, Presence }
 public sealed record CommandStorageAccess(string Storage, string Path, CommandStorageUse Use, SourceAddress Address, bool HasUnclassifiedReferences = false)
 {
     public NbtType? ListElementType { get; init; }

@@ -122,10 +122,23 @@ internal static class StorageAndDataTextTests
             var snapshot = WorldQueryTests.Query(root, cache);
             Require(snapshot.Manifest.CoverageComplete && Slots(snapshot).SequenceEqual(new[] { "First", "Second" }),
                 "a complete typed copy chain retains the original producer's text, including across sibling paths");
+            var blocked = new List<string>();
+            foreach (var control in new[] { "execute if data storage demo:messages staged run data modify storage demo:messages stats.count set value 7",
+                "data get storage demo:messages stats.items[0]", "data get storage demo:messages stats.items[{Slot:0b}].Count" })
+            {
+                Put(root, copy, Encoding.UTF8.GetBytes(commands + "\n" + control));
+                snapshot = WorldQueryTests.Query(root, cache);
+                if (!snapshot.Manifest.CoverageComplete || !Slots(snapshot).SequenceEqual(new[] { "First", "Second" })) blocked.Add(control);
+            }
+            Require(blocked.Count == 0, "presence checks and reads in separate subtrees must preserve the display proof: " + string.Join(", ", blocked));
             Put(root, copy, Encoding.UTF8.GetBytes(commands + "\ndata get storage demo:messages interim[0]"));
             snapshot = WorldQueryTests.Query(root, cache);
             Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(),
                 "an overlapping raw read of any intermediate must revoke the unchanged producer's inferred slots");
+            Put(root, copy, Encoding.UTF8.GetBytes(commands + "\ndata get storage demo:messages \"interim\"[0]"));
+            snapshot = WorldQueryTests.Query(root, cache);
+            Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(),
+                "a raw read without a provable plain ancestor must block storage inference");
             Put(root, copy, Encoding.UTF8.GetBytes(commands + "\ndata modify storage demo:messages unused set from storage demo:messages interim"));
             snapshot = WorldQueryTests.Query(root, cache);
             Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(),
@@ -356,15 +369,15 @@ internal static class StorageAndDataTextTests
             var uses = new List<CommandStorageAccess>();
             var rows = new WorldTextExtraction(new WorldInventory(world, World), new(SnapshotScope.All)).ReadSources(uses.Add).ToArray();
             var writer = uses.Single(use => use.Use == CommandStorageUse.ListElementWrite);
-            var other = uses.Single(use => use.Use == CommandStorageUse.Other);
+            var presence = uses.Single(use => use.Use == CommandStorageUse.Presence);
             var reader = uses.Single(use => use.Use == CommandStorageUse.InterpretedDisplay);
             var syntax = writer.Address.Syntax!;
-            var otherSyntax = other.Address.Syntax!;
+            var presenceSyntax = presence.Address.Syntax!;
             Require(writer.Storage == "minecraft:messages" && writer.Path == "lines" && writer.Address.Artifact.RelativePath == path
                 && Encoding.UTF8.GetString(bytes.AsSpan((int)syntax.StartByte, (int)syntax.LengthBytes)) == payload,
                 "a list write binds only its literal value and preserves the function address");
-            Require(other.Storage == "demo:state"
-                && Encoding.UTF8.GetString(bytes.AsSpan((int)otherSyntax.StartByte, (int)otherSyntax.LengthBytes)) == "demo:state"
+            Require(presence.Storage == "demo:state" && presence.Path == "ready"
+                && Encoding.UTF8.GetString(bytes.AsSpan((int)presenceSyntax.StartByte, (int)presenceSyntax.LengthBytes)) == "demo:state"
                 && rows.Single(row => row.Source.Location.Artifact.RelativePath == path).Outcome == SourceOutcome.Unsupported,
                 "an additional storage operand is observed without promoting incomplete reference coverage");
             Require(reader.Address.Artifact is { RelativePath: "datapacks/reader.zip", ContainerEntry: entry },
