@@ -40,6 +40,7 @@ internal static class StorageAndDataTextTests
         new("text-storage-native-seed-with-element-writes", "discovery", _ => StorageCommandProofTests.NativeSeedElementWrites()),
         new("text-storage-seed-runtime-component-schema", "discovery", _ => StorageCommandProofTests.NativeSeedRuntimeSchema()),
         new("command-copy-sign-text-source", "discovery", _ => CopySignTextSource()),
+        new("command-storage-structural-metadata-filters", "discovery", _ => StorageMetadataFilters()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
 
@@ -71,6 +72,31 @@ internal static class StorageAndDataTextTests
         Require(CommandTextExtractor.Extract(new(address, oldCopy), profile, runtimeDataVersion: 2205).Complete
             && !CommandTextExtractor.Extract(new(address, oldCopy), profile, runtimeDataVersion: 2204).Complete,
             "classic JSON sign fields are recognized once the runtime provides storage");
+    }
+
+    private static void StorageMetadataFilters()
+    {
+        var address = new SourceAddress(new(World, "filters.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var uses = new List<CommandStorageAccess>();
+        const string script = """
+            data remove storage demo:inventory items[{id:"minecraft:elytra",Slot:1b}]
+            execute if data storage demo:inventory items[{Slot:0b,id:"minecraft:stick"}] run tellraw @a[name=Guard] {"text":"Found"}
+            execute unless data storage demo:equipment attributes[{AttributeName:"minecraft:generic.armor"}] run tellraw @a {"text":"No armor"}
+            data modify storage demo:inventory items[{id:"minecraft:stick",Slot:0b}].Count set value 2b
+            """;
+        var result = CommandTextExtractor.Extract(new(address, script), profile, storageAccess: uses.Add);
+        Require(result.Complete && result.Text.Occurrences.Select(item => item.Text).SequenceEqual(new[] { "Found", "No armor" })
+            && result.References.Single().Name == "Guard", "storage metadata predicates preserve nested text and keep exact name references");
+        Require(uses.Count == 4 && uses.All(use => use.Use == CommandStorageUse.Other), "metadata predicates do not establish a display role");
+        foreach (var filter in new[] { """{id:"Not an id",Slot:1b}""", """{id:"minecraft:elytra",Slot:"head"}""",
+            """{id:"minecraft:elytra",Slot:1b,Name:"Visible"}""", """{AttributeName:"minecraft:generic.armor",Name:"Visible"}""",
+            """{id:"minecraft:elytra",id:"minecraft:stick"}""" })
+            Require(!CommandTextExtractor.Extract(new(address, "data remove storage demo:inventory items[" + filter + "]"), profile).Complete,
+                $"unproven metadata stays unresolved: {filter}");
+        const string command = """data remove storage demo:inventory items[{id:"minecraft:elytra",Slot:1b}]""";
+        Require(!CommandTextExtractor.Extract(new(address, command), profile, runtimeDataVersion: 2204).Complete,
+            "storage metadata is unavailable before the runtime supports storage");
     }
 
     private static void EntityUuidWidths()

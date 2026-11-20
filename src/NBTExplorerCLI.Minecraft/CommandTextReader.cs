@@ -131,7 +131,7 @@ internal sealed partial class CommandTextReader
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
                     if (dataPath >= 0 && dataPath < tokens.Count)
                     {
-                        ObserveStorageOperand(tokens, cursor + 1, path);
+                        ObserveStorageOperand(tokens, cursor + 1, path, dataPath);
                         if (StaticDataControlPath(tokens[cursor + 1].Text, tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
                     }
                 }
@@ -144,11 +144,11 @@ internal sealed partial class CommandTextReader
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
                     if (dataPath >= 0 && dataPath + 2 < tokens.Count)
                     {
-                        var staticPath = StaticDataPath(tokens[dataPath].Text);
+                        var staticPath = StaticDataPath(tokens[dataPath].Text, tokens[cursor + 1].Text == "storage");
                         if (tokens[dataPath + 1].Text is "byte" or "short" or "int" or "long" or "float" or "double"
                             && Decimal(tokens[dataPath + 2].Text, out _))
                         {
-                            ObserveStorageOperand(tokens, cursor + 1, path);
+                            ObserveStorageOperand(tokens, cursor + 1, path, dataPath);
                             if (staticPath) operands = dataPath + 3 - cursor;
                         }
                     }

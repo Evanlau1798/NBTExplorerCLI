@@ -129,9 +129,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         if (storage.Ambiguous) return;
         switch (access.Use)
         {
-            case CommandStorageUse.InterpretedDisplay when access.Path.EndsWith("[]", StringComparison.Ordinal)
-                && access.Path[..^2].Split('.').All(segment => segment.Length > 0
-                    && segment.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or ':' or '#')):
+            case CommandStorageUse.InterpretedDisplay when access.Path.EndsWith("[]", StringComparison.Ordinal) && PlainPath(access.Path[..^2]):
                 MatchPath(ref storage.DisplayPath, access.Path[..^2], storage);
                 break;
             case CommandStorageUse.ListElementWrite or CommandStorageUse.ListReplacement when access.Address.SemanticRole == "command.function":
@@ -143,7 +141,8 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
                 if (storage.Producers.Add(artifact)) Charge(artifact.Length);
                 break;
             default:
-                storage.Ambiguous = true;
+                if (!PlainPath(access.Path)) storage.Ambiguous = true;
+                else if (storage.OtherPaths.Add(access.Path)) Charge(access.Path.Length);
                 break;
         }
     }
@@ -160,8 +159,9 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             if (source.Location is { Role: WorldSourceRole.SavedData, Artifact: { Kind: ArtifactKind.Nbt, ContainerEntry: null } artifact }
                 && source.Chunk is null && WorldLayoutLocator.CommandStorageNamespace(metadata.Profile, artifact.RelativePath) is { } space)
                 saved.Add(space, source);
-        var matching = uses.Where(pair => !pair.Value.Ambiguous && pair.Value.DisplayPath is { Length: > 0 }
-            && (pair.Value.WritePath is null || pair.Value.WritePath == pair.Value.DisplayPath));
+        var matching = uses.Where(pair => !pair.Value.Ambiguous && pair.Value.DisplayPath is { Length: > 0 } display
+            && (pair.Value.WritePath is null || pair.Value.WritePath == display)
+            && pair.Value.OtherPaths.All(path => !Overlap(path, display)));
         foreach (var group in matching.GroupBy(pair => pair.Key[..pair.Key.IndexOf(':')], StringComparer.Ordinal))
         {
             NbtDocument? document = null;
@@ -220,6 +220,14 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
 
     private static TypedPath SeedPath(string id, string path)
         => new(new[] { "data", "contents", id }.Concat(path.Split('.')).Select(PathSegment.ForKey));
+
+    private static bool PlainPath(string path) => path.Split('.').All(segment => segment.Length > 0
+        && segment.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or ':' or '#'));
+
+    private static bool Overlap(string left, string right) => left == right || Parent(left, right) || Parent(right, left);
+
+    private static bool Parent(string possibleParent, string child) => child.Length > possibleParent.Length
+        && child[possibleParent.Length] == '.' && child.StartsWith(possibleParent, StringComparison.Ordinal);
 
     private static bool CompatibleWriters(CapabilityProfile runtime, StorageUses storage, NbtType seedType)
         => storage.ElementWrites.Count == 0 || MinecraftProfiles.SnbtGrammar(runtime) == SnbtProfile.Java1215
@@ -282,6 +290,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         internal string? WritePath;
         internal HashSet<NbtType> ElementWrites { get; } = [];
         internal HashSet<NbtType> ReplacementTypes { get; } = [];
+        internal HashSet<string> OtherPaths { get; } = new(StringComparer.Ordinal);
         internal bool Ambiguous;
         internal HashSet<string> Producers { get; } = new(StringComparer.Ordinal);
     }

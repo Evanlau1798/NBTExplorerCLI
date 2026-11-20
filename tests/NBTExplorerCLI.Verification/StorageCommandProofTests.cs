@@ -42,6 +42,13 @@ internal static class StorageCommandProofTests
             Require(display.Outcome == SourceOutcome.Success && display.Text!.Occurrences.Single().Text == "Welcome",
                 "a proven interpreted storage consumer identifies component text at its cross-file producer");
             Require(WriteSource("opaque").Text!.Occurrences.IsEmpty, "JSON syntax alone does not authorize edits to unrelated storage");
+            Put(root, Consumer, Encoding.UTF8.GetBytes(Reader + "\ndata modify storage demo:messages stats.count set value 7\ndata get storage demo:messages stats.count"));
+            Require(WriteSource("producer").Text!.Occurrences is [{ Text: "Welcome" }], "independent plain-key storage reads and writes cannot revoke the display role of a sibling field");
+            Put(root, Consumer, Encoding.UTF8.GetBytes(Reader + "\ndata get storage demo:messages lines[0]"));
+            Require(WriteSource("producer").Text!.Occurrences.IsEmpty, "a raw element read overlaps the interpreted list");
+            Put(root, Consumer, Encoding.UTF8.GetBytes(Reader + "\ndata get storage demo:messages"));
+            Require(WriteSource("producer").Text!.Occurrences.IsEmpty, "an unscoped storage read overlaps every child");
+            Put(root, Consumer, Encoding.UTF8.GetBytes(Reader));
             PutSeed(root, S("not a list"));
             Require(WriteSource("producer").Text!.Occurrences.IsEmpty, "an incompatible saved value invalidates the cached producer despite unchanged commands");
             PutSeed(root, new NbtList(NbtType.String, []));

@@ -42,12 +42,12 @@ internal sealed partial class CommandTextReader
         if (action == "get")
         {
             if (tokens.Count <= pathIndex + 1 || tokens.Count == pathIndex + 2 && Decimal(tokens[pathIndex + 1].Text, out _))
-                ObserveStorageOperand(tokens, target, path);
+                ObserveStorageOperand(tokens, target, path, pathIndex);
             return;
         }
         if (action is "remove" or "merge")
         {
-            if (tokens.Count == pathIndex + 1) ObserveStorageOperand(tokens, target, path);
+            if (tokens.Count == pathIndex + 1) ObserveStorageOperand(tokens, target, path, action == "remove" ? pathIndex : null);
             return;
         }
         if (action != "modify" || pathIndex + 3 >= tokens.Count) return;
@@ -66,11 +66,11 @@ internal sealed partial class CommandTextReader
             if (sourceEnd < 0 || tokens.Count > sourceEnd + (mode == "from" ? 1 : 3)) return;
             for (var offset = sourceEnd + 1; offset < tokens.Count; offset++)
                 if (!Integer(tokens[offset].Text, out _)) return;
-            ObserveStorageOperand(tokens, target, path);
-            ObserveStorageOperand(tokens, sourceTarget, path);
+            ObserveStorageOperand(tokens, target, path, pathIndex);
+            ObserveStorageOperand(tokens, sourceTarget, path, sourceEnd);
             return;
         }
-        if (mode == "value" && tokens.Count == sourceMode + 2) ObserveStorageOperand(tokens, target, path);
+        if (mode == "value" && tokens.Count == sourceMode + 2) ObserveStorageOperand(tokens, target, path, pathIndex);
     }
 
     private static (string Storage, string Path)? StorageDisplayWrite(List<CommandToken> tokens, int index)
@@ -89,11 +89,12 @@ internal sealed partial class CommandTextReader
         return true;
     }
 
-    private void ObserveStorageOperand(List<CommandToken> tokens, int index, TypedPath path)
+    private void ObserveStorageOperand(List<CommandToken> tokens, int index, TypedPath path, int? pathIndex = null)
     {
         if (storageAccess is null || tokens[index].Text != "storage") return;
         var id = tokens[index + 1];
-        ObserveStorage(id.Text, "", CommandStorageUse.Other, Address(path, id.Start, id.Text.Length, source.Address.SemanticRole));
+        var member = pathIndex is { } field && field < tokens.Count ? tokens[field].Text : "";
+        ObserveStorage(id.Text, member, CommandStorageUse.Other, Address(path, id.Start, id.Text.Length, source.Address.SemanticRole));
     }
 
     private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address, bool hasUnclassifiedReferences = false, NbtType? listElementType = null)

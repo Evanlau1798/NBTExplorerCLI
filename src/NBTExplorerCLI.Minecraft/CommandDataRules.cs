@@ -110,7 +110,7 @@ internal sealed partial class CommandTextReader
     {
         if (index + 2 >= tokens.Count || tokens[index + 1].Text != "modify") return false;
         var path = DataTargetEnd(tokens, index + 2);
-        if (path < 0 || path + 3 >= tokens.Count || !StaticDataPath(tokens[path].Text)) return false;
+        if (path < 0 || path + 3 >= tokens.Count || !StaticDataPath(tokens[path].Text, tokens[index + 2].Text == "storage")) return false;
         var value = path + 2;
         var operation = tokens[path + 1].Text;
         if (operation == "insert")
@@ -169,7 +169,7 @@ internal sealed partial class CommandTextReader
     {
         if (target == "entity" && path.StartsWith('{') && CompoundEnd(path, 0) == path.Length)
             return StaticNbtMatch.Entity(Snbt.ParseDocument(Utf8.GetBytes(path), MinecraftProfiles.SnbtGrammar(profile), limits).Root);
-        return StaticDataPath(path) || StaticItemSource(target, path);
+        return StaticDataPath(path, target == "storage") || StaticItemSource(target, path);
     }
     private static int DataTargetEnd(List<CommandToken> tokens, int target)
     {
@@ -198,7 +198,7 @@ internal sealed partial class CommandTextReader
         }
         return true;
     }
-    private bool StaticDataPath(string path)
+    private bool StaticDataPath(string path, bool storage)
     {
         var start = path.IndexOf('{');
         if (start < 0) return PlainDataPath(path);
@@ -213,7 +213,9 @@ internal sealed partial class CommandTextReader
             var end = CompoundEnd(path, start);
             if (end >= path.Length || path[end] != ']') return false;
             var root = Snbt.ParseDocument(Utf8.GetBytes(path[start..end]), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
-            if (root.Value is not LogicalMinecraftCompound || root.ContainsStringValues && !StaticItemTagPayload(path.AsSpan(0, start - 1), root, "filter")) return false;
+            if (root.Value is not LogicalMinecraftCompound || root.ContainsStringValues
+                && !StaticItemTagPayload(path.AsSpan(0, start - 1), root, "filter")
+                && !(storage && runtimeDataVersion >= StorageDataVersion && StaticNbtMatch.StorageMetadataFilter(root))) return false;
             structural.Append(path, copied, start - copied);
             copied = end;
             start = path.IndexOf('{', copied);

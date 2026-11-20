@@ -43,6 +43,11 @@ internal static class StaticNbtMatch
             _ => false
         });
 
+    internal static bool StorageMetadataFilter(SnbtNode root) => root.Value is LogicalMinecraftCompound
+        && (root.Children is [{ Selector.Key: "AttributeName" } attribute] && ResourceId(attribute.Node)
+            || root.Children.Length == 2 && root.Children.Any(field => field.Selector.Key == "id" && ResourceId(field.Node))
+            && root.Children.Any(field => field.Selector.Key == "Slot" && field.Node.Value is LogicalMinecraftLeaf { Value: NbtByte }));
+
     private static bool ResourceId(SnbtNode node) => node.Value is LogicalMinecraftLeaf { Value: NbtString id }
         && MinecraftIdentifier.ResourceLocation(id.Value);
 }
