@@ -20,6 +20,7 @@ internal static class StorageAndDataTextTests
         new("command-filtered-item-tag-data-controls", "discovery", _ => FilteredItemTagDataControls()),
         new("command-storage-item-tag-metadata", "discovery", _ => StorageVanillaItemTests.ItemTagMetadata()),
         new("command-storage-inventory-paths", "discovery", _ => StorageVanillaItemTests.InventoryPaths()),
+        new("command-storage-resource-backed-presentation", "discovery", _ => StorageVanillaItemTests.ResourceBackedPresentation()),
         new("command-storage-item-tag-trim-profile", "discovery", _ => StorageTrimRequiresProfile()),
         new("text-storage-item-tag-display-collision", "discovery", _ => StorageCommandProofTests.ItemMetadataIsNotDisplayText()),
         new("command-entity-uuid-widths", "discovery", _ => EntityUuidWidths()),

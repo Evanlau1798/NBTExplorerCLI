@@ -79,6 +79,31 @@ internal static class StorageVanillaItemTests
             Require(!Parse(command).Complete, $"unverified comparison, type, destination, or result remains unresolved: {command}");
     }
 
+    internal static void ResourceBackedPresentation()
+    {
+        const string resource = """data modify storage demo:labels catalog append value '{"translate":"enchantment.minecraft.sharpness","color":"gray","italic":false}'""";
+        const string level = """data modify storage demo:labels catalog prepend value '[{"translate":"enchantment.minecraft.mending"},{"text":" IV"}]'""";
+        foreach (var command in new[] { resource, level })
+        {
+            var uses = new List<CommandStorageAccess>();
+            var result = Parse(command, uses.Add);
+            Require(result.Complete && result.Text.Occurrences.IsEmpty
+                && uses.Single().Use == CommandStorageUse.ListElementWrite,
+                "known resource-backed text without free prose can stay unchanged and keeps its storage observation");
+        }
+
+        foreach (var command in new[]
+        {
+            """data modify storage demo:labels catalog append value '{"translate":"map.title","fallback":"Readable title"}'""",
+            """data modify storage demo:labels catalog append value '[{"translate":"map.title"},{"text":" Visible phrase"}]'""",
+            """data modify storage demo:labels catalog append value '{"translate":"map.title","with":[{"text":"Readable value"}]}'""",
+            """data modify storage demo:labels catalog append value '{"translate":"map.title","font":"demo:glyphs"}'""",
+            """data modify storage demo:labels catalog append value '{"translate":"map.title","clickEvent":{"action":"run_command","value":"/say Demo"}}'""",
+            "execute store success score $value demo run " + resource,
+        })
+            Require(!Parse(command).Complete, "prose, reference behaviors and result-observed writes still require use evidence");
+    }
+
     private static CommandExtractionResult Parse(string command, Action<CommandStorageAccess>? uses = null)
         => CommandTextExtractor.Extract(new(Address, command), MinecraftProfiles.ForDataVersion(TaggedItemVersion)!,
             storageAccess: uses, runtimeDataVersion: TaggedItemVersion);

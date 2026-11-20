@@ -1,5 +1,7 @@
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace NBTExplorerCLI.Minecraft;
 
@@ -213,6 +215,53 @@ internal sealed partial class CommandTextReader
     private bool JsonStorageRuntime() => runtimeDataVersion >= StorageDataVersion
         && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json"
         && (exactRuntimeDataVersion is not int version || MinecraftProfiles.ForDataVersion(version)?.Features[ProfileFacet.TextSchema].Schema == "java-text-json");
+
+    private bool ResourceStorageLabel(List<CommandToken> tokens, int index, SnbtNode? value)
+    {
+        if (!JsonStorageRuntime() || StorageDisplayWrite(tokens, index) is null || tokens[index + 5].Text == "set"
+            || tokens[^1].Text[0] is not ('\'' or '"')) return false;
+        value ??= Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+        if (value.Value is not LogicalMinecraftLeaf { Value: NbtString label }
+            || label.Value.AsSpan().TrimStart() is not ['{' or '[', ..]) return false;
+        try
+        {
+            using var document = BoundedJson.ReadDecoded(NativeJsonStrings.EncodeJavaDocument(label.Value, limits), limits);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object) return ResourceKey(root) is not null;
+            return root.ValueKind == JsonValueKind.Array && root.GetArrayLength() == 2
+                && ResourceKey(root[0]) is { } key && key.StartsWith("enchantment.", StringComparison.Ordinal)
+                && root[1].ValueKind == JsonValueKind.Object && root[1].EnumerateObject().Count() == 1
+                && root[1].TryGetNativeProperty("text", out var text) && text.ValueKind == JsonValueKind.String
+                && NativeJsonStrings.Read(text) is { Length: >= 2 and <= 16 } level
+                && level[0] == ' ' && RomanLevel.IsMatch(level.AsSpan(1));
+        }
+        catch (JsonException) { return false; }
+    }
+
+    private static readonly Regex RomanLevel = new(@"\AM{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})\z",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+
+    private static string? ResourceKey(JsonElement component)
+    {
+        if (component.ValueKind != JsonValueKind.Object || !component.TryGetNativeProperty("translate", out var value)
+            || value.ValueKind != JsonValueKind.String) return null;
+        var key = NativeJsonStrings.Read(value);
+        if (key.Length is < 1 or > 256 || !key.Contains('.') || !key.All(unit => char.IsAsciiLetterOrDigit(unit) || unit is '_' or '-' or '.' or ':'))
+            return null;
+        foreach (var field in component.EnumerateObject())
+        {
+            var supported = NativeJsonStrings.PropertyName(field) switch
+            {
+                "translate" => true,
+                "bold" or "italic" or "underlined" or "strikethrough" or "obfuscated" => field.Value.ValueKind is JsonValueKind.True or JsonValueKind.False,
+                "color" => field.Value.ValueKind == JsonValueKind.String && NativeJsonStrings.Read(field.Value) is { } color
+                    && (TeamOption("color", color) || color is ['#', _, _, _, _, _, _] && color.Skip(1).All(Uri.IsHexDigit)),
+                _ => false
+            };
+            if (!supported) return null;
+        }
+        return key;
+    }
 
     private Dictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? StorageGlyphs(SnbtNode value, bool storedList)
     {

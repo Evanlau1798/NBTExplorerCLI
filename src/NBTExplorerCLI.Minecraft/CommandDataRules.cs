@@ -59,6 +59,7 @@ internal sealed partial class CommandTextReader
             return;
         }
         if (StaticDataWrite(tokens, index, storageValue, resultObserved: resultObserved)) return;
+        if (!resultObserved && ResourceStorageLabel(tokens, index, storageValue)) return;
         if (tokens.Count >= index + 5 && tokens[index + 1].Text == "merge" && tokens[index + 2].Text == "entity")
         {
             if (tokens.Count != index + 5) throw new CommandSyntaxException();
