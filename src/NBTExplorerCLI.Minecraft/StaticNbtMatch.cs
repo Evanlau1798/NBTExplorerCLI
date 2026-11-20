@@ -48,6 +48,10 @@ internal static class StaticNbtMatch
             || root.Children.Length == 2 && root.Children.Any(field => field.Selector.Key == "id" && ResourceId(field.Node))
             && root.Children.Any(field => field.Selector.Key == "Slot" && field.Node.Value is LogicalMinecraftLeaf { Value: NbtByte }));
 
+    internal static bool ArmorTrim(SnbtNode root) => root.Value is LogicalMinecraftCompound && root.Children.Length == 2
+        && root.Children.Any(field => field.Selector.Key == "material" && ResourceId(field.Node))
+        && root.Children.Any(field => field.Selector.Key == "pattern" && ResourceId(field.Node));
+
     private static bool ResourceId(SnbtNode node) => node.Value is LogicalMinecraftLeaf { Value: NbtString id }
         && MinecraftIdentifier.ResourceLocation(id.Value);
 }

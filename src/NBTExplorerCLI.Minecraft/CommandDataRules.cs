@@ -8,6 +8,7 @@ namespace NBTExplorerCLI.Minecraft;
 internal sealed partial class CommandTextReader
 {
     private const int StorageDataVersion = 2205;
+    private const int VanillaArmorTrimDataVersion = 3442;
 
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
@@ -224,8 +225,13 @@ internal sealed partial class CommandTextReader
     }
     private bool StaticItemTagPayload(ReadOnlySpan<char> path, SnbtNode payload, string operation)
     {
+        var itemSchema = profile.Features[ProfileFacet.ItemSchema];
+        var taggedItems = itemSchema.Schema == "java-item-tags-1.20.4";
+        if (operation == "set")
+            return taggedItems && exactRuntimeDataVersion is int version && version >= VanillaArmorTrimDataVersion
+                && ItemTagPath(path, "tag.Trim", ".tag.Trim") && MinecraftProfiles.ForDataVersion(version)?.Features[ProfileFacet.ItemSchema] == itemSchema
+                && StaticNbtMatch.ArmorTrim(payload);
         if (operation is not ("append" or "prepend" or "insert" or "filter")) return false;
-        var taggedItems = profile.Features[ProfileFacet.ItemSchema].Schema == "java-item-tags-1.20.4";
         if ((taggedItems || operation == "filter")
             && (ItemTagPath(path, "tag.Enchantments", ".tag.Enchantments") || ItemTagPath(path, "tag.StoredEnchantments", ".tag.StoredEnchantments")))
             return StaticNbtMatch.Enchantment(payload);

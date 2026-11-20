@@ -22,6 +22,7 @@ internal sealed partial class CommandTextReader
     private readonly IReadOnlySet<(string Storage, string Path)>? storageDisplayLists;
     private readonly bool inspectNested;
     private readonly int runtimeDataVersion;
+    private readonly int? exactRuntimeDataVersion;
     private readonly Hash256 hash;
     private readonly int byteBase;
     private readonly string newline;
@@ -44,6 +45,7 @@ internal sealed partial class CommandTextReader
         this.storageDisplayLists = storageDisplayLists;
         this.inspectNested = inspectNested;
         this.runtimeDataVersion = runtimeDataVersion ?? MinecraftProfiles.EarliestDataVersion(profile);
+        exactRuntimeDataVersion = runtimeDataVersion;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
         byteBase = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 } ? 3 : 0;
@@ -214,7 +216,7 @@ internal sealed partial class CommandTextReader
     {
         var address = pending.Address;
         var nested = new CommandCandidate(new(address.Artifact, address.NodePath, address.SemanticRole, address.Dimension, address.Chunk), pending.Command);
-        var parsed = new CommandTextReader(nested, profile, limits, SnapshotScope.All, null, null, null, inspectNested: false, runtimeDataVersion: runtimeDataVersion).Read();
+        var parsed = new CommandTextReader(nested, profile, limits, SnapshotScope.All, null, null, null, inspectNested: false, runtimeDataVersion: exactRuntimeDataVersion).Read();
         return parsed.Complete && parsed.Text.Occurrences.IsEmpty && parsed.Text.TranslationKeys.IsEmpty && parsed.References.IsEmpty;
     }
     private SourceAddress BindComponent(SourceAddress address, TypedPath grammarPath, int start, bool syntaxResult, Dictionary<TypedPath, SnbtSpan>? spans)

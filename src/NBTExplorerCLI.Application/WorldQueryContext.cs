@@ -35,7 +35,7 @@ internal sealed class WorldQueryContext
         var policy = Hash256.Compute(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { limits = Extraction.Limits, request.Scan.MaximumSources, Execution.InFlightBytes,
             storageRules = policyRules, runtimeDataVersion = Extraction.Discovery.Metadata?.DataVersion })));
         var layout = Extraction.LayoutProfile?.Id;
-        var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-3" : "world-text-command-43";
+        var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-3" : "world-text-command-44";
         var baseline = new InterpretationVersions("nbt-snbt-json-zip-1", MinecraftProfiles.IsVersionedClassic(Extraction.LayoutProfile) ? layout! : "minecraft-known-5", extractor, "scan-2." + policy.Hex);
         static IEnumerable<CacheSourceBinding> Bindings(IEnumerable<DiscoveredSource> sources) => sources.Select(source => new CacheSourceBinding(source.Location, source.Chunk, source.PackMetadataHash));
         Versions = baseline with { Policy = baseline.Policy + "." + ScanCacheJson.BindingHash(layout, Bindings(Groups.Values.SelectMany(group => group))).Hex };

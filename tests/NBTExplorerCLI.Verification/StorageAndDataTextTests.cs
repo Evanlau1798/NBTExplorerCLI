@@ -227,6 +227,18 @@ internal static class StorageAndDataTextTests
             var result = CommandTextExtractor.Extract(new(address, command), profile);
             Require(!result.Complete && result.Text.Diagnostics.Single().Code == "UnknownDataTextSchema", "an earlier command profile cannot infer the later trim schema");
         }
+        var tagged = MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, 13, new(13, 0), new(13, 0)))!;
+        foreach (var (version, expected) in new[] { (3441, false), (3442, true), (3465, true), (3818, true), (3819, false) })
+        {
+            var uses = new List<CommandStorageAccess>();
+            var result = CommandTextExtractor.Extract(new(address, command), tagged, storageAccess: uses.Add, runtimeDataVersion: version);
+            Require(result.Complete == expected && result.Text.Occurrences.IsEmpty
+                && uses is [{ Use: CommandStorageUse.Other, Path: "stack.tag.Trim" }],
+                $"runtime {version} must distinguish the standard tagged item trim without inferring a storage display use");
+        }
+        foreach (var value in new[] { "{material:'minecraft:lapis'}", "{material:'minecraft:lapis',pattern:'minecraft:silence',note:'Display text'}" })
+            Require(!CommandTextExtractor.Extract(new(address, command[..command.IndexOf('{')] + value), tagged, runtimeDataVersion: 3442).Complete,
+                "missing required IDs or unrelated string fields remain unresolved");
     }
 
     private static TypedPath StoragePath(params string[] keys) => new(new[] { "data", "contents" }.Concat(keys).Select(PathSegment.ForKey));
