@@ -8,7 +8,7 @@ using NBTExplorerCLI.Minecraft;
 namespace NBTExplorerCLI.Application;
 
 internal sealed record StorageDisplayPolicy(ImmutableHashSet<(string Storage, string Path)> Lists, ImmutableDictionary<string, Hash256> SourceKeys,
-    bool CanBindWrites, ImmutableHashSet<SourceAddress> InterpretedReferences, ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> SeedRules)
+    bool CanBindWrites, ImmutableHashSet<ExtractionDiagnostic> ResolvedDiagnostics, ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> SeedRules)
 {
     internal static StorageDisplayPolicy Empty { get; } = new([], ImmutableDictionary<string, Hash256>.Empty, false, [],
         ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>>.Empty);
@@ -17,7 +17,7 @@ internal sealed record StorageDisplayPolicy(ImmutableHashSet<(string Storage, st
         || address.SemanticRole == "command_storage.component.interpreted"
         || address.SemanticRole.StartsWith("command_storage.component.interpreted.", StringComparison.Ordinal);
     internal static bool TargetsStorage(IEnumerable<PatchOperation> operations) => operations.Any(operation => operation.Targets.Any(Target));
-    internal bool Covers(ExtractionDiagnostic diagnostic) => diagnostic.Code == "DynamicComponentReference" && InterpretedReferences.Contains(diagnostic.Address);
+    internal bool Covers(ExtractionDiagnostic diagnostic) => ResolvedDiagnostics.Contains(diagnostic);
 
     internal bool ProjectedCoverage(IEnumerable<TextSourceExtraction> rows) => rows.All(row => row.Outcome is SourceOutcome.Success or SourceOutcome.Irrelevant
         || row.Outcome == SourceOutcome.Unsupported && row.Text is { Diagnostics.IsEmpty: false, Unclassified.IsEmpty: true } text
@@ -36,13 +36,15 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             return StorageDisplayPolicy.Empty;
         var index = new WorldStorageUseIndex(extraction.Limits);
         var observed = new Dictionary<StorageCommandNode, CommandStorageAccess>();
+        var copies = new Dictionary<SourceAddress, CommandStorageAccess>();
         var required = new HashSet<(string Storage, string Path)>();
-        var interpretedReferences = ImmutableHashSet.CreateBuilder<SourceAddress>();
+        var resolvedDiagnostics = ImmutableHashSet.CreateBuilder<ExtractionDiagnostic>();
         var pendingSeeds = new HashSet<string>(StringComparer.Ordinal);
         var covered = true;
         foreach (var row in extraction.ReadStorageObservations(access =>
         {
             index.Observe(access);
+            if (covered && access.Use == CommandStorageUse.ListCopy) copies.TryAdd(access.Address, access);
             var use = access.Use == CommandStorageUse.ListReplacement ? CommandStorageUse.ListElementWrite : access.Use;
             if (covered && !access.HasUnclassifiedReferences && access.Address.Syntax?.NodePath is { } syntax
                 && (use == CommandStorageUse.ListElementWrite
@@ -63,14 +65,19 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
                     if (pendingSeeds.Add(artifact.RelativePath)) index.Charge(artifact.RelativePath.Length);
                 }
                 else covered = text is { Diagnostics.IsEmpty: false, Unclassified.IsEmpty: true }
-                    && text.Diagnostics.All(diagnostic => index.MatchUse(diagnostic, observed, required, interpretedReferences));
+                    && text.Diagnostics.All(diagnostic => index.MatchUse(diagnostic, observed, copies, required, resolvedDiagnostics));
             }
             observed.Clear();
+            copies.Clear();
         }
-        var seedRules = ImmutableDictionary.CreateBuilder<ArtifactAddress, ImmutableArray<StorageTextRule>>();
-        var lists = index.ReadCompatibleLists(inventory, extraction, seedRules).ToImmutableHashSet();
+        var compatible = index.ReadCompatibleLists(inventory, extraction).ToDictionary(candidate => candidate.List);
+        var authorized = ClosedDisplayLists(compatible);
+        var lists = authorized.Select(list => (list.Storage, list.Path)).ToImmutableHashSet();
         if (lists.IsEmpty) return StorageDisplayPolicy.Empty;
-        var producers = lists.SelectMany(list => index.uses[list.Storage].Producers.Select(artifact => (Artifact: artifact, List: list)))
+        var seedRules = authorized.Select(list => compatible[list]).Where(candidate => candidate.Rule is not null)
+            .GroupBy(candidate => candidate.Artifact!)
+            .ToImmutableDictionary(group => group.Key, group => group.Select(candidate => candidate.Rule!).ToImmutableArray());
+        var producers = authorized.SelectMany(list => list.Producers.Select(artifact => (Artifact: artifact, List: list)))
             .GroupBy(item => item.Artifact, StringComparer.Ordinal)
             .ToImmutableDictionary(group => group.Key, group => Hash256.Compute(Encoding.UTF8.GetBytes(string.Join('\n', group
                 .OrderBy(item => item.List.Storage, StringComparer.Ordinal).ThenBy(item => item.List.Path, StringComparer.Ordinal)
@@ -78,19 +85,27 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         producers = producers.SetItems(seedRules.Select(pair => new KeyValuePair<string, Hash256>(pair.Key.RelativePath,
             Hash256.Compute(Encoding.UTF8.GetBytes(string.Concat(pair.Value.Select(rule => SourceIdentity.Occurrence(
                 new SourceAddress(pair.Key, rule.Path, "policy.storage.interpreted")).Digest.Hex).Order(StringComparer.Ordinal)))))));
-        var preview = new StorageDisplayPolicy(lists, producers, false, [], seedRules.ToImmutable());
+        var preview = new StorageDisplayPolicy(lists, producers, false, [], seedRules);
         if (!covered || !required.IsSubsetOf(lists)) return preview;
-        var policy = preview with { CanBindWrites = true, InterpretedReferences = interpretedReferences.ToImmutable() };
+        var policy = preview with { CanBindWrites = true, ResolvedDiagnostics = resolvedDiagnostics.ToImmutable() };
         if (!policy.ProjectedCoverage(extraction.ReadStorageProjection(policy, pendingSeeds))) return preview;
-        var consumerKeys = policy.InterpretedReferences.GroupBy(address => address.Artifact.RelativePath, StringComparer.Ordinal)
+        var consumerKeys = policy.ResolvedDiagnostics.Select(diagnostic => diagnostic.Address).GroupBy(address => address.Artifact.RelativePath, StringComparer.Ordinal)
             .Select(group => new KeyValuePair<string, Hash256>(group.Key, Hash256.Compute(Encoding.UTF8.GetBytes(
                 (producers.GetValueOrDefault(group.Key)?.Hex ?? "") + string.Concat(group.Select(address => SourceIdentity.Occurrence(address).Digest.Hex).Order(StringComparer.Ordinal))))));
         return policy with { SourceKeys = producers.SetItems(consumerKeys) };
     }
 
-    private bool MatchUse(ExtractionDiagnostic diagnostic, Dictionary<StorageCommandNode, CommandStorageAccess> observed, HashSet<(string Storage, string Path)> required,
-        ImmutableHashSet<SourceAddress>.Builder interpretedReferences)
+    private bool MatchUse(ExtractionDiagnostic diagnostic, Dictionary<StorageCommandNode, CommandStorageAccess> observed,
+        Dictionary<SourceAddress, CommandStorageAccess> copies, HashSet<(string Storage, string Path)> required,
+        ImmutableHashSet<ExtractionDiagnostic>.Builder resolvedDiagnostics)
     {
+        if (diagnostic.Code == "UnknownDataTextSchema" && copies.TryGetValue(diagnostic.Address, out var copy) && copy.CopySource is { } from)
+        {
+            Require(from);
+            Require((copy.Storage, copy.Path));
+            Resolve();
+            return true;
+        }
         var use = diagnostic.Code switch
         {
             "UnknownDataTextSchema" => CommandStorageUse.ListElementWrite,
@@ -102,9 +117,14 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             || !observed.TryGetValue(new(use, address.Artifact, address.Chunk, address.NodePath, syntax), out var access)) return false;
         var reader = use == CommandStorageUse.InterpretedDisplay;
         var requiredPath = reader ? access.Path[..^2] : access.Path;
-        if (required.Add((access.Storage, requiredPath))) Charge(access.Storage.Length + requiredPath.Length);
-        if (reader && interpretedReferences.Add(address)) Charge(address.Artifact.RelativePath.Length);
+        Require((access.Storage, requiredPath));
+        if (reader) Resolve();
         return true;
+
+        void Require((string Storage, string Path) target)
+        { if (required.Add(target)) Charge(target.Storage.Length + target.Path.Length); }
+        void Resolve()
+        { if (resolvedDiagnostics.Add(diagnostic)) Charge(diagnostic.Address.Artifact.RelativePath.Length); }
     }
 
     internal static bool HasOpaqueStorage(ReadOnlySpan<byte> json)
@@ -120,25 +140,28 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
 
     internal void Observe(CommandStorageAccess access)
     {
-        if (!uses.TryGetValue(access.Storage, out var storage))
-        {
-            Charge(access.Storage.Length);
-            storage = new();
-            uses.Add(access.Storage, storage);
-        }
-        if (storage.Ambiguous) return;
+        var storage = GetStorage(access.Storage);
         switch (access.Use)
         {
             case CommandStorageUse.InterpretedDisplay when access.Path.EndsWith("[]", StringComparison.Ordinal) && PlainPath(access.Path[..^2]):
-                MatchPath(ref storage.DisplayPath, access.Path[..^2], storage);
+                GetList(storage, access.Storage, access.Path[..^2]).Display = true;
                 break;
             case CommandStorageUse.ListElementWrite or CommandStorageUse.ListReplacement when access.Address.SemanticRole == "command.function":
-                MatchPath(ref storage.WritePath, access.Path, storage);
+                var list = GetList(storage, access.Storage, access.Path);
                 if (access.ListElementType is not { } type) storage.Ambiguous = true;
-                else if (access.Use == CommandStorageUse.ListElementWrite) storage.ElementWrites.Add(type);
-                else if (type != NbtType.End) storage.ReplacementTypes.Add(type);
+                else if (access.Use == CommandStorageUse.ListElementWrite) list.ElementWrites.Add(type);
+                else if (type != NbtType.End) list.ReplacementTypes.Add(type);
                 var artifact = access.Address.Artifact.RelativePath;
-                if (storage.Producers.Add(artifact)) Charge(artifact.Length);
+                if (list.Producers.Add(artifact)) Charge(artifact.Length);
+                break;
+            case CommandStorageUse.ListCopy when access.CopySource is { } source:
+                var from = GetList(GetStorage(source.Storage), source.Storage, source.Path);
+                var to = GetList(storage, access.Storage, access.Path);
+                if (from.Outgoing.Add(to))
+                {
+                    Charge(0);
+                    to.Incoming.Add(from);
+                }
                 break;
             default:
                 if (!PlainPath(access.Path)) storage.Ambiguous = true;
@@ -147,8 +170,21 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         }
     }
 
-    private IEnumerable<(string Storage, string Path)> ReadCompatibleLists(IWorldInventory inventory, WorldTextExtraction extraction,
-        ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>>.Builder seedRules)
+    private StorageUses GetStorage(string id)
+    {
+        if (uses.TryGetValue(id, out var storage)) return storage;
+        Charge(id.Length);
+        return uses[id] = new();
+    }
+
+    private ListUses GetList(StorageUses storage, string id, string path)
+    {
+        if (storage.Paths.TryGetValue(path, out var list)) return list;
+        Charge(path.Length);
+        return storage.Paths[path] = new(id, path);
+    }
+
+    private IEnumerable<ListCandidate> ReadCompatibleLists(IWorldInventory inventory, WorldTextExtraction extraction)
     {
         var discovery = extraction.Discovery;
         if (!CompleteScope(discovery) || discovery.Metadata is not { } metadata) yield break;
@@ -159,9 +195,8 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             if (source.Location is { Role: WorldSourceRole.SavedData, Artifact: { Kind: ArtifactKind.Nbt, ContainerEntry: null } artifact }
                 && source.Chunk is null && WorldLayoutLocator.CommandStorageNamespace(metadata.Profile, artifact.RelativePath) is { } space)
                 saved.Add(space, source);
-        var matching = uses.Where(pair => !pair.Value.Ambiguous && pair.Value.DisplayPath is { Length: > 0 } display
-            && (pair.Value.WritePath is null || pair.Value.WritePath == display)
-            && pair.Value.OtherPaths.All(path => !Overlap(path, display)));
+        var matching = uses.Where(pair => !pair.Value.Ambiguous
+            && pair.Value.Paths.Values.Any(path => path.Display || path.Copies));
         foreach (var group in matching.GroupBy(pair => pair.Key[..pair.Key.IndexOf(':')], StringComparer.Ordinal))
         {
             NbtDocument? document = null;
@@ -172,32 +207,35 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
                 if (Hash256.Compute(bytes) != source.ContentHash) throw new ArtifactConflictException("Saved storage changed during analysis");
                 document = WorldArtifactEdits.ReadNbt(bytes, limits).Document;
             }
-            var found = new List<(string Storage, string Path)>();
-            var rules = ImmutableArray.CreateBuilder<StorageTextRule>();
+            var found = new List<ListCandidate>();
             foreach (var (id, storage) in group)
             {
-                var path = storage.DisplayPath!;
                 var localId = id[(group.Key.Length + 1)..];
-                var node = SeedPath(localId, path);
-                var seed = document is null ? null : NbtLocator.Resolve(document.Root, node);
-                var type = seed?.Value is NbtList existing ? existing.ElementType : NbtType.End;
-                if (!CompatibleWriters(metadata.Profile, storage, type)) continue;
-                if (seed is null or { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }
-                    or { Status: ResolutionStatus.Found, Value: NbtList { Items.IsEmpty: true } })
+                var rawPaths = storage.OtherPaths.Order(StringComparer.Ordinal).ToArray();
+                var listPaths = storage.Paths.Keys.Order(StringComparer.Ordinal).ToArray();
+                foreach (var (path, list) in storage.Paths)
                 {
-                    if (storage.WritePath is not null) yield return (id, path);
-                }
-                else if (seed is { Status: ResolutionStatus.Found, Value: NbtList list } && source is not null
-                    && !extraction.StorageRules.ContainsKey(source.Location.Artifact) && CanInterpretSeed(source, document!, node, list, metadata.Profile))
-                {
-                    Charge(localId.Length + path.Length);
-                    rules.Add(new(node, StorageTextKind.InterpretedList));
-                    found.Add((id, path));
+                    if ((!list.Display && !list.Copies) || storage.OtherPaths.Contains(path)
+                        || RelatedPath(path, storage.OtherPaths, rawPaths) || RelatedPath(path, storage.Paths.Keys, listPaths)) continue;
+                    var node = SeedPath(localId, path);
+                    var seed = document is null ? null : NbtLocator.Resolve(document.Root, node);
+                    var type = seed?.Value is NbtList existing ? existing.ElementType : NbtType.End;
+                    if (!CompatibleWriters(metadata.Profile, list, type)) continue;
+                    if (seed is null or { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }
+                        or { Status: ResolutionStatus.Found, Value: NbtList { Items.IsEmpty: true } })
+                    {
+                        yield return new(list);
+                    }
+                    else if (seed is { Status: ResolutionStatus.Found, Value: NbtList existingList } && source is not null
+                        && !extraction.StorageRules.ContainsKey(source.Location.Artifact) && CanInterpretSeed(source, document!, node, existingList, metadata.Profile))
+                    {
+                        Charge(localId.Length + path.Length);
+                        found.Add(new(list, source.Location.Artifact, new(node, StorageTextKind.InterpretedList)));
+                    }
                 }
             }
-            if (rules.Count is 0 or > 256) continue;
-            seedRules.Add(source!.Location.Artifact, rules.ToImmutable());
-            foreach (var list in found) yield return list;
+            if (found.Count <= 256)
+                foreach (var list in found) yield return list;
         }
     }
 
@@ -224,15 +262,53 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
     private static bool PlainPath(string path) => path.Split('.').All(segment => segment.Length > 0
         && segment.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or ':' or '#'));
 
-    private static bool Overlap(string left, string right) => left == right || Parent(left, right) || Parent(right, left);
+    private static bool RelatedPath(string path, ICollection<string> paths, string[] ordered)
+    {
+        for (var dot = path.IndexOf('.'); dot >= 0; dot = path.IndexOf('.', dot + 1))
+            if (paths.Contains(path[..dot])) return true;
+        var prefix = path + ".";
+        var index = Array.BinarySearch(ordered, prefix, StringComparer.Ordinal);
+        index = index < 0 ? ~index : index;
+        return index < ordered.Length && ordered[index].StartsWith(prefix, StringComparison.Ordinal);
+    }
 
-    private static bool Parent(string possibleParent, string child) => child.Length > possibleParent.Length
-        && child[possibleParent.Length] == '.' && child.StartsWith(possibleParent, StringComparison.Ordinal);
+    private static bool CompatibleWriters(CapabilityProfile runtime, ListUses list, NbtType seedType)
+    {
+        if (list.Copies)
+            return runtime.Features[ProfileFacet.TextSchema].Schema == "java-text-json" && seedType is NbtType.End or NbtType.String
+                && list.ElementWrites.All(type => type == NbtType.String) && list.ReplacementTypes.All(type => type == NbtType.String);
+        return list.ElementWrites.Count == 0 || MinecraftProfiles.SnbtGrammar(runtime) == SnbtProfile.Java1215
+            || list.ElementWrites.Count == 1 && (seedType == NbtType.End || list.ElementWrites.Contains(seedType))
+            && list.ReplacementTypes.All(list.ElementWrites.Contains);
+    }
 
-    private static bool CompatibleWriters(CapabilityProfile runtime, StorageUses storage, NbtType seedType)
-        => storage.ElementWrites.Count == 0 || MinecraftProfiles.SnbtGrammar(runtime) == SnbtProfile.Java1215
-            || storage.ElementWrites.Count == 1 && (seedType == NbtType.End || storage.ElementWrites.Contains(seedType))
-            && storage.ReplacementTypes.All(storage.ElementWrites.Contains);
+    private static IEnumerable<ListUses> ClosedDisplayLists(Dictionary<ListUses, ListCandidate> compatible)
+    {
+        var visible = new HashSet<ListUses>();
+        var pending = new Queue<ListUses>(compatible.Keys.Where(list => list.Display));
+        while (pending.TryDequeue(out var list))
+        {
+            if (!compatible.ContainsKey(list) || !visible.Add(list)) continue;
+            foreach (var source in list.Incoming) pending.Enqueue(source);
+        }
+
+        var visited = new HashSet<ListUses>();
+        foreach (var start in visible)
+        {
+            if (!visited.Add(start)) continue;
+            var connected = new List<ListUses> { start };
+            for (var index = 0; index < connected.Count; index++)
+            {
+                foreach (var neighbor in connected[index].Incoming)
+                    if (visited.Add(neighbor)) connected.Add(neighbor);
+                foreach (var neighbor in connected[index].Outgoing)
+                    if (visited.Add(neighbor)) connected.Add(neighbor);
+            }
+            if (!connected.All(visible.Contains)
+                || !connected.Any(list => list.Producers.Count != 0 || compatible[list].Rule is not null)) continue;
+            foreach (var list in connected) yield return list;
+        }
+    }
 
     private bool CanInterpretSeed(DiscoveredSource source, NbtDocument document, TypedPath path, NbtList list, CapabilityProfile runtime)
     {
@@ -272,12 +348,6 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         catch (CodecException error) when (error.Code != CodecError.LimitExceeded) { return false; }
     }
 
-    private void MatchPath(ref string? current, string candidate, StorageUses storage)
-    {
-        if (current is null) { Charge(candidate.Length); current = candidate; }
-        else if (current != candidate) storage.Ambiguous = true;
-    }
-
     private void Charge(int characters)
     {
         retained = checked(retained + 256L + 2L * characters);
@@ -286,14 +356,24 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
 
     private sealed class StorageUses
     {
-        internal string? DisplayPath;
-        internal string? WritePath;
-        internal HashSet<NbtType> ElementWrites { get; } = [];
-        internal HashSet<NbtType> ReplacementTypes { get; } = [];
+        internal Dictionary<string, ListUses> Paths { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> OtherPaths { get; } = new(StringComparer.Ordinal);
         internal bool Ambiguous;
-        internal HashSet<string> Producers { get; } = new(StringComparer.Ordinal);
     }
 
+    private sealed class ListUses(string storage, string path)
+    {
+        internal string Storage { get; } = storage;
+        internal string Path { get; } = path;
+        internal bool Display;
+        internal bool Copies => Incoming.Count != 0 || Outgoing.Count != 0;
+        internal HashSet<NbtType> ElementWrites { get; } = [];
+        internal HashSet<NbtType> ReplacementTypes { get; } = [];
+        internal HashSet<string> Producers { get; } = new(StringComparer.Ordinal);
+        internal HashSet<ListUses> Incoming { get; } = [];
+        internal HashSet<ListUses> Outgoing { get; } = [];
+    }
+
+    private sealed record ListCandidate(ListUses List, ArtifactAddress? Artifact = null, StorageTextRule? Rule = null);
     private sealed record StorageCommandNode(CommandStorageUse Use, ArtifactAddress Artifact, ChunkPosition? Chunk, TypedPath CommandRoot, TypedPath Syntax);
 }

@@ -23,7 +23,7 @@ internal sealed partial class CommandTextReader
         };
     }
 
-    private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, (string Storage, string Path)? storageElement, SnbtNode? storageValue)
+    private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, int end, (string Storage, string Path)? storageElement, SnbtNode? storageValue)
     {
         if (storageElement is { } list)
         {
@@ -66,11 +66,35 @@ internal sealed partial class CommandTextReader
             if (sourceEnd < 0 || tokens.Count > sourceEnd + (mode == "from" ? 1 : 3)) return;
             for (var offset = sourceEnd + 1; offset < tokens.Count; offset++)
                 if (!Integer(tokens[offset].Text, out _)) return;
+            if (mode == "from" && ObserveStorageListCopy(tokens, index, path, end, pathIndex, sourceEnd, operation)) return;
             ObserveStorageOperand(tokens, target, path, pathIndex);
             ObserveStorageOperand(tokens, sourceTarget, path, sourceEnd);
             return;
         }
         if (mode == "value" && tokens.Count == sourceMode + 2) ObserveStorageOperand(tokens, target, path, pathIndex);
+    }
+
+    private bool ObserveStorageListCopy(List<CommandToken> tokens, int index, TypedPath path, int end, int targetPath, int sourcePath, string operation)
+    {
+        // Keep execute wrappers unresolved until their use of the mutation's result is known.
+        if (index != 0 || source.Address.SemanticRole != "command.function" || runtimeDataVersion < StorageDataVersion
+            || profile.Features[ProfileFacet.TextSchema].Schema != "java-text-json" || tokens.Count != sourcePath + 1
+            || tokens[2].Text != "storage" || tokens[sourcePath - 2].Text != "storage") return false;
+        var fromPath = tokens[sourcePath].Text;
+        if (operation != "set")
+        {
+            if (operation is not ("append" or "prepend") || !fromPath.EndsWith("[]", StringComparison.Ordinal)) return false;
+            fromPath = fromPath[..^2];
+        }
+        var toPath = tokens[targetPath].Text;
+        if (!fromPath.Split('.').All(PlainControlToken) || !toPath.Split('.').All(PlainControlToken)) return false;
+        var from = (MinecraftIdentifier.DefaultNamespace(tokens[sourcePath - 1].Text), fromPath);
+        var to = (MinecraftIdentifier.DefaultNamespace(tokens[3].Text), toPath);
+        if (from == to) return false;
+        var address = Address(path, tokens[0].Start, end - tokens[0].Start, source.Address.SemanticRole);
+        Charge(address, from.Item1 + fromPath + to.Item1 + toPath);
+        storageAccess!.Invoke(new(to.Item1, toPath, CommandStorageUse.ListCopy, address) { CopySource = from });
+        return true;
     }
 
     private static (string Storage, string Path)? StorageDisplayWrite(List<CommandToken> tokens, int index)

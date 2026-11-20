@@ -14,7 +14,7 @@ internal sealed partial class CommandTextReader
         var storageElement = storageAccess is not null || storageDisplayLists is { Count: > 0 } ? StorageDisplayWrite(tokens, index) : null;
         var storageValue = storageElement is null ? null : Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
         var staticListWrite = storageValue is not null && StaticDataWrite(tokens, index, storageValue, keepEmptyListReset: true);
-        if (storageAccess is not null) ObserveDataStorage(tokens, index, path, staticListWrite ? null : storageElement, storageValue);
+        if (storageAccess is not null) ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue);
         if (staticListWrite || ReadStorageDisplayWrite(tokens, index, path, storageElement)) return;
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;

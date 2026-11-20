@@ -41,6 +41,7 @@ internal static class StorageAndDataTextTests
         new("text-storage-seed-runtime-component-schema", "discovery", _ => StorageCommandProofTests.NativeSeedRuntimeSchema()),
         new("command-copy-sign-text-source", "discovery", _ => CopySignTextSource()),
         new("command-storage-structural-metadata-filters", "discovery", _ => StorageMetadataFilters()),
+        new("text-storage-component-list-copy-chain", "discovery", _ => ComponentListCopyChain()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
 
@@ -97,6 +98,46 @@ internal static class StorageAndDataTextTests
         const string command = """data remove storage demo:inventory items[{id:"minecraft:elytra",Slot:1b}]""";
         Require(!CommandTextExtractor.Extract(new(address, command), profile, runtimeDataVersion: 2204).Complete,
             "storage metadata is unavailable before the runtime supports storage");
+    }
+
+    private static void ComponentListCopyChain()
+    {
+        var root = ScratchDirectory.CreateChild();
+        var cache = ScratchDirectory.CreateChild();
+        const string folder = "datapacks/p/data/demo/functions/";
+        const string producer = folder + "producer.mcfunction";
+        const string copy = folder + "copy.mcfunction";
+        const string reader = folder + "reader.mcfunction";
+        const string commands = """
+            data modify storage demo:messages interim set from storage demo:messages staged
+            data modify storage demo:messages lines append from storage demo:messages interim[]
+            """;
+        try
+        {
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            Put(root, "datapacks/p/pack.mcmeta", """{"pack":{"pack_format":15,"description":"Storage commands"}}"""u8.ToArray());
+            Put(root, producer, """data modify storage demo:messages staged set value ['{"text":"First"}','{"text":"Second"}']"""u8.ToArray());
+            Put(root, copy, Encoding.UTF8.GetBytes(commands));
+            Put(root, reader, """tellraw @a {"storage":"demo:messages","nbt":"lines[]","interpret":true}"""u8.ToArray());
+            var snapshot = WorldQueryTests.Query(root, cache);
+            Require(snapshot.Manifest.CoverageComplete && Slots(snapshot).SequenceEqual(new[] { "First", "Second" }),
+                "a complete typed copy chain retains the original producer's text, including across sibling paths");
+            Put(root, copy, Encoding.UTF8.GetBytes(commands + "\ndata get storage demo:messages interim[0]"));
+            snapshot = WorldQueryTests.Query(root, cache);
+            Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(),
+                "an overlapping raw read of any intermediate must revoke the unchanged producer's inferred slots");
+            Put(root, copy, Encoding.UTF8.GetBytes(commands + "\ndata modify storage demo:messages unused set from storage demo:messages interim"));
+            snapshot = WorldQueryTests.Query(root, cache);
+            Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(),
+                "copying to a path with undetermined uses cannot authorize interpreting the original producer");
+            Put(root, copy, Encoding.UTF8.GetBytes("execute store success score #saved demo run " + commands));
+            snapshot = WorldQueryTests.Query(root, cache);
+            Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(),
+                "copying with an observed command result must remain unresolved");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+        static IEnumerable<string> Slots(WorldQuerySnapshot snapshot)
+            => snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == producer).Text!.Occurrences.Select(item => item.Text);
     }
 
     private static void EntityUuidWidths()
@@ -265,8 +306,9 @@ internal static class StorageAndDataTextTests
             data modify storage demo:extra_target value set from storage demo:extra_src path trailing
             data remove storage demo:missing_path
             """), MinecraftProfiles.ForDataVersion(3465)!, storageAccess: operands.Add);
-        Require(operands.All(item => item.Use == CommandStorageUse.Other)
-            && operands.Select(item => item.Storage).SequenceEqual(new[] { "demo:target", "demo:source", "demo:count", "demo:raw", "demo:root_copy", "demo:entire_source" }),
+        Require(operands[0] is { Use: CommandStorageUse.ListCopy, Storage: "demo:target", Path: "lines", CopySource: ("demo:source", "lines") }
+            && operands.Skip(1).All(item => item.Use == CommandStorageUse.Other)
+            && operands.Skip(1).Select(item => item.Storage).SequenceEqual(new[] { "demo:count", "demo:raw", "demo:root_copy", "demo:entire_source" }),
             "storage observations only use grammar operand positions and never arbitrary command message words");
         const string macroCall = """
             function demo:show with storage demo:root_arguments
