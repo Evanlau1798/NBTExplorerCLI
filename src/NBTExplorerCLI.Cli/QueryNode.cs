@@ -15,6 +15,10 @@ internal sealed class QueryNode
     internal QueryNode(JsonElement value) => Json = value;
     internal string Type => Nbt?.Type.ToString() ?? Json!.Value.ValueKind.ToString();
     internal bool Array => Nbt is NbtList or NbtByteArray or NbtIntArray or NbtLongArray || Json?.ValueKind == JsonValueKind.Array;
+    internal bool HasUnprovenFont => Nbt is NbtCompound compound
+        ? compound.Entries.Any(entry => entry.Name == "font" && entry.Value is not NbtString { Value: "minecraft:default" })
+        : Json is { ValueKind: JsonValueKind.Object } json && json.TryGetNativeProperty("font", out var font)
+            && (font.ValueKind != JsonValueKind.String || NativeJsonStrings.Read(font) != "minecraft:default");
     internal QueryNode Child(PathSegment segment)
     {
         if (Nbt is not null)

@@ -50,7 +50,8 @@ internal static class CliProtocolTests
                 Require(zhError.RootElement.GetProperty(key).GetRawText() == enError.RootElement.GetProperty(key).GetRawText(), "error machine fields are locale independent");
             var z = zhError.RootElement.GetProperty("error"); var e = enError.RootElement.GetProperty("error");
             Require(z.GetProperty("code").GetString() == "UNKNOWN_OPTION" && z.GetProperty("code").GetRawText() == e.GetProperty("code").GetRawText()
-                && z.GetProperty("message").GetString() != e.GetProperty("message").GetString(), "each command reports localized errors with stable codes");
+                && z.GetProperty("message").GetString() == "Unknown option." && z.GetProperty("message").GetRawText() == e.GetProperty("message").GetRawText(),
+                "each command reports the same English error with or without the explicit English option");
             using var repeated = Invoke([.. prefix, "--help", "--help"], 2);
             Require(repeated.RootElement.GetProperty("error").GetProperty("code").GetString() == "INVALID_ARGUMENTS", "duplicate help fails before any command side effect");
         }
@@ -78,7 +79,7 @@ internal static class CliProtocolTests
                 string[] value = alias.GetProperty("kind").GetString() == "value" ? ["probe"] : [];
                 string[] arguments = [.. prefix, .. input, alias.GetProperty("alias").GetString()!, .. value];
                 object result;
-                try { result = parse.Invoke(null, [arguments, "zh-TW"])!; }
+                try { result = parse.Invoke(null, [arguments])!; }
                 catch (TargetInvocationException error) { throw new InvalidOperationException("Alias contract parse failed: " + string.Join(' ', arguments), error.InnerException); }
                 var options = (IReadOnlyDictionary<string, string?>)result.GetType().GetProperty("Options")!.GetValue(result)!;
                 Require(options.TryGetValue(option, out var accepted) && accepted == value.SingleOrDefault(), "documented scoped flag alias reaches its declared parser option");
@@ -130,7 +131,7 @@ internal static class CliProtocolTests
     public static void MissingMessageKeysHaveSafeLocalizedFallbacks()
     {
         var message = typeof(CliApplication).GetMethod("Message", BindingFlags.NonPublic | BindingFlags.Static)!;
-        Require((string)message.Invoke(null, ["FUTURE_CODE", "zh-TW"])! == "操作失敗。"
-            && (string)message.Invoke(null, ["FUTURE_CODE", "en-US"])! == "The operation failed.", "unknown machine codes retain a localized fallback rather than exposing a missing key");
+        Require((string)message.Invoke(null, ["FUTURE_CODE"])! == "The operation failed.",
+            "unknown machine codes retain a readable fallback");
     }
 }

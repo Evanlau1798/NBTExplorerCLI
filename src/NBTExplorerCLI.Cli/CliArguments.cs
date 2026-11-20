@@ -7,7 +7,7 @@ internal sealed class CliFailure(string code, string? details = null, object? da
     internal string Code { get; } = code;
     internal object? Result { get; } = data;
 }
-internal sealed record CliArguments(string Command, string? Input, IReadOnlyDictionary<string, string?> Options, string Locale, string? Subcommand = null)
+internal sealed record CliArguments(string Command, string? Input, IReadOnlyDictionary<string, string?> Options, string? Subcommand = null)
 {
     internal static readonly string[] Commands = ["help", "version", "get", "list", "search", "scan", "extract", "validate", "capabilities", "set", "batch", "plan", "apply", "recover", "status", "backup", "restore", "convert", "translate", "agent"];
     internal static string Canonical(string name) => name switch { "--help" or "-h" => "help", "--version" or "-v" => "version", _ => name };
@@ -33,9 +33,9 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         "help" or "version" or "capabilities" => ["help"],
         _ => throw new CliFailure("UNKNOWN_COMMAND")
     };
-    internal static string[] ExtractLocale(IReadOnlyList<string> args, out string locale, out string command)
+    internal static string[] StripUiLocale(IReadOnlyList<string> args, out string command)
     {
-        locale = "zh-TW"; var seen = false; var rest = new List<string>(); var positional = false; CliFailure? failure = null;
+        var seen = false; var rest = new List<string>(); var positional = false; CliFailure? failure = null;
         for (var index = 0; index < args.Count; index++)
         {
             var arg = args[index]; if (arg == "--") positional = true;
@@ -43,8 +43,8 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
             {
                 if (seen) failure ??= new("INVALID_ARGUMENTS", "Repeated --ui-locale"); seen = true;
                 var value = arg.Contains('=') ? arg[(arg.IndexOf('=') + 1)..] : ++index < args.Count ? args[index] : "";
-                var parsed = value.ToLowerInvariant() switch { "en-us" => "en-US", "zh-tw" => "zh-TW", _ => null };
-                if (parsed is null) failure ??= new("INVALID_ARGUMENTS", "Use --ui-locale zh-TW or en-US"); else locale = parsed;
+                if (!value.Equals("en-US", StringComparison.OrdinalIgnoreCase))
+                    failure ??= new("INVALID_ARGUMENTS", "Remove --ui-locale or use --ui-locale en-US");
             }
             else rest.Add(arg);
         }
@@ -52,7 +52,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         if (failure is not null) throw failure;
         return rest.ToArray();
     }
-    internal static CliArguments Parse(string[] args, string locale)
+    internal static CliArguments Parse(string[] args)
     {
         var command = Canonical(args.Length == 0 ? "help" : args[0]); string? subcommand = null;
         if (command is "translate" or "agent")
@@ -76,7 +76,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
                 else
                 {
                     value = separator >= 0 ? arg[(separator + 1)..] : ++index < args.Length && !args[index].StartsWith("--", StringComparison.Ordinal) ? args[index] : throw new CliFailure("INVALID_ARGUMENTS", "Missing option value");
-                    if (value.Length == 0 && name is not ("pointer" or "path")) throw new CliFailure("INVALID_ARGUMENTS", "Empty option value");
+                    if (value.Length == 0 && name is not ("pointer" or "path" or "text-pointer")) throw new CliFailure("INVALID_ARGUMENTS", "Empty option value");
                 }
                 if (!options.TryAdd(name, value)) throw new CliFailure("INVALID_ARGUMENTS", "Repeated option: " + name);
             }
@@ -84,7 +84,7 @@ internal sealed record CliArguments(string Command, string? Input, IReadOnlyDict
         }
         if (inputs.Count > 1 || command is "version" or "capabilities" && inputs.Count != 0 || command is not ("help" or "version" or "capabilities") && subcommand != "help" && inputs.Count == 0 && !options.ContainsKey("help")) throw new CliFailure("INVALID_ARGUMENTS", "Supply exactly one input path");
         if (options.ContainsKey("pointer") && options.ContainsKey("segments")) throw new CliFailure("INVALID_ARGUMENTS", "Choose one exact path format");
-        var result = new CliArguments(command, inputs.SingleOrDefault(), options, locale, subcommand);
+        var result = new CliArguments(command, inputs.SingleOrDefault(), options, subcommand);
         _ = result.Number("limit", 100, 1, 10_000); _ = result.Number("offset", 0, 0, 2_000_000);
         if (result.Get("compression") is { } codec && codec is not ("auto" or "raw" or "gzip" or "zlib")) throw new CliFailure("INVALID_ARGUMENTS", "Unknown compression");
         if (command == "search" && !options.ContainsKey("help") && !new[] { "query", "name", "type" }.Any(name => options.ContainsKey(name))) throw new CliFailure("INVALID_ARGUMENTS", "Search needs query, name or type");

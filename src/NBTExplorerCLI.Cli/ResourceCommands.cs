@@ -26,6 +26,13 @@ internal static class ResourceCommands
         if (session.Source.WorldId != source.Inventory.WorldId || session.Revision != revision
             || session.Slots.Any(slot => slot.State is not (SessionSlotState.Translated or SessionSlotState.Unchanged or SessionSlotState.Applied)))
             throw new CliFailure("CONFLICT", "Retain this session and inspect its world binding, revision and pending replies before exporting resources");
+        var originalLocale = Locale(request.Get("original-lang") ?? session.SourceLocale);
+        if (originalLocale == TranslationLanguages.Undetermined)
+            throw new CliFailure("INVALID_ARGUMENTS", "The original language is undetermined. Supply --original-lang <language>.");
+        var targetLocale = Locale(request.Get("target-lang") ?? session.TargetLocale);
+        if (targetLocale == TranslationLanguages.Undetermined)
+            throw new CliFailure("INVALID_ARGUMENTS", "The translated language is undetermined. Supply --target-lang <language>.");
+        if (originalLocale == targetLocale) throw new CliFailure("INVALID_ARGUMENTS", "Original and translated resource locales must be distinct");
         var pack = request.Subcommand == "create-pack";
         var metadata = pack && (!request.Flag("output") || !request.Flag("pack-format")) ? Metadata(source) : null;
         var outputRoot = Path.GetFullPath(request.Get("output") ?? (pack
@@ -43,8 +50,6 @@ internal static class ResourceCommands
             if (mergePath is not null && Directory.Exists(mergePath)) ScanCommands.OutsideWorld(mergePath, file);
             QueryExportFile.EnsureNew(file);
         }
-        var originalLocale = Locale(request.Get("original-lang") ?? session.SourceLocale); var targetLocale = Locale(request.Get("target-lang") ?? session.TargetLocale);
-        if (originalLocale == targetLocale) throw new CliFailure("INVALID_ARGUMENTS", "Original and translated resource locales must be distinct");
         var prefix = request.Get("prefix") ?? "map.";
         if (prefix.Length is < 1 or > 128 || !prefix.All(unit => char.IsAsciiLetterOrDigit(unit) || unit is '.' or '_' or '-')) throw new CliFailure("INVALID_ARGUMENTS", "Key prefix requires 1-128 ASCII resource characters");
         if (session.Slots.Length > 50_000) throw new CodecException(CodecError.LimitExceeded, 0, "Two-locale resource output exceeds the language entry budget");

@@ -21,7 +21,7 @@ internal static class CliTranslationContextTests
             using var exported = Success(Call(work, world, session, "export"));
             var data = exported.RootElement.GetProperty("data");
             var page = SessionExchangeJson.ReadPage(data.GetProperty("page").GetRawText());
-            Require(page.PolicyVersion == SessionPage.GlyphProtectionPolicy && data.GetProperty("prompt").GetString()!.Contains("私用字元", StringComparison.Ordinal),
+            Require(page.PolicyVersion == SessionPage.GlyphProtectionPolicy && data.GetProperty("prompt").GetString()!.Contains("private-use font glyphs", StringComparison.Ordinal),
                 "new world pages bind and explain glyph protection");
             var slot = page.Slots.Single(item => item.SourceText == Stat);
             var template = SessionExchangeJson.ReadReply(data.GetProperty("replyTemplate").GetRawText());

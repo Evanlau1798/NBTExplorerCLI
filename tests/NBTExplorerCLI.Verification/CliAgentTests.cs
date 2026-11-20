@@ -19,6 +19,38 @@ internal static class CliAgentTests
     }
     private static string FileInput(string work, string json)
     { var path = Path.Combine(work, "answers.json"); File.WriteAllText(path, json, new UTF8Encoding(false)); return path; }
+    public static void TranslationStartsWithoutLanguageOptionsOrAgentConfiguration()
+    {
+        var world = WorldQueryTests.CreateWorld(); var work = ScratchDirectory.CreateChild();
+        try
+        {
+            var id = Guid.NewGuid().ToString();
+            var state = Path.Combine(work, "state");
+            using var started = Success(Run(work, "translate", "start", world, "--session-id", id,
+                "--types", "McFunction", "--state-root", state));
+            using var page = Success(Run(work, "translate", "export", world, "--session-id", id, "--state-root", state));
+            var exchange = page.RootElement.GetProperty("data").GetProperty("page").GetProperty("data");
+            var target = exchange.GetProperty("targetLocale").GetString();
+            Require(!string.IsNullOrWhiteSpace(target) && target is not ("und" or "auto"),
+                "start without flags binds a concrete display language");
+            Require(exchange.GetProperty("sourceLocale").GetString() == "und", "ambiguous short source text remains undetermined");
+            Require(started.RootElement.GetProperty("data").GetProperty("targetLocale").GetString() == target,
+                "start reports the target retained by the session");
+            var reply = FileInput(work, page.RootElement.GetProperty("data").GetProperty("replyTemplate").GetRawText());
+            using var submitted = Success(Run(work, "translate", "submit", world, "--session-id", id, "--state-root", state, "--reply", reply));
+            var output = Directory.CreateDirectory(Path.Combine(work, "language")).FullName;
+            var resource = Run(work, "translate", "export-lang", world, "--session-id", id, "--state-root", state, "--revision", "1",
+                "--output", output, "--target-lang", "es-419");
+            Require(resource.Exit == 2 && resource.Output.Contains("--original-lang", StringComparison.Ordinal),
+                "language file export needs a concrete original locale when detection cannot identify the source");
+            using var explicitResource = Success(Run(work, "translate", "export-lang", world, "--session-id", id, "--state-root", state,
+                "--revision", "1", "--output", output, "--target-lang", "es-419", "--original-lang", "pt-BR"));
+            Require(Run(work, "translate", "export-lang", world, "--session-id", id, "--state-root", state,
+                "--revision", "1", "--output", output, "--target-lang", "und", "--original-lang", "pt-BR").Exit == 2,
+                "an undetermined value cannot name the translated resource");
+        }
+        finally { Directory.Delete(world, true); Directory.Delete(work, true); }
+    }
     public static void QuestionnaireSubmissionPersistsRawInputAndDefaultsWithoutStartingASession()
     {
         var world = WorldQueryTests.CreateWorld(); var work = ScratchDirectory.CreateChild();
@@ -37,11 +69,12 @@ internal static class CliAgentTests
             var retained = stored.RootElement.GetProperty("data").GetProperty("submissions")[0].GetProperty("inputBase64").GetString()!;
             Require(Convert.FromBase64String(retained).SequenceEqual(original), "accepted questionnaire bytes are retained independently of the caller's file");
             var id = Guid.NewGuid().ToString();
-            using var started = Success(Run(work, "translate", "start", world, "--session-id", id, "--types", "McFunction", "--state-root", Path.Combine(work, "state"), "--ui-locale", "zh-TW"));
+            using var started = Success(Run(work, "translate", "start", world, "--session-id", id, "--types", "McFunction", "--state-root", Path.Combine(work, "state")));
             using var page = Success(Run(work, "translate", "export", world, "--session-id", id, "--state-root", Path.Combine(work, "state")));
             var exchange = page.RootElement.GetProperty("data").GetProperty("page").GetProperty("data");
-            Require(exchange.GetProperty("sourceLocale").GetString() == "en_us" && exchange.GetProperty("targetLocale").GetString() == "ja_jp" && exchange.GetProperty("slots").GetArrayLength() == 2,
-                "new sessions use configured languages and preferred page size independently of UI locale");
+            var defaultTarget = exchange.GetProperty("targetLocale").GetString();
+            Require(exchange.GetProperty("sourceLocale").GetString() == "und" && !string.IsNullOrEmpty(defaultTarget) && exchange.GetProperty("slots").GetArrayLength() == 2,
+                "new sessions resolve languages independently of agent preferences while retaining the preferred page size");
             using var updatedSetup = Success(Call(work, world, "setup")); var updated = Answer(updatedSetup); updated["data"]!["configuration"]!["targetLanguage"] = "zh_cn";
             using var update = Success(Call(work, world, "submit", "--request", FileInput(work, updated.ToJsonString())));
             using var oldReplay = Success(Call(work, world, "submit", "--request", FileInput(work, raw)));
@@ -49,7 +82,7 @@ internal static class CliAgentTests
                 && oldReplay.RootElement.GetProperty("data").GetProperty("revision").GetInt64() == 1
                 && oldReplay.RootElement.GetProperty("data").GetProperty("configuration").GetProperty("targetLanguage").GetString() == "zh_cn", "historical replay returns its old receipt without reverting newer preferences");
             using var unchangedPage = Success(Run(work, "translate", "export", world, "--session-id", id, "--state-root", Path.Combine(work, "state")));
-            Require(unchangedPage.RootElement.GetProperty("data").GetProperty("page").GetProperty("data").GetProperty("targetLocale").GetString() == "ja_jp", "configuration updates do not rewrite existing sessions");
+            Require(unchangedPage.RootElement.GetProperty("data").GetProperty("page").GetProperty("data").GetProperty("targetLocale").GetString() == defaultTarget, "configuration updates do not rewrite existing sessions");
             var overrideId = Guid.NewGuid().ToString();
             using var overridden = Success(Run(work, "translate", "start", world, "--session-id", overrideId, "--types", "McFunction", "--source-language", "fr_fr", "--target-language", "ko_kr", "--page-size", "1", "--state-root", Path.Combine(work, "state")));
             using var overridePage = Success(Run(work, "translate", "export", world, "--session-id", overrideId, "--state-root", Path.Combine(work, "state")));
@@ -107,7 +140,7 @@ internal static class CliAgentTests
             using var english = Success(Call(work, world, "setup", "--ui-locale", "en-US", "--source-language", "en_us", "--target-language", "zh_tw"));
             var questionnaire = english.RootElement.GetProperty("data").GetProperty("questionnaire").GetProperty("data");
             Require(questionnaire.GetProperty("instructions")[0].GetString()!.StartsWith("Fill in", StringComparison.Ordinal)
-                && questionnaire.GetProperty("configuration").GetProperty("targetLanguage").GetString() == "zh_tw", "UI locale changes instructions while retaining the requested translation language");
+                && questionnaire.GetProperty("configuration").GetProperty("targetLanguage").GetString() == "zh_tw", "English instructions retain the requested translation language");
             Require(!Directory.Exists(Path.Combine(work, "state", "sessions")) && !Directory.Exists(Path.Combine(work, "state", "journals")), "agent management never stages or applies world edits");
         }
         finally { Directory.Delete(world, true); Directory.Delete(work, true); }

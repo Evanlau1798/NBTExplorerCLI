@@ -300,7 +300,11 @@ internal static class CliReadOnlyTests
             var missing = Path.Combine(root, "missing.dat"); var zh = Run(root, "get", missing); var en = Run(root, "--ui-locale", "en-US", "get", missing);
             using var z = JsonDocument.Parse(zh.Output); using var e = JsonDocument.Parse(en.Output);
             Require(zh.Exit != 0 && en.Exit == zh.Exit && z.RootElement.GetProperty("error").GetProperty("code").GetString() == "FILE_NOT_FOUND"
-                && e.RootElement.GetProperty("error").GetProperty("code").GetString() == "FILE_NOT_FOUND" && z.RootElement.GetProperty("error").GetProperty("message").GetString() != e.RootElement.GetProperty("error").GetProperty("message").GetString(), "UI locale changes messages without changing machine codes or exit classification");
+                && e.RootElement.GetProperty("error").GetProperty("code").GetString() == "FILE_NOT_FOUND"
+                && z.RootElement.GetProperty("error").GetProperty("message").GetString() == "File or directory not found."
+                && z.RootElement.GetProperty("error").GetProperty("message").GetRawText() == e.RootElement.GetProperty("error").GetProperty("message").GetRawText(),
+                "default and explicit English preserve the message and machine failure");
+            Require(Run(root, "get", missing, "--ui-locale", "zh-TW").Exit == 2, "other interface languages are rejected before reading the input");
             using var help = Success(Run(root, "help", "get"));
             Require(help.RootElement.GetProperty("data").GetProperty("options").EnumerateArray().Any(option => option.GetString() == "--segments"), "command help names the implemented exact-path option");
         }

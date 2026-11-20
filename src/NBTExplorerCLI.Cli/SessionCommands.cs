@@ -15,7 +15,7 @@ internal static class SessionCommands
     {
         if (action == "help") return ["help"];
         if (action == "fallback") return ["path", "pointer", "segments", "chunk", "dimension", "entry", "compression", "format", "line",
-            "byte-range", "snbt-profile", "reply", "output", "help"];
+            "byte-range", "snbt-profile", "text-pointer", "source-language", "target-language", "reply", "output", "help"];
         string[] options = action switch
         {
             "start" => ["source-language", "target-language", "operation-id", "page-size", "page-bytes", "match-pattern", "types", "path", "dimension", "region", "standalone", "no-group", "minecraft-version"],
@@ -41,26 +41,34 @@ internal static class SessionCommands
         {
             options = new ScanOptions(request); policy = new(request.Number("page-size", 30, 1, 100_000), request.Number("page-bytes", 65_536, 1024, 67_108_864),
                 GroupRelatedText: !request.Flag("no-group"));
-            sourceLanguage = request.Get("source-language"); targetLanguage = request.Get("target-language");
+            sourceLanguage = TranslationLanguages.SourceOption(request.Get("source-language")); targetLanguage = request.Get("target-language");
         }
         var context = new WriteContext(request.Input!, request);
         if (request.Subcommand == "start")
         {
-            var configuration = sourceLanguage is null || targetLanguage is null || !request.Flag("page-size") ? AgentCommands.Configuration(context) : null;
-            sourceLanguage ??= configuration?.SourceLanguage ?? throw new CliFailure("INVALID_ARGUMENTS", "Supply --source-language or confirm an agent configuration");
-            targetLanguage ??= configuration?.TargetLanguage ?? throw new CliFailure("INVALID_ARGUMENTS", "Supply --target-language or confirm an agent configuration");
-            if (!request.Flag("page-size") && configuration is not null) policy = policy! with { MaximumPageSlots = configuration.PreferredItemsPerPage };
+            if (!request.Flag("page-size") && AgentCommands.Configuration(context) is { } configuration)
+                policy = policy! with { MaximumPageSlots = configuration.PreferredItemsPerPage };
         }
         var service = new TranslationSessionService(new FileSystemTranslationSessionStore(Path.Combine(context.State, "sessions")));
         if (request.Subcommand == "start")
         {
+            var existing = request.Flag("session-id") ? service.TryRead(id) : null;
+            targetLanguage = targetLanguage is null && existing is not null ? existing.TargetLocale : TranslationLanguages.Target(targetLanguage);
+            Func<IReadOnlyList<TextOccurrence>, string>? resolveSource = null;
+            if (sourceLanguage == TranslationLanguages.Automatic)
+            {
+                if (existing is not null) sourceLanguage = existing.SourceLocale;
+                else resolveSource = TranslationSourceDetection.Resolve;
+            }
             var snapshot = Query(context, options!.Scope, classicVersion: request.Get("minecraft-version"));
-            var start = TranslationSessionService.CreateStartRequest(snapshot, id, sourceLanguage!, targetLanguage!, policy, item => options.Matches(item.Text));
+            var start = TranslationSessionService.CreateStartRequest(snapshot, id, sourceLanguage!, targetLanguage, policy,
+                item => options.Matches(item.Text), resolveSource);
             if (start.Slots.IsEmpty) throw new CliFailure("NOT_FOUND", "No text slots match the requested selection");
             var receipt = service.Start(start, operationId);
             try { Preferences(context).Create(id, !request.Flag("no-group")); }
             catch (Exception error) { throw new CliFailure(CliApplication.Code(error), error.Message, new { sessionId = id, receipt, repair = "retry-start-with-same-identities" }); }
-            return new(new { receipt, status = service.Status(id), groups = Groups(service, id, request, context).Select(Group).ToArray() });
+            return new(new { receipt, status = service.Status(id), start.SourceLocale, start.TargetLocale,
+                groups = Groups(service, id, request, context).Select(Group).ToArray() });
         }
         var state = service.Read(id);
         if (state.Source.WorldId != context.Inventory.WorldId) throw new ArtifactConflictException("Session belongs to a different world root");

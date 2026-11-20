@@ -37,12 +37,12 @@ internal static class ConvertCommands
         {
             if (write && keys.Length != 0 && !request.Flag("no-backup"))
             {
-                var backup = WriteCommands.Execute(new("backup", context.Root, new Dictionary<string, string?> { ["state-root"] = context.State }, request.Locale));
+                var backup = WriteCommands.Execute(new("backup", context.Root, new Dictionary<string, string?> { ["state-root"] = context.State }));
                 if (backup.Code is not null) throw new CliFailure(backup.Code, "Convenience backup failed before world commit", backup.Data);
                 convenienceBackupHash = Hash256.Compute(new UTF8Encoding(false, true).GetBytes(backup.Export!));
             }
             var result = WriteCommands.ExecuteOperations(context, keys, write, snapshot);
-            if (request.Flag("verbose")) Console.Error.WriteLine(request.Locale == "en-US" ? "Conversion finished; inspect the retained plan and operation results." : "轉換結束；請核對保留計畫與逐項結果。");
+            if (request.Flag("verbose")) Console.Error.WriteLine("Conversion finished; inspect the retained plan and operation results.");
             return result with { Data = new { result = result.Data, conversion = summary, convenienceBackupHash } };
         }
         catch (CliFailure error)

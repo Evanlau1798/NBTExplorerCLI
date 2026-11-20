@@ -50,6 +50,7 @@ public sealed partial class TranslationSessionService
     {
         ArgumentNullException.ThrowIfNull(sourceSessions); ArgumentException.ThrowIfNullOrWhiteSpace(glossaryVersion);
         var target = Read(targetSession); var slot = target.Slots.SingleOrDefault(item => item.Slot.Id.Digest == slotId) ?? throw new KeyNotFoundException("Unknown target slot");
+        if (target.SourceLocale == "und") return [];
         var sessions = sourceSessions.Distinct().Take(257).ToArray();
         if (sessions.Length > 256 || sessions.Any(id => id == Guid.Empty)) throw new ArgumentException("Invalid or oversized memory candidate scope", nameof(sourceSessions));
         var result = ImmutableArray.CreateBuilder<TranslationMemoryCandidate>();

@@ -11,18 +11,25 @@ public sealed partial class TranslationSessionService(ITranslationSessionStore s
     private readonly ITranslationSessionStore store = store ?? throw new ArgumentNullException(nameof(store));
     public SessionOperationReceipt Start(WorldQuerySnapshot snapshot, Guid sessionId, string sourceLocale, string targetLocale, Guid operationId, SessionPolicy? policy = null)
         => Start(CreateStartRequest(snapshot, sessionId, sourceLocale, targetLocale, policy), operationId);
-    public static SessionStartRequest CreateStartRequest(WorldQuerySnapshot snapshot, Guid sessionId, string sourceLocale, string targetLocale, SessionPolicy? policy = null, Func<TextOccurrence, bool>? select = null)
+    public static SessionStartRequest CreateStartRequest(WorldQuerySnapshot snapshot, Guid sessionId, string sourceLocale, string targetLocale, SessionPolicy? policy = null,
+        Func<TextOccurrence, bool>? select = null, Func<IReadOnlyList<TextOccurrence>, string>? resolveSource = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot); var manifest = snapshot.Manifest;
         var source = new SessionSourceSnapshot(manifest.WorldId, manifest.SnapshotId, manifest.InputSources, manifest.Scope.Dimensions, manifest.Scope.Regions, manifest.Scope.Types, manifest.Scope.ArtifactPaths, manifest.Versions, manifest.CoverageComplete);
         var selected = snapshot.ReadSources().SelectMany(item => item.Text?.Occurrences ?? []).Where(item => select?.Invoke(item) ?? true).Take(100_001).ToArray();
         if (selected.Length > 100_000) throw new SessionSlotLimitException();
+        if (resolveSource is not null) sourceLocale = resolveSource(selected);
         var protection = new PlaceholderPolicy([], protectVisibleText: true, protectPrivateUseGlyphs: true);
         var slots = selected.Select(item => item.ToSlot(sourceLocale, targetLocale, protection)).ToImmutableArray();
         source = source with { ContextRoots = SessionStorageRoots.Build(snapshot, slots) };
         return new(sessionId, source, sourceLocale, targetLocale, policy ?? new(), slots);
     }
     public TranslationSession Read(Guid sessionId) => Load(sessionId).State;
+    public TranslationSession? TryRead(Guid sessionId)
+    {
+        try { return Read(sessionId); }
+        catch (KeyNotFoundException) { return null; }
+    }
     public SessionOperationReceipt Start(SessionStartRequest request, Guid operationId)
     {
         if (operationId == Guid.Empty) throw new ArgumentException("Operation identity is required", nameof(operationId));

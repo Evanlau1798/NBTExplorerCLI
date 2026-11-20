@@ -22,7 +22,7 @@ internal static class CliFallbackTests
             File.WriteAllText(source, "data modify storage example:state message set value 'Welcome'");
             var line = new[] { "translate", "fallback", source, "--line", "1" };
             const string multiline = "第一行\r\n第二行";
-            var rejectedLine = Submit(line, multiline);
+            var rejectedLine = Submit([.. line, "--text-pointer="], multiline);
             var rejectedSelectedText = Submit([.. line, "--format", "text"], multiline);
             var rejectedEncoding = Submit(["translate", "fallback", source, "--format", "text"], "SURROGATE_PROBE");
 
@@ -35,7 +35,7 @@ internal static class CliFallbackTests
                     "an escaped replacement remains one physical command line");
                 return content[(content.LastIndexOf(" value ", StringComparison.Ordinal) + " value ".Length)..];
             }
-            var modern = Snbt.ParseDocument(Encoding.UTF8.GetBytes(VerifiedCommand([.. line, "--snbt-profile", "1.21.5"])), SnbtProfile.Java1215);
+            var modern = Snbt.ParseDocument(Encoding.UTF8.GetBytes(VerifiedCommand([.. line, "--text-pointer=", "--snbt-profile", "1.21.5"])), SnbtProfile.Java1215);
             Require(modern.Root.Value is LogicalMinecraftLeaf { Value: NbtString modernText } && modernText.Value == multiline,
                 "the modern SNBT parser reads the full escaped text");
             File.WriteAllText(source, """data modify storage example:state message set value '{"text":"Welcome"}'""");
@@ -106,6 +106,133 @@ internal static class CliFallbackTests
         finally { Directory.Delete(work, recursive: true); }
     }
 
+    internal static void DraftLanguagesStayBoundOnSubmission()
+    {
+        var work = Directory.CreateTempSubdirectory("nbtcli-fallback-").FullName;
+        try
+        {
+            var input = Path.Combine(work, "dialogue.txt");
+            var reply = Path.Combine(work, "reply.json");
+            File.WriteAllText(input, "Ce village est entouré de montagnes. Les habitants préparent le marché depuis ce matin.");
+            var args = new[] { "translate", "fallback", input, "--format", "text" };
+            using var implicitDraft = Success(Run(work, args));
+            var implicitData = implicitDraft.RootElement.GetProperty("data");
+            Require(implicitData.GetProperty("sourceLocale").GetString() == "fr"
+                && implicitData.GetProperty("targetLocale").GetString() is { Length: > 1 } target && target != "und",
+                "fallback resolves the source text and system display language without either flag");
+            using var explicitDraft = Success(Run(work, [.. args, "--target-language", "ja-JP"]));
+            var template = JsonNode.Parse(explicitDraft.RootElement.GetProperty("data").GetProperty("replyTemplate").GetRawText())!;
+            Require(template["schemaVersion"]!.GetValue<int>() == 2 && template["sourceLocale"]!.GetValue<string>() == "fr"
+                && template["targetLocale"]!.GetValue<string>() == "ja_jp", "the versioned template carries the bound source and target");
+            File.WriteAllText(reply, template.ToJsonString());
+            using var resumed = Success(Run(work, [.. args, "--reply", reply]));
+            Require(resumed.RootElement.GetProperty("data").GetProperty("targetLocale").GetString() == "ja_jp",
+                "the reply continues with its bound target without reselecting the display language");
+            Require(Run(work, [.. args, "--target-language", "de-DE", "--reply", reply]).Exit == 3,
+                "an explicitly mismatched target conflicts");
+            template["targetLocale"] = "de_de";
+            File.WriteAllText(reply, template.ToJsonString());
+            Require(Run(work, [.. args, "--reply", reply]).Exit == 3, "the draft hash covers the language pair");
+            var languages = Directory.CreateDirectory(Path.Combine(work, "assets", "sample", "lang"));
+            File.WriteAllText(Path.Combine(languages.FullName, "de_de.json"), """{"font":"Bienvenue","type":"Bonjour","firstPerson":"I","kitchen":"MIX"}""");
+            using var marked = Success(Run(work, ["translate", "fallback", work, "--path", "assets/sample/lang/de_de.json"]));
+            var markedData = marked.RootElement.GetProperty("data");
+            Require(markedData.GetProperty("sourceLocale").GetString() == "de_de" && markedData.GetProperty("candidates").GetArrayLength() == 4,
+                "the selected language resource provides its locale and treats its arbitrary keys as language entries");
+            using var markedKey = Success(Run(work, "translate", "fallback", work, "--path", "assets/sample/lang/de_de.json", "--pointer", "/type"));
+            Require(markedKey.RootElement.GetProperty("data").GetProperty("candidates")[0].GetProperty("text").GetString() == "Bonjour",
+                "a language entry named font does not style the other entries when a single key is selected");
+
+            var mixed = Path.Combine(work, "mixed.json");
+            var french = new[] { "chat", "chien", "maison", "école", "forêt", "moulin", "château", "puits", "pont", "marché", "jardin", "bateau" };
+            File.WriteAllText(mixed, JsonSerializer.Serialize(french.Select(noun => "Les habitants de ce village ont découvert un " + noun + " ce matin.")
+                .Append("Das große Haus liegt neben der Kirche und es ist seit vielen Jahren geschlossen.")
+                .Select(text => new { text })));
+            using var ambiguous = Success(Run(work, "translate", "fallback", mixed));
+            Require(ambiguous.RootElement.GetProperty("data").GetProperty("sourceLocale").GetString() == "und",
+                "a finite recognition budget cannot turn a multilingual selection into one guessed source language");
+        }
+        finally { Directory.Delete(work, recursive: true); }
+    }
+
+    internal static void DraftKeepsSplitLevelsAndAncestorFonts()
+    {
+        var work = Directory.CreateTempSubdirectory("nbtcli-fallback-").FullName;
+        try
+        {
+            var input = Path.Combine(work, "text.nbt");
+            var document = new NbtDocument("", new NbtCompound([
+                new("description", new NbtString("""[{"text":"Bonus"},{"text":" I"}]""")),
+                new("caption", new NbtString("""{"text":"MIX"}"""))]));
+            File.WriteAllBytes(input, BinaryNbt.WriteDocument(document));
+            using var level = Success(Run(work, "translate", "fallback", input));
+            Require(level.RootElement.GetProperty("data").GetProperty("candidates").EnumerateArray()
+                    .Select(value => value.GetProperty("text").GetString()).SequenceEqual(new[] { "Bonus", "MIX" }),
+                "a separated level suffix is protected while ordinary letter-only captions remain editable");
+
+            document = new("", new NbtCompound([new("description", new NbtString(
+                """["",{"text":"Recover items"},{"text":"A","font":"test:meter"}]"""))]));
+            File.WriteAllBytes(input, BinaryNbt.WriteDocument(document));
+            using var array = Success(Run(work, "translate", "fallback", input));
+            Require(array.RootElement.GetProperty("data").GetProperty("candidates").EnumerateArray()
+                    .Select(value => value.GetProperty("text").GetString()).SequenceEqual(new[] { "Recover items" }),
+                "a leading empty component preserves the remaining compatible text objects");
+
+            input = Path.Combine(work, "pane.json");
+            File.WriteAllText(input, """{"pane":{"text":"Icon A","font":"test:meter"}}""");
+            foreach (var format in new[] { "auto", "json" })
+                Require(Run(work, "translate", "fallback", input, "--format", format, "--pointer", "/pane/text", "--text-pointer=").Exit == 4,
+                    "selecting a precise leaf cannot bypass its unproven ancestor font");
+
+            File.WriteAllText(input, """{"pane":{"text":"Icon A","font":{"resource":"test:meter"}}}""");
+            Require(Run(work, "translate", "fallback", input, "--text-pointer", "/pane/text").Exit == 4,
+                "confirmation of a relative JSON path cannot bypass a non-string font field");
+            File.WriteAllText(input, """{pane:{text:"Icon A",font:{resource:"test:meter"}}}""");
+            Require(Run(work, "translate", "fallback", input, "--format", "snbt", "--text-pointer", "/pane/text").Exit == 4,
+                "the same font guard applies to a relative SNBT path");
+        }
+        finally { Directory.Delete(work, recursive: true); }
+    }
+
+    internal static void DraftDoesNotTreatUnprovenOrMalformedStringsAsVisibleText()
+    {
+        var work = Directory.CreateTempSubdirectory("nbtcli-fallback-").FullName;
+        try
+        {
+            var input = Path.Combine(work, "dialogue.nbt");
+            var reply = Path.Combine(work, "reply.json");
+            var before = new NbtDocument("", new NbtCompound([
+                new("broken", new NbtString("""{"text":"Broken}""")),
+                new("duplicate", new NbtString("""{"text":"One","text":"Two"}""")),
+                new("message", new NbtString("""{"text":"Welcome","extra":[{"text":"A","font":"test:meter"},{"text":"Friend"}]}""")),
+                new("callback", new NbtString("open_screen")),
+                new("caption", new NbtString("Title XX"))]));
+            File.WriteAllBytes(input, BinaryNbt.WriteDocument(before));
+            var args = new[] { "translate", "fallback", input };
+            using var draft = Success(Run(work, args));
+            var data = draft.RootElement.GetProperty("data");
+            Require(data.GetProperty("candidates").EnumerateArray().Select(item => item.GetProperty("text").GetString())
+                .SequenceEqual(new[] { "Welcome", "Friend" }), "only established presentation strings are editable; bad layers and unknown font text stay in context");
+            var template = JsonNode.Parse(data.GetProperty("replyTemplate").GetRawText())!;
+            template["slots"]![0]!["text"] = "Bienvenue";
+            File.WriteAllText(reply, template.ToJsonString());
+            using var applied = Success(Run(work, [.. args, "--reply", reply]));
+            var result = applied.RootElement.GetProperty("data");
+            Require(!result.GetProperty("structureVerified").GetBoolean(), "report cannot mark known malformed inner structures as verified");
+            var translated = TypedNbtJson.Read(result.GetProperty("content").GetString()!);
+            Require(translated == new NbtDocument("", new NbtCompound(((NbtCompound)before.Root).Entries.Select(item =>
+                item.Name == "message" ? new NbtEntry(item.Name, new NbtString(((NbtString)item.Value).Value.Replace("Welcome", "Bienvenue", StringComparison.Ordinal))) : item))),
+                "only the verified sibling slot changes");
+            string[] selected = [.. args, "--text-pointer", "/caption"];
+            using var title = Success(Run(work, selected));
+            var titleTemplate = JsonNode.Parse(title.RootElement.GetProperty("data").GetProperty("replyTemplate").GetRawText())!;
+            titleTemplate["slots"]![0]!["text"] = "Titre XXI";
+            File.WriteAllText(reply, titleTemplate.ToJsonString());
+            Require(Run(work, [.. selected, "--reply", reply]).Exit == 3, "a trailing Roman level cannot be changed");
+        }
+        finally { Directory.Delete(work, recursive: true); }
+    }
+
     internal static void DraftsKeepStructureAndSourceBinding()
     {
         var work = Directory.CreateTempSubdirectory("nbtcli-fallback-").FullName;
@@ -115,7 +242,7 @@ internal static class CliFallbackTests
             const string json = """{"id":"example:item","threshold":1e2,"panel":{"color":"red","caption":"−2% power"}}""";
             File.WriteAllText(input, json);
             var reply = Path.Combine(work, "reply.json");
-            var args = new[] { "translate", "fallback", input, "--format", "json" };
+            var args = new[] { "translate", "fallback", input, "--format", "json", "--text-pointer", "/panel/caption" };
             using var draft = Success(Run(work, args));
             var data = draft.RootElement.GetProperty("data");
             Require(data.GetProperty("context").GetString() == json && !data.GetProperty("gameplayVerified").GetBoolean()
@@ -163,7 +290,7 @@ internal static class CliFallbackTests
             var original = new NbtDocument("native", new NbtCompound([new("caption", new NbtString("Readable prose")), new("hint", new NbtByte(7))]));
             var bytes = BinaryNbt.WriteDocument(original);
             File.WriteAllBytes(input, bytes);
-            args = ["translate", "fallback", input];
+            args = ["translate", "fallback", input, "--text-pointer", "/caption"];
             using var nbtDraft = Success(Run(work, args));
             template = JsonNode.Parse(nbtDraft.RootElement.GetProperty("data").GetProperty("replyTemplate").GetRawText())!;
             template["slots"]![0]!["text"] = "可閱讀的文字";
@@ -178,7 +305,7 @@ internal static class CliFallbackTests
             File.WriteAllText(input, unusual);
             const string field = "{caption:'Read this',count:7b}";
             var start = Encoding.UTF8.GetByteCount("背景|");
-            args = ["translate", "fallback", input, "--byte-range", $"{start},{Encoding.UTF8.GetByteCount(field)}"];
+            args = ["translate", "fallback", input, "--byte-range", $"{start},{Encoding.UTF8.GetByteCount(field)}", "--text-pointer", "/caption"];
             using var tag = Success(Run(work, args));
             data = tag.RootElement.GetProperty("data");
             Require(data.GetProperty("context").GetString() == field && data.GetProperty("candidates").GetArrayLength() == 1,

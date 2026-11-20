@@ -41,7 +41,7 @@ internal static class ScanCommands
         var query = new WorldQueryService(inventory, store).QueryAsync(new(new(options.Scope, ClassicVersion: request.Get("minecraft-version")), request.Command == "extract" ? WorldQueryPurpose.Extract : WorldQueryPurpose.Scan,
             new(Workers: options.Workers), ForceFull: transient || request.Flag("refresh"))).GetAwaiter().GetResult();
         var result = ScanProjection.Create(query, options, request);
-        if (request.Flag("verbose") || request.Flag("debug")) Console.Error.WriteLine(request.Locale == "en-US" ? "World query completed; inspect coverage and per-source outcomes." : "世界查詢結束；請核對完整性與逐來源結果。");
+        if (request.Flag("verbose") || request.Flag("debug")) Console.Error.WriteLine("World query completed; inspect coverage and per-source outcomes.");
         return result;
     }
     internal static void OutsideWorld(string world, string destination)
