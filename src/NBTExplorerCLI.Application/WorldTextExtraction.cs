@@ -111,27 +111,30 @@ public sealed partial class WorldTextExtraction
                 var index = chunk.LocalZ * 32 + chunk.LocalX;
                 var document = (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && source.Location.Role == WorldSourceRole.Terrain
                     ? region.ReadClassicAnvilChunk(index, request.Limits) : region.ReadChunk(index, request.Limits)).Document;
-                if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(document.Root)) opaqueStorage();
                 if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(document.Root)) opaqueEquipment();
-                text = NbtTextExtractor.Extract(source.Location, document, chunk, request.Limits, scope: request.Scope, layoutProfile: LayoutProfile);
+                text = ReadNbtText(source, document, [], storageAccess, opaqueStorage);
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Artifact.Kind == ArtifactKind.Nbt || source.Location.Role == WorldSourceRole.Structure)
             {
                 var document = ReadDat(bytes);
-                if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(document.Root)) opaqueStorage();
                 if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(document.Root)) opaqueEquipment();
                 var rules = StorageRules.GetValueOrDefault(source.Location.Artifact, []);
                 if (rules.IsEmpty && storageAccess is null && source.Location.Role == WorldSourceRole.SavedData && LayoutProfile is { } layout
                     && WorldLayoutLocator.CommandStorageNamespace(layout, source.Location.Artifact.RelativePath) is not null)
                     rules = (previewStorage ?? StorageDisplays).SeedRules.GetValueOrDefault(source.Location.Artifact, []);
-                text = NbtTextExtractor.Extract(source.Location, document, limits: request.Limits, storageRules: rules, scope: request.Scope, layoutProfile: LayoutProfile);
+                text = ReadNbtText(source, document, rules, storageAccess, opaqueStorage);
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
             {
-                if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes)) opaqueStorage();
-                if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(bytes)) opaqueEquipment();
+                var storageCandidate = opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes);
+                var equipmentCandidate = opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(bytes);
+                if ((storageCandidate || equipmentCandidate) && !PackTextExtractor.HasInertStorageShape(source.Location, bytes, Limits))
+                {
+                    if (storageCandidate) opaqueStorage!();
+                    if (equipmentCandidate) opaqueEquipment!();
+                }
                 text = PackTextExtractor.Extract(source.Location, bytes, source.Pack ?? throw new InvalidDataException("Missing pack metadata snapshot"), request.Limits, request.Scope);
                 commandProfile = MinecraftProfiles.ForPackMetadata(source.Pack!);
             }

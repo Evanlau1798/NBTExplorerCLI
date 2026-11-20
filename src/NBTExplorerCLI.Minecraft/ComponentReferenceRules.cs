@@ -6,6 +6,20 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal static class ComponentReferenceRules
 {
+    internal static (string Id, string Path, bool Interpreted, bool OpaqueClick)? JsonStorage(JsonElement value, DecodeLimits limits)
+    {
+        var id = Field(value, "storage"); var path = Field(value, "nbt");
+        if (id is null || path is null || !MinecraftIdentifier.ResourceLocation(id)) return null;
+        var interpreted = value.TryGetNativeProperty("interpret", out var flag) && flag.ValueKind == JsonValueKind.True
+            && !OtherComponentContent(field => value.TryGetNativeProperty(field, out _));
+        var opaqueClick = value.TryGetNativeProperty("clickEvent", out var click) && Click(click, null, limits) is null;
+        return (id, path, interpreted, opaqueClick);
+    }
+
+    internal static bool OtherComponentContent(Func<string, bool> hasField)
+        => hasField("text") || hasField("translate") || hasField("selector") || hasField("score") || hasField("keybind")
+            || hasField("entity") || hasField("block");
+
     private static bool Inert(string? action) => action is "open_url" or "change_page" or "copy_to_clipboard";
 
     internal static string CommandField(bool modern) => modern ? "command" : "value";

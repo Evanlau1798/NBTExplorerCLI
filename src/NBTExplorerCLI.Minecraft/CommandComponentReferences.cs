@@ -38,7 +38,7 @@ internal sealed partial class CommandTextReader
                     var interpreted = fields.GetValueOrDefault("interpret") is LogicalMinecraftLeaf { Value: NbtByte { Value: 1 } }
                         && fields.GetValueOrDefault("plain") is null or LogicalMinecraftLeaf { Value: NbtByte { Value: 0 } }
                         && fields.GetValueOrDefault("type") is null or LogicalMinecraftLeaf { Value: NbtString { Value: "nbt" } }
-                        && !OtherComponentContent(fields.ContainsKey);
+                        && !ComponentReferenceRules.OtherComponentContent(fields.ContainsKey);
                     var unknownClick = fields.TryGetValue("click_event", out var clickData) && ComponentReferenceRules.Click(clickData, grammar, limits) is null;
                     ReportStorage(storage.Value, nbtPath.Value, interpreted, path, unknownClick);
                 }
@@ -68,15 +68,10 @@ internal sealed partial class CommandTextReader
                 if (value.ValueKind != JsonValueKind.Object) return;
                 if (spans is not null && value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
                     Selector(NativeJsonStrings.Read(selector), At(path, "selector"), spans[At(path, "selector")]);
-                if ((storageAccess is not null || storageNodes is not null) && value.TryGetNativeProperty("nbt", out var nbtPath) && nbtPath.ValueKind == JsonValueKind.String
-                    && value.TryGetNativeProperty("storage", out var storage) && storage.ValueKind == JsonValueKind.String)
+                if ((storageAccess is not null || storageNodes is not null) && ComponentReferenceRules.JsonStorage(value, limits) is { } storage)
                 {
-                    var interpreted = value.TryGetNativeProperty("interpret", out var flag) && flag.ValueKind == JsonValueKind.True
-                        && !OtherComponentContent(field => value.TryGetNativeProperty(field, out _));
-                    var unknownClick = value.TryGetNativeProperty("clickEvent", out var clickData) && ComponentReferenceRules.Click(clickData, null, limits) is null;
-                    var id = NativeJsonStrings.Read(storage);
-                    if (storageNodes is not null && MinecraftIdentifier.ResourceLocation(id)) storageNodes.Add(path);
-                    ReportStorage(id, NativeJsonStrings.Read(nbtPath), interpreted, path, unknownClick);
+                    storageNodes?.Add(path);
+                    ReportStorage(storage.Id, storage.Path, storage.Interpreted, path, storage.OpaqueClick);
                 }
                 if (!observeStorageOnly && (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.HasFixedScoreHolder(score)
                     || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null))
@@ -104,10 +99,6 @@ internal sealed partial class CommandTextReader
                 (enclosingString ?? span).StartByte, (enclosingString ?? span).LengthBytes, enclosingString is null ? null : path));
         }
     }
-    private static bool OtherComponentContent(Func<string, bool> hasField)
-        => hasField("text") || hasField("translate") || hasField("selector") || hasField("score") || hasField("keybind")
-            || hasField("entity") || hasField("block");
-
     private bool PotentialReferences(SnbtNode node, IReadOnlyDictionary<SnbtSpan, HashSet<TypedPath>>? bookPages)
     {
         if (node.Value is LogicalMinecraftList) return node.Children.Any(child => PotentialReferences(child.Node, bookPages));

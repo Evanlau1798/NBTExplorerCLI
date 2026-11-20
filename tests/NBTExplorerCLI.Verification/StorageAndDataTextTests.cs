@@ -44,6 +44,8 @@ internal static class StorageAndDataTextTests
         new("command-storage-structural-metadata-filters", "discovery", _ => StorageMetadataFilters()),
         new("text-storage-component-list-copy-chain", "discovery", _ => ComponentListCopyChain()),
         new("text-storage-written-book-pages", "discovery", _ => StorageBookTests.CheckKnownPages()),
+        new("text-storage-inert-pack-assets", "discovery", _ => StorageBookTests.CheckInertPackAssets()),
+        new("text-storage-native-book-pages", "discovery", _ => StorageBookTests.CheckSavedPages()),
         new("text-storage-native-item-lore-copy", "discovery", _ => NativeItemLoreCopy()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];

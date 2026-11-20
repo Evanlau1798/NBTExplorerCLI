@@ -78,7 +78,7 @@ public static class NativeComponentReferences
     private static SourceAddress Child(SourceAddress root, string field)
         => new(root.Artifact, root.ComponentPath is null ? At(root.NodePath, field) : root.NodePath, "reference.component.selector", root.Dimension, root.Chunk,
             root.ComponentPath is null ? null : At(root.ComponentPath, field));
-    private static JsonElement JsonAt(JsonElement root, TypedPath path)
+    internal static JsonElement JsonAt(JsonElement root, TypedPath path)
     {
         foreach (var segment in path.Segments)
         {
