@@ -39,8 +39,39 @@ internal static class StorageAndDataTextTests
         new("prepare-world-storage-saved-list", "preparation", _ => StorageCommandProofTests.SavedDisplayList()),
         new("text-storage-native-seed-with-element-writes", "discovery", _ => StorageCommandProofTests.NativeSeedElementWrites()),
         new("text-storage-seed-runtime-component-schema", "discovery", _ => StorageCommandProofTests.NativeSeedRuntimeSchema()),
+        new("command-copy-sign-text-source", "discovery", _ => CopySignTextSource()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
+
+    private static void CopySignTextSource()
+    {
+        var address = new SourceAddress(new(World, "sign-transfer.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var uses = new List<CommandStorageAccess>();
+        const string script = """
+            setblock 0 65 0 oak_sign{front_text:{messages:['{"text":"Name"}','{"text":"First"}','{"text":"Second"}','{"text":"Fourth"}']}}
+            data modify storage demo:display name set from block 0 65 0 front_text.messages[0]
+            data modify storage demo:display lore append from block 0 65 0 front_text.messages[-1]
+            execute if entity @e[name=Guard] run data modify storage demo:display lore prepend from block 0 65 0 back_text.filtered_messages[]
+            data modify storage demo:display lore set from block 0 65 0 front_text.messages
+            """;
+        var result = CommandTextExtractor.Extract(new(address, script), profile, storageAccess: uses.Add);
+        Require(result.Complete && result.Text.Occurrences.Select(row => row.Text).SequenceEqual(new[] { "Name", "First", "Second", "Fourth" })
+            && result.References.Single().Name == "Guard", "verified sign sources keep writable text at its original field and preserve adjacent selector references");
+        Require(uses.Count == 4 && uses.All(use => use.Use == CommandStorageUse.Other), "copy sources do not imply exclusive interpreted storage authority");
+        foreach (var source in new[] { "block 0 65 0 front_text.messages[4]", "block 0 65 0 front_text.messages[0].extra",
+            "block 0 65 0 front_text.private", "entity @s front_text.messages[0]", "block 0 65 0 front_text.messages[{text:Hidden}]" })
+            Require(!CommandTextExtractor.Extract(new(address, "data modify storage demo:display name set from " + source), profile).Complete,
+                $"unproven sign source is still unresolved: {source}");
+        foreach (var destination in new[] { "entity @e[type=armor_stand,tag=copy_target,limit=1] CustomName",
+            "block 2 65 0 Items[0].tag.display.Name" })
+            Require(!CommandTextExtractor.Extract(new(address, "data modify " + destination + " set from block 0 65 0 front_text.messages[0]"), profile)
+                .Complete, $"sign text cannot create an unproven destination binding: {destination}");
+        const string oldCopy = "data modify storage demo:display name set from block 0 65 0 Text1";
+        Require(CommandTextExtractor.Extract(new(address, oldCopy), profile, runtimeDataVersion: 2205).Complete
+            && !CommandTextExtractor.Extract(new(address, oldCopy), profile, runtimeDataVersion: 2204).Complete,
+            "classic JSON sign fields are recognized once the runtime provides storage");
+    }
 
     private static void EntityUuidWidths()
     {

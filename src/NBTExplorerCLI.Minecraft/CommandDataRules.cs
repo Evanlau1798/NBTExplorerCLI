@@ -7,6 +7,8 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
+    private const int StorageDataVersion = 2205;
+
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
         var storageElement = storageAccess is not null || storageDisplayLists is { Count: > 0 } ? StorageDisplayWrite(tokens, index) : null;
@@ -55,13 +57,9 @@ internal sealed partial class CommandTextReader
     {
         if (tokens.Count != index + 10 || tokens[index + 1].Text != "modify" || tokens[index + 2].Text != "block"
             || DataTargetEnd(tokens, index + 2) != index + 6 || tokens[index + 7].Text != "set" || tokens[index + 8].Text != "value") return false;
-        var fields = tokens[index + 6].Text.Split('.');
-        if (fields.Length != 2 || fields[0] is not ("front_text" or "back_text")) return false;
-        var bracket = fields[1].IndexOf('[');
-        var field = bracket < 0 ? fields[1] : fields[1][..bracket];
-        if (field is not ("messages" or "filtered_messages")) return false;
-        var role = fields[0] == "front_text" ? "sign.front.line" : "sign.back.line";
-        var grammarPath = At(At(path, fields[0]), field);
+        if (!SignMessageField(tokens[index + 6].Text, out var side, out var field, out var selector)) return false;
+        var role = side == "front_text" ? "sign.front.line" : "sign.back.line";
+        var grammarPath = At(At(path, side), field);
         var token = tokens[index + 9];
         var tokenEnd = token.Start + token.Text.Length;
         void ReadLine(int start, int end, int line)
@@ -70,11 +68,10 @@ internal sealed partial class CommandTextReader
             try { Component(start, end, linePath, storedRole: role); }
             catch (DuplicateJsonMemberException) { Unknown(linePath, start, end - start, "UnsupportedSignCommandComponent"); }
         }
-        if (bracket >= 0)
+        if (selector.Length != 0)
         {
-            var suffix = fields[1].AsSpan(bracket);
-            if (suffix.Length != 3 || suffix[1] is < '0' or > '3' || suffix[2] != ']') return false;
-            ReadLine(token.Start, tokenEnd, suffix[1] - '0');
+            if (selector.Length != 3 || selector[1] is < '0' or > '3' || selector[2] != ']') return false;
+            ReadLine(token.Start, tokenEnd, selector[1] - '0');
             return true;
         }
         var bytes = Utf8.GetBytes(token.Text);
@@ -89,6 +86,26 @@ internal sealed partial class CommandTextReader
         }
         return true;
     }
+    private static bool SignMessageField(string path, out string side, out string field, out string selector)
+    {
+        side = field = selector = "";
+        var fields = path.Split('.');
+        if (fields.Length != 2 || fields[0] is not ("front_text" or "back_text")) return false;
+        side = fields[0];
+        var bracket = fields[1].IndexOf('[');
+        field = bracket < 0 ? fields[1] : fields[1][..bracket];
+        if (bracket >= 0) selector = fields[1][bracket..];
+        return field is "messages" or "filtered_messages";
+    }
+
+    private static bool SignTextSource(string path)
+    {
+        var singleLine = path.StartsWith("Filtered", StringComparison.Ordinal) ? path[8..] : path;
+        if (singleLine is "Text1" or "Text2" or "Text3" or "Text4") return true;
+        return SignMessageField(path, out _, out _, out var selector) && (selector is "" or "[]"
+            || selector.EndsWith(']') && Integer(selector[1..^1], out var line) && line is >= -4 and <= 3);
+    }
+
     private bool StaticDataWrite(List<CommandToken> tokens, int index, SnbtNode? valueNode = null, bool keepEmptyListReset = false)
     {
         if (index + 2 >= tokens.Count || tokens[index + 1].Text != "modify") return false;
@@ -107,7 +124,9 @@ internal sealed partial class CommandTextReader
             if (operation == "merge" || sourcePath < 0 || tokens.Count != sourcePath + 1) return false;
             var sourceType = tokens[value + 1].Text;
             var source = tokens[sourcePath].Text;
-            return sourceType == "entity" && NumericEntitySource(source) || StaticItemSource(sourceType, source);
+            return sourceType == "entity" && NumericEntitySource(source) || StaticItemSource(sourceType, source)
+                || sourceType == "block" && tokens[index + 2].Text == "storage"
+                && runtimeDataVersion >= StorageDataVersion && SignTextSource(source);
         }
         if (tokens.Count != value + 2 || tokens[value].Text != "value") return false;
         valueNode ??= Snbt.ParseDocument(Utf8.GetBytes(tokens[value + 1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
