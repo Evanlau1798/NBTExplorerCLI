@@ -11,7 +11,7 @@ public sealed record CommandStorageAccess(string Storage, string Path, CommandSt
 
 public static class CommandTextExtractor
 {
-    public static CommandExtractionResult Extract(CommandCandidate source, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null, Action<SourceAddress>? componentRoot = null, Action<CommandSelectorReference>? selectorReference = null, Action<CommandNameTemplate>? nameTemplate = null, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null)
+    public static CommandExtractionResult Extract(CommandCandidate source, CapabilityProfile profile, DecodeLimits? limits = null, SnapshotScope? scope = null, Action<SourceAddress>? componentRoot = null, Action<CommandSelectorReference>? selectorReference = null, Action<CommandNameTemplate>? nameTemplate = null, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null)
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(profile);
         using var observation = WorkDiagnostics.Start("command.parse", source.Address.Artifact.RelativePath, worldId: source.Address.Artifact.WorldId);
@@ -22,6 +22,7 @@ public static class CommandTextExtractor
         if (source.Address.Syntax is { } syntax && (syntax.GrammarProfile != expected.Features[ProfileFacet.CommandGrammar].Schema || syntax.GrammarVersion != expected.Features[ProfileFacet.CommandGrammar].Version))
             throw new CodecException(CodecError.UnsupportedProfile, 0, "Command grammar differs from its source binding");
         if (source.Address.Syntax is { Encoding: not ("utf8" or "utf8-bom") }) throw new CodecException(CodecError.UnsupportedProfile, 0, "Unsupported command source encoding");
-        return new CommandTextReader(source, profile, limits, scope ?? SnapshotScope.All, componentRoot, selectorReference, nameTemplate, storageAccess: storageAccess, storageDisplayLists: storageDisplayLists).Read();
+        return new CommandTextReader(source, profile, limits, scope ?? SnapshotScope.All, componentRoot, selectorReference, nameTemplate,
+            storageAccess: storageAccess, storageDisplayLists: storageDisplayLists, runtimeDataVersion: runtimeDataVersion).Read();
     }
 }

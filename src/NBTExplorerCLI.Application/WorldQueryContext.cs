@@ -32,9 +32,10 @@ internal sealed class WorldQueryContext
             .GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal).ToImmutableDictionary(group => group.Key, group => group.ToImmutableArray(), StringComparer.Ordinal);
         Inputs = Groups.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => Input(pair.Value)).ToImmutableArray();
         var policyRules = Extraction.StorageRules.SelectMany(pair => pair.Value.Select(rule => SourceIdentity.Occurrence(new(pair.Key, rule.Path, "policy.storage." + rule.Kind)).Digest.Hex)).Order(StringComparer.Ordinal).ToArray();
-        var policy = Hash256.Compute(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { limits = Extraction.Limits, request.Scan.MaximumSources, Execution.InFlightBytes, storageRules = policyRules })));
+        var policy = Hash256.Compute(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { limits = Extraction.Limits, request.Scan.MaximumSources, Execution.InFlightBytes,
+            storageRules = policyRules, runtimeDataVersion = Extraction.Discovery.Metadata?.DataVersion })));
         var layout = Extraction.LayoutProfile?.Id;
-        var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-3" : "world-text-command-36";
+        var extractor = layout == MinecraftProfiles.ClassicAnvil.Id ? "world-text-classic-anvil-3" : "world-text-command-37";
         var baseline = new InterpretationVersions("nbt-snbt-json-zip-1", MinecraftProfiles.IsVersionedClassic(Extraction.LayoutProfile) ? layout! : "minecraft-known-5", extractor, "scan-2." + policy.Hex);
         static IEnumerable<CacheSourceBinding> Bindings(IEnumerable<DiscoveredSource> sources) => sources.Select(source => new CacheSourceBinding(source.Location, source.Chunk, source.PackMetadataHash));
         Versions = baseline with { Policy = baseline.Policy + "." + ScanCacheJson.BindingHash(layout, Bindings(Groups.Values.SelectMany(group => group))).Hex };

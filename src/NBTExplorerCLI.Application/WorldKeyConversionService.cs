@@ -55,7 +55,8 @@ public sealed class WorldKeyConversionService(IWorldInventory inventory)
                 text = source.Location.Role == WorldSourceRole.Function ? new([], [], [], [WorldCommandEdits.BindFunction(source.Location.Artifact, bytes, profile, source.Location.Dimension)], [])
                     : PackTextExtractor.Extract(source.Location, bytes, source.Pack!, snapshot.Limits, snapshot.Manifest.Scope, Root);
             }
-            foreach (var command in text.PendingCommands) _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, Root);
+            foreach (var command in text.PendingCommands) _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, Root,
+                runtimeDataVersion: source.RuntimeDataVersion);
             var index = roots.ToLookup(address => (address.SemanticRole, Logical(address)));
             var jsonSpans = document is null && source.Location.Role != WorldSourceRole.Function ? NativeJsonValueSpans.Read(bytes, snapshot.Limits) : null;
             foreach (var item in group)

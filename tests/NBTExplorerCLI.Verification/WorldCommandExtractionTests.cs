@@ -12,6 +12,59 @@ namespace NBTExplorerCLI.Verification;
 
 internal static class WorldCommandExtractionTests
 {
+    internal static void StaticTimeAndScheduling()
+    {
+        const string script = """
+            summon armor_stand
+            summon minecraft:armor_stand ~ ~.5 ~
+            schedule function demo:repeat 60t
+            schedule function demo:repeat .5s replace
+            schedule clear demo:repeat
+            difficulty peaceful
+            time set 13000
+            time add 2s
+            time set 0.5t
+            time set 2147483647t
+            bossbar remove boss:status
+            title @a times 0t 40t 10t
+            execute as @e[type=armor_stand,name="North Guard"] run title @s actionbar {"text":"Welcome"}
+            """;
+        var address = new SourceAddress(new(World, "controls.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var result = CommandTextExtractor.Extract(new(address, script), profile);
+        Require(result.Complete && result.Text.Occurrences.Single().Text == "Welcome" && result.References.Single().Name == "North Guard",
+            "static commands are complete without losing adjacent text or selector names");
+        foreach (var invalid in new[] { "summon armor_stand ~ ~", "summon armor_stand ^ ~ ~", "schedule function demo:repeat 0t",
+            "schedule function demo:repeat .01s", "schedule function demo:repeat 2x", "schedule function demo:repeat 2t unexpected",
+            "schedule clear demo:repeat trailing", "difficulty impossible", "time set -2", "bossbar remove boss:status trailing",
+            "title @a times 0t 40.0x 10t", "title @a times -1 40 10" })
+            Require(!CommandTextExtractor.Extract(new(address, invalid), profile).Complete, $"invalid input stays unresolved: {invalid}");
+        HistoricalTimingCoverage();
+    }
+
+    private static void HistoricalTimingCoverage()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+        const string folder = "datapacks/p/data/demo/functions/";
+        var commands = new[] { ("time set 13000", 0), ("time set 2s", 1901), ("schedule function demo:repeat 20t", 1901),
+            ("schedule function demo:repeat 20t append", 2205), ("schedule clear demo:repeat", 2205), ("title @a times 0t 40t 10t", 3320) };
+        try
+        {
+            Put(root, "datapacks/p/pack.mcmeta", """{"pack":{"pack_format":4,"description":"Test"}}"""u8.ToArray());
+            foreach (var (item, index) in commands.Select((item, index) => (item, index)))
+                Put(root, folder + index + ".mcfunction", Encoding.UTF8.GetBytes(item.Item1));
+            foreach (var version in new[] { 1631, 1900, 1901, 2204, 2205, 3218, 3319, 3320 })
+            {
+                Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(version, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+                var rows = WorldQueryTests.Query(root, cache).ReadSources().ToDictionary(row => row.Source.Location.Artifact.RelativePath);
+                foreach (var (item, index) in commands.Select((item, index) => (item, index)))
+                    Require(rows[folder + index + ".mcfunction"].Outcome == (version >= item.Item2 ? SourceOutcome.Irrelevant : SourceOutcome.Unsupported),
+                        $"runtime {version} must respect the syntax boundary for {item.Item1} with a shared pack format and cache");
+            }
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+    }
+
     public static void FunctionsAndPhysicalNbtCommands()
     {
         CommandsRespectGrammarTransitions();

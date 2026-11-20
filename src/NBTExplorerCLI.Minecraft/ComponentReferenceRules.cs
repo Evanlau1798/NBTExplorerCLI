@@ -29,15 +29,11 @@ internal static class ComponentReferenceRules
         => value is LogicalMinecraftCompound compound
             && compound.Entries.Where(entry => entry.Name == name).Take(2).ToArray() is [{ Value: LogicalMinecraftLeaf { Value: NbtString text } }] ? text.Value : null;
 
-    internal static bool IsSelfScore(JsonElement value) => value.TryGetNativeProperty("name", out var name)
-        && name.ValueKind == JsonValueKind.String && NativeJsonStrings.Read(name) == "@s"
-        && value.TryGetNativeProperty("objective", out var objective) && objective.ValueKind == JsonValueKind.String && NativeJsonStrings.Read(objective).Length != 0;
+    internal static bool HasFixedScoreHolder(JsonElement value) => FixedScore(Field(value, "name"), Field(value, "objective"));
+    internal static bool HasFixedScoreHolder(NbtValue value) => FixedScore(Field(value, "name"), Field(value, "objective"));
+    internal static bool HasFixedScoreHolder(LogicalMinecraftValue value) => FixedScore(Field(value, "name"), Field(value, "objective"));
 
-    internal static bool IsSelfScore(NbtValue value) => value is NbtCompound compound
-        && compound.Entries.Where(entry => entry.Name == "name").Take(2).ToArray() is [{ Value: NbtString { Value: "@s" } }]
-        && compound.Entries.Where(entry => entry.Name == "objective").Take(2).ToArray() is [{ Value: NbtString { Value.Length: > 0 } }];
-
-    internal static bool IsSelfScore(LogicalMinecraftValue value) => value is LogicalMinecraftCompound compound
-        && compound.Entries.Where(entry => entry.Name == "name").Take(2).ToArray() is [{ Value: LogicalMinecraftLeaf { Value: NbtString { Value: "@s" } } }]
-        && compound.Entries.Where(entry => entry.Name == "objective").Take(2).ToArray() is [{ Value: LogicalMinecraftLeaf { Value: NbtString { Value.Length: > 0 } } }];
+    private static bool FixedScore(string? holder, string? objective) => objective is { Length: > 0 }
+        && (holder == "@s" || holder is { Length: > 1 } && holder[0] is '#' or '$'
+            && holder.Skip(1).All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.' or ':' or '#' or '$'));
 }

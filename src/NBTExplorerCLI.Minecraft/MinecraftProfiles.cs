@@ -134,6 +134,9 @@ public static class MinecraftProfiles
         return null;
     }
 
+    internal static int EarliestDataVersion(CapabilityProfile profile)
+        => DataVersionRanges.FirstOrDefault(range => range.Profile == profile).Minimum;
+
     public static SnbtProfile SnbtGrammar(CapabilityProfile profile)
         => profile == Java181 ? SnbtProfile.Java181 : profile == MixedListText ? SnbtProfile.JavaMixedLists
             : profile.Lists.Encoding == LogicalListEncoding.CompoundWrapper && profile != InitialNativeText && profile != EarlyNativeText

@@ -10,6 +10,7 @@ public sealed record DiscoveredSource(WorldSourceLocation Location, ChunkPositio
     string? DiagnosticCode, Hash256? ContentHash, OperationSupport Capability, PackMetadata? Pack = null, Hash256? PackMetadataHash = null)
 {
     internal bool MayUseCommandStorage { get; init; }
+    internal int? RuntimeDataVersion { get; init; }
 }
 public sealed record WorldDiscoveryResult(WorldMetadata? Metadata, SnapshotScope Scope, WorldInventorySnapshot Inventory, ImmutableArray<DiscoveredSource> Sources, string? DiagnosticCode, ImmutableArray<ManifestSource> MetadataSources = default)
 {
@@ -37,7 +38,7 @@ public static class WorldDiscovery
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (sources.Count == request.MaximumSources) { diagnostic = "SourceLimitExceeded"; return false; }
-            sources.Add(source); return true;
+            sources.Add(metadata?.DataVersion is { } version ? source with { RuntimeDataVersion = version } : source); return true;
         }
         var activeMetadata = "level.dat"; var validatingMetadata = false;
         NbtDocument ReadMetadata(string path)

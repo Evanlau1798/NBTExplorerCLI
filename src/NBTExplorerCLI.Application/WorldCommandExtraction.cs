@@ -15,7 +15,8 @@ public sealed partial class WorldTextExtraction
         foreach (var candidate in pending)
         {
             var policy = previewStorage ?? (storageAccess is null && candidate.Address.SemanticRole == "command.function" ? StorageDisplays : null);
-            var result = CommandTextExtractor.Extract(candidate, profile, request.Limits, request.Scope, storageAccess: storageAccess, storageDisplayLists: policy?.Lists);
+            var result = CommandTextExtractor.Extract(candidate, profile, request.Limits, request.Scope, storageAccess: storageAccess,
+                storageDisplayLists: policy?.Lists, runtimeDataVersion: Discovery.Metadata?.DataVersion);
             retained = checked(retained + CheckRetention(result.Text, result.References));
             if (retained > (request.Limits ?? DecodeLimits.Default).MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "Combined commands exceed retention budget");
             texts.AddRange(result.Text.Occurrences); keys.AddRange(result.Text.TranslationKeys); references.AddRange(result.References);

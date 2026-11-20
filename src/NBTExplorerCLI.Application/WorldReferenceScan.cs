@@ -100,7 +100,7 @@ internal sealed class WorldReferenceScan
                     Charge(part.Address, part.Text);
                 }
                 Targets.Add(target);
-            });
+            }, runtimeDataVersion: source.RuntimeDataVersion);
             if (!result.Complete || result.Text.Occurrences.Any(item => Identifying(item.Address.SemanticRole) && !declared.Contains(item.Address)))
                 Reject("Command reference domain is dynamic or contains unsupported named templates");
         }

@@ -40,7 +40,7 @@ public static class NativeComponentReferences
             var modern = profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
             if (value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
                 reader.Selector(Child(root, "selector"), NativeJsonStrings.Read(selector));
-            if (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
+            if (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.HasFixedScoreHolder(score)
                 || value.TryGetNativeProperty(modern ? "click_event" : "clickEvent", out var click)
                 && ComponentReferenceRules.Click(click, modern ? MinecraftProfiles.SnbtGrammar(profile) : null, limits) is null) reader.Dynamic(root);
             if (value.TryGetNativeProperty(modern ? "hover_event" : "hoverEvent", out var hover)
@@ -60,7 +60,7 @@ public static class NativeComponentReferences
             if (NbtLocator.Resolve(component, local).Value is not NbtCompound value) return;
             var fields = value.Entries.ToDictionary(item => item.Name, item => item.Value, StringComparer.Ordinal);
             if (fields.GetValueOrDefault("selector") is NbtString selector) reader.Selector(Child(root, "selector"), selector.Value);
-            if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
+            if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.HasFixedScoreHolder(score)
                 || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, MinecraftProfiles.SnbtGrammar(profile), limits) is null) reader.Dynamic(root);
             if (fields.TryGetValue("hover_event", out var hover))
             {

@@ -20,6 +20,7 @@ internal sealed partial class CommandTextReader
     private readonly Action<CommandStorageAccess>? storageAccess;
     private readonly IReadOnlySet<(string Storage, string Path)>? storageDisplayLists;
     private readonly bool inspectNested;
+    private readonly int runtimeDataVersion;
     private readonly Hash256 hash;
     private readonly int byteBase;
     private readonly string newline;
@@ -32,7 +33,7 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
         this.componentRoot = componentRoot;
@@ -41,6 +42,7 @@ internal sealed partial class CommandTextReader
         this.storageAccess = storageAccess;
         this.storageDisplayLists = storageDisplayLists;
         this.inspectNested = inspectNested;
+        this.runtimeDataVersion = runtimeDataVersion ?? MinecraftProfiles.EarliestDataVersion(profile);
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
         byteBase = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 } ? 3 : 0;
@@ -208,7 +210,7 @@ internal sealed partial class CommandTextReader
     {
         var address = pending.Address;
         var nested = new CommandCandidate(new(address.Artifact, address.NodePath, address.SemanticRole, address.Dimension, address.Chunk), pending.Command);
-        var parsed = new CommandTextReader(nested, profile, limits, SnapshotScope.All, null, null, null, inspectNested: false).Read();
+        var parsed = new CommandTextReader(nested, profile, limits, SnapshotScope.All, null, null, null, inspectNested: false, runtimeDataVersion: runtimeDataVersion).Read();
         return parsed.Complete && parsed.Text.Occurrences.IsEmpty && parsed.Text.TranslationKeys.IsEmpty && parsed.References.IsEmpty;
     }
     private SourceAddress BindComponent(SourceAddress address, TypedPath grammarPath, int start, bool syntaxResult, Dictionary<TypedPath, SnbtSpan>? spans)

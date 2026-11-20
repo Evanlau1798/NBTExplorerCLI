@@ -14,8 +14,9 @@ internal static class WorldCommandEdits
         var profile = MinecraftProfiles.ForPackMetadata(source.Pack ?? throw new NotSupportedException("Command pack profile is missing")) ?? throw new NotSupportedException("Command pack profile is unknown");
         var before = BindFunction(artifact, bytes, profile, source.Location.Dimension); var literal = operations.OfType<LiteralPatch>().Select(operation => operation.Translation).Concat(WorldReferenceMembers.Literals(operations, artifact)).ToArray();
         var conversions = operations.OfType<KeyConversionPatch>().Select(operation => operation.Conversion).ToArray();
-        var output = Rewrite(before, literal, profile, limits, conversions, storageDisplayLists);
-        return new(output, stream => Verify(before, BindFunction(artifact, WorldArtifactEdits.Read(stream), profile, source.Location.Dimension), literal, profile, limits, conversions, storageDisplayLists));
+        var output = Rewrite(before, literal, profile, limits, conversions, storageDisplayLists, source.RuntimeDataVersion);
+        return new(output, stream => Verify(before, BindFunction(artifact, WorldArtifactEdits.Read(stream), profile, source.Location.Dimension), literal, profile, limits,
+            conversions, storageDisplayLists, source.RuntimeDataVersion));
     }
     internal static CommandCandidate BindFunction(ArtifactAddress artifact, byte[] value, CapabilityProfile profile, string? dimension)
     {
@@ -25,7 +26,7 @@ internal static class WorldCommandEdits
             syntax: new(grammar.Schema, grammar.Version, start, value.Length - start, Hash256.Compute(value).Hex, start == 0 ? "utf8" : "utf8-bom", SyntaxLocator.DetectNewline(text))), text);
     }
     internal static byte[] Rewrite(CommandCandidate source, IReadOnlyList<LiteralTranslation> translations, CapabilityProfile profile, DecodeLimits limits, IReadOnlyList<TranslationKeyConversion>? conversions = null,
-        IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null)
+        IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null)
     {
         conversions ??= [];
         var encoding = new UTF8Encoding(false, true); var raw = encoding.GetBytes(source.Command);
@@ -34,7 +35,7 @@ internal static class WorldCommandEdits
         var referenceTargets = new List<CommandSelectorReference>();
         var references = translations.Any(item => item.Slot.Role == "reference.selector.name");
         var original = CommandTextExtractor.Extract(source, profile, limits, componentRoot: conversions.Count == 0 ? null : root => roots.Add(root), selectorReference: references ? referenceTargets.Add : null,
-            storageDisplayLists: storageDisplayLists);
+            storageDisplayLists: storageDisplayLists, runtimeDataVersion: runtimeDataVersion);
         var slots = original.Text.Occurrences.ToDictionary(item => item.Address);
         foreach (var binding in referenceTargets.Where(binding => binding.Direct))
         {
@@ -123,16 +124,16 @@ internal static class WorldCommandEdits
         var address = new SourceAddress(root.Artifact, root.NodePath, root.SemanticRole, root.Dimension, root.Chunk,
             syntax: syntax is null ? null : new(syntax.GrammarProfile, syntax.GrammarVersion, bom ? 3 : 0, output.Length - (bom ? 3 : 0), Hash256.Compute(output).Hex, syntax.Encoding, SyntaxLocator.DetectNewline(script), syntax.NodePath));
         using (WorkDiagnostics.Start("command.projection", phase: "projection"))
-            Verify(source, new(address, script), translations, profile, limits, conversions, storageDisplayLists);
+            Verify(source, new(address, script), translations, profile, limits, conversions, storageDisplayLists, runtimeDataVersion);
         return output;
     }
     private static (long Start, long Length, TypedPath? Path) SpanKey(SourceAddress address)
         => (address.Syntax!.StartByte, address.Syntax.LengthBytes, address.Syntax.NodePath);
     private static void Verify(CommandCandidate before, CommandCandidate after, IReadOnlyList<LiteralTranslation> translations, CapabilityProfile profile, DecodeLimits limits, IReadOnlyList<TranslationKeyConversion> conversions,
-        IReadOnlySet<(string Storage, string Path)>? storageDisplayLists)
+        IReadOnlySet<(string Storage, string Path)>? storageDisplayLists, int? runtimeDataVersion)
     {
-        var original = CommandTextExtractor.Extract(before, profile, limits, storageDisplayLists: storageDisplayLists);
-        var actual = CommandTextExtractor.Extract(after, profile, limits, storageDisplayLists: storageDisplayLists);
+        var original = CommandTextExtractor.Extract(before, profile, limits, storageDisplayLists: storageDisplayLists, runtimeDataVersion: runtimeDataVersion);
+        var actual = CommandTextExtractor.Extract(after, profile, limits, storageDisplayLists: storageDisplayLists, runtimeDataVersion: runtimeDataVersion);
         var expected = original.Text.Occurrences.ToDictionary(item => SourceIdentity.Occurrence(item.Address).Digest, item => item.Text);
         foreach (var item in translations.Where(item => item.Slot.Role != "reference.selector.name")) expected[SourceIdentity.Occurrence(item.Slot.Address).Digest] = item.Reply.Text;
         static string Id(SourceAddress address) => SourceIdentity.Occurrence(address).Digest.Hex;

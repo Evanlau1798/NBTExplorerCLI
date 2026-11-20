@@ -319,25 +319,25 @@ internal static class CommandTextExtractionTests
         foreach (var version in new[] { 3953, 4774 })
         {
             var profile = MinecraftProfiles.ForDataVersion(version)!;
-            foreach (var name in new[] { "@s", "@e[type=sheep,name=Guard,limit=1]", "@s[name=Guard]" })
+            foreach (var name in new[] { "@s", "$amount", "#counter", "Guard", "*", "@e[type=sheep,name=Guard,limit=1]", "@s[name=Guard]" })
             {
-                var isSelf = name == "@s";
+                var fixedHolder = name is "@s" or "$amount" or "#counter";
                 var score = "{\"score\":{\"name\":\"" + name + "\",\"objective\":\"temp_display\"}}";
                 var component = "[{\"text\":\"Current: \"}," + score + "]";
                 var text = CommandTextExtractor.Extract(new(command, "tellraw @s " + component), profile);
-                Require(text.Complete == isSelf && text.Text.Occurrences.Single().Text == "Current: " && text.References.IsEmpty,
-                    "plain self scores cannot use an entity name; a score with a selector predicate stays unresolved");
-                Require((NativeComponentReferences.Json(json, Encoding.UTF8.GetBytes(component), profile).Completeness == ReferenceCompleteness.Complete) == isSelf,
-                    "native JSON does not confuse the executor's score with a dynamic entity-name reference");
+                Require(text.Complete == fixedHolder && text.Text.Occurrences.Single().Text == "Current: " && text.References.IsEmpty,
+                    "fixed score holders preserve adjacent text and a score with a selector predicate stays unresolved");
+                Require((NativeComponentReferences.Json(json, Encoding.UTF8.GetBytes(component), profile).Completeness == ReferenceCompleteness.Complete) == fixedHolder,
+                    "native JSON distinguishes fixed score holders from dynamic entity-name references");
                 var page = version == 3953 ? "'" + component + "'" : component;
                 var book = CommandTextExtractor.Extract(new(command, "give @s written_book[written_book_content={title:'Title',author:'Author',pages:[" + page + "]}]"), profile);
-                Require(book.Complete == isSelf && book.Text.Occurrences.Any(occurrence => occurrence.Text == "Current: "),
-                    "nested item components preserve the same self score reference boundary");
+                Require(book.Complete == fixedHolder && book.Text.Occurrences.Any(occurrence => occurrence.Text == "Current: "),
+                    "nested item components preserve the same score reference boundary");
                 if (version == 4774)
                 {
                     var modern = new NbtCompound([new("score", new NbtCompound([new("name", new NbtString(name)), new("objective", new NbtString("temp_display"))]))]);
-                    Require((NativeComponentReferences.Nbt(nbt, modern, profile).Completeness == ReferenceCompleteness.Complete) == isSelf,
-                        "native NBT distinguishes a self score from a potentially name-dependent score");
+                    Require((NativeComponentReferences.Nbt(nbt, modern, profile).Completeness == ReferenceCompleteness.Complete) == fixedHolder,
+                        "native NBT distinguishes a fixed score holder from a potentially name-dependent score");
                 }
             }
         }

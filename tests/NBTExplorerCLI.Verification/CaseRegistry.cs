@@ -249,6 +249,7 @@ internal static class CaseRegistry
         new("command-conditional-data-item-grammar", "discovery", _ => CommandTextExtractionTests.ConditionalDataAndItemCommands()),
         new("command-component-selector-references", "discovery", _ => CommandTextExtractionTests.ComponentSelectorReferences()),
         new("world-command-functions-and-dat", "discovery", _ => WorldCommandExtractionTests.FunctionsAndPhysicalNbtCommands()),
+        new("command-static-time-summon-schedule", "discovery", _ => WorldCommandExtractionTests.StaticTimeAndScheduling()),
         new("command-summon-setblock-classic-give", "discovery", _ => CommandTextExtractionTests.SummonSetblockAndTaggedGive()),
         new("command-old-item-tag-vanilla-identity", "discovery", _ => CommandKeyPreparationTests.OlderItemTagsUseVanillaItemIdentity()),
         new("command-item-component-snbt-fragments", "discovery", _ => CommandTextExtractionTests.ItemComponentFragments()),

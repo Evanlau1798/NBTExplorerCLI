@@ -41,7 +41,7 @@ internal sealed partial class CommandTextReader
                     var unknownClick = fields.TryGetValue("click_event", out var clickData) && ComponentReferenceRules.Click(clickData, grammar, limits) is null;
                     ReportStorage(storage.Value, nbtPath.Value, interpreted, path, unknownClick);
                 }
-                if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
+                if (fields.ContainsKey("nbt") || fields.TryGetValue("score", out var score) && !ComponentReferenceRules.HasFixedScoreHolder(score)
                     || fields.TryGetValue("click_event", out var click) && ComponentReferenceRules.Click(click, grammar, limits) is null)
                     Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
                 if (fields.TryGetValue("extra", out var extra)) VisitNbt(extra, At(path, "extra"));
@@ -75,7 +75,7 @@ internal sealed partial class CommandTextReader
                     var unknownClick = value.TryGetNativeProperty("clickEvent", out var clickData) && ComponentReferenceRules.Click(clickData, null, limits) is null;
                     ReportStorage(NativeJsonStrings.Read(storage), NativeJsonStrings.Read(nbtPath), interpreted, path, unknownClick);
                 }
-                if (!observeStorageOnly && (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.IsSelfScore(score)
+                if (!observeStorageOnly && (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.HasFixedScoreHolder(score)
                     || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null))
                     Unknown(new(grammarPath.Segments.Concat(path.Segments)), start, end - start, "DynamicComponentReference");
                 if (value.TryGetNativeProperty("extra", out var extra)) VisitJson(extra, At(path, "extra"));
@@ -112,7 +112,7 @@ internal sealed partial class CommandTextReader
             return compound.Entries.Any(entry => entry.Name switch
             {
                 "selector" or "nbt" => true,
-                "score" => !ComponentReferenceRules.IsSelfScore(entry.Value),
+                "score" => !ComponentReferenceRules.HasFixedScoreHolder(entry.Value),
                 "click_event" => ComponentReferenceRules.Click(entry.Value, MinecraftProfiles.SnbtGrammar(profile), limits) is null,
                 "clickEvent" => ComponentReferenceRules.Click(entry.Value, null, limits) is null,
                 "minecraft:custom_data" or "custom_data" or "title" or "filtered_title" or "author" or "generation" or "resolved" or "id" or "count" or "Count" or "slot" or "Slot" => false,
@@ -133,7 +133,7 @@ internal sealed partial class CommandTextReader
                 : element.ValueKind == JsonValueKind.Object && element.EnumerateObject().Any(property => NativeJsonStrings.PropertyName(property) switch
                 {
                     "selector" or "nbt" => true,
-                    "score" => !ComponentReferenceRules.IsSelfScore(property.Value),
+                    "score" => !ComponentReferenceRules.HasFixedScoreHolder(property.Value),
                     "clickEvent" => ComponentReferenceRules.Click(property.Value, null, limits) is null,
                     _ => Contains(property.Value)
                 });

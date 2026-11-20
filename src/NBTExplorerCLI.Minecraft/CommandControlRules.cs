@@ -6,6 +6,10 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
+    private const int UnitTimeDataVersion = 1901;
+    private const int ExtendedScheduleDataVersion = 2205;
+    private const int TitleDurationDataVersion = 3320;
+
     private int ScoreCondition(List<CommandToken> tokens, int cursor)
     {
         if (cursor + 4 >= tokens.Count || !ScoreHolder(tokens[cursor + 1].Text) || !PlainControlToken(tokens[cursor + 2].Text)) return -1;
@@ -22,6 +26,19 @@ internal sealed partial class CommandTextReader
         bool Position(int offset) => Coordinates(Arg(offset), Arg(offset + 1), Arg(offset + 2));
         switch (name)
         {
+            case "summon":
+                return ResourceLocation(Arg(1)) && (count == 2 || count == 5 && Position(2));
+            case "schedule":
+                if (runtimeDataVersion < UnitTimeDataVersion) return false;
+                return Arg(1) switch
+                {
+                    "function" => count is 4 or 5 && ResourceOrTag(Arg(2)) && Duration(Arg(3), 1)
+                        && (count == 4 || runtimeDataVersion >= ExtendedScheduleDataVersion && Arg(4) is "append" or "replace"),
+                    "clear" => runtimeDataVersion >= ExtendedScheduleDataVersion && count == 3 && ResourceOrTag(Arg(2)),
+                    _ => false
+                };
+            case "difficulty":
+                return count == 1 || count == 2 && Arg(1) is "peaceful" or "easy" or "normal" or "hard";
             case "tp" or "teleport":
                 if (count is 2 or 3) return EntityTarget(Arg(1)) && (count == 2 || EntityTarget(Arg(2)));
                 if (count == 4) return Position(1);
@@ -108,7 +125,9 @@ internal sealed partial class CommandTextReader
                     && (count == position + 8 || Arg(position + 8) is "normal" or "force")
                     && (count < position + 10 || EntityTarget(Arg(position + 9))));
             case "title":
-                return count == 6 && EntityTarget(Arg(1)) && Arg(2) == "times" && Integer(Arg(3), out _) && Integer(Arg(4), out _) && Integer(Arg(5), out _);
+                return count == 6 && EntityTarget(Arg(1)) && Arg(2) == "times"
+                    && tokens.Skip(index + 3).All(token => runtimeDataVersion >= TitleDurationDataVersion
+                        ? Duration(token.Text, 0) : Integer(token.Text, out _));
             case "kill":
                 return count == 2 && EntityTarget(Arg(1));
             case "function":
@@ -116,8 +135,12 @@ internal sealed partial class CommandTextReader
             case "loot":
                 return count == 5 && Arg(1) == "give" && EntityTarget(Arg(2)) && Arg(3) == "loot" && ResourceLocation(Arg(4));
             case "time":
-                return count == 3 && Arg(1) == "query" && Arg(2) is "day" or "daytime" or "gametime";
+                return count == 3 && (Arg(1) is "set" or "add" && (runtimeDataVersion >= UnitTimeDataVersion ? Duration(Arg(2), 0)
+                        : Integer(Arg(2), out var ticks) && ticks >= 0)
+                    || Arg(1) == "set" && Arg(2) is "day" or "noon" or "night" or "midnight"
+                    || Arg(1) == "query" && Arg(2) is "day" or "daytime" or "gametime");
             case "bossbar":
+                if (Arg(1) == "remove") return count == 3 && ResourceLocation(Arg(2));
                 if (Arg(1) != "set" || !ResourceLocation(Arg(2))) return false;
                 return Arg(3) switch
                 {
@@ -270,6 +293,17 @@ internal sealed partial class CommandTextReader
         => double.TryParse(text, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out value) && double.IsFinite(value);
 
     private static bool Integer(string text, out int number) => int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out number) && !text.StartsWith('+');
+
+    private static bool Duration(string text, int minimum)
+    {
+        if (text.Length == 0 || text[0] == '+') return false;
+        var scale = text[^1] switch { 'd' => 24000, 's' => 20, _ => 1 };
+        var number = text[^1] is 'd' or 's' or 't' ? text.AsSpan(0, text.Length - 1) : text.AsSpan();
+        if (!float.TryParse(number, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var duration)
+            || !float.IsFinite(duration)) return false;
+        // Java's rounding saturates at Int32.MaxValue, which still satisfies the minimum.
+        return Math.Floor((double)(duration * scale) + 0.5) >= minimum;
+    }
 
     private static bool IntegerRange(string text)
     {

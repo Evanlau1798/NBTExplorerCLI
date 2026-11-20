@@ -155,8 +155,9 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
                 var profile = MinecraftProfiles.ForPackMetadata(functionPack) ?? throw new NotSupportedException("Command key conversion profile is unknown");
                 var command = WorldCommandEdits.BindFunction(group.Key.Artifact, bytes, profile, source.Location.Dimension);
                 var roots = new HashSet<SourceAddress>();
-                _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, root => roots.Add(root));
-                _ = WorldCommandEdits.Rewrite(command, [], profile, snapshot.Limits, conversions);
+                _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, root => roots.Add(root),
+                    runtimeDataVersion: source.RuntimeDataVersion);
+                _ = WorldCommandEdits.Rewrite(command, [], profile, snapshot.Limits, conversions, runtimeDataVersion: source.RuntimeDataVersion);
                 foreach (var conversion in conversions) ValidateBinding(conversion, profile, roots);
                 continue;
             }
@@ -185,8 +186,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
                 if (address.Syntax is not null)
                 {
                     var command = extracted.PendingCommands.SingleOrDefault(item => item.Address.NodePath.Equals(address.NodePath)) ?? throw new EditRejectedException(EditFailure.Precondition, "Command key target is not a real NBT command field");
-                    _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, Root);
-                    _ = WorldCommandEdits.Rewrite(command, [], profile, snapshot.Limits, [conversion]);
+                    _ = CommandTextExtractor.Extract(command, profile, snapshot.Limits, snapshot.Manifest.Scope, Root, runtimeDataVersion: source.RuntimeDataVersion);
+                    _ = WorldCommandEdits.Rewrite(command, [], profile, snapshot.Limits, [conversion], runtimeDataVersion: source.RuntimeDataVersion);
                 }
                 else if (conversion.Rule == KeyConversionRule.EncodedTextToTranslate && address.ComponentPath is not null && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json")
                 {

@@ -60,7 +60,8 @@ internal static class WorldArtifactEdits
             var pending = NbtTextExtractor.Extract(source.Location, document, source.Chunk, limits, layoutProfile: classic).PendingCommands.SingleOrDefault(item => item.Address.NodePath.Equals(path))
                 ?? throw new EditRejectedException(EditFailure.Precondition, "NBT syntax target is not an actual command field");
             var changed = WorldCommandEdits.Rewrite(pending, literal.Where(item => item.Slot.Address.Syntax is not null && item.Slot.Address.NodePath.Equals(path)).ToArray(), profile, limits,
-                conversions.Where(conversion => conversion.Address.Syntax is not null && conversion.Address.NodePath.Equals(path)).ToArray());
+                conversions.Where(conversion => conversion.Address.Syntax is not null && conversion.Address.NodePath.Equals(path)).ToArray(),
+                runtimeDataVersion: source.RuntimeDataVersion);
             edits.Add(TypedEdit.Replace(path, new NbtString(pending.Command), new NbtString(new UTF8Encoding(false, true).GetString(changed))));
         }
         foreach (var item in literal.Where(item => item.Slot.Address.Syntax is null && item.Slot.Address.ComponentPath is null))
