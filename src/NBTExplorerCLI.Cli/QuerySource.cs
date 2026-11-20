@@ -14,6 +14,7 @@ internal sealed class QuerySource : IDisposable
     internal ArtifactAddress Artifact { get; private set; }
     internal Hash256 RawHash { get; }
     internal Hash256? EntryHash { get; private set; }
+    internal byte[]? Payload { get; }
     internal QueryNode? Root { get; private set; }
     internal string RootName { get; private set; } = "";
     internal RegionFile? Region { get; }
@@ -26,7 +27,7 @@ internal sealed class QuerySource : IDisposable
         var id = new Guid(Convert.FromHexString(probe.AccessBinding.Hex).AsSpan(0, 16));
         return new(root, id);
     }
-    internal QuerySource(CliArguments request)
+    internal QuerySource(CliArguments request, bool readPayload = false)
     {
         var input = Path.GetFullPath(request.Input!); var world = Directory.Exists(input);
         var root = world ? input : Path.GetDirectoryName(input)!;
@@ -48,6 +49,13 @@ internal sealed class QuerySource : IDisposable
             if (Path.GetFileName(name) == "pack.mcmeta") extension = ".json";
         }
         else if (request.Flag("entry")) throw new CliFailure("INVALID_ARGUMENTS", "--entry requires an archive");
+        if (readPayload)
+        {
+            if (request.Flag("chunk") || request.Flag("dimension") || request.Flag("compression"))
+                throw new CliFailure("INVALID_ARGUMENTS", "Decoded chunk and compression options require format auto");
+            Payload = bytes;
+            return;
+        }
         if (kind is ArtifactKind.Region or ArtifactKind.Entities)
         {
             if (request.Flag("compression")) throw new CliFailure("INVALID_ARGUMENTS", "Region compression is selected by its chunk header");

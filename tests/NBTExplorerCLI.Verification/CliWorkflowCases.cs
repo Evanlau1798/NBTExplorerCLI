@@ -46,6 +46,8 @@ internal static class CliWorkflowCases
         new("cli-session-write-java-1-8-1", "cli-session-write", _ => CliSessionWriteTests.VersionlessAnvilUsesAnExplicitVersionForSessionApplyAndRollback()),
         new("cli-session-write-java-1-2-5", "cli-session-write", _ => CliSessionWriteTests.Java125TranslatesOnlyVanillaSigns()),
         new("cli-session-visible-text-protection", "cli-session-write", _ => CliTranslationContextTests.ProtectsVisibleNumbersAndFormatting()),
+        new("cli-translation-fallback-drafts", "cli-session-write", _ => CliFallbackTests.DraftsKeepStructureAndSourceBinding()),
+        new("cli-translation-fallback-boundaries", "cli-session-write", _ => CliFallbackTests.RespectsTextEncodingAndExportBoundaries()),
         new("cli-session-classic-sign-context", "cli-session-write", _ => CliTranslationContextTests.KeepsClassicSignLinesAndWholeDialogueTogether()),
         new("cli-session-java-1-20-1-write-rollback", "cli-session-write", _ => CliSessionWriteTests.Java1201ScansAndRecoversTaggedPackText()),
         new("cli-session-write-java-1-5-2", "cli-session-write", _ => CliSessionWriteTests.ClassicPlainTextRejectsValuesVanillaCannotLoad("1.5.2")),

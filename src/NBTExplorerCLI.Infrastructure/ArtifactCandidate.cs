@@ -54,7 +54,9 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
         input.Position = 0; verify(input);
         verified = true;
     }
-    public void Commit()
+    public void Commit() => Commit(null);
+
+    internal void Commit(Action? validateDestination)
     {
         using var observation = WorkDiagnostics.Start("candidate.commit", artifact.RelativePath, "commit", artifact.WorldId);
         RequireActive();
@@ -65,6 +67,7 @@ internal sealed class ArtifactCandidate : IArtifactCandidate
         var current = source is not null ? ArtifactStorage.Image(source) : parents ? ArtifactStorage.Image(path.Target) : ArtifactImage.Absent;
         if (current != Preimage) throw new ArtifactConflictException("Source changed before commit");
         if (Preimage == Postimage) { File.Delete(CandidatePath); committed = true; return; }
+        validateDestination?.Invoke();
         attempted = true;
         try
         {

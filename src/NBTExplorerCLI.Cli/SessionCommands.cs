@@ -10,10 +10,12 @@ namespace NBTExplorerCLI.Cli;
 
 internal static class SessionCommands
 {
-    internal static readonly string[] Subcommands = ["start", "status", "export", "advance", "submit", "get", "jump", "note", "glossary", "reset", "groups", "memory", "plan", "export-lang", "create-pack", "seal", "help"];
+    internal static readonly string[] Subcommands = ["start", "status", "export", "advance", "submit", "get", "jump", "note", "glossary", "reset", "groups", "memory", "plan", "export-lang", "create-pack", "seal", "fallback", "help"];
     internal static string[] Allowed(string action)
     {
         if (action == "help") return ["help"];
+        if (action == "fallback") return ["path", "pointer", "segments", "chunk", "dimension", "entry", "compression", "format", "line",
+            "byte-range", "snbt-profile", "reply", "output", "help"];
         string[] options = action switch
         {
             "start" => ["source-language", "target-language", "operation-id", "page-size", "page-bytes", "match-pattern", "types", "path", "dimension", "region", "standalone", "no-group", "minecraft-version"],
@@ -29,6 +31,7 @@ internal static class SessionCommands
     }
     internal static CliResult Execute(CliArguments request)
     {
+        if (request.Subcommand == "fallback") return FallbackCommands.Execute(request);
         if (request.Subcommand is "export-lang" or "create-pack") return ResourceCommands.Execute(request);
         var id = request.Get("session-id") is { } declared ? GuidValue(declared) : request.Subcommand == "start" ? Guid.NewGuid() : throw new CliFailure("INVALID_ARGUMENTS", "Missing --session-id");
         var operationId = request.Get("operation-id") is { } declaredOperation ? GuidValue(declaredOperation) : Guid.NewGuid();

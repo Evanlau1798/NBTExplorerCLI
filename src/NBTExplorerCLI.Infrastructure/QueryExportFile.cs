@@ -14,13 +14,19 @@ public static class QueryExportFile
         if (File.Exists(full) || Directory.Exists(full)) throw new ArtifactConflictException("Export destination already exists");
     }
     public static void WriteNew(string file, string content)
+        => WriteNew(file, content, null);
+
+    public static void WriteNew(string file, string content, Action<string>? validateDestination)
     {
         var full = Path.GetFullPath(file); var root = Path.GetDirectoryName(full)!;
         var bytes = new UTF8Encoding(false, true).GetBytes(content);
         if (bytes.Length > ArtifactStorage.MaximumBytes) throw new ArtifactSizeLimitException();
         var artifact = new ArtifactAddress(Namespace, Path.GetFileName(full), ArtifactKind.Json);
         using var path = GuardedArtifactPath.Acquire(root, Namespace, artifact);
+        validateDestination?.Invoke(path.Target);
         using var candidate = new ArtifactCandidate(path, artifact, ArtifactImage.Absent, bytes, new ArtifactFileIo());
-        candidate.Flush(); candidate.Verify(_ => { }); candidate.Commit();
+        candidate.Flush(); candidate.Verify(_ => { });
+        // shortcut: checking markers and renaming are separate operations; atomic exclusion needs external world writers to cooperate.
+        candidate.Commit(validateDestination is null ? null : () => validateDestination(path.Target));
     }
 }

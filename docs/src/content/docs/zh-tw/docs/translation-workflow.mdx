@@ -221,6 +221,28 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
 
 ---
 
+## 遇到未支援來源時匯出翻譯草稿
+
+掃描能讀取來源、但尚未判定文字用途時，可用 `translate fallback` 匯出選定標籤或指令行、候選文字路徑與回覆範本。支援 NBT、JSON、SNBT 和 UTF-8 純文字。
+
+```powershell
+.\nbtcli.exe translate fallback 'D:\WorldCopy' `
+  --path 'datapacks/story/data/story/functions/dialogue.mcfunction' --line 12 `
+  --output 'D:\Drafts\dialogue-context.json'
+```
+
+NBT 檔可以用 `--pointer` 選標籤，省略時會讀取根標籤。讀取區塊時需指定 `--chunk x,z`，獨立區域檔還需指定維度。ZIP 可用 `--entry` 選定成員。獨立 SNBT 片段使用 `--format snbt`。行號從 1 開始，預設讀取指令行末尾的結構化參數。若標籤嵌在其他格式中，可用 `--byte-range 起始,長度` 指定從 0 開始的 UTF-8 位元組位置，並選擇 `--format json`、`snbt` 或 `text`。指定 `--format text` 時會產生純文字草稿，結果會標明 `structureVerified: false`。
+
+把 `data.replyTemplate` 存成另一個 JSON 檔，只填入要翻譯欄位的 `text`，其餘可留 `null`。再次執行相同選取條件，加上 `--reply` 和新的輸出檔名。
+
+```powershell
+.\nbtcli.exe translate fallback 'D:\WorldCopy' `
+  --path 'datapacks/story/data/story/functions/dialogue.mcfunction' --line 12 `
+  --reply 'D:\Drafts\dialogue-reply.json' --output 'D:\Drafts\dialogue-validated.json'
+```
+
+譯後片段在 `data.content`。CLI 會比對原始來源和候選欄位、驗證格式碼、數值和私用區字元，並保留結構化草稿的其他欄位。選取單行時，輸出必須維持一個物理行，能以跳脫表示的字串換行仍可保留。即使只選取單一檔案，也請將草稿匯出到 Minecraft 世界資料夾以外。結果會標明 `gameplayVerified: false`。請先在世界副本核對指令或畫面，再將草稿納入編輯。原始來源與掃描狀態會保留。
+
 ## 選用進階小幫手
 
 一般地圖翻譯不需要用到以下功能，但在翻譯超大型地圖時非常實用：

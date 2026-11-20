@@ -221,6 +221,28 @@ Then finish in three clear steps:
 
 ---
 
+## Draft Text From an Unresolved Source
+
+Use `translate fallback` when a scan can read an artifact but cannot establish how its text is used. The draft includes the selected tag or line as context, candidate string paths, and a reply template. It works with NBT, JSON, SNBT, and UTF-8 text.
+
+```powershell
+.\nbtcli.exe translate fallback 'D:\WorldCopy' `
+  --path 'datapacks/story/data/story/functions/dialogue.mcfunction' --line 12 `
+  --output 'D:\Drafts\dialogue-context.json'
+```
+
+For an NBT file, use `--pointer` to select a tag, or omit it to inspect the root. A region lookup also needs `--chunk x,z` and a dimension when the input is a standalone region file. Use `--entry` for an exact ZIP member. Use `--format snbt` for a standalone SNBT snippet. Line numbers start at 1 and select a trailing structured command operand by default. For a fragment in an unfamiliar file, select `--byte-range start,length` using zero-based UTF-8 byte offsets and choose `--format json`, `snbt`, or `text` as appropriate. Explicit `--format text` produces a plain-text draft and reports `structureVerified: false`.
+
+Copy `data.replyTemplate` to a separate JSON file. Fill in the `text` values for the slots you want to translate. Leave other values as `null`. Run the same selection again with `--reply` and a new output filename.
+
+```powershell
+.\nbtcli.exe translate fallback 'D:\WorldCopy' `
+  --path 'datapacks/story/data/story/functions/dialogue.mcfunction' --line 12 `
+  --reply 'D:\Drafts\dialogue-reply.json' --output 'D:\Drafts\dialogue-validated.json'
+```
+
+The result contains the translated snippet in `data.content`. The CLI matches the original source and selected slots, validates protected formatting, numbers, and private-use glyphs, and preserves other members of structured drafts. A line selection retains one physical line, including when the format can escape a newline inside a string. Place draft exports outside Minecraft world folders, even when selecting an individual file. The result reports `gameplayVerified: false`. Review the draft on a world copy before incorporating it into an edit. The fallback leaves the original artifact and scan verdict intact.
+
 ## Helpful Extras (Optional)
 
 You do not need any of these to finish a map translation, but they are handy on large projects:

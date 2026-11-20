@@ -331,8 +331,8 @@ export const COMMAND_SURFACE: CommandEntry[] = [
     syntax: 'nbtcli translate <subcommand> <world> [options]',
     tier: 'preview',
     requiredArgs: {
-      en: 'Subcommand (start, status, export, advance, submit, get, jump, note, glossary, reset, groups, memory, plan, export-lang, create-pack, seal, help)',
-      'zh-tw': '子命令（start、status、export、advance、submit、get、jump、note、glossary、reset、groups、memory、plan、export-lang、create-pack、seal、help）',
+      en: 'Subcommand (start, status, export, advance, submit, get, jump, note, glossary, reset, groups, memory, plan, export-lang, create-pack, seal, fallback, help)',
+      'zh-tw': '子命令（start、status、export、advance、submit、get、jump、note、glossary、reset、groups、memory、plan、export-lang、create-pack、seal、fallback、help）',
     },
     summary: {
       en: 'Runs the full page-by-page adventure map translation workflow, glossary management, resource pack export, and completion sealing.',
