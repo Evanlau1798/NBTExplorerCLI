@@ -10,8 +10,9 @@ internal sealed partial class CommandTextReader
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
         var storageElement = storageAccess is not null || storageDisplayLists is { Count: > 0 } ? StorageDisplayWrite(tokens, index) : null;
-        var staticListWrite = storageElement is not null && StaticDataWrite(tokens, index, keepEmptyListReset: true);
-        if (storageAccess is not null) ObserveDataStorage(tokens, index, path, staticListWrite ? null : storageElement);
+        var storageValue = storageElement is null ? null : Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+        var staticListWrite = storageValue is not null && StaticDataWrite(tokens, index, storageValue, keepEmptyListReset: true);
+        if (storageAccess is not null) ObserveDataStorage(tokens, index, path, staticListWrite ? null : storageElement, storageValue);
         if (staticListWrite || ReadStorageDisplayWrite(tokens, index, path, storageElement)) return;
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;
@@ -39,7 +40,7 @@ internal sealed partial class CommandTextReader
             if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(token.Text), token.Start, tokenEnd, grammarPath, true, itemTree: true, commandTag: true);
             return;
         }
-        if (StaticDataWrite(tokens, index)) return;
+        if (StaticDataWrite(tokens, index, storageValue)) return;
         if (tokens.Count >= index + 5 && tokens[index + 1].Text == "merge" && tokens[index + 2].Text == "entity")
         {
             if (tokens.Count != index + 5) throw new CommandSyntaxException();
@@ -88,7 +89,7 @@ internal sealed partial class CommandTextReader
         }
         return true;
     }
-    private bool StaticDataWrite(List<CommandToken> tokens, int index, bool keepEmptyListReset = false)
+    private bool StaticDataWrite(List<CommandToken> tokens, int index, SnbtNode? valueNode = null, bool keepEmptyListReset = false)
     {
         if (index + 2 >= tokens.Count || tokens[index + 1].Text != "modify") return false;
         var path = DataTargetEnd(tokens, index + 2);
@@ -109,10 +110,10 @@ internal sealed partial class CommandTextReader
             return sourceType == "entity" && NumericEntitySource(source) || StaticItemSource(sourceType, source);
         }
         if (tokens.Count != value + 2 || tokens[value].Text != "value") return false;
-        var parsed = Snbt.ParseDocument(Utf8.GetBytes(tokens[value + 1].Text), MinecraftProfiles.SnbtGrammar(profile), limits);
-        if (keepEmptyListReset && operation == "set" && parsed.Root.Value is LogicalMinecraftList { Items.IsEmpty: true }) return false;
-        return !parsed.Root.ContainsStringValues && (operation != "merge" || parsed.Root.Value is LogicalMinecraftCompound)
-            || StaticItemTagPayload(tokens[path].Text, parsed.Root, operation);
+        valueNode ??= Snbt.ParseDocument(Utf8.GetBytes(tokens[value + 1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+        if (keepEmptyListReset && operation == "set" && valueNode.Value is LogicalMinecraftList { Items.IsEmpty: true }) return false;
+        return !valueNode.ContainsStringValues && (operation != "merge" || valueNode.Value is LogicalMinecraftCompound)
+            || StaticItemTagPayload(tokens[path].Text, valueNode, operation);
     }
     private static bool NumericEntitySource(string path)
     {

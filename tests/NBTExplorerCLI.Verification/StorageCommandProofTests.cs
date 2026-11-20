@@ -324,6 +324,134 @@ internal static class StorageCommandProofTests
         finally { Directory.Delete(root, true); Directory.Delete(cache, true); Directory.Delete(state, true); }
     }
 
+    internal static void SavedDisplayList()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild(); var state = ScratchDirectory.CreateChild();
+        const string seed = "data/command_storage_demo.dat";
+        const string first = """data modify storage demo:messages lines set value ['{"text":"First"}']""";
+        const string second = """data modify storage demo:messages lines set value ['{"text":"Second"}']""";
+        const string branch = Folder + "branch.mcfunction";
+        const string late = Folder + "late.mcfunction";
+        try
+        {
+            Create(root);
+            PutSeed(root, L(S("""{"text":"Saved A"}"""), S("""{"text":"Saved B"}""")));
+            Put(root, Producer, Encoding.UTF8.GetBytes(first));
+            Put(root, branch, Encoding.UTF8.GetBytes(second));
+            var snapshot = WorldQueryTests.Query(root, cache);
+            Require(snapshot.Manifest.CoverageComplete, "the verified saved list and both replacement branches have complete coverage");
+            var occurrences = snapshot.ReadSources().SelectMany(row => row.Text?.Occurrences ?? []).Where(item => item.Text != "Test").ToArray();
+            Require(occurrences.Select(item => item.Text).Order().SequenceEqual(new[] { "First", "Saved A", "Saved B", "Second" }),
+                "saved strings are independently extracted alongside both writers");
+            var sessionService = new TranslationSessionService(new FileSystemTranslationSessionStore(state));
+            var session = Guid.NewGuid();
+            sessionService.Start(snapshot, session, "en_us", "zh_tw", Guid.NewGuid());
+            var sourceState = sessionService.Read(session);
+            var seedSlots = sourceState.Slots.Where(item => item.Slot.Address.Artifact.RelativePath == seed).Select(item => item.Slot.Id.Digest).ToHashSet();
+            Require(seedSlots.Count == 2 && sessionService.Groups(session).Any(group => group.Slots.SequenceEqual(sourceState.Slots
+                .Where(item => seedSlots.Contains(item.Slot.Id.Digest)).OrderBy(item => item.Slot.SourceText).Select(item => item.Slot.Id.Digest))),
+                "session prompt preserves the ordered context of the saved list");
+
+            var operations = occurrences.Select((occurrence, index) =>
+            {
+                var slot = occurrence.ToSlot("en_us", "zh_tw");
+                return new LiteralPatch("seed-" + index, new(slot, new(slot.Id, slot.SourceTextHash, "zh_tw", "譯：" + slot.SourceText)));
+            }).ToArray();
+            var inventory = new WorldInventory(root, World); var storage = new ArtifactStorage(root, World);
+            var plan = new WorldPlanBuilder(inventory).Build(snapshot, operations);
+            var originals = new[] { seed, Producer, branch }.ToDictionary(path => path, path => File.ReadAllBytes(Path.Combine(root, path)));
+            var preparation = new WorldPlanPreparation(inventory, storage);
+            var engine = WorldApplyTests.Engine(root, state, storage);
+            using (var prepared = preparation.Prepare(snapshot, plan, true))
+            {
+                Put(root, late, Encoding.UTF8.GetBytes(LiteralReader));
+                Reject<ArtifactConflictException>(() => engine.Apply(prepared, true));
+                Require(originals.All(pair => File.ReadAllBytes(Path.Combine(root, pair.Key)).SequenceEqual(pair.Value)), "a late raw consumer cannot commit any staged output");
+                File.Delete(Path.Combine(root, late));
+            }
+            using (var prepared = preparation.Prepare(snapshot, plan, true))
+            {
+                Require(engine.Apply(prepared, true).Success, "storage seed and writers can be committed together");
+                var updated = WorldQueryTests.Query(root, cache).ReadSources().SelectMany(row => row.Text?.Occurrences ?? []).Select(item => item.Text).ToArray();
+                Require(occurrences.All(item => updated.Contains("譯：" + item.Text)), "all four translations can be read back");
+                Require(engine.Recover(plan.PlanHash, true, rollback: true).Counts[OperationOutcome.RolledBack] == 4
+                    && originals.All(pair => File.ReadAllBytes(Path.Combine(root, pair.Key)).SequenceEqual(pair.Value)), "rollback restores the exact saved NBT and command bytes");
+            }
+            File.Delete(Path.Combine(root, Producer));
+            File.Delete(Path.Combine(root, branch));
+            var onlySeed = WorldQueryTests.Query(root, cache);
+            Require(onlySeed.Manifest.CoverageComplete && onlySeed.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == seed).Text!.Occurrences.Length == 2,
+                "an exclusive display reader is enough even without any writer");
+            Put(root, late, Encoding.UTF8.GetBytes(LiteralReader));
+            var mixed = WorldQueryTests.Query(root, cache);
+            Require(!mixed.Manifest.CoverageComplete && mixed.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == seed).Text!.Occurrences.IsEmpty,
+                "changing a reader invalidates cached saved text even though NBT bytes are unchanged");
+            File.Delete(Path.Combine(root, late));
+            PutSeed(root, L(S("""{"text":"Saved A"}"""), S("not a JSON component")));
+            var invalid = WorldQueryTests.Query(root, cache).ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == seed);
+            Require(invalid.Outcome == SourceOutcome.Unsupported && invalid.Text!.Occurrences.IsEmpty,
+                "an incompatible value leaves the actual list unclassified");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); Directory.Delete(state, true); }
+    }
+
+    internal static void NativeSeedElementWrites()
+    {
+        foreach (var version in new[] { 4298, 4308, 5130 })
+        {
+            var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+            try
+            {
+                var producer = version == 5130 ? CreateNamespaced(root, "demo") : "datapacks/p/data/demo/function/producer.mcfunction";
+                var seed = version == 5130 ? "data/demo/command_storage.dat" : "data/command_storage_demo.dat";
+                if (version != 5130)
+                {
+                    Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(version, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+                    var format = version == 4298 ? 62 : 64;
+                    Put(root, "datapacks/p/pack.mcmeta", Encoding.UTF8.GetBytes($$$"""{"pack":{"pack_format":{{{format}}},"description":"Test"}}"""));
+                    Put(root, "datapacks/p/data/demo/function/consumer.mcfunction", """tellraw @a {storage:"demo:messages",nbt:"lines[]",interpret:true}"""u8.ToArray());
+                }
+                Put(root, producer, """data modify storage demo:messages lines append value {text:"Appended"}"""u8.ToArray());
+                PutSeed(root, new NbtList(NbtType.Compound, []), seed, version);
+                Require(WorldQueryTests.Query(root, cache).Manifest.CoverageComplete, $"an empty compound seed accepts a native component writer in {version}");
+                PutSeed(root, L(C(E("text", S("Saved")))), seed, version);
+                var filled = WorldQueryTests.Query(root, cache);
+                Require(filled.Manifest.CoverageComplete && filled.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == seed).Text!.Occurrences.Single().Text == "Saved",
+                    $"a nonempty native component seed remains a distinct translation source in {version}");
+                Put(root, producer, """data modify storage demo:messages lines prepend value "Appended" """u8.ToArray());
+                var mixed = WorldQueryTests.Query(root, cache);
+                Require(mixed.Manifest.CoverageComplete == (version == 5130), $"append/prepend heterogeneity depends on runtime list mutation support in {version}");
+            }
+            finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+        }
+    }
+
+    internal static void NativeSeedRuntimeSchema()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+        const string seed = "data/command_storage_demo.dat";
+        try
+        {
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(4304, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            Put(root, "datapacks/p/pack.mcmeta", """{"pack":{"pack_format":63,"description":"Test"}}"""u8.ToArray());
+            Put(root, "datapacks/p/data/demo/function/reader.mcfunction", """tellraw @a {storage:"demo:messages",nbt:"lines[]",interpret:true}"""u8.ToArray());
+            PutSeed(root, L(C(E("text", S("Shared")))), seed, 4298);
+            Require(WorldQueryTests.Query(root, cache).Manifest.CoverageComplete, "a cross-version native component with identical meaning stays supported");
+
+            var oldHint = E("text", C(E("text", S("Old hint"))));
+            var newHint = E("value", C(E("text", S("New hint"))));
+            foreach (var hover in new[] { C(E("action", S("show_text")), oldHint), C(E("action", S("show_text")), oldHint, newHint) })
+            {
+                PutSeed(root, L(C(E("text", S("Body")), E("hover_event", hover))), seed, 4298);
+                var snapshot = WorldQueryTests.Query(root, cache);
+                var row = snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == seed);
+                Require(!snapshot.Manifest.CoverageComplete && row.Outcome == SourceOutcome.Unsupported && row.Text!.Occurrences.IsEmpty,
+                    "the scan cannot authorize saved hover text that the current game cannot display or reads from another field");
+            }
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+    }
+
     private static void Create(string root, bool seed = true)
     {
         var level = WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions);

@@ -25,7 +25,8 @@ internal static class SessionContextGrouping
             : role.StartsWith("sign.back", StringComparison.Ordinal) || role.StartsWith("hanging_sign.back", StringComparison.Ordinal) ? "sign.back"
             : role == "item.lore" ? "item.lore" : "styled.fragments";
         if (declared is not null) return (kind, new(declared.Artifact, declared.NodePath, "session.group." + kind, declared.Dimension, declared.Chunk));
-        if (role == "command_storage.component") throw new InvalidOperationException("Storage component grouping requires an explicit root; rescan and start with its rules");
+        if (role is "command_storage.component" or "command_storage.component.interpreted")
+            throw new InvalidOperationException("Storage component grouping requires a bound scan root; rescan and start again");
         var path = address.Syntax is null ? ContainerPath(address.NodePath, address.ComponentPath is null, role) : address.NodePath;
         var syntax = address.Syntax;
         if (syntax?.NodePath is { } syntaxPath)

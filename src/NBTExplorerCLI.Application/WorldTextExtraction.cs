@@ -32,7 +32,7 @@ public sealed partial class WorldTextExtraction
             {
                 if (pair.Key is null || pair.Key.WorldId != inventory.WorldId || pair.Key.Kind != ArtifactKind.Nbt || pair.Key.ContainerEntry is not null
                     || pair.Value is null || pair.Value.Count > 256 || (total += pair.Value.Count) > 100_000
-                    || pair.Value.Any(rule => rule is null || rule.Path is null || !Enum.IsDefined(rule.Kind)))
+                    || pair.Value.Any(rule => rule is null || rule.Path is null || rule.Kind is not (StorageTextKind.Literal or StorageTextKind.TextComponent)))
                     throw new ArgumentException("Invalid or oversized explicit storage policy", nameof(storageRules));
                 rules.Add(pair.Key, pair.Value.ToImmutableArray());
             }
@@ -51,8 +51,9 @@ public sealed partial class WorldTextExtraction
     }
     internal IEnumerable<TextSourceExtraction> ReadStorageObservations(Action<CommandStorageAccess> observe, Action opaqueStorage)
         => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage);
-    internal IEnumerable<TextSourceExtraction> ReadStorageProducers(StorageDisplayPolicy storage)
-        => ReadSourcesCore(Discovery.Sources.Where(source => storage.SourceKeys.ContainsKey(source.Location.Artifact.RelativePath)), previewStorage: storage);
+    internal IEnumerable<TextSourceExtraction> ReadStorageProjection(StorageDisplayPolicy storage, HashSet<string> pendingSeeds)
+        => ReadSourcesCore(Discovery.Sources.Where(source => storage.SourceKeys.ContainsKey(source.Location.Artifact.RelativePath)
+            || pendingSeeds.Contains(source.Location.Artifact.RelativePath)), previewStorage: storage);
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
     private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected, Action<CommandStorageAccess>? storageAccess = null, Action? opaqueStorage = null,
         StorageDisplayPolicy? previewStorage = null)
@@ -118,7 +119,11 @@ public sealed partial class WorldTextExtraction
             {
                 var document = ReadDat(bytes);
                 if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(document.Root)) opaqueStorage();
-                text = NbtTextExtractor.Extract(source.Location, document, limits: request.Limits, storageRules: StorageRules.GetValueOrDefault(source.Location.Artifact, ImmutableArray<StorageTextRule>.Empty), scope: request.Scope, layoutProfile: LayoutProfile);
+                var rules = StorageRules.GetValueOrDefault(source.Location.Artifact, []);
+                if (rules.IsEmpty && storageAccess is null && source.Location.Role == WorldSourceRole.SavedData && LayoutProfile is { } layout
+                    && WorldLayoutLocator.CommandStorageNamespace(layout, source.Location.Artifact.RelativePath) is not null)
+                    rules = (previewStorage ?? StorageDisplays).SeedRules.GetValueOrDefault(source.Location.Artifact, []);
+                text = NbtTextExtractor.Extract(source.Location, document, limits: request.Limits, storageRules: rules, scope: request.Scope, layoutProfile: LayoutProfile);
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)

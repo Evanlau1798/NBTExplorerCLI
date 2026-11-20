@@ -29,7 +29,7 @@ public static class TextExtractionBudget
         return bytes;
     }
 }
-public enum StorageTextKind { Literal, TextComponent }
+public enum StorageTextKind { Literal, TextComponent, InterpretedList }
 public sealed record StorageTextRule(TypedPath Path, StorageTextKind Kind);
 public sealed record TextExtractionResult(ImmutableArray<TextOccurrence> Occurrences,
     ImmutableArray<TranslationKeyReference> TranslationKeys, ImmutableArray<ExtractionDiagnostic> Diagnostics,

@@ -23,14 +23,16 @@ internal sealed partial class CommandTextReader
         };
     }
 
-    private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, (string Storage, string Path)? storageElement)
+    private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, (string Storage, string Path)? storageElement, SnbtNode? storageValue)
     {
         if (storageElement is { } list)
         {
             var value = tokens[^1];
             var use = tokens[index + 5].Text == "set" ? CommandStorageUse.ListReplacement : CommandStorageUse.ListElementWrite;
+            var encoded = MinecraftNbtAdapter.Encode(new("", storageValue!.Value), profile, limits).Root;
+            var elementType = use == CommandStorageUse.ListReplacement ? (encoded as NbtList)?.ElementType : encoded.Type;
             ObserveStorage(list.Storage, list.Path, use,
-                Address(path, value.Start, value.Text.Length, source.Address.SemanticRole));
+                Address(path, value.Start, value.Text.Length, source.Address.SemanticRole), listElementType: elementType);
             return;
         }
         var target = index + 2;
@@ -94,12 +96,12 @@ internal sealed partial class CommandTextReader
         ObserveStorage(id.Text, "", CommandStorageUse.Other, Address(path, id.Start, id.Text.Length, source.Address.SemanticRole));
     }
 
-    private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address, bool hasUnclassifiedReferences = false)
+    private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address, bool hasUnclassifiedReferences = false, NbtType? listElementType = null)
     {
         if (!MinecraftIdentifier.ResourceLocation(storage)) return;
         var normalized = MinecraftIdentifier.DefaultNamespace(storage);
         retained = checked(retained + TextExtractionBudget.RecordBytes(address, (long)normalized.Length + path.Length));
         if (retained > limits.MaxDecodedBytes) Limit();
-        storageAccess?.Invoke(new(normalized, path, use, address, hasUnclassifiedReferences));
+        storageAccess?.Invoke(new(normalized, path, use, address, hasUnclassifiedReferences) { ListElementType = listElementType });
     }
 }

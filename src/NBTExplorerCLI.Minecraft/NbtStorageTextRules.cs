@@ -22,6 +22,7 @@ internal sealed partial class NbtTextReader
             var resolved = NbtLocator.Resolve(root, rule.Path);
             if (resolved.Status != ResolutionStatus.Found) { output.Diagnostic(rule.Path, "StorageRuleTargetNotFoundOrAmbiguous"); continue; }
             if (rule.Kind == StorageTextKind.Literal) Literal(resolved.Value, rule.Path, "command_storage.literal");
+            else if (rule.Kind == StorageTextKind.InterpretedList) ComponentList(resolved.Value!, rule.Path, "command_storage.component.interpreted");
             else Component(resolved.Value, rule.Path, "command_storage.component");
         }
         Unknown(contents, path);
