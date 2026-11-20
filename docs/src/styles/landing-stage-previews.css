@@ -1,117 +1,102 @@
-/* Scene 2: World Layers with Cyan Laser Scan Beam */
+/* Scene 2: World Layers (Clean Architectural Stack) */
 .world-stack {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: rgba(7, 13, 24, 0.78);
-  overflow: hidden;
-}
-
-.scan-beam {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 32px;
-  background: linear-gradient(180deg, transparent, rgba(56, 189, 248, 0.24), rgba(74, 222, 128, 0.14), transparent);
-  border-bottom: 1px solid rgba(125, 211, 252, 0.7);
-  animation: laserScan 3.4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes laserScan {
-  0%, 100% { top: -12px; opacity: 0.35; }
-  50% { top: calc(100% - 22px); opacity: 0.95; }
+  background: var(--surface-code);
 }
 
 .world-layer {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
-  border-radius: 9px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(15, 24, 38, 0.82);
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-card);
+  transition: border-color 0.16s ease;
+}
+
+.world-layer:hover {
+  border-color: var(--border-strong);
 }
 
 .world-layer-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 8px;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
   border-radius: 2px;
-  background: var(--grass-bright);
-  box-shadow: 0 0 10px rgba(74, 222, 128, 0.65);
+  background: var(--accent);
 }
 
 .world-layer-1 .world-layer-dot {
-  background: var(--cyan);
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+  background: var(--signal-sky);
 }
 
 .world-layer-2 .world-layer-dot {
-  background: var(--amber);
-  box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  background: var(--signal-amber);
 }
 
 .world-layer-text {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .world-layer-file {
   font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--text);
 }
 
 .world-layer-detail {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--muted);
 }
 
-/* Scene 3: Pack Bundle */
+/* Scene 3: Pack Bundle (Single-line Crisp Paths) */
 .pack-bundle {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(106, 160, 76, 0.28);
-  background: linear-gradient(160deg, rgba(16, 34, 26, 0.52), rgba(9, 17, 30, 0.85));
+  gap: 9px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-code);
 }
 
 .pack-archive-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
 }
 
 .pack-cube-icon {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  color: var(--text-soft);
 }
 
 .pack-archive-name {
   font-family: var(--font-mono);
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #e2e8f0;
-  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pack-entry-list {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   padding: 0;
   list-style: none;
 }
@@ -121,20 +106,23 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(6, 11, 20, 0.72);
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-card);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .pack-entry-path {
+  min-width: 0;
   color: var(--text-soft);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pack-entry-tag {
   flex: 0 0 auto;
-  color: var(--cyan-bright);
+  color: var(--muted);
 }

@@ -25,16 +25,22 @@ const ui = {
     required: 'Inputs',
     next: 'Result',
     options: 'Options',
+    copy: 'Copy command syntax',
+    copied: 'Copied',
   },
   'zh-tw': {
     required: '必要輸入',
     next: '輸出與下一步',
     options: '支援選項',
+    copy: '複製指令語法',
+    copied: '已複製',
   },
 }[lang] ?? {
   required: 'Inputs',
   next: 'Result',
   options: 'Options',
+  copy: 'Copy command syntax',
+  copied: 'Copied',
 };
 
 const filteredCommands =
@@ -55,7 +61,26 @@ const filteredCommands =
         return (
           <div class="nbt-cmd-card" id={`cmd-${cmd.id}`} data-cmd-card data-tier={cmd.tier} data-search={searchIndex}>
             <div class="nbt-cmd-card-top">
-              <code class="nbt-cmd-syntax">{cmd.syntax}</code>
+              <div class="nbt-cmd-syntax-group">
+                <code class="nbt-cmd-syntax">{cmd.syntax}</code>
+                <button
+                  type="button"
+                  class="nbt-cmd-copy"
+                  data-copy-cmd={cmd.syntax}
+                  data-copy-label={ui.copy}
+                  data-copied-label={ui.copied}
+                  aria-label={ui.copy}
+                  title={ui.copy}
+                >
+                  <svg class="nbt-icon-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.5" />
+                    <path d="M10.75 5.25V3.5a1.25 1.25 0 0 0-1.25-1.25h-6A1.25 1.25 0 0 0 2.25 3.5v6a1.25 1.25 0 0 0 1.25 1.25h1.75" />
+                  </svg>
+                  <svg class="nbt-icon-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="m3.5 8.5 3 3 6-6.5" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
               <span class="nbt-pill" data-tier={cmd.tier}>
                 <span class="nbt-safety-dot" aria-hidden="true" />
                 {labels[cmd.tier].badge}
@@ -73,7 +98,7 @@ const filteredCommands =
               </div>
             </div>
             {flags.length > 0 && (
-              <div style="margin-top: 0.6rem;">
+              <div class="nbt-cmd-options-wrap">
                 <span class="nbt-cmd-meta-label">{ui.options}</span>
                 <div class="nbt-flag-list">
                   {flags.map((flag) => (
@@ -116,7 +141,26 @@ const filteredCommands =
             data-search={searchIndex}
           >
             <div class="nbt-cmd-card-top">
-              <code class="nbt-cmd-syntax">{syntax}</code>
+              <div class="nbt-cmd-syntax-group">
+                <code class="nbt-cmd-syntax">{syntax}</code>
+                <button
+                  type="button"
+                  class="nbt-cmd-copy"
+                  data-copy-cmd={syntax}
+                  data-copy-label={ui.copy}
+                  data-copied-label={ui.copied}
+                  aria-label={ui.copy}
+                  title={ui.copy}
+                >
+                  <svg class="nbt-icon-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.5" />
+                    <path d="M10.75 5.25V3.5a1.25 1.25 0 0 0-1.25-1.25h-6A1.25 1.25 0 0 0 2.25 3.5v6a1.25 1.25 0 0 0 1.25 1.25h1.75" />
+                  </svg>
+                  <svg class="nbt-icon-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="m3.5 8.5 3 3 6-6.5" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
               <span class="nbt-pill" data-tier={tier}>
                 <span class="nbt-safety-dot" aria-hidden="true" />
                 {labels[tier].badge}
@@ -124,7 +168,7 @@ const filteredCommands =
             </div>
             {summary && <p class="nbt-cmd-summary">{summary}</p>}
             {sub.options.length > 0 && (
-              <div>
+              <div class="nbt-cmd-options-wrap">
                 <span class="nbt-cmd-meta-label">{ui.options}</span>
                 <div class="nbt-flag-list">
                   {sub.options.map((flag) => (

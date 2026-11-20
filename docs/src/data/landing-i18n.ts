@@ -6,6 +6,12 @@ export interface HeroSceneCopy {
   worldLabel: string;
   outputLabel: string;
   bridgeCmd: string;
+  cliCommand: string;
+}
+
+export interface SpecStripItem {
+  value: string;
+  label: string;
 }
 
 export interface LandingCopy {
@@ -18,6 +24,8 @@ export interface LandingCopy {
   navDocs: string;
   navAgents: string;
   navDownload: string;
+  themeToLight: string;
+  themeToDark: string;
   switchLangLabel: string;
   switchLangHref: string;
   docsHomeHref: string;
@@ -27,11 +35,14 @@ export interface LandingCopy {
   safetyHref: string;
   agentsHref: string;
   llmsHref: string;
+  heroEyebrow: string;
   heroTitlePlain: string;
   heroTitleAccent: string;
   heroSubtitle: string;
   ctaDownload: string;
   ctaDocs: string;
+  copyCmdLabel: string;
+  copiedCmdLabel: string;
   stageAriaLabel: string;
   heroScenes: HeroSceneCopy[];
   heroTranslate: {
@@ -58,8 +69,13 @@ export interface LandingCopy {
     entries: Array<{ path: string; tag: string }>;
     jsonFields: Array<{ key: string; val: string; type: 'str' | 'num' }>;
   };
+  specStripAriaLabel: string;
+  specStrip: SpecStripItem[];
+  bentoEyebrow: string;
   bentoTitle: string;
+  bentoSubtitle: string;
   bentoTranslate: {
+    indexLabel: string;
     title: string;
     description: string;
     href: string;
@@ -76,6 +92,7 @@ export interface LandingCopy {
     progressLabel: string;
   };
   bentoInspect: {
+    indexLabel: string;
     title: string;
     description: string;
     href: string;
@@ -90,6 +107,7 @@ export interface LandingCopy {
     }>;
   };
   bentoPack: {
+    indexLabel: string;
     title: string;
     description: string;
     href: string;
@@ -100,6 +118,7 @@ export interface LandingCopy {
     zipFiles: Array<{ path: string; note: string }>;
   };
   bentoSafe: {
+    indexLabel: string;
     title: string;
     description: string;
     href: string;
@@ -111,6 +130,7 @@ export interface LandingCopy {
       status: string;
     }>;
   };
+  ctaEyebrow: string;
   ctaTitle: string;
   ctaSubtitle: string;
   ctaPrimary: string;
@@ -130,6 +150,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     navDocs: 'Docs',
     navAgents: 'AI Agents',
     navDownload: 'Download',
+    themeToLight: 'Switch to light theme',
+    themeToDark: 'Switch to dark theme',
     switchLangLabel: '繁體中文',
     switchLangHref: '/zh-tw/',
     docsHomeHref: '/docs/',
@@ -139,12 +161,15 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     safetyHref: '/docs/safe-editing/',
     agentsHref: '/docs/ai-agents/',
     llmsHref: '/llms.txt',
+    heroEyebrow: 'WINDOWS X64 · OFFLINE-SAFE NBT ENGINE',
     heroTitlePlain: 'Minecraft worlds,',
     heroTitleAccent: 'clearly decoded.',
     heroSubtitle:
       'Inspect saves across Java Edition format families, translate adventure maps across languages with automatic language selection, and export resource packs — safely offline.',
-    ctaDownload: 'Download',
-    ctaDocs: 'Explore Docs',
+    ctaDownload: 'Download ZIP',
+    ctaDocs: 'Read Docs',
+    copyCmdLabel: 'Copy command',
+    copiedCmdLabel: 'Copied',
     stageAriaLabel: 'Interactive world transformation preview',
     heroScenes: [
       {
@@ -153,13 +178,15 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         worldLabel: 'Map Text Slots',
         outputLabel: 'Translated Output',
         bridgeCmd: 'translate',
+        cliCommand: 'nbtcli translate start .\\MyWorld',
       },
       {
         id: 'inspect',
         label: 'Inspect Save',
         worldLabel: 'World Save',
         outputLabel: 'NBT JSON',
-        bridgeCmd: 'get',
+        bridgeCmd: 'inspect',
+        cliCommand: 'nbtcli inspect .\\MyWorld',
       },
       {
         id: 'pack',
@@ -167,6 +194,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         worldLabel: 'Resource Pack',
         outputLabel: 'Pack Manifest',
         bridgeCmd: 'create-pack',
+        cliCommand: 'nbtcli translate create-pack .\\MyWorld --output .\\out\\pack.zip',
       },
     ],
     heroTranslate: {
@@ -211,10 +239,22 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         { key: 'worldModified', val: 'false', type: 'num' },
       ],
     },
-    bentoTitle: 'See every workflow at a glance.',
+    specStripAriaLabel: 'Technical specifications',
+    specStrip: [
+      { value: '17 Format Families', label: 'Java 1.2.5 through 26.1+' },
+      { value: 'Single-Line JSON', label: 'Strict UTF-8 stdout contract' },
+      { value: 'Offline-Safe Plans', label: 'Preview diffs & external backups' },
+      { value: 'Agent-Ready', label: 'Built-in llms.txt & auto locales' },
+    ],
+    bentoEyebrow: 'CAPABILITIES',
+    bentoTitle: 'Engineered for every save workflow.',
+    bentoSubtitle:
+      'Every operation follows a deterministic inspect, plan, and offline-apply contract.',
     bentoTranslate: {
+      indexLabel: '01 / TRANSLATION',
       title: 'Translate whole adventure maps',
-      description: 'Signs, books, items, NPCs, and command blocks — automatic language detection, paginated sessions, and validated fallback drafts.',
+      description:
+        'Signs, books, items, NPCs, and command blocks — automatic language detection, paginated sessions, and validated fallback drafts.',
       href: '/docs/translation-workflow/',
       linkLabel: 'Map translation guide',
       btnOriginal: 'JA',
@@ -229,6 +269,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       progressLabel: '142 / 142 slots ready',
     },
     bentoInspect: {
+      indexLabel: '02 / INSPECTION',
       title: 'Explore saves read-only',
       description: 'Inspect level.dat, region chunks, and datapacks without modifying a single byte.',
       href: '/docs/getting-started/',
@@ -257,6 +298,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     bentoPack: {
+      indexLabel: '03 / PACKAGING',
       title: 'Ship a map or a resource pack',
       description: 'Write translations directly into your world or bundle a standalone .zip client pack.',
       href: '/docs/resources-and-packs/',
@@ -273,6 +315,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     bentoSafe: {
+      indexLabel: '04 / RECOVERY',
       title: 'Preview first. Roll back anytime.',
       description: 'Every write creates a reviewable plan and an external backup before touching your save.',
       href: '/docs/safe-editing/',
@@ -298,9 +341,10 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         },
       ],
     },
+    ctaEyebrow: 'GET STARTED',
     ctaTitle: 'Ready for your next world.',
-    ctaSubtitle: 'Extract the full ZIP from GitHub Releases. The .NET runtime is included.',
-    ctaPrimary: 'Go to Download Page',
+    ctaSubtitle: 'Extract the full ZIP from GitHub Releases. The .NET runtime is bundled.',
+    ctaPrimary: 'Download Release',
     ctaQuickstart: 'Quickstart Guide',
     ctaAgents: 'AI Agent Manual (llms.txt)',
     footerNote:
@@ -316,6 +360,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     navDocs: '線上文件',
     navAgents: 'AI 整合',
     navDownload: '下載',
+    themeToLight: '切換為淺色主題',
+    themeToDark: '切換為深色主題',
     switchLangLabel: 'English',
     switchLangHref: '/',
     docsHomeHref: '/zh-tw/docs/',
@@ -325,12 +371,15 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     safetyHref: '/zh-tw/docs/safe-editing/',
     agentsHref: '/zh-tw/docs/ai-agents/',
     llmsHref: '/llms.txt',
+    heroEyebrow: 'WINDOWS X64 · 離線安全 NBT 引擎',
     heroTitlePlain: '解碼方塊世界，',
     heroTitleAccent: '安全翻譯與編輯。',
     heroSubtitle:
       '解壓縮即用的本地命令列工具，跨多版本 Java 存檔唯讀查閱、支援多語自動辨識翻譯整張冒險地圖並打包資源包。',
-    ctaDownload: '前往下載頁面',
-    ctaDocs: '瀏覽教學文件',
+    ctaDownload: '下載發行套件',
+    ctaDocs: '瀏覽文件',
+    copyCmdLabel: '複製指令',
+    copiedCmdLabel: '已複製',
     stageAriaLabel: '互動式世界轉換預覽',
     heroScenes: [
       {
@@ -339,13 +388,15 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         worldLabel: '地圖文字槽位',
         outputLabel: '轉換結果',
         bridgeCmd: 'translate',
+        cliCommand: 'nbtcli translate start .\\MyWorld',
       },
       {
         id: 'inspect',
         label: '查閱存檔',
         worldLabel: '世界結構',
         outputLabel: 'NBT JSON',
-        bridgeCmd: 'get',
+        bridgeCmd: 'inspect',
+        cliCommand: 'nbtcli inspect .\\MyWorld',
       },
       {
         id: 'pack',
@@ -353,6 +404,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         worldLabel: '資源包封裝',
         outputLabel: '輸出資訊',
         bridgeCmd: 'create-pack',
+        cliCommand: 'nbtcli translate create-pack .\\MyWorld --output .\\out\\pack.zip',
       },
     ],
     heroTranslate: {
@@ -397,8 +449,18 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         { key: 'worldModified', val: 'false', type: 'num' },
       ],
     },
-    bentoTitle: '用視覺一眼看懂核心功能。',
+    specStripAriaLabel: '核心技術規格',
+    specStrip: [
+      { value: '17 種格式家族', label: '涵蓋 Java 1.2.5 至 26.1+' },
+      { value: '單行 JSON 契約', label: '嚴格 UTF-8 stdout 結構輸出' },
+      { value: '離線安全計畫', label: '先預覽差異，世界外自動備份' },
+      { value: 'AI Agent 就緒', label: '內建 llms.txt 與自動語言辨識' },
+    ],
+    bentoEyebrow: '核心能力',
+    bentoTitle: '每個存檔流程都清晰可控。',
+    bentoSubtitle: '所有操作皆遵循可檢視、可預覽、離線套用與可回溯的結構化契約。',
     bentoTranslate: {
+      indexLabel: '01 / 冒險地圖翻譯',
       title: '翻譯整張冒險地圖',
       description: '告示牌、書本、道具、NPC 與指令方塊，支援自動語言辨識、分頁翻譯與 fallback 草稿驗證。',
       href: '/zh-tw/docs/translation-workflow/',
@@ -415,6 +477,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       progressLabel: '142 / 142 筆譯文就緒',
     },
     bentoInspect: {
+      indexLabel: '02 / 唯讀探索',
       title: '零風險探索存檔',
       description: '唯讀檢視 level.dat、區塊與資料包內容，絕不意外改動任何位元組。',
       href: '/zh-tw/docs/getting-started/',
@@ -443,6 +506,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     bentoPack: {
+      indexLabel: '03 / 資源包封裝',
       title: '直接改地圖，或打包資源包',
       description: '自由選擇把譯文寫回地圖，或一鍵封裝與合併成獨立 .zip 資源包。',
       href: '/zh-tw/docs/resources-and-packs/',
@@ -459,6 +523,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     bentoSafe: {
+      indexLabel: '04 / 安全與復原',
       title: '先預覽，隨時可還原',
       description: '所有修改都先在世界外產出計畫與自動備份，離線寫入更安心。',
       href: '/zh-tw/docs/safe-editing/',
@@ -484,7 +549,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         },
       ],
     },
-    ctaTitle: '準備好整理你的世界了嗎？',
+    ctaEyebrow: '開始使用',
+    ctaTitle: '準備好處理下一張世界存檔了嗎？',
     ctaSubtitle: '前往 GitHub Releases 下載並解壓完整 ZIP，內含 .NET 執行環境。',
     ctaPrimary: '前往下載頁面',
     ctaQuickstart: '快速入門指南',

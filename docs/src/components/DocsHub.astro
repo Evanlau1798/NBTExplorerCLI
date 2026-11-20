@@ -84,35 +84,38 @@ const hub =
 ---
 
 <div class="nbt-hub-grid not-content">
-  {hub.primary.map((item) => (
+  {hub.primary.map((item, index) => (
     <a class="nbt-hub-card" href={item.href}>
-      <span class="nbt-hub-icon" aria-hidden="true">
-        {item.icon === 'start' && (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
-            <path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        )}
-        {item.icon === 'translate' && (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
-            <path d="M4 6h10M9 4v2m-3 0c0 4 2.5 7 6 8.5M12 6c-1 3.5-3.5 6.5-7 8.5M13 20l3.5-9 3.5 9M14.3 17h4.4" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        )}
-        {item.icon === 'shield' && (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
-            <path d="M12 3 5 6v6c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9V6l-7-3Z" stroke-linejoin="round" />
-            <path d="m9.5 12 1.8 1.8 3.6-3.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        )}
-        {item.icon === 'agent' && (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
-            <rect x="4" y="5" width="16" height="14" rx="3" />
-            <path d="m8.5 10 2.5 2-2.5 2M13 14h3" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        )}
-      </span>
+      <div class="nbt-hub-top">
+        <span class="nbt-hub-icon" aria-hidden="true">
+          {item.icon === 'start' && (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          )}
+          {item.icon === 'translate' && (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M4 6h10M9 4v2m-3 0c0 4 2.5 7 6 8.5M12 6c-1 3.5-3.5 6.5-7 8.5M13 20l3.5-9 3.5 9M14.3 17h4.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          )}
+          {item.icon === 'shield' && (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 3 5 6v6c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9V6l-7-3Z" stroke-linejoin="round" />
+              <path d="m9.5 12 1.8 1.8 3.6-3.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          )}
+          {item.icon === 'agent' && (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="4" y="5" width="16" height="14" rx="2.5" />
+              <path d="m8.5 10 2.5 2-2.5 2M13 14h3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          )}
+        </span>
+        <span class="nbt-hub-index">0{index + 1}</span>
+      </div>
       <span class="nbt-hub-title">
         <span>{item.title}</span>
-        <svg class="nbt-hub-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <svg class="nbt-hub-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
           <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </span>

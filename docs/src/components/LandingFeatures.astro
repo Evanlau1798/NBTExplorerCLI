@@ -11,226 +11,240 @@ const { copy, pageHref } = Astro.props;
 
 <section class="bento-section" aria-labelledby="bento-title">
   <div class="container">
-    <h2 id="bento-title" class="section-title" data-reveal>{copy.bentoTitle}</h2>
+    <div class="section-head" data-reveal>
+      <span class="section-eyebrow">{copy.bentoEyebrow}</span>
+      <h2 id="bento-title" class="section-title">{copy.bentoTitle}</h2>
+      <p class="section-subtitle">{copy.bentoSubtitle}</p>
+    </div>
 
-    <div class="bento-grid">
-      {/* Card 1 (Wide): Live Map Translation */}
-      <article class="bento-card bento-wide" data-spotlight data-tilt data-reveal>
-        <div class="bento-visual visual-translate" data-bento-lang="zh">
-          <div class="mini-switch-bar">
-            <div class="mini-progress-wrap">
-              <div class="mini-progress-bar">
-                <span class="mini-progress-fill"></span>
-              </div>
-              <span class="mini-progress-text">{copy.bentoTranslate.progressLabel}</span>
-            </div>
-            <div class="segmented-mini" role="group" aria-label={copy.bentoTranslate.title}>
-              <button type="button" class="seg-btn" data-set-bento-lang="en" aria-pressed="false">
-                {copy.bentoTranslate.btnOriginal}
-              </button>
-              <button type="button" class="seg-btn is-active" data-set-bento-lang="zh" aria-pressed="true">
-                {copy.bentoTranslate.btnTranslated}
-              </button>
-            </div>
-          </div>
+    <div class="bento-frame">
+      <div class="bento-grid">
+        {/* Cell 1 (Wide): Live Map Translation */}
+        <article class="bento-card bento-wide" data-spotlight data-reveal>
+          <div class="bento-index">{copy.bentoTranslate.indexLabel}</div>
 
-          <div class="translate-showcase">
-            <div class="slot-card slot-card-compact slot-accent-grass">
-              <div class="slot-card-head">
-                <svg class="slot-card-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                  <rect x="2" y="3" width="12" height="7" rx="1.5" />
-                  <path d="M8 10v4M5 6.5h6" stroke-linecap="round" />
-                </svg>
-                <span class="slot-card-meta">{copy.bentoTranslate.signMeta}</span>
-              </div>
-              <div class="slot-card-stack">
-                <div class="slot-layer b-en">
-                  {copy.bentoTranslate.signOriginal.map((line, i) => (
-                    <span class={i === 0 ? 'slot-title' : 'slot-line'}>{line}</span>
-                  ))}
+          <div class="bento-visual visual-translate" data-bento-lang="zh">
+            <div class="mini-switch-bar">
+              <div class="mini-progress-wrap">
+                <div class="mini-progress-bar">
+                  <span class="mini-progress-fill"></span>
                 </div>
-                <div class="slot-layer b-zh">
-                  {copy.bentoTranslate.signTranslated.map((line, i) => (
-                    <span class={i === 0 ? 'slot-title' : 'slot-line'}>{line}</span>
-                  ))}
+                <span class="mini-progress-text">{copy.bentoTranslate.progressLabel}</span>
+              </div>
+              <div class="segmented-mini" role="group" aria-label={copy.bentoTranslate.title}>
+                <button type="button" class="seg-btn" data-set-bento-lang="en" aria-pressed="false">
+                  {copy.bentoTranslate.btnOriginal}
+                </button>
+                <button type="button" class="seg-btn is-active" data-set-bento-lang="zh" aria-pressed="true">
+                  {copy.bentoTranslate.btnTranslated}
+                </button>
+              </div>
+            </div>
+
+            <div class="translate-showcase">
+              <div class="slot-card slot-card-compact slot-accent-emerald">
+                <div class="slot-card-head">
+                  <svg class="slot-card-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <rect x="2" y="3" width="12" height="7" rx="1.5" />
+                    <path d="M8 10v4M5 6.5h6" stroke-linecap="round" />
+                  </svg>
+                  <span class="slot-card-meta">{copy.bentoTranslate.signMeta}</span>
+                </div>
+                <div class="slot-card-stack">
+                  <div class="slot-layer b-en">
+                    {copy.bentoTranslate.signOriginal.map((line, i) => (
+                      <span class={i === 0 ? 'slot-title' : 'slot-line'}>{line}</span>
+                    ))}
+                  </div>
+                  <div class="slot-layer b-zh">
+                    {copy.bentoTranslate.signTranslated.map((line, i) => (
+                      <span class={i === 0 ? 'slot-title' : 'slot-line'}>{line}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="slot-card slot-card-compact slot-accent-cyan">
-              <div class="slot-card-head">
-                <svg class="slot-card-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                  <path d="M3 3.2A1.2 1.2 0 0 1 4.2 2h7.6A1.2 1.2 0 0 1 13 3.2v9.6a1.2 1.2 0 0 1-1.2 1.2H4.2A1.2 1.2 0 0 1 3 12.8V3.2Z" />
-                  <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3.2" stroke-linecap="round" />
-                </svg>
-                <span class="slot-card-meta b-en">{copy.bentoTranslate.bookTitleOriginal}</span>
-                <span class="slot-card-meta b-zh">{copy.bentoTranslate.bookTitleTranslated}</span>
+              <div class="slot-card slot-card-compact slot-accent-neutral">
+                <div class="slot-card-head">
+                  <svg class="slot-card-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <path d="M3 3.2A1.2 1.2 0 0 1 4.2 2h7.6A1.2 1.2 0 0 1 13 3.2v9.6a1.2 1.2 0 0 1-1.2 1.2H4.2A1.2 1.2 0 0 1 3 12.8V3.2Z" />
+                    <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3.2" stroke-linecap="round" />
+                  </svg>
+                  <span class="slot-card-meta b-en">{copy.bentoTranslate.bookTitleOriginal}</span>
+                  <span class="slot-card-meta b-zh">{copy.bentoTranslate.bookTitleTranslated}</span>
+                </div>
+                <p class="slot-prose">
+                  <span class="b-en">{copy.bentoTranslate.bookLineOriginal}</span>
+                  <span class="b-zh">{copy.bentoTranslate.bookLineTranslated}</span>
+                </p>
               </div>
-              <p class="slot-prose">
-                <span class="b-en">{copy.bentoTranslate.bookLineOriginal}</span>
-                <span class="b-zh">{copy.bentoTranslate.bookLineTranslated}</span>
-              </p>
             </div>
           </div>
-        </div>
 
-        <div class="bento-body">
-          <h3>{copy.bentoTranslate.title}</h3>
-          <p>{copy.bentoTranslate.description}</p>
-          <a class="card-link" href={pageHref(copy.bentoTranslate.href)}>
-            <span>{copy.bentoTranslate.linkLabel}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </a>
-        </div>
-      </article>
-
-      {/* Card 2 (Narrow): Interactive Read-Only NBT Tree */}
-      <article class="bento-card bento-narrow" data-spotlight data-tilt data-reveal>
-        <div class="bento-visual visual-tree">
-          <div class="nbt-tree-root">
-            <span class="nbt-root-dot" aria-hidden="true"></span>
-            <span>{copy.bentoInspect.rootLabel}</span>
+          <div class="bento-body">
+            <h3>{copy.bentoTranslate.title}</h3>
+            <p>{copy.bentoTranslate.description}</p>
+            <a class="card-link" href={pageHref(copy.bentoTranslate.href)}>
+              <span>{copy.bentoTranslate.linkLabel}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </a>
           </div>
-          <div class="nbt-branches">
-            {copy.bentoInspect.nodes.map((node, index) => (
-              <div class="nbt-branch" data-tree-branch data-open={index === 0 ? 'true' : 'false'}>
+        </article>
+
+        {/* Cell 2 (Narrow): Interactive Read-Only NBT Tree */}
+        <article class="bento-card bento-narrow" data-spotlight data-reveal>
+          <div class="bento-index">{copy.bentoInspect.indexLabel}</div>
+
+          <div class="bento-visual visual-tree">
+            <div class="nbt-tree-root">
+              <span class="nbt-root-dot" aria-hidden="true"></span>
+              <span>{copy.bentoInspect.rootLabel}</span>
+            </div>
+            <div class="nbt-branches">
+              {copy.bentoInspect.nodes.map((node, index) => (
+                <div class="nbt-branch" data-tree-branch data-open={index === 0 ? 'true' : 'false'}>
+                  <button
+                    type="button"
+                    class="nbt-branch-toggle"
+                    aria-expanded={index === 0 ? 'true' : 'false'}
+                  >
+                    <svg class="nbt-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <path d="m6 4 4 4-4 4" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span class="nbt-key">{node.key}</span>
+                    <span class="nbt-type nbt-type-compound">{node.type}</span>
+                  </button>
+                  <div class="nbt-children">
+                    {node.children?.map((child) => (
+                      <div class="nbt-leaf">
+                        <span class="nbt-leaf-key">{child.key}</span>
+                        <span class="nbt-leaf-val">{child.value}</span>
+                        <span class={'nbt-type ' + (child.type === 'Int' ? 'nbt-type-int' : 'nbt-type-str')}>
+                          {child.type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div class="bento-body">
+            <h3>{copy.bentoInspect.title}</h3>
+            <p>{copy.bentoInspect.description}</p>
+            <a class="card-link" href={pageHref(copy.bentoInspect.href)}>
+              <span>{copy.bentoInspect.linkLabel}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </a>
+          </div>
+        </article>
+
+        {/* Cell 3 (Narrow): Resource Pack Mode Morph */}
+        <article class="bento-card bento-narrow" data-spotlight data-reveal>
+          <div class="bento-index">{copy.bentoPack.indexLabel}</div>
+
+          <div class="bento-visual visual-pack" data-pack-mode="zip">
+            <div class="segmented-mini segmented-pack" role="group" aria-label={copy.bentoPack.title}>
+              <button type="button" class="seg-btn" data-set-pack-mode="direct" aria-pressed="false">
+                {copy.bentoPack.modeDirectLabel}
+              </button>
+              <button type="button" class="seg-btn is-active" data-set-pack-mode="zip" aria-pressed="true">
+                {copy.bentoPack.modeZipLabel}
+              </button>
+            </div>
+
+            <div class="pack-morph-list">
+              <div class="pack-mode-group pack-mode-direct">
+                {copy.bentoPack.directFiles.map((file) => (
+                  <div class="pack-row">
+                    <span class="pack-row-indicator pack-ind-emerald" aria-hidden="true"></span>
+                    <div class="pack-row-copy">
+                      <span class="pack-row-path">{file.path}</span>
+                      <span class="pack-row-note">{file.note}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div class="pack-mode-group pack-mode-zip">
+                {copy.bentoPack.zipFiles.map((file) => (
+                  <div class="pack-row">
+                    <span class="pack-row-indicator pack-ind-sky" aria-hidden="true"></span>
+                    <div class="pack-row-copy">
+                      <span class="pack-row-path">{file.path}</span>
+                      <span class="pack-row-note">{file.note}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div class="bento-body">
+            <h3>{copy.bentoPack.title}</h3>
+            <p>{copy.bentoPack.description}</p>
+            <a class="card-link" href={pageHref(copy.bentoPack.href)}>
+              <span>{copy.bentoPack.linkLabel}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </a>
+          </div>
+        </article>
+
+        {/* Cell 4 (Wide): Safe Edit & Rollback Timeline */}
+        <article class="bento-card bento-wide" data-spotlight data-reveal>
+          <div class="bento-index">{copy.bentoSafe.indexLabel}</div>
+
+          <div class="bento-visual visual-safety" data-active-step="0">
+            <div class="safety-track" role="group" aria-label={copy.bentoSafe.title}>
+              <div class="safety-rail" aria-hidden="true">
+                <span class="safety-rail-fill"></span>
+              </div>
+              {copy.bentoSafe.checkpoints.map((cp, index) => (
                 <button
                   type="button"
-                  class="nbt-branch-toggle"
-                  aria-expanded={index === 0 ? 'true' : 'false'}
+                  class={'safety-node' + (index === 0 ? ' is-active' : '')}
+                  data-safety-step={index}
+                  aria-pressed={index === 0 ? 'true' : 'false'}
+                  aria-controls={`safety-detail-${index}`}
                 >
-                  <svg class="nbt-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                    <path d="m6 4 4 4-4 4" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                  <span class="nbt-key">{node.key}</span>
-                  <span class="nbt-type nbt-type-compound">{node.type}</span>
+                  <span class="safety-node-dot" aria-hidden="true">{index + 1}</span>
+                  <span class="safety-node-label">{cp.label}</span>
                 </button>
-                <div class="nbt-children">
-                  {node.children?.map((child) => (
-                    <div class="nbt-leaf">
-                      <span class="nbt-leaf-key">{child.key}</span>
-                      <span class="nbt-leaf-val">{child.value}</span>
-                      <span class={'nbt-type ' + (child.type === 'Int' ? 'nbt-type-int' : 'nbt-type-str')}>
-                        {child.type}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div class="bento-body">
-          <h3>{copy.bentoInspect.title}</h3>
-          <p>{copy.bentoInspect.description}</p>
-          <a class="card-link" href={pageHref(copy.bentoInspect.href)}>
-            <span>{copy.bentoInspect.linkLabel}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </a>
-        </div>
-      </article>
-
-      {/* Card 3 (Narrow): Resource Pack Mode Morph */}
-      <article class="bento-card bento-narrow" data-spotlight data-tilt data-reveal>
-        <div class="bento-visual visual-pack" data-pack-mode="zip">
-          <div class="segmented-mini segmented-pack" role="group" aria-label={copy.bentoPack.title}>
-            <button type="button" class="seg-btn" data-set-pack-mode="direct" aria-pressed="false">
-              {copy.bentoPack.modeDirectLabel}
-            </button>
-            <button type="button" class="seg-btn is-active" data-set-pack-mode="zip" aria-pressed="true">
-              {copy.bentoPack.modeZipLabel}
-            </button>
-          </div>
-
-          <div class="pack-morph-list">
-            <div class="pack-mode-group pack-mode-direct">
-              {copy.bentoPack.directFiles.map((file) => (
-                <div class="pack-row">
-                  <span class="pack-row-indicator pack-ind-grass" aria-hidden="true"></span>
-                  <div class="pack-row-copy">
-                    <span class="pack-row-path">{file.path}</span>
-                    <span class="pack-row-note">{file.note}</span>
-                  </div>
-                </div>
               ))}
             </div>
-            <div class="pack-mode-group pack-mode-zip">
-              {copy.bentoPack.zipFiles.map((file) => (
-                <div class="pack-row">
-                  <span class="pack-row-indicator pack-ind-cyan" aria-hidden="true"></span>
-                  <div class="pack-row-copy">
-                    <span class="pack-row-path">{file.path}</span>
-                    <span class="pack-row-note">{file.note}</span>
-                  </div>
+
+            <div class="safety-readout">
+              {copy.bentoSafe.checkpoints.map((cp, index) => (
+                <div
+                  id={`safety-detail-${index}`}
+                  class={'safety-detail' + (index === 0 ? ' is-active' : '')}
+                  data-safety-detail={index}
+                >
+                  <span class="safety-status">{cp.status}</span>
+                  <p class="safety-text">{cp.detail}</p>
                 </div>
               ))}
             </div>
           </div>
-        </div>
 
-        <div class="bento-body">
-          <h3>{copy.bentoPack.title}</h3>
-          <p>{copy.bentoPack.description}</p>
-          <a class="card-link" href={pageHref(copy.bentoPack.href)}>
-            <span>{copy.bentoPack.linkLabel}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </a>
-        </div>
-      </article>
-
-      {/* Card 4 (Wide): Safe Edit & Rollback Timeline */}
-      <article class="bento-card bento-wide" data-spotlight data-tilt data-reveal>
-        <div class="bento-visual visual-safety" data-active-step="0">
-          <div class="safety-track" role="group" aria-label={copy.bentoSafe.title}>
-            <div class="safety-rail" aria-hidden="true">
-              <span class="safety-rail-pulse"></span>
-            </div>
-            {copy.bentoSafe.checkpoints.map((cp, index) => (
-              <button
-                type="button"
-                class={'safety-node' + (index === 0 ? ' is-active' : '')}
-                data-safety-step={index}
-                aria-pressed={index === 0 ? 'true' : 'false'}
-                aria-controls={`safety-detail-${index}`}
-              >
-                <span class="safety-node-dot" aria-hidden="true">{index + 1}</span>
-                <span class="safety-node-label">{cp.label}</span>
-              </button>
-            ))}
+          <div class="bento-body">
+            <h3>{copy.bentoSafe.title}</h3>
+            <p>{copy.bentoSafe.description}</p>
+            <a class="card-link" href={pageHref(copy.bentoSafe.href)}>
+              <span>{copy.bentoSafe.linkLabel}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </a>
           </div>
-
-          <div class="safety-readout">
-            {copy.bentoSafe.checkpoints.map((cp, index) => (
-              <div
-                id={`safety-detail-${index}`}
-                class={'safety-detail' + (index === 0 ? ' is-active' : '')}
-                data-safety-detail={index}
-              >
-                <span class="safety-status">{cp.status}</span>
-                <p class="safety-text">{cp.detail}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div class="bento-body">
-          <h3>{copy.bentoSafe.title}</h3>
-          <p>{copy.bentoSafe.description}</p>
-          <a class="card-link" href={pageHref(copy.bentoSafe.href)}>
-            <span>{copy.bentoSafe.linkLabel}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </a>
-        </div>
-      </article>
+        </article>
+      </div>
     </div>
   </div>
 </section>

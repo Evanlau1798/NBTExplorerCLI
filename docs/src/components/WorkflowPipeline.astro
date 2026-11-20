@@ -18,30 +18,30 @@ const { kind, lang = 'en' } = Astro.props;
 const pipelines: Record<'edit' | 'translate', Record<LocaleKey, Step[]>> = {
   edit: {
     en: [
-      { step: '1', title: 'Read Value', cmd: 'get --types', tier: 'safe' },
-      { step: '2', title: 'Preview Plan', cmd: 'set / plan', tier: 'preview' },
-      { step: '3', title: 'Apply Offline', cmd: 'apply', tier: 'write' },
-      { step: '4', title: 'Check or Undo', cmd: 'status / recover', tier: 'safe' },
+      { step: '01', title: 'Read Value', cmd: 'get --types', tier: 'safe' },
+      { step: '02', title: 'Preview Plan', cmd: 'set / plan', tier: 'preview' },
+      { step: '03', title: 'Apply Offline', cmd: 'apply', tier: 'write' },
+      { step: '04', title: 'Check or Undo', cmd: 'status / recover', tier: 'safe' },
     ],
     'zh-tw': [
-      { step: '1', title: '讀取原值', cmd: 'get --types', tier: 'safe' },
-      { step: '2', title: '預覽計畫', cmd: 'set / plan', tier: 'preview' },
-      { step: '3', title: '離線套用', cmd: 'apply', tier: 'write' },
-      { step: '4', title: '檢查復原', cmd: 'status / recover', tier: 'safe' },
+      { step: '01', title: '讀取原值', cmd: 'get --types', tier: 'safe' },
+      { step: '02', title: '預覽計畫', cmd: 'set / plan', tier: 'preview' },
+      { step: '03', title: '離線套用', cmd: 'apply', tier: 'write' },
+      { step: '04', title: '檢查復原', cmd: 'status / recover', tier: 'safe' },
     ],
   },
   translate: {
     en: [
-      { step: '1', title: 'Start', cmd: 'translate start', tier: 'preview' },
-      { step: '2', title: 'Translate', cmd: 'export -> submit', tier: 'preview' },
-      { step: '3', title: 'Build Plan', cmd: 'translate plan', tier: 'preview' },
-      { step: '4', title: 'Apply', cmd: 'apply -> seal', tier: 'write' },
+      { step: '01', title: 'Start', cmd: 'translate start', tier: 'preview' },
+      { step: '02', title: 'Translate', cmd: 'export -> submit', tier: 'preview' },
+      { step: '03', title: 'Build Plan', cmd: 'translate plan', tier: 'preview' },
+      { step: '04', title: 'Apply', cmd: 'apply -> seal', tier: 'write' },
     ],
     'zh-tw': [
-      { step: '1', title: '建立進度', cmd: 'translate start', tier: 'preview' },
-      { step: '2', title: '分頁翻譯', cmd: 'export -> submit', tier: 'preview' },
-      { step: '3', title: '產生計畫', cmd: 'translate plan', tier: 'preview' },
-      { step: '4', title: '套用封存', cmd: 'apply -> seal', tier: 'write' },
+      { step: '01', title: '建立進度', cmd: 'translate start', tier: 'preview' },
+      { step: '02', title: '分頁翻譯', cmd: 'export -> submit', tier: 'preview' },
+      { step: '03', title: '產生計畫', cmd: 'translate plan', tier: 'preview' },
+      { step: '04', title: '套用封存', cmd: 'apply -> seal', tier: 'write' },
     ],
   },
 };
@@ -50,9 +50,6 @@ const steps = pipelines[kind][lang] ?? pipelines[kind].en;
 ---
 
 <div class="nbt-pipeline not-content">
-  <div class="nbt-pipeline-rail" aria-hidden="true">
-    <span class="nbt-pipeline-pulse"></span>
-  </div>
   {
     steps.map((s) => (
       <div class="nbt-pipeline-step" data-tier={s.tier}>
@@ -68,148 +65,113 @@ const steps = pipelines[kind][lang] ?? pipelines[kind].en;
 
 <style>
   .nbt-pipeline {
-    position: relative;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.7rem;
-    margin: 1.4rem 0 1.85rem;
-  }
-
-  .nbt-pipeline-rail {
-    position: absolute;
-    top: 26px;
-    left: 28px;
-    right: 28px;
-    height: 2px;
-    background: rgba(148, 163, 184, 0.2);
+    gap: 1px;
+    margin: 1.35rem 0 1.75rem;
+    border: 1px solid var(--nbt-border-strong);
+    border-radius: 10px;
+    background: var(--nbt-border);
     overflow: hidden;
-    border-radius: 999px;
-    pointer-events: none;
-  }
-
-  .nbt-pipeline-pulse {
-    display: block;
-    width: 34%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, #4ade80, #38bdf8, transparent);
-    animation: pipelineFlow 3.2s ease-in-out infinite;
-  }
-
-  @keyframes pipelineFlow {
-    0% { transform: translateX(-110%); }
-    100% { transform: translateX(320%); }
   }
 
   .nbt-pipeline-step {
     position: relative;
-    z-index: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
-    padding: 0.95rem 1rem;
-    border: 1px solid var(--sl-color-gray-5);
-    border-radius: 12px;
-    background: rgba(13, 21, 34, 0.88);
-    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.22s ease, box-shadow 0.22s ease;
-  }
-
-  :root[data-theme='light'] .nbt-pipeline-step {
-    background: #ffffff;
+    gap: 0.65rem;
+    padding: 0.95rem 1.05rem;
+    background: var(--nbt-surface);
+    transition: background-color 0.14s ease;
   }
 
   .nbt-pipeline-step:hover {
-    transform: translateY(-2px);
-    border-color: rgba(56, 189, 248, 0.45);
-    box-shadow: 0 14px 28px -18px rgba(0, 0, 0, 0.7);
+    background: var(--nbt-surface-elevated);
   }
 
   .nbt-pipeline-head {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.5rem;
   }
 
   .nbt-pipeline-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    flex: 0 0 24px;
-    border-radius: 50%;
+    padding: 0.1rem 0.38rem;
+    border-radius: 4px;
     font-family: var(--sl-font-mono);
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: 0.7rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
     border: 1px solid transparent;
   }
 
   .nbt-pipeline-step[data-tier='safe'] .nbt-pipeline-badge {
-    background: rgba(74, 222, 128, 0.16);
-    border-color: rgba(74, 222, 128, 0.45);
-    color: #86efac;
+    background: rgba(52, 211, 153, 0.1);
+    border-color: rgba(52, 211, 153, 0.3);
+    color: #6ee7b7;
   }
 
   .nbt-pipeline-step[data-tier='preview'] .nbt-pipeline-badge {
-    background: rgba(56, 189, 248, 0.16);
-    border-color: rgba(56, 189, 248, 0.45);
-    color: #7dd3fc;
+    background: rgba(251, 191, 36, 0.1);
+    border-color: rgba(251, 191, 36, 0.3);
+    color: #fde68a;
   }
 
   .nbt-pipeline-step[data-tier='write'] .nbt-pipeline-badge {
-    background: rgba(248, 113, 113, 0.18);
-    border-color: rgba(248, 113, 113, 0.48);
+    background: rgba(248, 113, 113, 0.12);
+    border-color: rgba(248, 113, 113, 0.32);
     color: #fca5a5;
   }
 
-  :root[data-theme='light'] .nbt-pipeline-step[data-tier='safe'] .nbt-pipeline-badge { color: #065f46; }
-  :root[data-theme='light'] .nbt-pipeline-step[data-tier='preview'] .nbt-pipeline-badge { color: #075985; }
-  :root[data-theme='light'] .nbt-pipeline-step[data-tier='write'] .nbt-pipeline-badge { color: #991b1b; }
+  :root[data-theme='light'] .nbt-pipeline-step[data-tier='safe'] .nbt-pipeline-badge {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #166534;
+  }
+
+  :root[data-theme='light'] .nbt-pipeline-step[data-tier='preview'] .nbt-pipeline-badge {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #92400e;
+  }
+
+  :root[data-theme='light'] .nbt-pipeline-step[data-tier='write'] .nbt-pipeline-badge {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #991b1b;
+  }
 
   .nbt-pipeline-title {
-    font-weight: 700;
-    font-size: 0.9rem;
+    font-weight: 600;
+    font-size: 0.875rem;
     color: var(--sl-color-white);
     white-space: nowrap;
   }
 
   .nbt-pipeline-cmd {
     font-family: var(--sl-font-mono);
-    font-size: 0.72rem;
-    color: var(--sl-color-accent-high);
-    background: rgba(6, 9, 15, 0.7);
-    border: 1px solid var(--sl-color-gray-5);
-    padding: 0.22rem 0.45rem;
-    border-radius: 6px;
+    font-size: 0.74rem;
+    color: var(--sl-color-gray-1);
+    background: var(--nbt-surface-code);
+    border: 1px solid var(--nbt-border);
+    padding: 0.22rem 0.48rem;
+    border-radius: 5px;
     align-self: flex-start;
     white-space: nowrap;
   }
 
-  :root[data-theme='light'] .nbt-pipeline-cmd {
-    background: #f1f5f9;
-  }
-
-  @media (max-width: 720px) {
+  @media (max-width: 760px) {
     .nbt-pipeline {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .nbt-pipeline-rail {
-      display: none;
     }
   }
 
   @media (max-width: 440px) {
     .nbt-pipeline {
       grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .nbt-pipeline-pulse {
-      animation: none;
-      transform: translateX(100%);
-    }
-    .nbt-pipeline-step {
-      transition: none;
     }
   }
 </style>

@@ -3,6 +3,7 @@ import '../styles/landing.css';
 import LandingHero from './LandingHero.astro';
 import LandingFeatures from './LandingFeatures.astro';
 import logoDark from '../assets/logo.svg';
+import logoLight from '../assets/logo-light.svg';
 import { LANDING_COPY } from '../data/landing-i18n';
 import { PRODUCT_META, type LocaleKey } from '../data/cli-surface';
 
@@ -26,10 +27,16 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#06090f" />
+    <meta name="theme-color" content="#09090b" />
     <title>{title}</title>
     <meta name="description" content={copy.heroSubtitle} />
     <link rel="icon" type="image/svg+xml" href={pageHref('/favicon.svg')} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400..700&family=Geist:wght@400..800&family=Noto+Sans+TC:wght@400;500;600;700&display=swap"
+    />
     <link rel="canonical" href={absoluteHref(homePath)} />
     <link rel="alternate" hreflang="en" href={absoluteHref('/')} />
     <link rel="alternate" hreflang="zh-TW" href={absoluteHref('/zh-tw/')} />
@@ -41,21 +48,31 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
     <meta property="og:url" content={absoluteHref(homePath)} />
     <meta property="og:locale" content={lang === 'zh-tw' ? 'zh_TW' : 'en_US'} />
     <meta property="og:locale:alternate" content={lang === 'zh-tw' ? 'en_US' : 'zh_TW'} />
+    <script is:inline>
+      (() => {
+        try {
+          const saved = localStorage.getItem('starlight-theme');
+          const theme = saved === 'light' || saved === 'dark' ? saved : 'dark';
+          document.documentElement.dataset.theme = theme;
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', theme === 'light' ? '#ffffff' : '#09090b');
+        } catch {}
+      })();
+    </script>
   </head>
   <body class="landing-page">
     <a class="skip-link" href="#main">{copy.skipLink}</a>
 
-    <div class="ambient-backdrop" aria-hidden="true">
-      <div class="ambient-orb ambient-orb-grass"></div>
-      <div class="ambient-orb ambient-orb-cyan"></div>
-      <div class="voxel-grid-plane"></div>
-      <canvas id="voxel-canvas" class="voxel-canvas"></canvas>
+    <div class="arch-backdrop" aria-hidden="true">
+      <div class="arch-grid-plane"></div>
+      <div class="arch-top-sheen"></div>
     </div>
 
     <header class="site-header" data-header>
       <div class="container header-inner">
         <a href={pageHref(homePath)} class="brand">
-          <img class="brand-logo" src={logoDark.src} alt="" width="34" height="34" />
+          <img class="brand-logo brand-logo-dark" src={logoDark.src} alt="" width="30" height="30" />
+          <img class="brand-logo brand-logo-light" src={logoLight.src} alt="" width="30" height="30" />
           <span class="brand-name">{PRODUCT_META.name}</span>
         </a>
 
@@ -79,9 +96,26 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
           <a href={pageHref(copy.docsHomeHref)}>{copy.navDocs}</a>
           <a href={pageHref(copy.agentsHref)}>{copy.navAgents}</a>
           <a href={PRODUCT_META.repoUrl}>GitHub</a>
+          <span class="nav-divider" aria-hidden="true"></span>
           <a href={pageHref(copy.switchLangHref)} hreflang={alternateLang} lang={alternateLang} class="nav-lang">
             {copy.switchLangLabel}
           </a>
+          <button
+            type="button"
+            class="theme-toggle"
+            id="landing-theme-toggle"
+            aria-label={copy.themeToLight}
+            data-label-light={copy.themeToLight}
+            data-label-dark={copy.themeToDark}
+          >
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke-linecap="round" />
+            </svg>
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
           <a href={PRODUCT_META.releasesUrl} class="nav-cta">{copy.navDownload}</a>
         </nav>
       </div>
@@ -91,21 +125,30 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
       <LandingHero {copy} {pageHref} />
       <LandingFeatures {copy} {pageHref} />
 
-      <section class="cta-section" aria-labelledby="cta-title">
+      <section class="closing-section" aria-labelledby="cta-title">
         <div class="container">
-          <div class="cta-dock" data-spotlight data-reveal>
-            <img class="cta-emblem" src={logoDark.src} alt="" width="56" height="56" />
-            <h2 id="cta-title" class="cta-title">{copy.ctaTitle}</h2>
-            <p class="cta-subtitle">{copy.ctaSubtitle}</p>
-            <div class="cta-actions">
+          <div class="closing-frame" data-spotlight data-reveal>
+            <div class="closing-copy">
+              <div class="closing-eyebrow">
+                <img class="closing-mark brand-logo-dark" src={logoDark.src} alt="" width="24" height="24" />
+                <img class="closing-mark brand-logo-light" src={logoLight.src} alt="" width="24" height="24" />
+                <span>{copy.ctaEyebrow}</span>
+              </div>
+              <h2 id="cta-title" class="closing-title">{copy.ctaTitle}</h2>
+              <p class="closing-subtitle">{copy.ctaSubtitle}</p>
+            </div>
+
+            <div class="closing-actions">
               <a href={PRODUCT_META.releasesUrl} class="btn btn-primary">
                 <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 19h16" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
                 <span>{copy.ctaPrimary}</span>
               </a>
-              <a href={pageHref(copy.gettingStartedHref)} class="btn btn-secondary">{copy.ctaQuickstart}</a>
-              <a href={pageHref(copy.agentsHref)} class="btn btn-ghost">{copy.ctaAgents}</a>
+              <div class="closing-secondary-row">
+                <a href={pageHref(copy.gettingStartedHref)} class="btn btn-secondary">{copy.ctaQuickstart}</a>
+                <a href={pageHref(copy.agentsHref)} class="btn btn-ghost">{copy.ctaAgents}</a>
+              </div>
             </div>
           </div>
         </div>
@@ -121,6 +164,7 @@ const title = PRODUCT_META.name + ' — ' + copy.pageTitle;
         <nav class="footer-links" aria-label={copy.navigationLabel}>
           <a href={pageHref(copy.docsHomeHref)}>{copy.navDocs}</a>
           <a href={pageHref(copy.agentsHref)}>{copy.navAgents}</a>
+          <a href={pageHref(copy.llmsHref)}>llms.txt</a>
           <a href={PRODUCT_META.repoUrl}>GitHub</a>
           <a href={pageHref(copy.switchLangHref)} hreflang={alternateLang} lang={alternateLang}>
             {copy.switchLangLabel}
