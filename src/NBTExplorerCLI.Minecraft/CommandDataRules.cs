@@ -7,12 +7,15 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
-    private const int StorageDataVersion = 2205;
+    private const int StorageDataVersion = MinecraftProfiles.CommandStorageDataVersion;
     private const int DisplayEntityDataVersion = 3326;
     private const int VanillaArmorTrimDataVersion = 3442;
 
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end, bool resultObserved)
     {
+        if (ReadIndexedBlankWrite(tokens, index, path)
+            || resultObserved && ReadScratchComparison(tokens, index, path)
+            || ReadStorageBlankReset(tokens, index, path)) return;
         var storageElement = !resultObserved && (storageAccess is not null || storageDisplayLists is { Count: > 0 }) ? StorageDisplayWrite(tokens, index) : null;
         var storageValue = storageElement is null ? null : Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
         Dictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? glyphs = null;
@@ -148,9 +151,9 @@ internal sealed partial class CommandTextReader
                 && NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[index + 3].Start));
             return sourceType == "entity" && (nativeNumericDestination || NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[value + 2].Start)))
                 || StaticItemSource(sourceType, source)
-                || sourceType == "storage" && !resultObserved && TaggedStorageItems()
+                || sourceType == "storage" && (!resultObserved || operation == "append" && FixedScoreStore(tokens, index)) && TaggedStorageItems()
                 && InventoryTransfer(tokens[index + 2].Text, tokens[path].Text, operation, source)
-                || sourceType == "block" && tokens[index + 2].Text == "storage"
+                || sourceType == "block" && tokens[index + 2].Text == "storage" && (!resultObserved || operation != "set")
                 && runtimeDataVersion >= StorageDataVersion && SignTextSource(source);
         }
         if (tokens.Count != value + 2 || tokens[value].Text != "value") return false;
@@ -158,7 +161,8 @@ internal sealed partial class CommandTextReader
         if (keepEmptyListReset && operation == "set" && valueNode.Value is LogicalMinecraftList { Items.IsEmpty: true }) return false;
         return !valueNode.ContainsStringValues && (operation != "merge" || valueNode.Value is LogicalMinecraftCompound)
             || StaticItemTagPayload(tokens[path].Text, valueNode, operation)
-            || operation == "set" && !resultObserved && TaggedStorageItems() && AttributeMemberWrite(tokens[path].Text, valueNode)
+            || operation == "set" && !resultObserved && TaggedStorageItems()
+                && (AttributeMemberWrite(tokens[path].Text, valueNode) || EnchantmentIdWrite(tokens[path].Text, valueNode))
             || operation == "set" && (tokens[index + 2].Text == "entity" && tokens[path].Text == "Item" && StaticNbtMatch.ItemStack(valueNode)
                 || valueNode.Value is LogicalMinecraftLeaf { Value: NbtString id } && MinecraftIdentifier.ResourceLocation(id.Value)
                 && NativeItemIdPath(tokens[index + 2].Text, tokens[path].Text));
@@ -182,14 +186,23 @@ internal sealed partial class CommandTextReader
     }
 
     private static bool AttributeMemberWrite(string path, SnbtNode payload)
+        => TaggedItemMember(path, "tag.AttributeModifiers[", out var field) && StaticNbtMatch.AttributeModifierField(field, payload);
+
+    private static bool EnchantmentIdWrite(string path, SnbtNode payload)
+        => payload.Value is LogicalMinecraftLeaf { Value: NbtString id } && MinecraftIdentifier.ResourceLocation(id.Value)
+            && (TaggedItemMember(path, "tag.Enchantments[", out var field) || TaggedItemMember(path, "tag.StoredEnchantments[", out field))
+            && field == "id";
+
+    private static bool TaggedItemMember(string path, string list, out string field)
     {
-        const string list = "tag.AttributeModifiers[";
+        field = "";
         var start = path.LastIndexOf(list, StringComparison.Ordinal);
         var end = path.LastIndexOf("].", StringComparison.Ordinal);
         if (start < 0 || start > 0 && path[start - 1] != '.' || end < start + list.Length) return false;
         var selector = start + list.Length;
-        return (end == selector || Integer(path[selector..end], out _) || path[selector] == '{' && CompoundEnd(path, selector) == end)
-            && StaticNbtMatch.AttributeModifierField(path[(end + 2)..], payload);
+        if (end != selector && !Integer(path[selector..end], out _) && !(path[selector] == '{' && CompoundEnd(path, selector) == end)) return false;
+        field = path[(end + 2)..];
+        return true;
     }
 
     private static bool NumericEntitySource(string path, string? entityType = null)

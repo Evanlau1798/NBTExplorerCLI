@@ -243,6 +243,10 @@ NBT 檔可以用 `--pointer` 選標籤，省略時會讀取根標籤。讀取區
 
 譯後片段在 `data.content`。CLI 會比對原始來源和候選欄位、驗證格式碼、數值和私用區字元，並保留結構化草稿的其他欄位。選取單行時，輸出必須維持一個物理行，能以跳脫表示的字串換行仍可保留。即使只選取單一檔案，也請將草稿匯出到 Minecraft 世界資料夾以外。結果會標明 `gameplayVerified: false`。請先在世界副本核對指令或畫面，再將草稿納入編輯。原始來源與掃描狀態會保留。
 
+同一個世界有多筆選取時，可用 `translate fallback <world> --batch draft-batch.json`。請求包含 `schemaFamily: "nbtcli.translation-draft-batch"`、`schemaVersion: 1` 與 `selections` 陣列。每筆提供外層檔案的 SHA-256 作為 `sourceHash`，並在 `options` 填入選取參數，例如 `{"path":"datapacks/example/data/demo/functions/read.mcfunction","line":"12"}`。選取壓縮檔內的成員時，也要提供它的 `entryHash`。依選取順序讀取 `data.drafts`，將各筆的 `replyTemplate` 放回請求對應的 `reply`、填入譯文，再執行相同指令即可驗證。一批最多 1,024 筆，沿用單筆的唯讀草稿驗證。
+
+加上 `--session-id <id>` 可對照既有翻譯工作階段。若工作階段使用自訂位置，也要提供同一個 `--state-root`。批次繼承工作階段的語言設定，只為當前世界快照中有精確對應槽的譯文回傳 `data.sessionReplySlots`。依 `slotId` 合併到 `translate export` 的各頁回覆範本，再以 `translate submit` 送出完整頁面。來源已變更、對應不唯一或缺少已驗證槽時，批次驗證會拒絕。計畫與套用也會在回寫前重新檢查來源。
+
 ## 選用進階小幫手
 
 一般地圖翻譯不需要用到以下功能，但在翻譯超大型地圖時非常實用：

@@ -38,6 +38,7 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
+    private (string Storage, string Path, SourceAddress Address)? previousReset, lineReset;
     internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null, Action? opaqueEquipment = null, Action<CommandFunctionCall>? functionCall = null)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
@@ -78,6 +79,7 @@ internal sealed partial class CommandTextReader
                 body = "";
             }
             else if (trimmed.StartsWith('#')) body = "";
+            lineReset = null;
             try
             {
                 if (classic) ClassicCommand(body, start, path);
@@ -96,6 +98,7 @@ internal sealed partial class CommandTextReader
             catch (CommandSyntaxException) { Unknown(path, start, end - start, "InvalidCommandSyntax"); }
             catch (JsonException) { Unknown(path, start, end - start, "InvalidCommandComponent"); }
             catch (SnbtException error) when (error.Code != SnbtError.LimitExceeded) { Unknown(path, start, end - start, "InvalidCommandSnbt"); }
+            previousReset = lineReset;
             lineByte += Utf8.GetByteCount(source.Command.AsSpan(start, Math.Min(source.Command.Length, index + 1) - start));
             start = index + 1;
         }
@@ -263,8 +266,10 @@ internal sealed partial class CommandTextReader
         return new(source.Address.Artifact, source.Address.NodePath, role, source.Address.Dimension, source.Address.Chunk, componentPath, syntax);
     }
     private void Unknown(TypedPath path, int start, int length, string code)
+        => Unknown(Address(path, start, length, source.Address.SemanticRole), code);
+    private void Unknown(SourceAddress address, string code)
     {
-        var address = Address(path, start, length, source.Address.SemanticRole); Charge(address, code); diagnostics.Add(new(address, code)); completeness = ReferenceCompleteness.Unresolved;
+        Charge(address, code); diagnostics.Add(new(address, code)); completeness = ReferenceCompleteness.Unresolved;
     }
     private void Charge(SourceAddress address, string value)
     {

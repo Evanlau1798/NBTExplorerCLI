@@ -27,6 +27,8 @@ The namespaced world layout introduced in 26.1 Snapshot 6 has an open upper boun
 
 Later datapacks and resource packs can reuse the same readers when their metadata and content follow the existing format. If `create-pack` cannot infer the output format, specify a verified format with `--pack-format`.
 
+`scan` and full `validate` list recognized biome sound configuration issues in `data.compatibilityWarnings`, with the affected file and field. These settings are preserved byte-for-byte by translation. The matching Minecraft version still determines whether the sound plays.
+
 ### Classic Anvil Worlds
 
 Older Minecraft Java Edition Anvil saves (storage version `19133`, before Minecraft added `DataVersion`) do not store an exact version number inside `level.dat`:

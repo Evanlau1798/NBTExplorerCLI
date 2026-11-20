@@ -184,8 +184,45 @@ internal static class PackTextExtractionTests
             Require(Read(valid) is { Complete: true, Occurrences.IsEmpty: true }, "known vanilla worldgen has no display text: " + kind);
             Require(Read(unknown) is { Complete: false, Occurrences.IsEmpty: true }, "unknown worldgen remains protected: " + kind);
             if (kind == "worldgen/biome")
+            {
                 Require(!Read(valid.Replace("minecraft:ambient.cave", "playsound ambient.cave", StringComparison.Ordinal)).Complete,
                     "a malformed resource ID remains unresolved");
+                var optionalSound = valid.Replace("\"fog_color\":0,",
+                    """{"additions_sound":{"sound":{"sound_id":"invalid sound id"},"tick_chance":0.015},"fog_color":0,"""[1..],
+                    StringComparison.Ordinal);
+                var warning = Read(optionalSound);
+                Require(warning.Complete && warning.Occurrences.IsEmpty
+                    && warning.Diagnostics.Any(item => item.Code == "InvalidOptionalBiomeSoundIdentifier"
+                        && item.Address.NodePath.Segments.Select(segment => segment.Key).SequenceEqual(["effects", "additions_sound", "sound", "sound_id"])),
+                    "known optional inline sound compatibility is a warning at the exact field");
+                Require(!Read(optionalSound.Replace("\"sound_id\":", "\"unknown\":true,\"sound_id\":", StringComparison.Ordinal)).Complete,
+                    "an unknown inline sound field is never treated as a compatibility warning");
+                WorldgenWarningsReachCachedCli(optionalSound);
+            }
         }
+    }
+
+    private static void WorldgenWarningsReachCachedCli(string biome)
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+        try
+        {
+            WorldDiscoveryTests.Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            WorldDiscoveryTests.Put(root, "datapacks/p/pack.mcmeta", """{"pack":{"pack_format":15,"description":"Pack"}}"""u8.ToArray());
+            WorldDiscoveryTests.Put(root, "datapacks/p/data/test/worldgen/biome/example.json", Encoding.UTF8.GetBytes(biome));
+            foreach (var attempt in new[] { "cold", "warm" })
+            {
+                var invocation = CliScanTests.Run(root, "scan", root, "--cache-root", cache, "--summary");
+                Require(invocation.Exit == 0, attempt + " scan accepts a known optional sound warning");
+                using var result = CliScanTests.Success(invocation);
+                var data = result.RootElement.GetProperty("data");
+                var warnings = data.GetProperty("compatibilityWarnings");
+                Require(data.GetProperty("coverageComplete").GetBoolean()
+                    && warnings.GetProperty("total").GetInt32() == 2
+                    && warnings.GetProperty("items").EnumerateArray().Any(item => item.GetProperty("code").GetString() == "InvalidOptionalBiomeSoundIdentifier"),
+                    attempt + " scan exposes both original sound warnings with complete text coverage");
+            }
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
     }
 }

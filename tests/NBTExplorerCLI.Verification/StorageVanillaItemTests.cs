@@ -22,11 +22,13 @@ internal static class StorageVanillaItemTests
             data modify storage demo:items stack.tag.AttributeModifiers[{AttributeName:"generic.armor"}].AttributeName set value "minecraft:generic.armor"
             data modify storage demo:items stack.tag.AttributeModifiers[0].Name set value "minecraft:generic.armor"
             data modify storage demo:items stack.tag.AttributeModifiers[-1].Slot set value "offhand"
+            execute if data storage demo:items stack.tag.Enchantments[{id:"sharpness"}] run data modify storage demo:items stack.tag.Enchantments[{id:"sharpness"}].id set value "minecraft:sharpness"
+            data modify storage demo:items stack.tag.StoredEnchantments[0].id set value "minecraft:mending"
             """;
         var uses = new List<CommandStorageAccess>();
         var result = Parse(script, uses.Add);
         Require(result.Complete && result.Text.Occurrences.Single().Text == "Equipped", "standard item metadata does not block adjacent visible text");
-        Require(uses.Count == 8 && uses.All(use => use.Use == CommandStorageUse.Other), "known item metadata does not authorize display inference");
+        Require(uses.Count == 11 && uses.All(use => use.Use == CommandStorageUse.Other), "known item metadata does not authorize display inference");
 
         foreach (var (path, operation) in new[]
         {
@@ -37,6 +39,9 @@ internal static class StorageVanillaItemTests
             ("stack.tag.AttributeModifiers[0].Name", "set value 'Custom text'"),
             ("stack.tag.AttributeModifiers[0].Caption", "set value 'VisibleText'"),
             ("stack.tag.AttributeModifiers[0].Slot", "set value 'unknown'"),
+            ("stack.extra.Enchantments[0].id", "set value 'minecraft:sharpness'"),
+            ("stack.tag.Enchantments[0].caption", "set value 'minecraft:sharpness'"),
+            ("stack.tag.Enchantments[0].id", "set value 'Unparsed words'"),
         })
         {
             var unresolved = Parse($"data modify storage demo:items {path} {operation}");
@@ -47,11 +52,14 @@ internal static class StorageVanillaItemTests
             var observed = Parse($"""execute store {mode} score $x demo run data modify storage demo:items stack.tag.AttributeModifiers[0].Name set value "minecraft:generic.armor" """.TrimEnd());
             Require(!observed.Complete && observed.Text.Occurrences.IsEmpty,
                 "observed attribute assignments retain their unresolved result semantics");
+            Require(!Parse("execute store " + mode + """ score #rc demo run data modify storage demo:items stack.tag.Enchantments[0].id set value "minecraft:sharpness" """.TrimEnd()).Complete,
+                "an observed enchantment replacement still needs a result proof");
         }
     }
 
     internal static void InventoryPaths()
     {
+        const string filteredAppend = """data modify storage demo:queue rows append from storage demo:items carried.items[{id:"minecraft:paper",Slot:2b}]""";
         var commands = new[]
         {
             ("data modify storage demo:queue rows append from storage demo:items carried.items[{Slot:-106b}]", 2),
@@ -59,6 +67,8 @@ internal static class StorageVanillaItemTests
             ("""data modify storage demo:queue rows insert 0 from storage demo:items carried.items[{tag:{Enchantments:[{id:"minecraft:binding_curse"}]}}]""", 2),
             ("data modify block 6 65 0 Items set from storage demo:queue rows", 1),
             ("""data modify storage demo:items carried.items[{Slot:3b,tag:{Enchantments:[{id:"minecraft:binding_curse"}]}}].Slot set value 36b""", 1),
+            ("execute store success score $observed demo run " + filteredAppend, 2),
+            ("execute store result score #observed demo run " + filteredAppend, 2),
         };
         foreach (var (command, count) in commands)
         {
@@ -75,6 +85,11 @@ internal static class StorageVanillaItemTests
             "data modify block 6 65 0 CustomName set from storage demo:queue rows",
             "data modify block 6 65 0 Items set from storage demo:queue rows[0]",
             "execute store success score $x demo run data modify block 6 65 0 Items set from storage demo:queue rows",
+            "execute store success score * demo run " + filteredAppend,
+            "execute store result score @a demo run " + filteredAppend,
+            "execute if score #gate demo matches 1 store success score #observed demo run " + filteredAppend,
+            "execute store success score #observed demo run " + filteredAppend.Replace(" append ", " set ", StringComparison.Ordinal),
+            "execute store result score #observed demo run " + filteredAppend.Replace("Slot:2b", """tag:{display:{Name:'{"text":"Welcome"}'}}""", StringComparison.Ordinal),
         })
             Require(!Parse(command).Complete, $"unverified comparison, type, destination, or result remains unresolved: {command}");
     }

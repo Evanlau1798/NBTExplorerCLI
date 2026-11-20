@@ -21,6 +21,9 @@ public static class ClickCommandText
         {
             var tokens = CommandTokens.Read(command, 0, limits);
             if (tokens.Count == 2 && tokens[0].Text == "/function" && CommandTextReader.ResourceOrTag(tokens[1].Text)) return NoText;
+            if (tokens.Count == 7 && tokens[0].Text == "/execute" && tokens[1].Text is "if" or "unless" && tokens[2].Text == "entity"
+                && tokens[4].Text == "run" && tokens[5].Text == "function" && CommandTextReader.ResourceOrTag(tokens[6].Text)
+                && SelectorNames.Parse(tokens[3].Text, limits, allowNearest: false) is { Complete: true, Names.IsEmpty: true }) return NoText;
             if (tokens.Count == 5 && tokens[0].Text is "/tp" or "/teleport" && tokens[1].Text is "@s" or "@p" or "@a"
                 && tokens.Skip(2).All(token => CommandTextReader.Coordinate(token.Text))) return NoText;
             if (tokens.Count != 3 || tokens[0].Text != "/tellraw" || tokens[1].Text is not ("@s" or "@p" or "@a")) return null;

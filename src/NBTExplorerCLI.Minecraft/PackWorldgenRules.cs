@@ -1,5 +1,7 @@
 using System.Text.Json;
+using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using static NBTExplorerCLI.Minecraft.TextExtractionCollector;
 
 namespace NBTExplorerCLI.Minecraft;
 
@@ -98,26 +100,40 @@ public static partial class PackTextExtractor
             || key == "replace_current_music" && BooleanValue(field)),
         "mood_sound" => SoundSettings(member, (key, field) => key is "tick_delay" or "block_search_extent" && IntegerValue(field)
             || key == "offset" && NumberValue(field)),
-        "additions_sound" => BiomeAdditionsSound(member),
+        "additions_sound" => BiomeAdditionsSound(member, optionalInlineId: true),
         "particle" => member.TryGetNativeProperty("options", out var options) && options.TryGetNativeProperty("type", out var type)
             && WorldgenId(type) && Fields(options, (key, _) => key == "type")
             && Fields(member, (key, field) => key == "options" || key == "probability" && NumberValue(field)),
         _ => false
     });
 
-    private static bool BiomeAdditionsSound(JsonElement value) => SoundSettings(value, (key, field) => key == "tick_chance" && NumberValue(field));
+    private static bool BiomeAdditionsSound(JsonElement value, bool optionalInlineId = false)
+        => SoundSettings(value, (key, field) => key == "tick_chance" && NumberValue(field), optionalInlineId);
 
-    private static bool SoundSettings(JsonElement value, Func<string, JsonElement, bool> option) => value.TryGetNativeProperty("sound", out var sound)
-        && WorldgenSound(sound) && Fields(value, (name, member) => name == "sound" || option(name, member));
-    private static bool WorldgenSound(JsonElement value)
+    private static bool SoundSettings(JsonElement value, Func<string, JsonElement, bool> option, bool optionalInlineId = false)
+        => value.TryGetNativeProperty("sound", out var sound) && WorldgenSound(sound, optionalInlineId)
+            && Fields(value, (name, member) => name == "sound" || option(name, member));
+    private static bool WorldgenSound(JsonElement value, bool optionalInlineId = false)
     {
         if (value.ValueKind == JsonValueKind.String)
         {
             var sound = NativeJsonStrings.Read(value);
             return sound.Length == 0 || MinecraftIdentifier.ResourceLocation(sound);
         }
-        return value.TryGetNativeProperty("sound_id", out var id) && WorldgenId(id)
+        return value.TryGetNativeProperty("sound_id", out var id) && (optionalInlineId ? id.ValueKind == JsonValueKind.String : WorldgenId(id))
             && Fields(value, (name, member) => name == "sound_id" || name == "range" && NumberValue(member));
+    }
+
+    private static void ReportBiomeSoundWarnings(JsonElement root, TextExtractionCollector output)
+    {
+        var effects = root.GetProperty("effects");
+        var path = At(TypedPath.Root, "effects");
+        if (effects.TryGetNativeProperty("music", out var music) && music.TryGetNativeProperty("sound", out var sound)
+            && sound.ValueKind == JsonValueKind.String && NativeJsonStrings.Read(sound).Length == 0)
+            output.Diagnostic(At(At(path, "music"), "sound"), "EmptyBiomeMusicSoundIdentifier");
+        if (effects.TryGetNativeProperty("additions_sound", out var additions) && additions.TryGetNativeProperty("sound", out sound)
+            && sound.TryGetNativeProperty("sound_id", out var id) && !WorldgenId(id))
+            output.Diagnostic(At(At(At(path, "additions_sound"), "sound"), "sound_id"), "InvalidOptionalBiomeSoundIdentifier");
     }
     private static bool WorldgenId(JsonElement value) => value.ValueKind == JsonValueKind.String
         && MinecraftIdentifier.ResourceLocation(NativeJsonStrings.Read(value));

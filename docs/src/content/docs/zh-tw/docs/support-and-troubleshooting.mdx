@@ -27,6 +27,8 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
 
 後續資料包與資源包若沿用同一套中繼資料與內容格式，讀取時可沿用既有解析器。若 `create-pack` 無法推得輸出格式，請用 `--pack-format` 指定已驗證的格式。
 
+`scan` 與完整 `validate` 會在 `data.compatibilityWarnings` 列出可辨識的生態域音效設定問題，以及對應的檔案和欄位。翻譯會逐位元組保留這些設定。音效能否播放仍由對應的 Minecraft 版本決定。
+
 ### 經典 Anvil 存檔
 
 在 Minecraft 導入 `DataVersion` 之前的舊版 Anvil 存檔（儲存版本 `19133`）裡，檔案本身沒有標記確切的遊戲版本：

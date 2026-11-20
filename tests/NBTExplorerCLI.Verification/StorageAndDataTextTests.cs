@@ -39,6 +39,13 @@ internal static class StorageAndDataTextTests
         new("apply-storage-late-namespaced-reader-forward-recovery", "apply", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(true, true)),
         new("cli-session-write-storage-archive", "cli-session-write", _ => StorageCommandProofTests.CliArchiveSession()),
         new("prepare-world-storage-list-replacements", "preparation", _ => StorageCommandProofTests.WholeListReplacements()),
+        new("prepare-storage-blank-edits", "preparation", _ => StorageBlankProbeTests.BlankEditsAreRejected()),
+        new("prepare-storage-indexed-blank-comparison", "preparation", _ => StorageBlankProbeTests.ObservedIndexedBlankWriteAllowsTranslationAndRollback()),
+        new("prepare-storage-reset-scratch-comparison", "preparation", _ => StorageBlankProbeTests.ResetScratchComparisonRequiresExclusiveUse()),
+        new("prepare-storage-blank-comparison-proven-source", "preparation", _ => StorageBlankProbeTests.BlankComparisonRequiresProvenSource()),
+        new("prepare-storage-blank-comparison-scoped-signs", "preparation", _ => StorageBlankProbeTests.ScopedSignCannotChangeComparedBlankness()),
+        new("prepare-storage-sign-observed-copy", "preparation", _ => StorageBlankProbeTests.ScopedSignRejectsObservedCopy(native: false)),
+        new("prepare-storage-sign-native-command", "preparation", _ => StorageBlankProbeTests.ScopedSignRejectsObservedCopy(native: true)),
         new("prepare-world-storage-saved-list", "preparation", _ => StorageCommandProofTests.SavedDisplayList()),
         new("text-storage-native-seed-with-element-writes", "discovery", _ => StorageCommandProofTests.NativeSeedElementWrites()),
         new("text-storage-seed-runtime-component-schema", "discovery", _ => StorageCommandProofTests.NativeSeedRuntimeSchema()),
@@ -102,11 +109,12 @@ internal static class StorageAndDataTextTests
             execute if data storage demo:inventory items[{Slot:0b,id:"minecraft:stick"}] run tellraw @a[name=Guard] {"text":"Found"}
             execute unless data storage demo:equipment attributes[{AttributeName:"minecraft:generic.armor"}] run tellraw @a {"text":"No armor"}
             data modify storage demo:inventory items[{id:"minecraft:stick",Slot:0b}].Count set value 2b
+            execute if data storage demo:inventory {selected:{id:"minecraft:potion",tag:{Potion:"minecraft:water"}}} run tellraw @s {"text":"Potion found"}
             """;
         var result = CommandTextExtractor.Extract(new(address, script), profile, storageAccess: uses.Add);
-        Require(result.Complete && result.Text.Occurrences.Select(item => item.Text).SequenceEqual(new[] { "Found", "No armor" })
+        Require(result.Complete && result.Text.Occurrences.Select(item => item.Text).SequenceEqual(new[] { "Found", "No armor", "Potion found" })
             && result.References.Single().Name == "Guard", "storage metadata predicates preserve nested text and keep exact name references");
-        Require(uses.Count == 4 && uses.All(use => use.Use == CommandStorageUse.Other), "metadata predicates do not establish a display role");
+        Require(uses.Count == 5 && uses.All(use => use.Use == CommandStorageUse.Other) && uses.Any(use => use.Path == "selected"), "metadata predicates block inference for the entire compared value");
         foreach (var filter in new[] { """{id:"Not an id",Slot:1b}""", """{id:"minecraft:elytra",Slot:"head"}""",
             """{id:"minecraft:elytra",Slot:1b,Name:"Visible"}""", """{AttributeName:"minecraft:generic.armor",Name:"Visible"}""",
             """{id:"minecraft:elytra",id:"minecraft:stick"}""" })
@@ -115,6 +123,10 @@ internal static class StorageAndDataTextTests
         const string command = """data remove storage demo:inventory items[{id:"minecraft:elytra",Slot:1b}]""";
         Require(!CommandTextExtractor.Extract(new(address, command), profile, runtimeDataVersion: 2204).Complete,
             "storage metadata is unavailable before the runtime supports storage");
+        var unsupported = CommandTextExtractor.Extract(new(address, """
+            execute if data storage demo:inventory {selected:{id:"minecraft:stick",tag:{display:{Name:'{"text":"Hidden"}'}}}} run function demo:target
+            """), profile, runtimeDataVersion: 3465);
+        Require(!unsupported.Complete, "a nested text comparison cannot be treated as fixed item metadata");
     }
 
     private static void ComponentListCopyChain()

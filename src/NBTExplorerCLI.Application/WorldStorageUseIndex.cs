@@ -12,10 +12,7 @@ internal sealed record StorageDisplayPolicy(ImmutableHashSet<(string Storage, st
 {
     internal static StorageDisplayPolicy Empty { get; } = new([], ImmutableDictionary<string, Hash256>.Empty, false, [],
         ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>>.Empty);
-    internal static bool Target(SourceAddress address) => address.Syntax is not null
-        && address.SemanticRole.StartsWith("command.function.storage.component", StringComparison.Ordinal)
-        || address.SemanticRole == "command_storage.component.interpreted"
-        || address.SemanticRole.StartsWith("command_storage.component.interpreted.", StringComparison.Ordinal);
+    internal static bool Target(SourceAddress address) => TextSlot.IsInterpretedStorage(address);
     internal static bool TargetsStorage(IEnumerable<PatchOperation> operations) => operations.Any(operation => operation.Targets.Any(Target));
     internal bool Covers(ExtractionDiagnostic diagnostic) => ResolvedDiagnostics.Contains(diagnostic);
 
@@ -39,7 +36,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         var index = new WorldStorageUseIndex(extraction.Limits);
         var functionResults = new StorageFunctionResults(index.Charge);
         var observed = new Dictionary<StorageCommandNode, CommandStorageAccess>();
-        var copies = new Dictionary<SourceAddress, CommandStorageAccess>();
+        var exact = new Dictionary<SourceAddress, CommandStorageAccess>();
         var required = new HashSet<(string Storage, string Path)>();
         var resolvedDiagnostics = ImmutableHashSet.CreateBuilder<ExtractionDiagnostic>();
         var pendingSeeds = new HashSet<string>(StringComparer.Ordinal);
@@ -48,8 +45,12 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         {
             index.Observe(access);
             functionResults.ObserveMutation(access);
-            if (covered && access.Use is CommandStorageUse.ListCopy or CommandStorageUse.EquipmentExport)
-                copies.TryAdd(access.Address, access);
+            if (covered && access.Use is CommandStorageUse.ListCopy or CommandStorageUse.EquipmentExport
+                or CommandStorageUse.IndexedBlankWrite or CommandStorageUse.ScratchComparison)
+            {
+                exact.TryAdd(access.Address, access);
+                if (access.BlankResetAddress is { } reset) exact.TryAdd(reset, access);
+            }
             var use = access.Use is CommandStorageUse.ListReplacement or CommandStorageUse.ScalarWrite ? CommandStorageUse.ListElementWrite : access.Use;
             if (covered && !access.HasUnclassifiedReferences && access.Address.Syntax?.NodePath is { } syntax
                 && (use == CommandStorageUse.ListElementWrite
@@ -70,12 +71,13 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                     if (pendingSeeds.Add(artifact.RelativePath)) index.Charge(artifact.RelativePath.Length);
                 }
                 else covered = text is { Diagnostics.IsEmpty: false, Unclassified.IsEmpty: true }
-                    && text.Diagnostics.All(diagnostic => index.MatchUse(diagnostic, observed, copies, required, resolvedDiagnostics));
+                    && text.Diagnostics.All(diagnostic => index.MatchUse(diagnostic, observed, exact, required, resolvedDiagnostics));
             }
             observed.Clear();
-            copies.Clear();
+            exact.Clear();
         }
         if (!functionResults.BlockObservedMutations(extraction.Discovery, index.Block, cancellationToken)) covered = false;
+        index.BlockUnsafeScratchComparisons();
         index.PropagateAssignmentShapes();
         var compatible = index.ReadCompatibleLists(inventory, extraction).ToDictionary(candidate => candidate.List);
         var authorized = ClosedDisplayLists(compatible).ToHashSet();
@@ -103,18 +105,24 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         var preview = new StorageDisplayPolicy(lists, producers, false, [], seedRules);
         if (!covered || !required.IsSubsetOf(lists)) return preview;
         var policy = preview with { CanBindWrites = true, ResolvedDiagnostics = resolvedDiagnostics.ToImmutable() };
-        if (!policy.ProjectedCoverage(extraction.ReadStorageProjection(policy, pendingSeeds))) return preview;
         var consumerKeys = policy.ResolvedDiagnostics.Select(diagnostic => diagnostic.Address).GroupBy(address => address.Artifact.RelativePath, StringComparer.Ordinal)
             .Select(group => new KeyValuePair<string, Hash256>(group.Key, Hash256.Compute(Encoding.UTF8.GetBytes(
                 (producers.GetValueOrDefault(group.Key)?.Hex ?? "") + string.Concat(group.Select(address => SourceIdentity.Occurrence(address).Digest.Hex).Order(StringComparer.Ordinal))))));
-        return policy with { SourceKeys = producers.SetItems(consumerKeys) };
+        policy = policy with { SourceKeys = producers.SetItems(consumerKeys) };
+        return policy.ProjectedCoverage(extraction.ReadStorageProjection(policy, pendingSeeds)) ? policy : preview;
     }
 
     private bool MatchUse(ExtractionDiagnostic diagnostic, Dictionary<StorageCommandNode, CommandStorageAccess> observed,
-        Dictionary<SourceAddress, CommandStorageAccess> copies, HashSet<(string Storage, string Path)> required,
+        Dictionary<SourceAddress, CommandStorageAccess> exact, HashSet<(string Storage, string Path)> required,
         ImmutableHashSet<ExtractionDiagnostic>.Builder resolvedDiagnostics)
     {
-        if (diagnostic.Code == "UnknownDataTextSchema" && copies.TryGetValue(diagnostic.Address, out var copy))
+        if (diagnostic.Code == "UnresolvedStorageBlankComparison" && exact.TryGetValue(diagnostic.Address, out var comparison))
+        {
+            Require(comparison.CopySource ?? (comparison.Storage, comparison.Path));
+            Resolve();
+            return true;
+        }
+        if (diagnostic.Code == "UnknownDataTextSchema" && exact.TryGetValue(diagnostic.Address, out var copy))
         {
             if (copy.CopySource is { } from) Require(from);
             Require((copy.Storage, copy.Use == CommandStorageUse.EquipmentExport ? copy.Path + TaggedItemLorePath : copy.Path));
@@ -123,7 +131,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         }
         var use = diagnostic.Code switch
         {
-            "UnknownDataTextSchema" => CommandStorageUse.ListElementWrite,
+            "UnknownDataTextSchema" or "UnresolvedStorageBlankComparison" => CommandStorageUse.ListElementWrite,
             "DynamicComponentReference" => CommandStorageUse.InterpretedDisplay,
             _ => CommandStorageUse.Other
         };
@@ -170,6 +178,9 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         var storage = GetStorage(access.Storage);
         switch (access.Use)
         {
+            case CommandStorageUse.ScratchComparison when access.CopySource is { } input:
+                ObserveScratchComparison((access.Storage, access.Path), input);
+                break;
             case CommandStorageUse.Presence:
                 break;
             case CommandStorageUse.ListCardinality when PlainPath(access.Path):
@@ -181,7 +192,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 if (access.Path.EndsWith("[]", StringComparison.Ordinal)) subject.RequiresList = true;
                 else subject.RequiresScalar = true;
                 break;
-            case CommandStorageUse.ListElementWrite or CommandStorageUse.ListReplacement or CommandStorageUse.ScalarWrite
+            case CommandStorageUse.ListElementWrite or CommandStorageUse.ListReplacement or CommandStorageUse.ScalarWrite or CommandStorageUse.IndexedBlankWrite
                 when access.Address.SemanticRole == "command.function":
                 var list = GetList(storage, access.Storage, access.Path);
                 if (access.ListElementType is not { } type) storage.Ambiguous = true;
@@ -193,7 +204,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 else
                 {
                     list.RequiresList = true;
-                    if (access.Use == CommandStorageUse.ListElementWrite) list.ElementWrites.Add(type);
+                    if (access.Use is CommandStorageUse.ListElementWrite or CommandStorageUse.IndexedBlankWrite) list.ElementWrites.Add(type);
                     else if (type != NbtType.End) list.ReplacementTypes.Add(type);
                 }
                 var artifact = access.Address.Artifact.RelativePath;

@@ -186,10 +186,12 @@ public sealed partial class WorldTextExtraction
                 CheckRetention(text, commands.References);
             }
             if (!text.Unclassified.IsEmpty) return new(source, SourceOutcome.Unsupported, text, "UnclassifiedStorageText");
-            if (!text.Diagnostics.IsEmpty)
+            if (text.Diagnostics.FirstOrDefault(diagnostic => !ExtractionDiagnostic.IsCompatibilityWarning(diagnostic.Code)) is { } blocking)
             {
-                var unsupported = text.Diagnostics.All(diagnostic => diagnostic.Code.StartsWith("Unsupported", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Unknown", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Dynamic", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Unresolved", StringComparison.Ordinal));
-                return new(source, unsupported ? SourceOutcome.Unsupported : SourceOutcome.Failed, text, text.Diagnostics[0].Code, commands);
+                var unsupported = text.Diagnostics.All(diagnostic => ExtractionDiagnostic.IsCompatibilityWarning(diagnostic.Code)
+                    || diagnostic.Code.StartsWith("Unsupported", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Unknown", StringComparison.Ordinal)
+                    || diagnostic.Code.StartsWith("Dynamic", StringComparison.Ordinal) || diagnostic.Code.StartsWith("Unresolved", StringComparison.Ordinal));
+                return new(source, unsupported ? SourceOutcome.Unsupported : SourceOutcome.Failed, text, blocking.Code, commands);
             }
             if (commands is { ReferenceCompleteness: not ReferenceCompleteness.Complete }) return new(source, SourceOutcome.Unsupported, text, "IncompleteCommandReferences", commands);
             return new(source, text.Occurrences.IsEmpty && text.TranslationKeys.IsEmpty && (commands?.References.IsEmpty ?? true) ? SourceOutcome.Irrelevant : SourceOutcome.Success, text, Commands: commands);

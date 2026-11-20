@@ -76,8 +76,10 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         }
         foreach (var metadata in snapshot.Discovery.MetadataSources.IsDefault ? [] : snapshot.Discovery.MetadataSources) Input(metadata.Artifact, ArtifactImage.Present(metadata.ContentHash!));
         foreach (var input in referenceInputs) Input(input.Artifact, input.Image);
-        if (storageDisplays.CanBindWrites)
-            foreach (var source in WorldReferenceScan.Relevant(snapshot.Discovery).Where(source => source.Chunk is null && source.Location.Artifact.ContainerEntry is null))
+        var storageDependencies = storageDisplays.CanBindWrites ? snapshot.Discovery
+            : WorldStorageSignSafety.Targets(requested) ? WorldStorageSignSafety.Bind(inventory, snapshot.Limits, classicVersion) : null;
+        if (storageDependencies is not null)
+            foreach (var source in WorldReferenceScan.Relevant(storageDependencies).Where(source => source.Chunk is null && source.Location.Artifact.ContainerEntry is null))
                 Input(source.Location.Artifact, ArtifactImage.Present(source.ContentHash!));
         var policy = requested.OfType<ReferencePatch>().Skip(1).Any() ? MultipleReferencePolicy : Policy;
         var plan = new PatchPlan(inventory.WorldId, snapshot.Manifest.SnapshotId, snapshot.Manifest.Versions.Profile, policy, requested,

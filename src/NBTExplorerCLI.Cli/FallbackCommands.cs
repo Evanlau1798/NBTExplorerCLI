@@ -17,6 +17,20 @@ internal static class FallbackCommands
 
     internal static CliResult Execute(CliArguments request)
     {
+        if (request.Get("output") is { } output)
+        {
+            var input = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.Input!));
+            if (Directory.Exists(input)) ScanCommands.OutsideWorld(input, output);
+        }
+        if (request.Get("batch") is { } batch) return FallbackDraftBatch.Execute(request, batch);
+        if (request.Flag("session-id") || request.Flag("state-root"))
+            throw new CliFailure("INVALID_ARGUMENTS", "Fallback session binding requires --batch");
+        return ExecuteSelection(request);
+    }
+
+    internal static CliResult ExecuteSelection(CliArguments request, Hash256? expectedSource = null, Hash256? expectedEntry = null,
+        JsonElement? suppliedReply = null, FallbackSessionBinding? binding = null)
+    {
         var line = request.Get("line");
         var byteRange = request.Get("byte-range");
         var textPointer = request.Get("text-pointer");
@@ -28,15 +42,13 @@ internal static class FallbackCommands
             throw new CliFailure("INVALID_ARGUMENTS", "Choose one compatible line or byte-range selection and format");
         if (textPointer is { Length: > 0 } && !textPointer.StartsWith('/') || textPointer is not null && format == "text")
             throw new CliFailure("INVALID_ARGUMENTS", "Use a relative JSON pointer for an exact literal in a structured selection");
-        if (request.Get("output") is { } output)
-        {
-            var input = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.Input!));
-            if (Directory.Exists(input)) ScanCommands.OutsideWorld(input, output);
-        }
         using var source = new QuerySource(request, readPayload: format != "auto");
-        var payload = Read(source, request, format);
-        using var reply = request.Get("reply") is { } file ? BoundedJson.ReadDecoded(CliInput.ReadBytes(file), Limits) : null;
-        if (reply is not null) ValidateReplyDocument(reply.RootElement);
+        if (expectedSource is not null && (source.RawHash != expectedSource || source.EntryHash != expectedEntry))
+            throw new CliFailure("CONFLICT", "Fallback batch selection preimage changed");
+        var payload = Read(source, request, format, binding is not null);
+        using var replyFile = request.Get("reply") is { } file ? BoundedJson.ReadDecoded(CliInput.ReadBytes(file), Limits) : null;
+        var reply = replyFile?.RootElement ?? suppliedReply;
+        if (reply is { } replyDocument) ValidateReplyDocument(replyDocument);
         var unverified = new List<TypedPath>();
         var candidateList = Candidates(source, payload, textPointer, unverified).ToArray();
         if (textPointer is not null && !candidateList.Any(candidate => Pointer(candidate.Leaf.Path) == textPointer))
@@ -44,25 +56,25 @@ internal static class FallbackCommands
         var sourceOption = TranslationLanguages.SourceOption(request.Get("source-language"));
         var targetOption = request.Get("target-language");
         var sourceLocale = reply is not null && sourceOption == TranslationLanguages.Automatic
-            ? BoundLocale(reply.RootElement, "sourceLocale", allowUndetermined: true)
+            ? BoundLocale(reply.Value, "sourceLocale", allowUndetermined: true)
             : sourceOption == TranslationLanguages.Automatic
                 ? (payload.Representation == "json" ? TranslationLanguages.ResourceSource(source.Artifact) : null)
                     ?? TranslationSourceDetection.Detect(candidateList.Select(candidate => candidate.Slot.SourceText))
                 : sourceOption;
-        var targetLocale = reply is not null && targetOption is null ? BoundLocale(reply.RootElement, "targetLocale")
+        var targetLocale = reply is not null && targetOption is null ? BoundLocale(reply.Value, "targetLocale")
             : TranslationLanguages.Target(targetOption);
         var origin = new { source = source.Description(payload.Selection), line, byteRange };
         var draftId = Hash256.Compute(JsonSerializer.SerializeToUtf8Bytes(new
         {
             schemaVersion = ReplyVersion, origin, payload.Representation, profile = request.Get("snbt-profile"), textPointer, sourceLocale, targetLocale
         })).Hex;
-        if (reply is not null)
+        if (reply is { } submitted)
         {
-            if (BoundLocale(reply.RootElement, "sourceLocale", allowUndetermined: true) != sourceLocale
-                || BoundLocale(reply.RootElement, "targetLocale") != targetLocale)
+            if (BoundLocale(submitted, "sourceLocale", allowUndetermined: true) != sourceLocale
+                || BoundLocale(submitted, "targetLocale") != targetLocale)
                 throw new CliFailure("CONFLICT", "Draft reply languages differ from the requested languages");
             var candidates = candidateList.ToDictionary(candidate => candidate.Slot.Id.Digest.Hex, StringComparer.Ordinal);
-            var replies = ReadReply(reply.RootElement, draftId, candidates, sourceLocale, targetLocale);
+            var replies = ReadReply(submitted, draftId, candidates, sourceLocale, targetLocale);
             var edits = replies.GroupBy(reply => reply.Candidate.Leaf).Select(group =>
             {
                 var text = group.Key.Text;
@@ -73,6 +85,8 @@ internal static class FallbackCommands
             }).ToArray();
             var content = payload.Rewrite(edits);
             CheckContent(content, payload.Representation, line is not null);
+            if (binding is not null)
+                foreach (var item in replies) binding.Add(source, item.Candidate.Slot, item.Candidate.Leaf.Span, item.Text);
             return new(new
             {
                 draftId, origin, payload.Representation, sourceLocale, targetLocale,
@@ -130,7 +144,7 @@ internal static class FallbackCommands
         }
     }
 
-    private static DraftPayload Read(QuerySource source, CliArguments request, string format)
+    private static DraftPayload Read(QuerySource source, CliArguments request, string format, bool bindSession)
     {
         if (format == "auto")
         {
@@ -146,6 +160,7 @@ internal static class FallbackCommands
             }, AncestorFont(source.Root!, path));
         }
         var bytes = source.Payload!;
+        var byteOffset = 0;
         if (request.Get("byte-range") is { } range)
         {
             var parts = range.Split(',');
@@ -154,23 +169,34 @@ internal static class FallbackCommands
                 || length < 1 || start > bytes.Length || length > bytes.Length - start)
                 throw new CliFailure("INVALID_ARGUMENTS", "Byte range must be start,length within the selected file or archive entry");
             bytes = bytes.AsSpan(start, length).ToArray();
+            byteOffset = start;
         }
         if (format == "json")
         {
             using var json = BoundedJson.ReadDecoded(bytes, Limits);
             var jsonRoot = new QueryNode(json.RootElement);
             var (node, path) = QueryPath.Select(jsonRoot, request);
-            return Json((JsonElement)node.Display()!, path, source, jsonRoot);
+            var spans = bindSession && request.Flag("byte-range") ? NativeJsonStringSpans.Read(bytes, Limits) : null;
+            return Json((JsonElement)node.Display()!, path, source, jsonRoot, spans, byteOffset);
         }
         if (request.Flag("pointer") || request.Flag("segments"))
             throw new CliFailure("INVALID_ARGUMENTS", "Use a line or byte range for an SNBT operand or text");
-        var text = CliInput.Decode(bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }) ? bytes.AsSpan(3) : bytes);
+        var bom = bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }) ? 3 : 0;
+        byteOffset += bom;
+        var text = CliInput.Decode(bytes.AsSpan(bom));
         if (request.Flag("line"))
         {
             var number = request.Number("line", 1, 1, int.MaxValue);
             using var lines = new StringReader(text);
+            var characters = 0;
             for (var index = 1; index < number; index++)
-                if (lines.ReadLine() is null) throw new CliFailure("NOT_FOUND", "Line is absent");
+            {
+                var preceding = lines.ReadLine() ?? throw new CliFailure("NOT_FOUND", "Line is absent");
+                characters += preceding.Length;
+                if (characters < text.Length && text[characters++] == '\r' && characters < text.Length && text[characters] == '\n')
+                    characters++;
+            }
+            byteOffset += Utf8.GetByteCount(text.AsSpan(0, characters));
             text = lines.ReadLine() ?? throw new CliFailure("NOT_FOUND", "Line is absent");
         }
         if (format == "text")
@@ -188,7 +214,8 @@ internal static class FallbackCommands
         SnbtDocument snbt;
         try { snbt = Snbt.ParseDocument(sourceText.AsSpan(operand.StartByte, operand.LengthBytes).ToArray(), profile, Limits); }
         catch (SnbtException error) { throw SyntaxError(error); }
-        return new(request.Flag("line") ? "command-line" : "snbt", TypedPath.Root, text, SnbtStrings(snbt.Root, TypedPath.Root), edits =>
+        return new(request.Flag("line") ? "command-line" : "snbt", TypedPath.Root, text,
+            SnbtStrings(snbt.Root, TypedPath.Root, byteOffset + operand.StartByte), edits =>
         {
             byte[] replacement;
             try
@@ -203,13 +230,21 @@ internal static class FallbackCommands
         });
     }
 
-    private static DraftPayload Json(JsonElement root, TypedPath path, QuerySource source, QueryNode document)
+    private static DraftPayload Json(JsonElement root, TypedPath path, QuerySource source, QueryNode document,
+        Dictionary<TypedPath, SnbtSpan>? spans = null, int byteOffset = 0)
     {
         var raw = root.GetRawText();
         var bytes = Encoding.UTF8.GetBytes(raw);
         var language = TranslationLanguages.ResourceSource(source.Artifact) is not null;
         var blockedFont = !language && AncestorFont(document, path);
         var leaves = blockedFont ? [] : JsonStrings(root, TypedPath.Root, language).Take(100_001).ToArray();
+        if (spans is not null)
+            for (var index = 0; index < leaves.Length; index++)
+            {
+                var leaf = leaves[index];
+                var span = spans[new TypedPath(path.Segments.AddRange(leaf.Path.Segments))];
+                leaves[index] = leaf with { Span = new(byteOffset + span.StartByte, span.LengthBytes) };
+            }
         return new("json", path, raw, leaves,
             edits => CliInput.Decode(NativeJsonEdits.ReplaceStrings(bytes, edits.Select(edit => (edit.Path, edit.Expected, edit.Replacement)), Limits)), blockedFont);
     }
@@ -329,18 +364,18 @@ internal static class FallbackCommands
                 foreach (var leaf in NbtStrings(list.Items[index], QueryPath.Append(path, PathSegment.ForIndex(index)))) yield return leaf;
     }
 
-    private static IEnumerable<Leaf> SnbtStrings(SnbtNode node, TypedPath path)
+    private static IEnumerable<Leaf> SnbtStrings(SnbtNode node, TypedPath path, int byteOffset)
     {
         if (node.Value is LogicalMinecraftLeaf leaf)
         {
-            if (leaf.Value is NbtString text) yield return new(path, text.Value);
+            if (leaf.Value is NbtString text) yield return new(path, text.Value, new(byteOffset + node.Span.StartByte, node.Span.LengthBytes));
             yield break;
         }
         if (node.Children.Any(child => child.Selector.Key == "font" && child.Node.Value is not LogicalMinecraftLeaf { Value: NbtString { Value: "minecraft:default" } }))
             yield break;
         foreach (var group in node.Children.GroupBy(child => child.Selector))
             if (group.Count() == 1)
-                foreach (var descendant in SnbtStrings(group.Single().Node, QueryPath.Append(path, group.Key))) yield return descendant;
+                foreach (var descendant in SnbtStrings(group.Single().Node, QueryPath.Append(path, group.Key), byteOffset)) yield return descendant;
     }
 
     private static bool Protected(TypedPath path) => !path.Segments.IsEmpty
@@ -412,7 +447,7 @@ internal static class FallbackCommands
     private static string? Field(JsonElement record, string key)
         => record.TryGetProperty(key, out var field) && field.ValueKind == JsonValueKind.String ? NativeJsonStrings.Read(field) : null;
 
-    private sealed record Leaf(TypedPath Path, string Text);
+    private sealed record Leaf(TypedPath Path, string Text, SnbtSpan? Span = null);
     private sealed record LiteralEdit(TypedPath Path, string Expected, string Replacement);
     private sealed record Candidate(TextSlot Slot, Leaf Leaf, TypedPath? Inner);
     private sealed record DraftPayload(string Representation, TypedPath Selection, string Context, IEnumerable<Leaf> Leaves,

@@ -9,7 +9,10 @@ public sealed record TextOccurrence(SourceAddress Address, string Text, string C
         => new(Address, Text, Context, sourceLocale, targetLocale, AllowedEmpty, placeholders ?? PlaceholderPolicy.None);
 }
 public sealed record TranslationKeyReference(SourceAddress Address, string Key);
-public sealed record ExtractionDiagnostic(SourceAddress Address, string Code);
+public sealed record ExtractionDiagnostic(SourceAddress Address, string Code)
+{
+    public static bool IsCompatibilityWarning(string code) => code is "EmptyBiomeMusicSoundIdentifier" or "InvalidOptionalBiomeSoundIdentifier";
+}
 public sealed record CommandCandidate(SourceAddress Address, string Command);
 public sealed record UnclassifiedTextCandidate(SourceAddress Address, string Text);
 public static class TextExtractionBudget
@@ -35,5 +38,6 @@ public sealed record TextExtractionResult(ImmutableArray<TextOccurrence> Occurre
     ImmutableArray<TranslationKeyReference> TranslationKeys, ImmutableArray<ExtractionDiagnostic> Diagnostics,
     ImmutableArray<CommandCandidate> PendingCommands, ImmutableArray<UnclassifiedTextCandidate> Unclassified)
 {
-    public bool Complete => Diagnostics.IsEmpty && PendingCommands.IsEmpty && Unclassified.IsEmpty;
+    public bool Complete => PendingCommands.IsEmpty && Unclassified.IsEmpty
+        && (Diagnostics.IsEmpty || Diagnostics.All(diagnostic => ExtractionDiagnostic.IsCompatibilityWarning(diagnostic.Code)));
 }

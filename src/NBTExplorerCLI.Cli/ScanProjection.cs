@@ -9,6 +9,7 @@ internal static class ScanProjection
     {
         var snapshot = query.Snapshot ?? throw new CliFailure("INCOMPLETE_SOURCE", "Scan was interrupted before publication");
         var sources = new List<object>(); var items = new List<TextOccurrence>(); var groups = new Dictionary<string, List<TextOccurrence>>(StringComparer.Ordinal);
+        var warnings = new List<ExtractionDiagnostic>(); var warningCount = 0;
         var sourceCount = 0; var textCount = 0; var matched = 0; var keyCount = 0; var references = 0; var unsupported = 0; var failed = 0;
         var resource = ReadCommands.IsResourceLimit(snapshot.Manifest.CatalogDiagnosticCode); var unreadable = ReadFailure(snapshot.Manifest.CatalogDiagnosticCode); long retained = 0;
         var extracting = request.Command == "extract"; var all = request.Flag("all"); var unique = request.Flag("unique");
@@ -28,6 +29,12 @@ internal static class ScanProjection
             if (source.Outcome == SourceOutcome.Unsupported) unsupported++;
             else if (source.Outcome is SourceOutcome.Failed or SourceOutcome.Cancelled) failed++;
             if (source.Text is not { } text) continue;
+            foreach (var diagnostic in text.Diagnostics)
+            {
+                if (!ExtractionDiagnostic.IsCompatibilityWarning(diagnostic.Code)) continue;
+                if (warningCount >= options.Offset && warnings.Count < options.Limit) warnings.Add(diagnostic);
+                warningCount++;
+            }
             keyCount += text.TranslationKeys.Length; references += source.Commands?.References.Length ?? 0;
             foreach (var occurrence in text.Occurrences)
             {
@@ -51,6 +58,7 @@ internal static class ScanProjection
         return Classify(new { worldId = snapshot.Manifest.WorldId, snapshotId = snapshot.Manifest.SnapshotId, snapshot.Manifest.Scope,
             coverageComplete = complete, referenceCoverage = "not-assessed", validationScope = request.Command == "validate" ? "decoded-text-sources" : null,
             catalogDiagnosticCode = snapshot.Manifest.CatalogDiagnosticCode, counts = new { sources = sourceCount, occurrences = textCount, matched, translationKeys = keyCount, commandReferences = references, unsupported, failed },
+            compatibilityWarnings = new { total = warningCount, offset = options.Offset, items = warnings },
             sources, sourcePagination = new { offset = options.Offset, limit = options.Limit, total = sourceCount }, items = extracting ? null : items, texts,
             pagination = new { offset = all ? 0 : options.Offset, limit = all ? total : options.Limit, total }, telemetry = query.Telemetry, cacheBefore = query.Before,
             execution = query.Scan?.Telemetry }, complete, resource, unreadable, failed > 0, unsupported > 0);

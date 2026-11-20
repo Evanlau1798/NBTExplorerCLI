@@ -103,6 +103,7 @@ public static class MinecraftProfiles
             && version[^1] >= '1' && version[^1] <= '0' + LastClassic18Patch
             ? Java181 : ClassicProfiles.GetValueOrDefault(version);
     public static string? ClassicVersion(string profile) => ClassicProfiles.FirstOrDefault(pair => pair.Value.Id == profile).Key;
+    public const int CommandStorageDataVersion = 2205;
     public static bool IsVersionedClassic(CapabilityProfile? profile) => profile is not null && ClassicProfiles.ContainsValue(profile);
     public static bool UsesClassicPlainText(CapabilityProfile? profile) => profile == Java125 || profile == Java152 || profile == Java164;
     public static bool IsReadOnlyAnvil(CapabilityProfile? profile) => profile == EarlyAnvil || profile == EarlyJsonNames;

@@ -162,7 +162,7 @@ internal static class WorldReferenceMembers
         }).ToArray();
     internal static void Catalog(IWorldInventory inventory, PatchPlan plan, bool includeStorage = true)
     {
-        var storage = includeStorage && StorageDisplayPolicy.TargetsStorage(plan.Operations);
+        var storage = includeStorage && (StorageDisplayPolicy.TargetsStorage(plan.Operations) || WorldStorageSignSafety.Targets(plan.Operations));
         if (!plan.Operations.Any(operation => operation is ReferencePatch) && !storage) return;
         var discovery = WorldDiscovery.Discover(inventory, new(SnapshotScope.All));
         if (storage && WorldStorageUseIndex.HasUnsafeSeedPath(discovery))

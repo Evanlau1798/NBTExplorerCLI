@@ -243,6 +243,10 @@ Copy `data.replyTemplate` to a separate JSON file. Fill in the `text` values for
 
 The result contains the translated snippet in `data.content`. The CLI matches the original source and selected slots, validates protected formatting, numbers, and private-use glyphs, and preserves other members of structured drafts. A line selection retains one physical line, including when the format can escape a newline inside a string. Place draft exports outside Minecraft world folders, even when selecting an individual file. The result reports `gameplayVerified: false`. Review the draft on a world copy before incorporating it into an edit. The fallback leaves the original artifact and scan verdict intact.
 
+For several selections in one world, use `translate fallback <world> --batch draft-batch.json`. The request uses `schemaFamily: "nbtcli.translation-draft-batch"`, `schemaVersion: 1`, and a `selections` array. Each selection contains the whole file's SHA-256 as `sourceHash` and an `options` object, for example `{"path":"datapacks/example/data/demo/functions/read.mcfunction","line":"12"}`. An archive selection also needs its member's `entryHash`. Use the returned `data.drafts` in selection order. To validate translations, copy a draft's `replyTemplate` to the corresponding selection's `reply` field, fill the slot texts, and run the same command again. Batch requests accept up to 1,024 selections and use the same read-only draft validation as a single selection.
+
+Add `--session-id <id>` and the session's `--state-root` if you used a custom location. The batch inherits the session languages and returns `data.sessionReplySlots` for each translated leaf that matches an exact slot in the current world snapshot. Merge those rows by `slotId` into the corresponding reply templates from `translate export`, then submit each complete page with `translate submit`. Stale sources, ambiguous matches, and leaves without a verified slot fail validation. The session plan and apply steps check the sources again before writing.
+
 ## Helpful Extras (Optional)
 
 You do not need any of these to finish a map translation, but they are handy on large projects:

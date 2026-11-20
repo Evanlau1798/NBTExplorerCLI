@@ -57,6 +57,11 @@ public sealed class TextSlot
     public bool AllowedEmpty { get; }
     public PlaceholderPolicy Placeholders { get; }
     public string Role => Address.SemanticRole;
+    public static bool IsInterpretedStorage(SourceAddress address) => (address.Syntax is not null
+        && (address.SemanticRole == "command.function.storage.component"
+            || address.SemanticRole.StartsWith("command.function.storage.component.", StringComparison.Ordinal)))
+        || address.SemanticRole == "command_storage.component.interpreted"
+        || address.SemanticRole.StartsWith("command_storage.component.interpreted.", StringComparison.Ordinal);
     public TextSlot(SourceAddress address, string sourceText, string context, string sourceLocale,
         string targetLocale, bool allowedEmpty, PlaceholderPolicy placeholders)
     {
@@ -79,6 +84,9 @@ public sealed class TextSlot
         if (reply.SourceTextHash != SourceTextHash) return SlotValidation.StaleSource;
         if (reply.TargetLocale != TargetLocale) return SlotValidation.WrongLocale;
         if (!AllowedEmpty && reply.Text.Length == 0) return SlotValidation.EmptyDisallowed;
+        if (reply.Text != SourceText && IsInterpretedStorage(Address)
+            && (string.IsNullOrWhiteSpace(SourceText) || string.IsNullOrWhiteSpace(reply.Text)))
+            return SlotValidation.VisibleTextMismatch;
         if (!Placeholders.Accepts(SourceText, reply.Text)) return SlotValidation.PlaceholderMismatch;
         return Placeholders.ProtectVisibleText && !VisibleTextProtection.Equivalent(SourceText, reply.Text, Role, Placeholders.ProtectPrivateUseGlyphs)
             ? SlotValidation.VisibleTextMismatch : SlotValidation.Valid;

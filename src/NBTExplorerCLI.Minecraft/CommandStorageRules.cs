@@ -121,7 +121,8 @@ internal sealed partial class CommandTextReader
             && MinecraftProfiles.ForDataVersion(version)?.Features[ProfileFacet.TextSchema].Schema == "java-text-json";
         if (root.Value is not LogicalMinecraftCompound || root.Children.Any(field => field.Selector.Key is not { } key
             || !PlainControlToken(key) || key.Contains('.') || field.Node.ContainsStringValues
-            && !(jsonComponents && field.Node.Value is LogicalMinecraftLeaf { Value: NbtString id } && MinecraftIdentifier.ResourceLocation(id.Value)))) return false;
+            && !(jsonComponents && field.Node.Value is LogicalMinecraftLeaf { Value: NbtString id } && MinecraftIdentifier.ResourceLocation(id.Value)
+                || TaggedStorageItems() && StaticNbtMatch.ItemStack(field.Node)))) return false;
         if (storageAccess is not null)
         {
             var storage = tokens[target + 1];
@@ -215,6 +216,92 @@ internal sealed partial class CommandTextReader
     private bool JsonStorageRuntime() => runtimeDataVersion >= StorageDataVersion
         && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json"
         && (exactRuntimeDataVersion is not int version || MinecraftProfiles.ForDataVersion(version)?.Features[ProfileFacet.TextSchema].Schema == "java-text-json");
+
+    private const string BlankComparisonDiagnostic = "UnresolvedStorageBlankComparison";
+
+    private bool ReadIndexedBlankWrite(List<CommandToken> tokens, int index, TypedPath path)
+    {
+        if (tokens.Count != index + 8 || tokens[index + 1].Text != "modify" || tokens[index + 2].Text != "storage"
+            || DataTargetEnd(tokens, index + 2) != index + 4 || tokens[index + 5].Text != "set" || tokens[index + 6].Text != "value"
+            || source.Address.SemanticRole != "command.function" || !JsonStorageRuntime()) return false;
+        var element = tokens[index + 4].Text;
+        if (element.EndsWith("[]", StringComparison.Ordinal) || PositionalListPath(element) is not { } list) return false;
+        var token = tokens[^1];
+        if (!IsBlankStorageComponent(token.Text)) return false;
+        var address = Address(path, token.Start, token.Text.Length, source.Address.SemanticRole);
+        var use = index == 0 || FixedScoreStore(tokens, index) ? CommandStorageUse.IndexedBlankWrite : CommandStorageUse.Other;
+        ObserveStorage(tokens[index + 3].Text, list, use, address, listElementType: NbtType.String);
+        Unknown(address, BlankComparisonDiagnostic);
+        return true;
+    }
+
+    private bool FixedScoreStore(List<CommandToken> tokens, int index)
+        => index == 7 && tokens[0].Text == "execute" && tokens[1].Text == "store"
+            && tokens[2].Text is "success" or "result" && tokens[3].Text == "score"
+            && !tokens[4].Text.StartsWith('@') && ScoreHolder(tokens[4].Text)
+            && PlainControlToken(tokens[5].Text) && tokens[6].Text == "run";
+
+    private bool ReadStorageBlankReset(List<CommandToken> tokens, int index, TypedPath path)
+    {
+        if (index != 0 || tokens.Count != 8 || tokens[1].Text != "modify" || tokens[2].Text != "storage"
+            || !MinecraftIdentifier.ResourceLocation(tokens[3].Text)
+            || !PlainControlToken(tokens[4].Text) || tokens[4].Text.Contains('.')
+            || tokens[5].Text != "set" || tokens[6].Text != "value"
+            || source.Address.SemanticRole != "command.function" || !JsonStorageRuntime()
+            || !IsBlankStorageComponent(tokens[7].Text)) return false;
+        var storage = MinecraftIdentifier.DefaultNamespace(tokens[3].Text);
+        var member = tokens[4].Text;
+        if (storageDisplayLists?.Contains((storage, member)) == true) return false;
+        var value = tokens[7];
+        var address = Address(path, value.Start, value.Text.Length, source.Address.SemanticRole);
+        Unknown(address, BlankComparisonDiagnostic);
+        ObserveStorage(storage, member, CommandStorageUse.ScalarWrite, address, listElementType: NbtType.String);
+        lineReset = (storage, member, address);
+        return true;
+    }
+
+    private bool ReadScratchComparison(List<CommandToken> tokens, int index, TypedPath path)
+    {
+        if (source.Address.SemanticRole != "command.function" || !JsonStorageRuntime()
+            || previousReset is not { } reset || tokens.Count != 17 || !FixedScoreStore(tokens, index)
+            || tokens[8].Text != "modify" || tokens[9].Text != "storage" || tokens[12].Text != "set" || tokens[13].Text != "from"
+            || tokens[14].Text != "storage" || !MinecraftIdentifier.ResourceLocation(tokens[15].Text)
+            || !MinecraftIdentifier.ResourceLocation(tokens[10].Text) || reset.Path != tokens[11].Text) return false;
+        var destination = MinecraftIdentifier.DefaultNamespace(tokens[10].Text);
+        var scratch = reset.Path;
+        var sourceStorage = MinecraftIdentifier.DefaultNamespace(tokens[15].Text);
+        var element = tokens[16].Text;
+        if (destination != reset.Storage || element.EndsWith("[]", StringComparison.Ordinal)
+            || PositionalListPath(element) is not { } list
+            || sourceStorage == destination && (list == scratch || list.StartsWith(scratch + ".", StringComparison.Ordinal))) return false;
+        var target = tokens[11];
+        var address = Address(path, target.Start, target.Text.Length, source.Address.SemanticRole);
+        Unknown(address, BlankComparisonDiagnostic);
+        if (storageAccess is not null)
+        {
+            Charge(address, sourceStorage + list + destination + scratch);
+            storageAccess(new(destination, scratch, CommandStorageUse.ScratchComparison, address)
+            { CopySource = (sourceStorage, list), BlankResetAddress = reset.Address });
+        }
+        return true;
+    }
+
+    private bool IsBlankStorageComponent(string token)
+    {
+        if (token[0] is not ('\'' or '"')) return false;
+        var value = Snbt.ParseDocument(Utf8.GetBytes(token), MinecraftProfiles.SnbtGrammar(profile), limits).Root.Value;
+        if (value is not LogicalMinecraftLeaf { Value: NbtString component }
+            || component.Value.AsSpan().TrimStart() is not ['{', ..]) return false;
+        try
+        {
+            using var document = BoundedJson.ReadDecoded(NativeJsonStrings.EncodeJavaDocument(component.Value, limits), limits);
+            var root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object && root.EnumerateObject().Count() == 1
+                && root.TryGetNativeProperty("text", out var text) && text.ValueKind == JsonValueKind.String
+                && string.IsNullOrWhiteSpace(NativeJsonStrings.Read(text));
+        }
+        catch (JsonException) { return false; }
+    }
 
     private bool ResourceStorageLabel(List<CommandToken> tokens, int index, SnbtNode? value)
     {

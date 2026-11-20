@@ -15,7 +15,7 @@ internal static class SessionCommands
     {
         if (action == "help") return ["help"];
         if (action == "fallback") return ["path", "pointer", "segments", "chunk", "dimension", "entry", "compression", "format", "line",
-            "byte-range", "snbt-profile", "text-pointer", "source-language", "target-language", "reply", "output", "help"];
+            "byte-range", "snbt-profile", "text-pointer", "source-language", "target-language", "reply", "batch", "session-id", "state-root", "output", "help"];
         string[] options = action switch
         {
             "start" => ["source-language", "target-language", "operation-id", "page-size", "page-bytes", "match-pattern", "types", "path", "dimension", "region", "standalone", "no-group", "minecraft-version"],
@@ -158,7 +158,7 @@ internal static class SessionCommands
         }
         return snapshot;
     }
-    private static void RequireFresh(WriteContext context, TranslationSession state)
+    internal static void RequireFresh(WriteContext context, TranslationSession state)
     {
         if (Query(context, state).Manifest.SnapshotId != state.Source.SnapshotId)
             throw new CliFailure("CONFLICT", "World sources changed; retain this session and start a new session from current sources", new { sessionId = state.SessionId, repair = "start-new-session" });
