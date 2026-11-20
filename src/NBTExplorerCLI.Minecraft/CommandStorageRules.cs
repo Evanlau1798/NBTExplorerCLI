@@ -44,6 +44,10 @@ internal sealed partial class CommandTextReader
             ObserveStorage(list.Storage, list.Path, use,
                 Address(path, value.Start, value.Text.Length, source.Address.SemanticRole), listElementType: elementType,
                 glyphLiterals: glyphs is { Count: > 0 } ? glyphs.Values : null);
+            if (storageAccess is not null && JsonStorageRuntime() && storageDisplayLists?.Contains(list) != true
+                && (value.Text.Contains("storage", StringComparison.Ordinal) || value.Text.Contains("\\u", StringComparison.Ordinal)))
+                ComponentReferences(Utf8.GetBytes(value.Text), value.Start, value.Start + value.Text.Length,
+                    TextExtractionCollector.At(path, "storage.list.value"), true, observeStorageOnly: true, displayContainer: list);
             return;
         }
         var target = index + 2;
@@ -393,12 +397,13 @@ internal sealed partial class CommandTextReader
     }
 
     private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address, bool hasUnclassifiedReferences = false,
-        NbtType? listElementType = null, IEnumerable<StorageGlyphLiteral>? glyphLiterals = null)
+        NbtType? listElementType = null, IEnumerable<StorageGlyphLiteral>? glyphLiterals = null, (string Storage, string Path)? displayContainer = null)
     {
         if (!MinecraftIdentifier.ResourceLocation(storage)) return;
         var normalized = MinecraftIdentifier.DefaultNamespace(storage);
         retained = checked(retained + TextExtractionBudget.RecordBytes(address, (long)normalized.Length + path.Length));
         if (retained > limits.MaxDecodedBytes) Limit();
-        storageAccess?.Invoke(new(normalized, path, use, address, hasUnclassifiedReferences) { ListElementType = listElementType, GlyphLiterals = glyphLiterals });
+        storageAccess?.Invoke(new(normalized, path, use, address, hasUnclassifiedReferences)
+        { ListElementType = listElementType, GlyphLiterals = glyphLiterals, DisplayContainer = displayContainer });
     }
 }

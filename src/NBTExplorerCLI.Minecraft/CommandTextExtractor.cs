@@ -9,6 +9,7 @@ public sealed record CommandStorageAccess(string Storage, string Path, CommandSt
 {
     public NbtType? ListElementType { get; init; }
     public (string Storage, string Path)? CopySource { get; init; }
+    public (string Storage, string Path)? DisplayContainer { get; init; }
     public SourceAddress? BlankResetAddress { get; init; }
     public SourceAddress? ControlResetAddress { get; init; }
     public bool ReplacesList { get; init; }

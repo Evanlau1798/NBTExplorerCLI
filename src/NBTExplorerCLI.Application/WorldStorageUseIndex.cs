@@ -17,9 +17,10 @@ internal sealed record StorageDisplayPolicy(ImmutableHashSet<(string Storage, st
     internal static bool TargetsStorage(IEnumerable<PatchOperation> operations) => operations.Any(operation => operation.Targets.Any(Target));
     internal bool Covers(ExtractionDiagnostic diagnostic) => ResolvedDiagnostics.Contains(diagnostic);
 
-    internal bool ProjectedCoverage(IEnumerable<TextSourceExtraction> rows) => rows.All(row => row.Outcome is SourceOutcome.Success or SourceOutcome.Irrelevant
+    internal bool ProjectedCoverage(IEnumerable<TextSourceExtraction> rows, Func<ExtractionDiagnostic, bool>? resolve = null)
+        => rows.All(row => row.Outcome is SourceOutcome.Success or SourceOutcome.Irrelevant
         || row.Outcome == SourceOutcome.Unsupported && row.Text is { Diagnostics.IsEmpty: false, Unclassified.IsEmpty: true } text
-        && text.Diagnostics.All(Covers));
+        && text.Diagnostics.All(diagnostic => Covers(diagnostic) || resolve?.Invoke(diagnostic) == true));
 }
 
 internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
@@ -38,6 +39,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         var index = new WorldStorageUseIndex(extraction.Limits);
         var functionResults = new StorageFunctionResults(index.Charge);
         var observed = new Dictionary<StorageCommandNode, CommandStorageAccess>();
+        var nested = new Dictionary<StorageCommandNode, CommandStorageAccess>();
         var exact = new Dictionary<SourceAddress, CommandStorageAccess>();
         var required = new HashSet<(string Storage, string Path)>();
         var resolvedDiagnostics = ImmutableHashSet.CreateBuilder<ExtractionDiagnostic>();
@@ -57,7 +59,11 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
             if (covered && !access.HasUnclassifiedReferences && access.Address.Syntax?.NodePath is { } syntax
                 && (use == CommandStorageUse.ListElementWrite
                     || use == CommandStorageUse.InterpretedDisplay && PlainPath(DisplayPath(access.Path))))
-                observed.TryAdd(new(use, access.Address.Artifact, access.Address.Chunk, access.Address.NodePath, syntax), access);
+            {
+                var node = new StorageCommandNode(use, access.Address.Artifact, access.Address.Chunk, access.Address.NodePath, syntax);
+                if (access.DisplayContainer is null) observed.TryAdd(node, access);
+                else if (nested.TryAdd(node, access)) index.Charge(access.Address.Artifact.RelativePath.Length + access.Path.Length);
+            }
         }, () => covered = false, () => index.opaqueEquipment = true, functionResults.ObserveCall, index.ObserveFont))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -105,12 +111,27 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         var retainedSeeds = index.RetainUnreferencedSeeds(seedRules);
         if (lists.IsEmpty && resolvedDiagnostics.Count == 0 && retainedSeeds.IsEmpty) return StorageDisplayPolicy.Empty;
         producers = WithSeedKeys(producers, seedRules, retainedSeeds);
-        var policy = preview with { CanBindWrites = true, ResolvedDiagnostics = resolvedDiagnostics.ToImmutable(), RetainedSeeds = retainedSeeds };
-        var consumerKeys = policy.ResolvedDiagnostics.Select(diagnostic => diagnostic.Address).GroupBy(address => address.Artifact.RelativePath, StringComparer.Ordinal)
+        StorageDisplayPolicy BoundPolicy()
+        {
+            var resolved = resolvedDiagnostics.ToImmutable();
+            var consumerKeys = resolved.Select(diagnostic => diagnostic.Address).GroupBy(address => address.Artifact.RelativePath, StringComparer.Ordinal)
             .Select(group => new KeyValuePair<string, Hash256>(group.Key, Hash256.Compute(Encoding.UTF8.GetBytes(
                 (producers.GetValueOrDefault(group.Key)?.Hex ?? "") + string.Concat(group.Select(address => SourceIdentity.Occurrence(address).Digest.Hex).Order(StringComparer.Ordinal))))));
-        policy = policy with { SourceKeys = producers.SetItems(consumerKeys) };
-        return policy.ProjectedCoverage(extraction.ReadStorageProjection(policy, pendingSeeds)) ? policy : preview;
+            return preview with { CanBindWrites = true, ResolvedDiagnostics = resolved, RetainedSeeds = retainedSeeds, SourceKeys = producers.SetItems(consumerKeys) };
+        }
+        var policy = BoundPolicy();
+        if (!policy.ProjectedCoverage(extraction.ReadStorageProjection(policy, pendingSeeds), ResolveNested)) return preview;
+        return resolvedDiagnostics.Count == policy.ResolvedDiagnostics.Count ? policy : BoundPolicy();
+
+        bool ResolveNested(ExtractionDiagnostic diagnostic)
+        {
+            var address = diagnostic.Address;
+            if (diagnostic.Code != "DynamicComponentReference" || address.Syntax?.NodePath is not { } syntax
+                || !nested.TryGetValue(new(CommandStorageUse.InterpretedDisplay, address.Artifact, address.Chunk, address.NodePath, syntax), out var read)
+                || !(read.DisplayContainer is { } container && lists.Contains(container) && lists.Contains((read.Storage, DisplayPath(read.Path))))) return false;
+            if (resolvedDiagnostics.Add(diagnostic)) index.Charge(address.Artifact.RelativePath.Length);
+            return true;
+        }
     }
 
     private bool MatchUse(ExtractionDiagnostic diagnostic, Dictionary<StorageCommandNode, CommandStorageAccess> observed,
@@ -191,7 +212,13 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 break;
             case CommandStorageUse.InterpretedDisplay when !access.HasUnclassifiedReferences && PlainPath(DisplayPath(access.Path)):
                 var subject = GetList(storage, access.Storage, DisplayPath(access.Path));
-                subject.Display = true;
+                if (access.DisplayContainer is { } container)
+                {
+                    var owner = GetList(GetStorage(container.Storage), container.Storage, container.Path);
+                    owner.NestedRead = true;
+                    Link(subject, owner);
+                }
+                else subject.Display = true;
                 if (access.Path.EndsWith("[]", StringComparison.Ordinal)) subject.RequiresList = true;
                 else subject.RequiresScalar = true;
                 break;
@@ -219,11 +246,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
             case CommandStorageUse.ListCopy when access.CopySource is { } source:
                 var from = GetList(GetStorage(source.Storage), source.Storage, source.Path);
                 var to = GetList(storage, access.Storage, access.Path);
-                if (from.Outgoing.Add(to))
-                {
-                    Charge(0);
-                    to.Incoming.Add(from);
-                }
+                Link(from, to);
                 if (access.ReplacesList)
                 {
                     if (from.Assignments.Add(to)) { Charge(0); to.Assignments.Add(from); }
@@ -262,6 +285,13 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         var prefix = PlainAncestor(path);
         if (prefix.Length == 0) storage.Ambiguous = true;
         else if (storage.OtherPaths.Add(prefix)) Charge(prefix.Length);
+    }
+
+    private void Link(ListUses from, ListUses to)
+    {
+        if (!from.Outgoing.Add(to)) return;
+        Charge(0);
+        to.Incoming.Add(from);
     }
 
     private void RecordEquipmentStep(ref SourceAddress? previous, SourceAddress address, ListUses list)
@@ -351,10 +381,24 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 foreach (var neighbor in connected[index].Outgoing)
                     if (visited.Add(neighbor)) connected.Add(neighbor);
             }
-            if (!connected.All(visible.Contains)
+            if (!connected.All(visible.Contains) || connected.Any(list => list.NestedRead) && HasCycle(connected)
                 || !connected.Any(list => list.Producers.Count != 0 || compatible[list].Rule is not null)) continue;
             foreach (var list in connected) yield return list;
         }
+    }
+
+    private static bool HasCycle(IReadOnlyCollection<ListUses> connected)
+    {
+        var indegrees = connected.ToDictionary(list => list, list => list.Incoming.Count);
+        var pending = new Queue<ListUses>(connected.Where(list => indegrees[list] == 0));
+        var visited = 0;
+        while (pending.TryDequeue(out var value))
+        {
+            visited++;
+            foreach (var destination in value.Outgoing)
+                if (--indegrees[destination] == 0) pending.Enqueue(destination);
+        }
+        return visited != connected.Count;
     }
 
     private void Charge(int characters)

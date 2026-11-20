@@ -8,7 +8,8 @@ namespace NBTExplorerCLI.Minecraft;
 internal sealed partial class CommandTextReader
 {
     private void ComponentReferences(byte[] bytes, int start, int end, TypedPath grammarPath, bool snbt, SnbtSpan? enclosingString = null, bool itemTree = false,
-        bool commandTag = false, bool observeStorageOnly = false, IReadOnlyDictionary<SnbtSpan, HashSet<TypedPath>>? bookPages = null, ISet<TypedPath>? storageNodes = null)
+        bool commandTag = false, bool observeStorageOnly = false, IReadOnlyDictionary<SnbtSpan, HashSet<TypedPath>>? bookPages = null,
+        ISet<TypedPath>? storageNodes = null, (string Storage, string Path)? displayContainer = null)
     {
         if (snbt)
         {
@@ -24,7 +25,9 @@ internal sealed partial class CommandTextReader
             {
                 if (value is LogicalMinecraftLeaf { Value: NbtString embeddedJson } && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json")
                 {
-                    ComponentReferences(NativeJsonStrings.EncodeJavaDocument(embeddedJson.Value, limits), start, end, new(grammarPath.Segments.Concat(path.Segments)), false, parsed.Resolve(path).Span); return;
+                    ComponentReferences(NativeJsonStrings.EncodeJavaDocument(embeddedJson.Value, limits), start, end,
+                        new(grammarPath.Segments.Concat(path.Segments)), false, parsed.Resolve(path).Span,
+                        observeStorageOnly: observeStorageOnly, displayContainer: displayContainer); return;
                 }
                 if (value is LogicalMinecraftList list)
                 { for (var index = 0; index < list.Items.Length; index++) VisitNbt(list.Items[index], At(path, index)); return; }
@@ -91,7 +94,8 @@ internal sealed partial class CommandTextReader
         {
             var address = Address(new(grammarPath.Segments.Concat(component.Segments)), start, end - start, source.Address.SemanticRole,
                 enclosingString?.StartByte, enclosingString?.LengthBytes);
-            ObserveStorage(storage, path, interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay, address, hasUnclassifiedReferences);
+            ObserveStorage(storage, path, interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay,
+                address, hasUnclassifiedReferences, displayContainer: displayContainer);
         }
         void Selector(string selector, TypedPath path, SnbtSpan span)
         {

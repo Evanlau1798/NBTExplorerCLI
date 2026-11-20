@@ -73,6 +73,7 @@ internal sealed partial class WorldStorageUseIndex
         internal string Storage { get; } = storage;
         internal string Path { get; } = path;
         internal bool Display;
+        internal bool NestedRead;
         internal bool RequiresList;
         internal bool RequiresScalar;
         internal string? EquipmentRoot;
