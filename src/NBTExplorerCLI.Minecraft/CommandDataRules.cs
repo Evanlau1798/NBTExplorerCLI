@@ -58,7 +58,7 @@ internal sealed partial class CommandTextReader
             if (result.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(token.Text), token.Start, tokenEnd, grammarPath, true, itemTree: true, commandTag: true);
             return;
         }
-        if (StaticDataWrite(tokens, index, storageValue)) return;
+        if (StaticDataWrite(tokens, index, storageValue, resultObserved: resultObserved)) return;
         if (tokens.Count >= index + 5 && tokens[index + 1].Text == "merge" && tokens[index + 2].Text == "entity")
         {
             if (tokens.Count != index + 5) throw new CommandSyntaxException();
@@ -124,7 +124,8 @@ internal sealed partial class CommandTextReader
             || selector.EndsWith(']') && Integer(selector[1..^1], out var line) && line is >= -4 and <= 3);
     }
 
-    private bool StaticDataWrite(List<CommandToken> tokens, int index, SnbtNode? valueNode = null, bool keepEmptyListReset = false)
+    private bool StaticDataWrite(List<CommandToken> tokens, int index, SnbtNode? valueNode = null,
+        bool keepEmptyListReset = false, bool resultObserved = false)
     {
         if (index + 2 >= tokens.Count || tokens[index + 1].Text != "modify") return false;
         var path = DataTargetEnd(tokens, index + 2);
@@ -146,6 +147,8 @@ internal sealed partial class CommandTextReader
                 && NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[index + 3].Start));
             return sourceType == "entity" && (nativeNumericDestination || NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[value + 2].Start)))
                 || StaticItemSource(sourceType, source)
+                || sourceType == "storage" && !resultObserved && TaggedStorageItems()
+                && InventoryTransfer(tokens[index + 2].Text, tokens[path].Text, operation, source)
                 || sourceType == "block" && tokens[index + 2].Text == "storage"
                 && runtimeDataVersion >= StorageDataVersion && SignTextSource(source);
         }
@@ -154,10 +157,40 @@ internal sealed partial class CommandTextReader
         if (keepEmptyListReset && operation == "set" && valueNode.Value is LogicalMinecraftList { Items.IsEmpty: true }) return false;
         return !valueNode.ContainsStringValues && (operation != "merge" || valueNode.Value is LogicalMinecraftCompound)
             || StaticItemTagPayload(tokens[path].Text, valueNode, operation)
+            || operation == "set" && !resultObserved && TaggedStorageItems() && AttributeMemberWrite(tokens[path].Text, valueNode)
             || operation == "set" && (tokens[index + 2].Text == "entity" && tokens[path].Text == "Item" && StaticNbtMatch.ItemStack(valueNode)
                 || valueNode.Value is LogicalMinecraftLeaf { Value: NbtString id } && MinecraftIdentifier.ResourceLocation(id.Value)
                 && NativeItemIdPath(tokens[index + 2].Text, tokens[path].Text));
     }
+    private bool TaggedStorageItems()
+    {
+        var items = profile.Features[ProfileFacet.ItemSchema];
+        return runtimeDataVersion >= StorageDataVersion && items.Schema == "java-item-tags-1.20.4"
+            && MinecraftProfiles.ForDataVersion(runtimeDataVersion)?.Features[ProfileFacet.ItemSchema] == items;
+    }
+
+    private bool InventoryTransfer(string target, string destination, string operation, string source)
+    {
+        if (target == "block") return destination == "Items" && operation == "set" && source.Split('.').All(PlainControlToken);
+        if (target != "storage" || operation is not ("append" or "prepend" or "insert") || !PlainDataPath(destination)) return false;
+        var bracket = source.IndexOf('[');
+        var start = bracket + 1;
+        return bracket > 0 && PlainDataPath(source[..bracket]) && source[^1] == ']' && source[start] == '{'
+            && CompoundEnd(source, start) == source.Length - 1
+            && StaticNbtMatch.InventoryItemFilter(Snbt.ParseDocument(Utf8.GetBytes(source[start..^1]), MinecraftProfiles.SnbtGrammar(profile), limits).Root);
+    }
+
+    private static bool AttributeMemberWrite(string path, SnbtNode payload)
+    {
+        const string list = "tag.AttributeModifiers[";
+        var start = path.LastIndexOf(list, StringComparison.Ordinal);
+        var end = path.LastIndexOf("].", StringComparison.Ordinal);
+        if (start < 0 || start > 0 && path[start - 1] != '.' || end < start + list.Length) return false;
+        var selector = start + list.Length;
+        return (end == selector || Integer(path[selector..end], out _) || path[selector] == '{' && CompoundEnd(path, selector) == end)
+            && StaticNbtMatch.AttributeModifierField(path[(end + 2)..], payload);
+    }
+
     private static bool NumericEntitySource(string path, string? entityType = null)
     {
         if (path is "Health" or "UUID" or "Fire" or "Air" or "FallDistance" or "PortalCooldown"
@@ -272,7 +305,8 @@ internal sealed partial class CommandTextReader
             var root = Snbt.ParseDocument(Utf8.GetBytes(path[start..end]), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
             if (root.Value is not LogicalMinecraftCompound || root.ContainsStringValues
                 && !StaticItemTagPayload(path.AsSpan(0, start - 1), root, "filter")
-                && !(storage && runtimeDataVersion >= StorageDataVersion && StaticNbtMatch.StorageMetadataFilter(root))) return false;
+                && !(storage && runtimeDataVersion >= StorageDataVersion && (StaticNbtMatch.StorageMetadataFilter(root)
+                    || TaggedStorageItems() && StaticNbtMatch.InventoryItemFilter(root)))) return false;
             structural.Append(path, copied, start - copied);
             copied = end;
             start = path.IndexOf('{', copied);
