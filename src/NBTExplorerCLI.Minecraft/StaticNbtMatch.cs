@@ -35,6 +35,14 @@ internal static class StaticNbtMatch
     internal static bool Enchantment(SnbtNode root) => root.Value is LogicalMinecraftCompound
         && root.Children.All(member => !member.Node.ContainsStringValues || member.Selector.Key == "id" && ResourceId(member.Node));
 
+    internal static bool AttributeModifier(SnbtNode root) => root.Value is LogicalMinecraftCompound
+        && root.Children.All(member => !member.Node.ContainsStringValues || member.Selector.Key switch
+        {
+            "AttributeName" or "Name" => ResourceId(member.Node),
+            "Slot" => member.Node.Value is LogicalMinecraftLeaf { Value: NbtString { Value: "mainhand" or "offhand" or "head" or "chest" or "legs" or "feet" } },
+            _ => false
+        });
+
     private static bool ResourceId(SnbtNode node) => node.Value is LogicalMinecraftLeaf { Value: NbtString id }
         && MinecraftIdentifier.ResourceLocation(id.Value);
 }

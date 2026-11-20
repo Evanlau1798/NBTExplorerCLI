@@ -9,8 +9,10 @@ internal sealed partial class CommandTextReader
 {
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
     {
-        if (storageAccess is not null) ObserveDataStorage(tokens, index, path);
-        if (ReadStorageDisplayWrite(tokens, index, path)) return;
+        var storageElement = storageAccess is not null || storageDisplayLists is { Count: > 0 } ? StorageDisplayWrite(tokens, index) : null;
+        var staticListWrite = storageElement is not null && StaticDataWrite(tokens, index);
+        if (storageAccess is not null) ObserveDataStorage(tokens, index, path, staticListWrite ? null : storageElement);
+        if (staticListWrite || ReadStorageDisplayWrite(tokens, path, storageElement)) return;
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;
         if (tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"
@@ -108,7 +110,8 @@ internal sealed partial class CommandTextReader
         }
         if (tokens.Count != value + 2 || tokens[value].Text != "value") return false;
         var parsed = Snbt.ParseDocument(Utf8.GetBytes(tokens[value + 1].Text), MinecraftProfiles.SnbtGrammar(profile), limits);
-        return !parsed.Root.ContainsStringValues && (operation != "merge" || parsed.Root.Value is LogicalMinecraftCompound);
+        return !parsed.Root.ContainsStringValues && (operation != "merge" || parsed.Root.Value is LogicalMinecraftCompound)
+            || StaticItemTagPayload(tokens[path].Text, parsed.Root, operation);
     }
     private static bool NumericEntitySource(string path)
     {
@@ -189,17 +192,25 @@ internal sealed partial class CommandTextReader
             var end = CompoundEnd(path, start);
             if (end >= path.Length || path[end] != ']') return false;
             var root = Snbt.ParseDocument(Utf8.GetBytes(path[start..end]), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
-            if (root.Value is not LogicalMinecraftCompound || root.ContainsStringValues && !EnchantmentFilter(path.AsSpan(0, start - 1), root)) return false;
+            if (root.Value is not LogicalMinecraftCompound || root.ContainsStringValues && !StaticItemTagPayload(path.AsSpan(0, start - 1), root, "filter")) return false;
             structural.Append(path, copied, start - copied);
             copied = end;
             start = path.IndexOf('{', copied);
         }
         return PlainDataPath(structural.Append(path, copied, path.Length - copied).ToString());
     }
-    private static bool EnchantmentFilter(ReadOnlySpan<char> path, SnbtNode filter)
-        => (path is "tag.Enchantments" or "tag.StoredEnchantments"
-            || path.EndsWith(".tag.Enchantments", StringComparison.Ordinal) || path.EndsWith(".tag.StoredEnchantments", StringComparison.Ordinal))
-            && StaticNbtMatch.Enchantment(filter);
+    private bool StaticItemTagPayload(ReadOnlySpan<char> path, SnbtNode payload, string operation)
+    {
+        if (operation is not ("append" or "prepend" or "insert" or "filter")) return false;
+        var taggedItems = profile.Features[ProfileFacet.ItemSchema].Schema == "java-item-tags-1.20.4";
+        if ((taggedItems || operation == "filter")
+            && (ItemTagPath(path, "tag.Enchantments", ".tag.Enchantments") || ItemTagPath(path, "tag.StoredEnchantments", ".tag.StoredEnchantments")))
+            return StaticNbtMatch.Enchantment(payload);
+        return taggedItems && ItemTagPath(path, "tag.AttributeModifiers", ".tag.AttributeModifiers") && StaticNbtMatch.AttributeModifier(payload);
+    }
+
+    private static bool ItemTagPath(ReadOnlySpan<char> path, ReadOnlySpan<char> root, ReadOnlySpan<char> nested)
+        => path.SequenceEqual(root) || path.EndsWith(nested, StringComparison.Ordinal);
 
     private static int CompoundEnd(string path, int start)
     {

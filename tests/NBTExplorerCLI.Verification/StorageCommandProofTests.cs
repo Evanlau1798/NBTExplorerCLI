@@ -51,6 +51,24 @@ internal static class StorageCommandProofTests
         finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
     }
 
+    internal static void ItemMetadataIsNotDisplayText()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+        try
+        {
+            Create(root, seed: false);
+            Put(root, Producer, """data modify storage demo:messages stack.tag.Enchantments append value {id:"minecraft:sharpness",lvl:1s}"""u8.ToArray());
+            Put(root, Consumer, """tellraw @a {"storage":"demo:messages","nbt":"stack.tag.Enchantments[]","interpret":true}"""u8.ToArray());
+            var snapshot = WorldQueryTests.Query(root, cache);
+            var rows = snapshot.ReadSources().ToDictionary(row => row.Source.Location.Artifact.RelativePath);
+            Require(rows[Producer].Outcome == SourceOutcome.Irrelevant && rows[Producer].Text!.Occurrences.IsEmpty,
+                "a conflicting interpretation must not misparse an item metadata writer as display text");
+            Require(rows[Consumer].Outcome == SourceOutcome.Unsupported && !snapshot.Manifest.CoverageComplete,
+                "an interpreted reader of nontext metadata retains the unresolved diagnostic");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+    }
+
     internal static void AliasedSeedBeforeScan(bool namespaced = false)
     {
         var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();

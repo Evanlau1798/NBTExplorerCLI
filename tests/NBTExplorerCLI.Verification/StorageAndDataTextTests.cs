@@ -18,6 +18,9 @@ internal static class StorageAndDataTextTests
         new("text-storage-explicit-rules-and-candidates", "discovery", _ => ExplicitStorageRulesAndUnknownCandidates()),
         new("command-storage-display-modes", "discovery", _ => CommandStorageDisplayModes()),
         new("command-filtered-item-tag-data-controls", "discovery", _ => FilteredItemTagDataControls()),
+        new("command-storage-item-tag-metadata", "discovery", _ => StorageItemTagMetadata()),
+        new("command-storage-item-tag-trim-profile", "discovery", _ => StorageTrimRequiresProfile()),
+        new("text-storage-item-tag-display-collision", "discovery", _ => StorageCommandProofTests.ItemMetadataIsNotDisplayText()),
         new("command-entity-uuid-widths", "discovery", _ => EntityUuidWidths()),
         new("command-numeric-entity-data-copy", "discovery", _ => NumericEntityDataCopy()),
         new("text-storage-command-display-consumers", "discovery", _ => StorageCommandProofTests.CrossFileDisplayConsumers()),
@@ -81,6 +84,46 @@ internal static class StorageAndDataTextTests
         {
             var unresolved = CommandTextExtractor.Extract(new(binding, "data get storage demo:data " + path), profile);
             Require(!unresolved.Complete && unresolved.Text.Occurrences.IsEmpty, "unknown filter values and locations remain unresolved");
+        }
+    }
+
+    private static void StorageItemTagMetadata()
+    {
+        const string script = """
+            data modify storage demo:items stack.tag.Enchantments append value {id:"minecraft:sharpness",lvl:1s}
+            data modify storage demo:items stack.tag.StoredEnchantments prepend value {id:"minecraft:mending",lvl:1s}
+            data modify storage demo:items stack.tag.AttributeModifiers append value {AttributeName:"minecraft:generic.attack_damage",Name:"minecraft:generic.attack_damage",Amount:1,Operation:0,UUID:[I;1,2,3,4],Slot:"mainhand"}
+            execute if data storage demo:items stack.tag.AttributeModifiers[{Slot:"mainhand"}] run tellraw @a {"text":"Equipped"}
+            data remove storage demo:items stack.tag.AttributeModifiers[{Name:"minecraft:generic.attack_damage",Operation:0}]
+            """;
+        var address = new SourceAddress(new(World, "item-controls.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var uses = new List<CommandStorageAccess>();
+        var result = CommandTextExtractor.Extract(new(address, script), profile, storageAccess: uses.Add);
+        Require(result.Complete && result.Text.Occurrences.Single().Text == "Equipped", "standard item metadata does not block adjacent visible text");
+        Require(uses.Count == 5 && uses.All(use => use.Use == CommandStorageUse.Other), "known item metadata remains visible without authorizing display inference");
+
+        foreach (var (path, operation) in new[]
+        {
+            ("stack.extra.Enchantments", "append value {id:'minecraft:sharpness',lvl:1s}"),
+            ("stack.tag.Enchantments", "append value {id:'minecraft:sharpness',lvl:1s,Note:'Readable'}"),
+            ("stack.tag.Trim", "set value {material:'minecraft:lapis',pattern:'Custom text'}"),
+            ("stack.tag.AttributeModifiers", "append value {Name:'Custom text',Amount:1}"),
+        })
+        {
+            var unresolved = CommandTextExtractor.Extract(new(address, $"data modify storage demo:items {path} {operation}"), profile);
+            Require(!unresolved.Complete && unresolved.Text.Occurrences.IsEmpty, "undetermined locations or payloads stay unresolved");
+        }
+    }
+
+    private static void StorageTrimRequiresProfile()
+    {
+        var address = new SourceAddress(new(World, "trim.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        const string command = """data modify storage demo:items stack.tag.Trim set value {material:"minecraft:lapis",pattern:"minecraft:silence"}""";
+        foreach (var profile in new[] { MinecraftProfiles.ForDataVersion(1631)!, MinecraftProfiles.ForPackMetadata(new(PackSourceKind.Datapack, 6, new(6, 0), new(6, 0)))! })
+        {
+            var result = CommandTextExtractor.Extract(new(address, command), profile);
+            Require(!result.Complete && result.Text.Diagnostics.Single().Code == "UnknownDataTextSchema", "an earlier command profile cannot infer the later trim schema");
         }
     }
 

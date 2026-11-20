@@ -23,9 +23,9 @@ internal sealed partial class CommandTextReader
         };
     }
 
-    private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path)
+    private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, (string Storage, string Path)? storageElement)
     {
-        if (StorageDisplayWrite(tokens, index) is { } list)
+        if (storageElement is { } list)
         {
             var value = tokens[^1];
             ObserveStorage(list.Storage, list.Path, CommandStorageUse.ListElementWrite,
@@ -76,9 +76,9 @@ internal sealed partial class CommandTextReader
             && tokens[index + 5].Text is "append" or "prepend" && tokens[index + 6].Text == "value"
             ? (MinecraftIdentifier.DefaultNamespace(tokens[index + 3].Text), tokens[index + 4].Text) : null;
 
-    private bool ReadStorageDisplayWrite(List<CommandToken> tokens, int index, TypedPath path)
+    private bool ReadStorageDisplayWrite(List<CommandToken> tokens, TypedPath path, (string Storage, string Path)? storageElement)
     {
-        if (storageDisplayLists is not { Count: > 0 } || StorageDisplayWrite(tokens, index) is not { } list || !storageDisplayLists.Contains(list)) return false;
+        if (storageDisplayLists is not { Count: > 0 } || storageElement is not { } list || !storageDisplayLists.Contains(list)) return false;
         var value = tokens[^1];
         Component(value.Start, value.Start + value.Text.Length, TextExtractionCollector.At(path, "storage.list.value"),
             storedRole: source.Address.SemanticRole + ".storage.component");
