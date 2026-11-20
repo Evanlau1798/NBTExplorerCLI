@@ -15,7 +15,7 @@ internal sealed partial class CommandTextReader
     {
         if (ReadIndexedBlankWrite(tokens, index, path)
             || resultObserved && ReadScratchComparison(tokens, index, path)
-            || ReadStorageBlankReset(tokens, index, path)) return;
+            || ReadStorageScratchReset(tokens, index, path)) return;
         var storageElement = !resultObserved && (storageAccess is not null || storageDisplayLists is { Count: > 0 }) ? StorageDisplayWrite(tokens, index) : null;
         var storageValue = storageElement is null ? null : Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
         Dictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? glyphs = null;

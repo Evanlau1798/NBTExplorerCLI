@@ -160,6 +160,57 @@ internal static class StorageBlankProbeTests
         finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
     }
 
+    internal static void ResetScratchSeparatesSlotMetadata()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild(); var state = ScratchDirectory.CreateChild();
+        try
+        {
+            const string controlPath = Folder + "control.mcfunction";
+            const string metadata = """
+                data modify storage proof:labels scratch set value "mainhand"
+                execute store result score $slot results run data modify storage proof:labels scratch set from storage demo:equipment modifiers[0].Slot
+                """;
+            Create(root, Reset + "\n" + Copy + "\n" + Reader);
+            Put(root, controlPath, Encoding.UTF8.GetBytes(metadata));
+            var snapshot = WorldQueryTests.Query(root, cache);
+            Require(snapshot.Manifest.CoverageComplete, "two distinct adjacent reset pairs do not publish each other's scratch values");
+            Require(snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == controlPath).Text!.Occurrences.IsEmpty,
+                "the equipment slot and reset are protected literals");
+            var slot = snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == Writer).Text!.Occurrences
+                .Single(item => item.Text == "Open this gate").ToSlot("en_us", "zh_tw");
+            var inventory = new WorldInventory(root, World); var storage = new ArtifactStorage(root, World);
+            var plan = new WorldPlanBuilder(inventory).Build(snapshot, [Patch(slot, "打開這扇門")]);
+            using var prepared = new WorldPlanPreparation(inventory, storage).Prepare(snapshot, plan, true);
+            var engine = WorldApplyTests.Engine(root, state, storage);
+            Require(engine.Apply(prepared, true).Success, "the display producer can be translated");
+            Require(File.ReadAllText(Path.Combine(root, controlPath)) == metadata, "both control commands remain byte-identical");
+            Require(engine.Recover(plan.PlanHash, true, rollback: true).Counts[OperationOutcome.RolledBack] == 1, "the producer rolls back");
+            Require(File.ReadAllText(Path.Combine(root, Writer)) == Initial, "the original producer is restored");
+
+            foreach (var unsafeControl in new[]
+            {
+                metadata + "\ndata get storage proof:labels scratch",
+                metadata.Replace("[0].Slot", "[].Slot", StringComparison.Ordinal),
+                metadata.Replace("[0].Slot", "[0].Caption", StringComparison.Ordinal),
+                metadata.Replace("demo:equipment modifiers", "proof:labels lines", StringComparison.Ordinal),
+                metadata.Replace("\nexecute", "\nfunction proof:other\nexecute", StringComparison.Ordinal),
+                "execute if score #flag results matches 1 run " + metadata
+            })
+            {
+                Put(root, controlPath, Encoding.UTF8.GetBytes(unsafeControl));
+                Require(!WorldQueryTests.Query(root, cache).Manifest.CoverageComplete,
+                    "unknown, escaping or conditionally initialized scratch inputs remain unresolved");
+            }
+
+            Put(root, Probe, []);
+            Put(root, Writer, []);
+            Put(root, controlPath, Encoding.UTF8.GetBytes(metadata));
+            Require(WorldQueryTests.Query(root, cache).Manifest.CoverageComplete,
+                "a proven retained comparison needs no editable storage producer");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); Directory.Delete(state, true); }
+    }
+
     internal static void ScopedSignCannotChangeComparedBlankness()
     {
         var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild(); var state = ScratchDirectory.CreateChild();

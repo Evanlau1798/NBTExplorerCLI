@@ -218,6 +218,7 @@ internal sealed partial class CommandTextReader
         && (exactRuntimeDataVersion is not int version || MinecraftProfiles.ForDataVersion(version)?.Features[ProfileFacet.TextSchema].Schema == "java-text-json");
 
     private const string BlankComparisonDiagnostic = "UnresolvedStorageBlankComparison";
+    private const string ControlComparisonDiagnostic = "UnresolvedStorageControlComparison";
 
     private bool ReadIndexedBlankWrite(List<CommandToken> tokens, int index, TypedPath path)
     {
@@ -227,7 +228,7 @@ internal sealed partial class CommandTextReader
         var element = tokens[index + 4].Text;
         if (element.EndsWith("[]", StringComparison.Ordinal) || PositionalListPath(element) is not { } list) return false;
         var token = tokens[^1];
-        if (!IsBlankStorageComponent(token.Text)) return false;
+        if (!IsBlankStorageComponent(QuotedOperand(token.Text))) return false;
         var address = Address(path, token.Start, token.Text.Length, source.Address.SemanticRole);
         var use = index == 0 || FixedScoreStore(tokens, index) ? CommandStorageUse.IndexedBlankWrite : CommandStorageUse.Other;
         ObserveStorage(tokens[index + 3].Text, list, use, address, listElementType: NbtType.String);
@@ -241,22 +242,24 @@ internal sealed partial class CommandTextReader
             && !tokens[4].Text.StartsWith('@') && ScoreHolder(tokens[4].Text)
             && PlainControlToken(tokens[5].Text) && tokens[6].Text == "run";
 
-    private bool ReadStorageBlankReset(List<CommandToken> tokens, int index, TypedPath path)
+    private bool ReadStorageScratchReset(List<CommandToken> tokens, int index, TypedPath path)
     {
         if (index != 0 || tokens.Count != 8 || tokens[1].Text != "modify" || tokens[2].Text != "storage"
             || !MinecraftIdentifier.ResourceLocation(tokens[3].Text)
             || !PlainControlToken(tokens[4].Text) || tokens[4].Text.Contains('.')
             || tokens[5].Text != "set" || tokens[6].Text != "value"
             || source.Address.SemanticRole != "command.function" || !JsonStorageRuntime()
-            || !IsBlankStorageComponent(tokens[7].Text)) return false;
+            || QuotedOperand(tokens[7].Text) is not { } operand) return false;
+        var blank = IsBlankStorageComponent(operand);
+        if (!blank && !(TaggedStorageItems() && StaticNbtMatch.AttributeModifierField("Slot", operand))) return false;
         var storage = MinecraftIdentifier.DefaultNamespace(tokens[3].Text);
         var member = tokens[4].Text;
-        if (storageDisplayLists?.Contains((storage, member)) == true) return false;
+        if (blank && storageDisplayLists?.Contains((storage, member)) == true) return false;
         var value = tokens[7];
         var address = Address(path, value.Start, value.Text.Length, source.Address.SemanticRole);
-        Unknown(address, BlankComparisonDiagnostic);
-        ObserveStorage(storage, member, CommandStorageUse.ScalarWrite, address, listElementType: NbtType.String);
-        lineReset = (storage, member, address);
+        Unknown(address, blank ? BlankComparisonDiagnostic : ControlComparisonDiagnostic);
+        if (blank) ObserveStorage(storage, member, CommandStorageUse.ScalarWrite, address, listElementType: NbtType.String);
+        lineReset = (storage, member, address, blank);
         return true;
     }
 
@@ -271,26 +274,37 @@ internal sealed partial class CommandTextReader
         var scratch = reset.Path;
         var sourceStorage = MinecraftIdentifier.DefaultNamespace(tokens[15].Text);
         var element = tokens[16].Text;
+        if (!reset.Blank)
+        {
+            if (!element.EndsWith(".Slot", StringComparison.Ordinal)) return false;
+            element = element[..^".Slot".Length];
+        }
         if (destination != reset.Storage || element.EndsWith("[]", StringComparison.Ordinal)
             || PositionalListPath(element) is not { } list
             || sourceStorage == destination && (list == scratch || list.StartsWith(scratch + ".", StringComparison.Ordinal))) return false;
         var target = tokens[11];
         var address = Address(path, target.Start, target.Text.Length, source.Address.SemanticRole);
-        Unknown(address, BlankComparisonDiagnostic);
+        Unknown(address, reset.Blank ? BlankComparisonDiagnostic : ControlComparisonDiagnostic);
         if (storageAccess is not null)
         {
             Charge(address, sourceStorage + list + destination + scratch);
-            storageAccess(new(destination, scratch, CommandStorageUse.ScratchComparison, address)
-            { CopySource = (sourceStorage, list), BlankResetAddress = reset.Address });
+            var use = reset.Blank ? CommandStorageUse.ScratchComparison : CommandStorageUse.ScratchControlComparison;
+            storageAccess(new(destination, scratch, use, address)
+            {
+                CopySource = (sourceStorage, list),
+                BlankResetAddress = reset.Blank ? reset.Address : null,
+                ControlResetAddress = reset.Blank ? null : reset.Address
+            });
         }
         return true;
     }
 
-    private bool IsBlankStorageComponent(string token)
+    private SnbtNode? QuotedOperand(string token) => token[0] is '\'' or '"'
+        ? Snbt.ParseDocument(Utf8.GetBytes(token), MinecraftProfiles.SnbtGrammar(profile), limits).Root : null;
+
+    private bool IsBlankStorageComponent(SnbtNode? node)
     {
-        if (token[0] is not ('\'' or '"')) return false;
-        var value = Snbt.ParseDocument(Utf8.GetBytes(token), MinecraftProfiles.SnbtGrammar(profile), limits).Root.Value;
-        if (value is not LogicalMinecraftLeaf { Value: NbtString component }
+        if (node?.Value is not LogicalMinecraftLeaf { Value: NbtString component }
             || component.Value.AsSpan().TrimStart() is not ['{', ..]) return false;
         try
         {

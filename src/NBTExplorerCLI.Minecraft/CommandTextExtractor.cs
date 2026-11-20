@@ -3,13 +3,14 @@ using NBTExplorerCLI.Formats;
 
 namespace NBTExplorerCLI.Minecraft;
 
-public enum CommandStorageUse { InterpretedDisplay, LiteralDisplay, ListElementWrite, Other, ListReplacement, ListCopy, Presence, EquipmentImport, EquipmentExport, ListCardinality, ScalarWrite, ScratchComparison, IndexedBlankWrite }
+public enum CommandStorageUse { InterpretedDisplay, LiteralDisplay, ListElementWrite, Other, ListReplacement, ListCopy, Presence, EquipmentImport, EquipmentExport, ListCardinality, ScalarWrite, ScratchComparison, IndexedBlankWrite, ScratchControlComparison }
 public readonly record struct StorageGlyphLiteral(string Font, string Text);
 public sealed record CommandStorageAccess(string Storage, string Path, CommandStorageUse Use, SourceAddress Address, bool HasUnclassifiedReferences = false)
 {
     public NbtType? ListElementType { get; init; }
     public (string Storage, string Path)? CopySource { get; init; }
     public SourceAddress? BlankResetAddress { get; init; }
+    public SourceAddress? ControlResetAddress { get; init; }
     public bool ReplacesList { get; init; }
     public bool AppendsScalar { get; init; }
     public IEnumerable<StorageGlyphLiteral>? GlyphLiterals { get; init; }

@@ -46,10 +46,10 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
             index.Observe(access);
             functionResults.ObserveMutation(access);
             if (covered && access.Use is CommandStorageUse.ListCopy or CommandStorageUse.EquipmentExport
-                or CommandStorageUse.IndexedBlankWrite or CommandStorageUse.ScratchComparison)
+                or CommandStorageUse.IndexedBlankWrite or CommandStorageUse.ScratchComparison or CommandStorageUse.ScratchControlComparison)
             {
                 exact.TryAdd(access.Address, access);
-                if (access.BlankResetAddress is { } reset) exact.TryAdd(reset, access);
+                if ((access.BlankResetAddress ?? access.ControlResetAddress) is { } reset) exact.TryAdd(reset, access);
             }
             var use = access.Use is CommandStorageUse.ListReplacement or CommandStorageUse.ScalarWrite ? CommandStorageUse.ListElementWrite : access.Use;
             if (covered && !access.HasUnclassifiedReferences && access.Address.Syntax?.NodePath is { } syntax
@@ -90,7 +90,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
             authorized = ClosedDisplayLists(compatible).ToHashSet();
         }
         var lists = authorized.Select(list => (list.Storage, list.Path)).ToImmutableHashSet();
-        if (lists.IsEmpty) return StorageDisplayPolicy.Empty;
+        if (lists.IsEmpty && resolvedDiagnostics.Count == 0) return StorageDisplayPolicy.Empty;
         var seedRules = authorized.Select(list => compatible[list]).Where(candidate => candidate.Rule is not null)
             .GroupBy(candidate => candidate.Artifact!)
             .ToImmutableDictionary(group => group.Key, group => group.Select(candidate => candidate.Rule!).ToImmutableArray());
@@ -116,9 +116,11 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         Dictionary<SourceAddress, CommandStorageAccess> exact, HashSet<(string Storage, string Path)> required,
         ImmutableHashSet<ExtractionDiagnostic>.Builder resolvedDiagnostics)
     {
-        if (diagnostic.Code == "UnresolvedStorageBlankComparison" && exact.TryGetValue(diagnostic.Address, out var comparison))
+        if (diagnostic.Code is "UnresolvedStorageBlankComparison" or "UnresolvedStorageControlComparison"
+            && exact.TryGetValue(diagnostic.Address, out var comparison))
         {
-            Require(comparison.CopySource ?? (comparison.Storage, comparison.Path));
+            if (comparison.Use != CommandStorageUse.ScratchControlComparison)
+                Require(comparison.CopySource ?? (comparison.Storage, comparison.Path));
             Resolve();
             return true;
         }
@@ -178,8 +180,8 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         var storage = GetStorage(access.Storage);
         switch (access.Use)
         {
-            case CommandStorageUse.ScratchComparison when access.CopySource is { } input:
-                ObserveScratchComparison((access.Storage, access.Path), input);
+            case CommandStorageUse.ScratchComparison or CommandStorageUse.ScratchControlComparison when access.CopySource is { } input:
+                ObserveScratchComparison((access.Storage, access.Path), input, access.Use == CommandStorageUse.ScratchControlComparison);
                 break;
             case CommandStorageUse.Presence:
                 break;

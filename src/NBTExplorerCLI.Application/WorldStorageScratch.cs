@@ -3,9 +3,16 @@ namespace NBTExplorerCLI.Application;
 internal sealed partial class WorldStorageUseIndex
 {
     private readonly HashSet<((string Storage, string Path) Scratch, (string Storage, string Path) Source)> scratchComparisons = [];
+    private readonly HashSet<(string Storage, string Path)> controlScratch = [];
 
-    private void ObserveScratchComparison((string Storage, string Path) scratch, (string Storage, string Path) source)
+    private void ObserveScratchComparison((string Storage, string Path) scratch, (string Storage, string Path) source, bool control)
     {
+        if (control)
+        {
+            if (controlScratch.Add(scratch)) Charge(scratch.Storage.Length + scratch.Path.Length);
+            Block(source.Storage, source.Path);
+            return;
+        }
         if (scratchComparisons.Add((scratch, source))) Charge(scratch.Storage.Length + scratch.Path.Length + source.Storage.Length + source.Path.Length);
         GetList(GetStorage(source.Storage), source.Storage, source.Path).RequiresList = true;
     }
@@ -32,5 +39,6 @@ internal sealed partial class WorldStorageUseIndex
         }
         foreach (var (id, source) in unsafeComparisons) Block(id, source);
         foreach (var comparison in scratchComparisons) Block(comparison.Scratch.Storage, comparison.Scratch.Path);
+        foreach (var (id, scratch) in controlScratch) Block(id, scratch);
     }
 }

@@ -38,7 +38,7 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    private (string Storage, string Path, SourceAddress Address)? previousReset, lineReset;
+    private (string Storage, string Path, SourceAddress Address, bool Blank)? previousReset, lineReset;
     internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null, Action? opaqueEquipment = null, Action<CommandFunctionCall>? functionCall = null)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);

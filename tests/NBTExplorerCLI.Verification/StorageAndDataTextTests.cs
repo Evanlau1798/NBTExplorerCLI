@@ -42,6 +42,7 @@ internal static class StorageAndDataTextTests
         new("prepare-storage-blank-edits", "preparation", _ => StorageBlankProbeTests.BlankEditsAreRejected()),
         new("prepare-storage-indexed-blank-comparison", "preparation", _ => StorageBlankProbeTests.ObservedIndexedBlankWriteAllowsTranslationAndRollback()),
         new("prepare-storage-reset-scratch-comparison", "preparation", _ => StorageBlankProbeTests.ResetScratchComparisonRequiresExclusiveUse()),
+        new("prepare-storage-scratch-separates-control-comparisons", "preparation", _ => StorageBlankProbeTests.ResetScratchSeparatesSlotMetadata()),
         new("prepare-storage-blank-comparison-proven-source", "preparation", _ => StorageBlankProbeTests.BlankComparisonRequiresProvenSource()),
         new("prepare-storage-blank-comparison-scoped-signs", "preparation", _ => StorageBlankProbeTests.ScopedSignCannotChangeComparedBlankness()),
         new("prepare-storage-sign-observed-copy", "preparation", _ => StorageBlankProbeTests.ScopedSignRejectsObservedCopy(native: false)),
