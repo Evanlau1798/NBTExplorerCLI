@@ -213,7 +213,16 @@ internal sealed partial class CommandTextReader
         && text[1] is 'a' or 'e' or 'n' or 'p' or 'r' or 's' && (text.Length == 2 || text[2] == '[');
     private static bool EntityTarget(string text) => text.StartsWith('@')
         ? SelectorTarget(text)
-        : text.Length is >= 1 and <= 16 && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') || Guid.TryParseExact(text, "D", out _);
+        : text.Length is >= 1 and <= 16 && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') || EntityUuid(text);
+
+    private static bool EntityUuid(string text)
+    {
+        if (text.Length is < 9 or > 36) return false;
+        var fields = text.Split('-');
+        return fields.Length == 5 && fields[0].Length is >= 1 and <= 8 && fields[1].Length is >= 1 and <= 4
+            && fields[2].Length is >= 1 and <= 4 && fields[3].Length is >= 1 and <= 4 && fields[4].Length is >= 1 and <= 12
+            && fields.All(field => field.All(char.IsAsciiHexDigit));
+    }
     private bool ScoreHolder(string text, bool allowWildcard = false)
         => SelectorTarget(text) || allowWildcard && text == "*" || PlainControlToken(text)
             || MinecraftProfiles.UsesEarlyTaggedItemCommands(profile) && text.StartsWith('$') && PlainControlToken(text[1..]);

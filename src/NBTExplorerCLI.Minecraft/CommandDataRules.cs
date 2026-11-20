@@ -104,14 +104,15 @@ internal sealed partial class CommandTextReader
             if (operation == "merge" || sourcePath < 0 || tokens.Count != sourcePath + 1) return false;
             var sourceType = tokens[value + 1].Text;
             var source = tokens[sourcePath].Text;
-            return sourceType == "entity" && NumericEntityVector(source) || StaticItemSource(sourceType, source);
+            return sourceType == "entity" && NumericEntitySource(source) || StaticItemSource(sourceType, source);
         }
         if (tokens.Count != value + 2 || tokens[value].Text != "value") return false;
         var parsed = Snbt.ParseDocument(Utf8.GetBytes(tokens[value + 1].Text), MinecraftProfiles.SnbtGrammar(profile), limits);
         return !parsed.Root.ContainsStringValues && (operation != "merge" || parsed.Root.Value is LogicalMinecraftCompound);
     }
-    private static bool NumericEntityVector(string path)
+    private static bool NumericEntitySource(string path)
     {
+        if (path is "Health" or "UUID") return true;
         var start = path.IndexOf('[');
         if ((start < 0 ? path : path[..start]) is not ("Pos" or "Motion" or "Rotation")) return false;
         return start < 0 || path[^1] == ']' && (start + 2 == path.Length || Integer(path[(start + 1)..^1], out _));

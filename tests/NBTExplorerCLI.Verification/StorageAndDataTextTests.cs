@@ -18,6 +18,8 @@ internal static class StorageAndDataTextTests
         new("text-storage-explicit-rules-and-candidates", "discovery", _ => ExplicitStorageRulesAndUnknownCandidates()),
         new("command-storage-display-modes", "discovery", _ => CommandStorageDisplayModes()),
         new("command-filtered-item-tag-data-controls", "discovery", _ => FilteredItemTagDataControls()),
+        new("command-entity-uuid-widths", "discovery", _ => EntityUuidWidths()),
+        new("command-numeric-entity-data-copy", "discovery", _ => NumericEntityDataCopy()),
         new("text-storage-command-display-consumers", "discovery", _ => StorageCommandProofTests.CrossFileDisplayConsumers()),
         new("text-storage-saved-path-alias", "discovery", _ => StorageCommandProofTests.AliasedSeedBeforeScan()),
         new("text-storage-namespaced-seed-path-alias", "discovery", _ => StorageCommandProofTests.AliasedSeedBeforeScan(true)),
@@ -32,6 +34,32 @@ internal static class StorageAndDataTextTests
         new("cli-session-write-storage-archive", "cli-session-write", _ => StorageCommandProofTests.CliArchiveSession()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
+
+    private static void EntityUuidWidths()
+    {
+        var address = new SourceAddress(new(World, "entities.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var script = "data get entity a-0-0-0-8 Health\ndata get entity 0000000a-0000-0000-0000-000000000008 Health";
+        var result = CommandTextExtractor.Extract(new(address, script), profile);
+        Require(result.Complete && result.Text.Occurrences.IsEmpty && result.References.IsEmpty, "canonical and shorter Java UUID fields name the same kind of nontext entity target");
+        foreach (var id in new[] { "1-0-0-0", "1-g-0-0-8", "1--0-0-8" })
+            Require(!CommandTextExtractor.Extract(new(address, "data get entity " + id + " Health"), profile).Complete, "invalid UUID shapes remain unresolved");
+    }
+
+    private static void NumericEntityDataCopy()
+    {
+        const string script = """
+            data modify entity @e[type=pig,limit=1] Health set from entity @e[type=pig,limit=1,sort=furthest] Health
+            data modify entity @e[type=wolf,limit=1] AngryAt set from entity @p UUID
+            tellraw @a {"text":"Visible"}
+            """;
+        var address = new SourceAddress(new(World, "entities.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        var profile = MinecraftProfiles.ForDataVersion(3465)!;
+        var result = CommandTextExtractor.Extract(new(address, script), profile);
+        Require(result.Complete && result.Text.Occurrences.Single().Text == "Visible", "typed numeric entity state copies keep adjacent text without adding editable values");
+        const string unknown = "data modify entity @e[type=pig,limit=1] CustomName set from entity @p CustomName";
+        Require(!CommandTextExtractor.Extract(new(address, unknown), profile).Complete, "copying arbitrary text data requires its own semantic proof");
+    }
 
     private static void FilteredItemTagDataControls()
     {
