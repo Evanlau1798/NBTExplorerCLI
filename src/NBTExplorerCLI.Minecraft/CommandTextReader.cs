@@ -9,6 +9,7 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
+    private const int ExecuteDimensionDataVersion = 3320;
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly CommandCandidate source;
     private readonly CapabilityProfile profile;
@@ -125,6 +126,9 @@ internal sealed partial class CommandTextReader
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "score") operands = ScoreCondition(tokens, cursor);
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text is "block" or "blocks" or "items") operands = BlockOrItemCondition(tokens, cursor);
                 if (clause is "if" or "unless" && cursor + 1 < tokens.Count && tokens[cursor].Text == "predicate"
+                    && MinecraftIdentifier.ResourceLocation(tokens[cursor + 1].Text)) operands = 2;
+                if (clause is "if" or "unless" && runtimeDataVersion >= ExecuteDimensionDataVersion
+                    && cursor + 1 < tokens.Count && tokens[cursor].Text == "dimension"
                     && MinecraftIdentifier.ResourceLocation(tokens[cursor + 1].Text)) operands = 2;
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "data")
                 {

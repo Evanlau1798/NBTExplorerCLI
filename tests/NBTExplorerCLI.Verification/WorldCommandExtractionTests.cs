@@ -27,7 +27,7 @@ internal static class WorldCommandExtractionTests
             time set 2147483647t
             bossbar remove boss:status
             title @a times 0t 40t 10t
-            execute as @e[type=armor_stand,name="North Guard"] run title @s actionbar {"text":"Welcome"}
+            execute if dimension minecraft:overworld as @e[type=armor_stand,name="North Guard"] run title @s actionbar {"text":"Welcome"}
             """;
         var address = new SourceAddress(new(World, "controls.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
         var profile = MinecraftProfiles.ForDataVersion(3465)!;
@@ -37,7 +37,8 @@ internal static class WorldCommandExtractionTests
         foreach (var invalid in new[] { "summon armor_stand ~ ~", "summon armor_stand ^ ~ ~", "schedule function demo:repeat 0t",
             "schedule function demo:repeat .01s", "schedule function demo:repeat 2x", "schedule function demo:repeat 2t unexpected",
             "schedule clear demo:repeat trailing", "difficulty impossible", "time set -2", "bossbar remove boss:status trailing",
-            "title @a times 0t 40.0x 10t", "title @a times -1 40 10" })
+            "title @a times 0t 40.0x 10t", "title @a times -1 40 10", "execute if dimension",
+            "execute if dimension #minecraft:overworld", "execute unless dimension Minecraft:overworld" })
             Require(!CommandTextExtractor.Extract(new(address, invalid), profile).Complete, $"invalid input stays unresolved: {invalid}");
         HistoricalTimingCoverage();
     }
@@ -47,7 +48,8 @@ internal static class WorldCommandExtractionTests
         var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
         const string folder = "datapacks/p/data/demo/functions/";
         var commands = new[] { ("time set 13000", 0), ("time set 2s", 1901), ("schedule function demo:repeat 20t", 1901),
-            ("schedule function demo:repeat 20t append", 2205), ("schedule clear demo:repeat", 2205), ("title @a times 0t 40t 10t", 3320) };
+            ("schedule function demo:repeat 20t append", 2205), ("schedule clear demo:repeat", 2205), ("title @a times 0t 40t 10t", 3320),
+            ("execute if dimension minecraft:overworld", 3320), ("execute unless dimension demo:void", 3320) };
         try
         {
             Put(root, "datapacks/p/pack.mcmeta", """{"pack":{"pack_format":4,"description":"Test"}}"""u8.ToArray());
