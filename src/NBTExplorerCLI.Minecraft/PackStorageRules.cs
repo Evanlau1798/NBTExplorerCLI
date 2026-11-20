@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
@@ -6,6 +8,27 @@ namespace NBTExplorerCLI.Minecraft;
 
 public static partial class PackTextExtractor
 {
+    public static bool DefinesDefaultFont(WorldSourceLocation source)
+        => source.PackKind == PackSourceKind.ResourcePack && source.Role == WorldSourceRole.PackJson
+            && Entry(source).Equals("assets/minecraft/font/default.json", StringComparison.OrdinalIgnoreCase);
+
+    public static bool HasOnlyPrivateUseGlyphs(byte[] json, DecodeLimits limits)
+    {
+        using var document = BoundedJson.ReadDecoded(json, limits);
+        return FontProviders(document.RootElement, provider => KnownGlyphProvider(provider)
+            && (provider.TryGetNativeProperty("advances", out var advances)
+                ? Fields(advances, (glyph, _) => PrivateUseGlyphs(glyph))
+                : provider.TryGetNativeProperty("chars", out var chars)
+                    && ArrayOf(chars, row => PrivateUseGlyphs(NativeJsonStrings.Read(row)))));
+    }
+
+    private static bool PrivateUseGlyphs(string text)
+    {
+        foreach (var glyph in text.EnumerateRunes())
+            if (Rune.GetUnicodeCategory(glyph) != UnicodeCategory.PrivateUse) return false;
+        return true;
+    }
+
     public static bool HasInertStorageShape(WorldSourceLocation source, byte[] json, DecodeLimits limits)
     {
         var metadata = source.Role == WorldSourceRole.PackMetadata && Entry(source) == "pack.mcmeta";
@@ -26,9 +49,12 @@ public static partial class PackTextExtractor
                     "supported_formats" => NumberShape(value) || Fields(value, (endpoint, bound) => endpoint is "min_inclusive" or "max_inclusive" && NumberShape(bound)),
                     _ => false
                 });
-        return Fields(root, (key, _) => key == "providers") && root.TryGetNativeProperty("providers", out var providers)
-            && ArrayOf(providers, KnownGlyphProvider);
+        return FontProviders(root, KnownGlyphProvider);
     }
+
+    private static bool FontProviders(JsonElement root, Func<JsonElement, bool> provider)
+        => Fields(root, (key, _) => key == "providers") && root.TryGetNativeProperty("providers", out var providers)
+            && ArrayOf(providers, provider);
 
     private static bool NumberShape(JsonElement value) => IntegerValue(value) || ArrayOf(value, IntegerValue);
 

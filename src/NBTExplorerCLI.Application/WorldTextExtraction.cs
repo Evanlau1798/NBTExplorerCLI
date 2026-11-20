@@ -49,14 +49,15 @@ public sealed partial class WorldTextExtraction
         ArgumentNullException.ThrowIfNull(storageAccess);
         return ReadSourcesCore(Discovery.Sources, storageAccess);
     }
-    internal IEnumerable<TextSourceExtraction> ReadStorageObservations(Action<CommandStorageAccess> observe, Action opaqueStorage, Action opaqueEquipment, Action<string?, CommandFunctionCall> functionCall)
-        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage, opaqueEquipment: opaqueEquipment, functionCall: functionCall);
+    internal IEnumerable<TextSourceExtraction> ReadStorageObservations(Action<CommandStorageAccess> observe, Action opaqueStorage, Action opaqueEquipment,
+        Action<string?, CommandFunctionCall> functionCall, Action opaqueDefaultFont)
+        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage, opaqueEquipment: opaqueEquipment, functionCall: functionCall, opaqueDefaultFont: opaqueDefaultFont);
     internal IEnumerable<TextSourceExtraction> ReadStorageProjection(StorageDisplayPolicy storage, HashSet<string> pendingSeeds)
         => ReadSourcesCore(Discovery.Sources.Where(source => storage.SourceKeys.ContainsKey(source.Location.Artifact.RelativePath)
             || pendingSeeds.Contains(source.Location.Artifact.RelativePath)), previewStorage: storage);
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
     private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected, Action<CommandStorageAccess>? storageAccess = null, Action? opaqueStorage = null,
-        StorageDisplayPolicy? previewStorage = null, Action? opaqueEquipment = null, Action<string?, CommandFunctionCall>? functionCall = null)
+        StorageDisplayPolicy? previewStorage = null, Action? opaqueEquipment = null, Action<string?, CommandFunctionCall>? functionCall = null, Action? opaqueDefaultFont = null)
     {
         foreach (var group in selected.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
         {
@@ -88,11 +89,11 @@ public sealed partial class WorldTextExtraction
                 continue;
             }
             using (archive)
-                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage, opaqueEquipment, functionCall);
+                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage, opaqueEquipment, functionCall, opaqueDefaultFont);
         }
     }
     private TextSourceExtraction ReadOne(DiscoveredSource source, byte[] bytes, RegionFile? region, ZipArchive? archive, Action<CommandStorageAccess>? storageAccess, Action? opaqueStorage,
-        StorageDisplayPolicy? previewStorage, Action? opaqueEquipment, Action<string?, CommandFunctionCall>? functionCall)
+        StorageDisplayPolicy? previewStorage, Action? opaqueEquipment, Action<string?, CommandFunctionCall>? functionCall, Action? opaqueDefaultFont)
     {
         if (source.Outcome != SourceOutcome.Success) return Forward(source);
         if (source.Location.Role == WorldSourceRole.Archive || region is not null && source.Chunk is null)
@@ -128,6 +129,8 @@ public sealed partial class WorldTextExtraction
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
             {
+                if (opaqueDefaultFont is not null && PackTextExtractor.DefinesDefaultFont(source.Location)
+                    && !PackTextExtractor.HasOnlyPrivateUseGlyphs(bytes, Limits)) opaqueDefaultFont();
                 var storageCandidate = opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes);
                 var equipmentCandidate = opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(bytes);
                 if ((storageCandidate || equipmentCandidate) && !PackTextExtractor.HasInertStorageShape(source.Location, bytes, Limits))

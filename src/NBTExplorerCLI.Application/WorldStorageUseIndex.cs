@@ -24,7 +24,7 @@ internal sealed record StorageDisplayPolicy(ImmutableHashSet<(string Storage, st
         && text.Diagnostics.All(Covers));
 }
 
-internal sealed class WorldStorageUseIndex(DecodeLimits limits)
+internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
 {
     private const string TaggedItemLorePath = ".tag.display.Lore";
     private readonly Dictionary<string, StorageUses> uses = new(StringComparer.Ordinal);
@@ -44,21 +44,22 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         var resolvedDiagnostics = ImmutableHashSet.CreateBuilder<ExtractionDiagnostic>();
         var pendingSeeds = new HashSet<string>(StringComparer.Ordinal);
         var covered = true;
+        var opaqueDefaultFont = false;
         foreach (var row in extraction.ReadStorageObservations(access =>
         {
             index.Observe(access);
             functionResults.ObserveMutation(access);
             if (covered && access.Use is CommandStorageUse.ListCopy or CommandStorageUse.EquipmentExport)
                 copies.TryAdd(access.Address, access);
-            var use = access.Use == CommandStorageUse.ListReplacement ? CommandStorageUse.ListElementWrite : access.Use;
+            var use = access.Use is CommandStorageUse.ListReplacement or CommandStorageUse.ScalarWrite ? CommandStorageUse.ListElementWrite : access.Use;
             if (covered && !access.HasUnclassifiedReferences && access.Address.Syntax?.NodePath is { } syntax
                 && (use == CommandStorageUse.ListElementWrite
-                    || use == CommandStorageUse.InterpretedDisplay && access.Path.EndsWith("[]", StringComparison.Ordinal)))
+                    || use == CommandStorageUse.InterpretedDisplay && PlainPath(DisplayPath(access.Path))))
                 observed.TryAdd(new(use, access.Address.Artifact, access.Address.Chunk, access.Address.NodePath, syntax), access);
-        }, () => covered = false, () => index.opaqueEquipment = true, functionResults.ObserveCall))
+        }, () => covered = false, () => index.opaqueEquipment = true, functionResults.ObserveCall, () => opaqueDefaultFont = true))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (row.Outcome is SourceOutcome.Failed or SourceOutcome.Cancelled) return StorageDisplayPolicy.Empty;
+            if (opaqueDefaultFont || row.Outcome is SourceOutcome.Failed or SourceOutcome.Cancelled) return StorageDisplayPolicy.Empty;
             if (covered && row.Outcome == SourceOutcome.Unsupported)
             {
                 var text = row.Text;
@@ -76,6 +77,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             copies.Clear();
         }
         if (!functionResults.BlockObservedMutations(extraction.Discovery, index.Block, cancellationToken)) covered = false;
+        index.PropagateAssignmentShapes();
         var compatible = index.ReadCompatibleLists(inventory, extraction).ToDictionary(candidate => candidate.List);
         var authorized = ClosedDisplayLists(compatible).ToHashSet();
         var equipment = index.uses.Values.SelectMany(storage => storage.Paths.Values).Where(list => list.EquipmentRoot is not null).ToArray();
@@ -130,7 +132,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         if (use == CommandStorageUse.Other || address.Syntax?.NodePath is not { } syntax
             || !observed.TryGetValue(new(use, address.Artifact, address.Chunk, address.NodePath, syntax), out var access)) return false;
         var reader = use == CommandStorageUse.InterpretedDisplay;
-        var requiredPath = reader ? access.Path[..^2] : access.Path;
+        var requiredPath = reader ? DisplayPath(access.Path) : access.Path;
         Require((access.Storage, requiredPath));
         if (reader) Resolve();
         return true;
@@ -172,16 +174,29 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             case CommandStorageUse.Presence:
                 break;
             case CommandStorageUse.ListCardinality when PlainPath(access.Path):
-                GetList(storage, access.Storage, access.Path);
+                GetList(storage, access.Storage, access.Path).RequiresList = true;
                 break;
-            case CommandStorageUse.InterpretedDisplay when access.Path.EndsWith("[]", StringComparison.Ordinal) && PlainPath(access.Path[..^2]):
-                GetList(storage, access.Storage, access.Path[..^2]).Display = true;
+            case CommandStorageUse.InterpretedDisplay when !access.HasUnclassifiedReferences && PlainPath(DisplayPath(access.Path)):
+                var subject = GetList(storage, access.Storage, DisplayPath(access.Path));
+                subject.Display = true;
+                if (access.Path.EndsWith("[]", StringComparison.Ordinal)) subject.RequiresList = true;
+                else subject.RequiresScalar = true;
                 break;
-            case CommandStorageUse.ListElementWrite or CommandStorageUse.ListReplacement when access.Address.SemanticRole == "command.function":
+            case CommandStorageUse.ListElementWrite or CommandStorageUse.ListReplacement or CommandStorageUse.ScalarWrite
+                when access.Address.SemanticRole == "command.function":
                 var list = GetList(storage, access.Storage, access.Path);
                 if (access.ListElementType is not { } type) storage.Ambiguous = true;
-                else if (access.Use == CommandStorageUse.ListElementWrite) list.ElementWrites.Add(type);
-                else if (type != NbtType.End) list.ReplacementTypes.Add(type);
+                else if (access.Use == CommandStorageUse.ScalarWrite)
+                {
+                    list.RequiresScalar = true;
+                    if (type != NbtType.String) Block(access.Storage, access.Path);
+                }
+                else
+                {
+                    list.RequiresList = true;
+                    if (access.Use == CommandStorageUse.ListElementWrite) list.ElementWrites.Add(type);
+                    else if (type != NbtType.End) list.ReplacementTypes.Add(type);
+                }
                 var artifact = access.Address.Artifact.RelativePath;
                 if (list.Producers.Add(artifact)) Charge(artifact.Length);
                 break;
@@ -193,12 +208,23 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
                     Charge(0);
                     to.Incoming.Add(from);
                 }
+                if (access.ReplacesList)
+                {
+                    if (from.Assignments.Add(to)) { Charge(0); to.Assignments.Add(from); }
+                }
+                else
+                {
+                    to.RequiresList = true;
+                    if (access.AppendsScalar) from.RequiresScalar = true;
+                    else from.RequiresList = true;
+                }
                 if (access.ReplacesList && access.Path.EndsWith(TaggedItemLorePath, StringComparison.Ordinal))
                     RecordEquipmentStep(ref to.LoreReplacement, access.Address, to);
                 break;
             case CommandStorageUse.EquipmentImport or CommandStorageUse.EquipmentExport:
                 if (storage.EquipmentRoots.Add(access.Path)) Charge(access.Path.Length);
                 var lore = GetList(storage, access.Storage, access.Path + TaggedItemLorePath);
+                lore.RequiresList = true;
                 lore.EquipmentRoot = access.Path;
                 if (access.Use == CommandStorageUse.EquipmentImport)
                     RecordEquipmentStep(ref lore.EquipmentImport, access.Address, lore);
@@ -287,6 +313,11 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
                     else if (storage.EquipmentRoots.Contains(path) || RelatedPath(path, storage.EquipmentRoots, equipmentRoots)) continue;
                     var node = SeedPath(localId, path);
                     var seed = document is null ? null : NbtLocator.Resolve(document.Root, node);
+                    if (list.RequiresScalar)
+                    {
+                        if (!list.RequiresList && seed is null or { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }) yield return new(list);
+                        continue;
+                    }
                     var type = seed?.Value is NbtList existing ? existing.ElementType : NbtType.End;
                     if (!CompatibleWriters(metadata.Profile, list, type)) continue;
                     if (seed is null or { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }
@@ -329,6 +360,8 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
 
     private static bool CompleteScope(WorldDiscoveryResult discovery)
         => discovery.Complete && discovery.Scope is { Dimensions.IsEmpty: true, Regions.IsEmpty: true, Types.IsEmpty: true, ArtifactPaths.IsEmpty: true };
+
+    private static string DisplayPath(string path) => path.EndsWith("[]", StringComparison.Ordinal) ? path[..^2] : path;
 
     private static TypedPath SeedPath(string id, string path)
         => new(new[] { "data", "contents", id }.Concat(path.Split('.')).Select(PathSegment.ForKey));
@@ -441,32 +474,5 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         if (retained > limits.MaxDecodedBytes) throw new CodecException(CodecError.LimitExceeded, 0, "World storage use index exceeds retention budget");
     }
 
-    private sealed class StorageUses
-    {
-        internal Dictionary<string, ListUses> Paths { get; } = new(StringComparer.Ordinal);
-        internal HashSet<string> OtherPaths { get; } = new(StringComparer.Ordinal);
-        internal HashSet<string> EquipmentRoots { get; } = new(StringComparer.Ordinal);
-        internal bool Ambiguous;
-    }
-
-    private sealed class ListUses(string storage, string path)
-    {
-        internal string Storage { get; } = storage;
-        internal string Path { get; } = path;
-        internal bool Display;
-        internal string? EquipmentRoot;
-        internal SourceAddress? EquipmentImport;
-        internal SourceAddress? LoreReplacement;
-        internal SourceAddress? EquipmentExport;
-        internal bool RepeatedEquipmentStep;
-        internal bool Copies => Incoming.Count != 0 || Outgoing.Count != 0 || EquipmentRoot is not null;
-        internal HashSet<NbtType> ElementWrites { get; } = [];
-        internal HashSet<NbtType> ReplacementTypes { get; } = [];
-        internal HashSet<string> Producers { get; } = new(StringComparer.Ordinal);
-        internal HashSet<ListUses> Incoming { get; } = [];
-        internal HashSet<ListUses> Outgoing { get; } = [];
-    }
-
-    private sealed record ListCandidate(ListUses List, ArtifactAddress? Artifact = null, StorageTextRule? Rule = null);
     private sealed record StorageCommandNode(CommandStorageUse Use, ArtifactAddress Artifact, ChunkPosition? Chunk, TypedPath CommandRoot, TypedPath Syntax);
 }

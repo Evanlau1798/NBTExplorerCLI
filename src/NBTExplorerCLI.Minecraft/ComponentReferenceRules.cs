@@ -16,6 +16,33 @@ internal static class ComponentReferenceRules
         return (id, path, interpreted, opaqueClick);
     }
 
+    internal static bool UsesExplicitJsonFont(JsonElement value, TypedPath path)
+    {
+        var siblings = false;
+        foreach (var segment in path.Segments)
+        {
+            if (value.TryGetNativeProperty("font", out _)) return true;
+            if (segment.Index is { } index)
+            {
+                if (!siblings && index > 0 && FirstComponentHasFont(value[0])) return true;
+                value = value[index];
+                siblings = false;
+            }
+            else
+            {
+                siblings = segment.Key is "extra" or "with";
+                if (!value.TryGetNativeProperty(segment.Key!, out value)) return true;
+            }
+        }
+        return value.TryGetNativeProperty("font", out _);
+    }
+
+    private static bool FirstComponentHasFont(JsonElement value)
+    {
+        while (value.ValueKind == JsonValueKind.Array && value.GetArrayLength() > 0) value = value[0];
+        return value.TryGetNativeProperty("font", out _);
+    }
+
     internal static bool OtherComponentContent(Func<string, bool> hasField)
         => hasField("text") || hasField("translate") || hasField("selector") || hasField("score") || hasField("keybind")
             || hasField("entity") || hasField("block");

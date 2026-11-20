@@ -259,6 +259,9 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
     private static void ValidateLiteral(LiteralTranslation translation, Hash256 snapshot)
     {
         var slot = translation.Slot;
+        if (StorageDisplayPolicy.Target(slot.Address) && !slot.Placeholders.ProtectPrivateUseGlyphs)
+            slot = new(slot.Address, slot.SourceText, slot.Context, slot.SourceLocale, slot.TargetLocale,
+                slot.AllowedEmpty, new(slot.Placeholders.Tokens, protectVisibleText: true, protectPrivateUseGlyphs: true));
         if (translation.Reply.Text != slot.SourceText && WorldReferenceService.IsIdentifyingName(slot.Role))
             throw new EditRejectedException(EditFailure.Precondition, "Identifying names require an explicitly verified complete reference synchronization");
         var id = Guid.NewGuid(); var pageId = Hash256.Compute([]); var format = MinecraftPlaceholderProfiles.ForRole(slot.Role);

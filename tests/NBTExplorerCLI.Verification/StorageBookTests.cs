@@ -59,6 +59,9 @@ internal static class StorageBookTests
             _ = builder.Build(known, [edit!]);
             var literal = Read(page.Replace(":true", ":false", StringComparison.Ordinal));
             Require(StorageEdit(literal) is null, "a saved page with raw storage prevents translating its writer");
+            var styled = Read(page.Replace("""{"text":"Intro: "}""", """{"text":"Intro: ","font":"demo:meter"}""", StringComparison.Ordinal));
+            Require(!styled.Manifest.CoverageComplete && StorageEdit(styled) is null,
+                "an interpreted saved book reader cannot authorize glyphs inherited from its first component");
             var unknown = Read(page, """{"nbt":"lines[]","storage":"demo:pages"}""");
             if (StorageEdit(unknown) is { } preview) Reject<EditRejectedException>(() => builder.Build(unknown, [preview]));
             var opaquePage = Read(page.Replace("""{"text":"Intro: "}""", """{"text":"Intro: ","opaque":{"nbt":"lines[]","storage":"demo:pages"}}""", StringComparison.Ordinal));

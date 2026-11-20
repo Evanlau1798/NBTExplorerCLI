@@ -15,6 +15,8 @@ internal sealed partial class CommandTextReader
     {
         var storageElement = !resultObserved && (storageAccess is not null || storageDisplayLists is { Count: > 0 }) ? StorageDisplayWrite(tokens, index) : null;
         var storageValue = storageElement is null ? null : Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+        if (storageElement is not null && tokens[index + 5].Text == "set" && !tokens[^1].Text.StartsWith('[') && !IsScalarStorageComponent(storageValue!))
+            storageElement = null;
         var staticListWrite = storageValue is not null && StaticDataWrite(tokens, index, storageValue, keepEmptyListReset: true);
         if (storageAccess is not null || opaqueEquipment is not null)
             ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue, resultObserved);

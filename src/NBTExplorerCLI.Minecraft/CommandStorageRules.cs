@@ -1,5 +1,6 @@
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using System.Text.Json;
 
 namespace NBTExplorerCLI.Minecraft;
 
@@ -34,7 +35,8 @@ internal sealed partial class CommandTextReader
         if (storageElement is { } list)
         {
             var value = tokens[^1];
-            var use = tokens[index + 5].Text == "set" ? CommandStorageUse.ListReplacement : CommandStorageUse.ListElementWrite;
+            var use = tokens[index + 5].Text != "set" ? CommandStorageUse.ListElementWrite
+                : value.Text.StartsWith('[') ? CommandStorageUse.ListReplacement : CommandStorageUse.ScalarWrite;
             var encoded = MinecraftNbtAdapter.Encode(new("", storageValue!.Value), profile, limits).Root;
             var elementType = use == CommandStorageUse.ListReplacement ? (encoded as NbtList)?.ElementType : encoded.Type;
             ObserveStorage(list.Storage, list.Path, use,
@@ -153,10 +155,12 @@ internal sealed partial class CommandTextReader
             || profile.Features[ProfileFacet.TextSchema].Schema != "java-text-json" || tokens.Count != sourcePath + 1
             || tokens[index + 2].Text != "storage" || tokens[sourcePath - 2].Text != "storage") return false;
         var fromPath = tokens[sourcePath].Text;
+        var appendsScalar = false;
         if (operation != "set")
         {
-            if (operation is not ("append" or "prepend" or "insert") || PositionalListPath(fromPath) is not { } list) return false;
-            fromPath = list;
+            if (operation is not ("append" or "prepend" or "insert")) return false;
+            if (PositionalListPath(fromPath) is { } list) fromPath = list;
+            else appendsScalar = true;
         }
         var toPath = tokens[targetPath].Text;
         if (!fromPath.Split('.').All(PlainControlToken) || !toPath.Split('.').All(PlainControlToken)) return false;
@@ -165,7 +169,8 @@ internal sealed partial class CommandTextReader
         if (from == to) return false;
         var address = Address(path, tokens[index].Start, end - tokens[index].Start, source.Address.SemanticRole);
         Charge(address, from.Item1 + fromPath + to.Item1 + toPath);
-        storageAccess!.Invoke(new(to.Item1, toPath, CommandStorageUse.ListCopy, address) { CopySource = from, ReplacesList = operation == "set" });
+        storageAccess!.Invoke(new(to.Item1, toPath, CommandStorageUse.ListCopy, address)
+        { CopySource = from, ReplacesList = operation == "set", AppendsScalar = appendsScalar });
         return true;
     }
 
@@ -176,10 +181,11 @@ internal sealed partial class CommandTextReader
             && path[..bracket].Split('.').All(PlainControlToken) ? path[..bracket] : null;
     }
 
-    private static (string Storage, string Path)? StorageDisplayWrite(List<CommandToken> tokens, int index)
+    private (string Storage, string Path)? StorageDisplayWrite(List<CommandToken> tokens, int index)
         => tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "storage"
             && MinecraftIdentifier.ResourceLocation(tokens[index + 3].Text) && tokens[index + 4].Text.Split('.').All(PlainControlToken)
-            && (tokens[index + 5].Text is "append" or "prepend" || tokens[index + 5].Text == "set" && tokens[^1].Text.StartsWith('['))
+            && (tokens[index + 5].Text is "append" or "prepend" || tokens[index + 5].Text == "set"
+                && (tokens[^1].Text.StartsWith('[') || tokens[^1].Text[0] is '\'' or '"' && JsonStorageRuntime()))
             && tokens[index + 6].Text == "value"
             ? (MinecraftIdentifier.DefaultNamespace(tokens[index + 3].Text), tokens[index + 4].Text) : null;
 
@@ -188,9 +194,33 @@ internal sealed partial class CommandTextReader
         if (storageDisplayLists is not { Count: > 0 } || storageElement is not { } list || !storageDisplayLists.Contains(list)) return false;
         var value = tokens[^1];
         Component(value.Start, value.Start + value.Text.Length, TextExtractionCollector.At(path, "storage.list.value"),
-            storedRole: source.Address.SemanticRole + ".storage.component", storedList: tokens[index + 5].Text == "set");
+            storedRole: source.Address.SemanticRole + ".storage.component", storedList: tokens[index + 5].Text == "set" && value.Text.StartsWith('['));
         return true;
     }
+
+    private bool JsonStorageRuntime() => runtimeDataVersion >= StorageDataVersion
+        && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json"
+        && (exactRuntimeDataVersion is not int version || MinecraftProfiles.ForDataVersion(version)?.Features[ProfileFacet.TextSchema].Schema == "java-text-json");
+
+    private bool IsScalarStorageComponent(SnbtNode node)
+    {
+        if (node.Value is not LogicalMinecraftLeaf { Value: NbtString text }) return false;
+        try
+        {
+            using var document = BoundedJson.ReadDecoded(NativeJsonStrings.EncodeJavaDocument(text.Value, limits), limits);
+            return document.RootElement.ValueKind is JsonValueKind.String or JsonValueKind.Object or JsonValueKind.Array
+                && !ContainsFont(document.RootElement);
+        }
+        catch (JsonException) { return false; }
+    }
+
+    // shortcut: explicit fonts can encode glyphs as ordinary characters, use the pack's glyph definitions when available.
+    private static bool ContainsFont(JsonElement component) => component.ValueKind switch
+    {
+        JsonValueKind.Object => component.EnumerateObject().Any(field => field.NameEquals("font") || ContainsFont(field.Value)),
+        JsonValueKind.Array => component.EnumerateArray().Any(ContainsFont),
+        _ => false
+    };
 
     private void ObserveStorageOperand(List<CommandToken> tokens, int index, TypedPath path, int? pathIndex = null,
         CommandStorageUse use = CommandStorageUse.Other)

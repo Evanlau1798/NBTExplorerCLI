@@ -22,7 +22,8 @@ public static class NativeBookStorage
             if (ComponentReferenceRules.JsonStorage(value, limits) is not { } storage) continue;
             storageNodes.Add(path);
             report(new(MinecraftIdentifier.DefaultNamespace(storage.Id), storage.Path,
-                storage.Interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay, root, storage.OpaqueClick));
+                storage.Interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay, root,
+                storage.OpaqueClick || ComponentReferenceRules.UsesExplicitJsonFont(document.RootElement, path)));
         }
         return !Unclassified(document.RootElement, TypedPath.Root);
 

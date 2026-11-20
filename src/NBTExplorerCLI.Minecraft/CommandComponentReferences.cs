@@ -71,7 +71,8 @@ internal sealed partial class CommandTextReader
                 if ((storageAccess is not null || storageNodes is not null) && ComponentReferenceRules.JsonStorage(value, limits) is { } storage)
                 {
                     storageNodes?.Add(path);
-                    ReportStorage(storage.Id, storage.Path, storage.Interpreted, path, storage.OpaqueClick);
+                    ReportStorage(storage.Id, storage.Path, storage.Interpreted, path,
+                        storage.OpaqueClick || ComponentReferenceRules.UsesExplicitJsonFont(document.RootElement, path));
                 }
                 if (!observeStorageOnly && (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.HasFixedScoreHolder(score)
                     || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null))
@@ -86,11 +87,11 @@ internal sealed partial class CommandTextReader
                 }
             }
         }
-        void ReportStorage(string storage, string path, bool interpreted, TypedPath component, bool unknownClick)
+        void ReportStorage(string storage, string path, bool interpreted, TypedPath component, bool hasUnclassifiedReferences)
         {
             var address = Address(new(grammarPath.Segments.Concat(component.Segments)), start, end - start, source.Address.SemanticRole,
                 enclosingString?.StartByte, enclosingString?.LengthBytes);
-            ObserveStorage(storage, path, interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay, address, unknownClick);
+            ObserveStorage(storage, path, interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay, address, hasUnclassifiedReferences);
         }
         void Selector(string selector, TypedPath path, SnbtSpan span)
         {

@@ -3,12 +3,13 @@ using NBTExplorerCLI.Formats;
 
 namespace NBTExplorerCLI.Minecraft;
 
-public enum CommandStorageUse { InterpretedDisplay, LiteralDisplay, ListElementWrite, Other, ListReplacement, ListCopy, Presence, EquipmentImport, EquipmentExport, ListCardinality }
+public enum CommandStorageUse { InterpretedDisplay, LiteralDisplay, ListElementWrite, Other, ListReplacement, ListCopy, Presence, EquipmentImport, EquipmentExport, ListCardinality, ScalarWrite }
 public sealed record CommandStorageAccess(string Storage, string Path, CommandStorageUse Use, SourceAddress Address, bool HasUnclassifiedReferences = false)
 {
     public NbtType? ListElementType { get; init; }
     public (string Storage, string Path)? CopySource { get; init; }
     public bool ReplacesList { get; init; }
+    public bool AppendsScalar { get; init; }
 }
 public sealed record CommandFunctionCall(string Target, bool ResultObserved);
 
