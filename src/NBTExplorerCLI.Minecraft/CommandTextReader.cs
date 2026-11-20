@@ -10,6 +10,7 @@ namespace NBTExplorerCLI.Minecraft;
 internal sealed partial class CommandTextReader
 {
     private const int ExecuteDimensionDataVersion = 3320;
+    private const int ExecuteBiomeDataVersion = 3210;
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly CommandCandidate source;
     private readonly CapabilityProfile profile;
@@ -19,6 +20,7 @@ internal sealed partial class CommandTextReader
     private readonly Action<CommandSelectorReference>? selectorReference;
     private readonly Action<CommandNameTemplate>? nameTemplate;
     private readonly Action<CommandStorageAccess>? storageAccess;
+    private readonly Action? opaqueEquipment;
     private readonly IReadOnlySet<(string Storage, string Path)>? storageDisplayLists;
     private readonly bool inspectNested;
     private readonly int runtimeDataVersion;
@@ -35,7 +37,7 @@ internal sealed partial class CommandTextReader
     private long tokensConsumed;
     private int lineStart;
     private long lineByte;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null, Action? opaqueEquipment = null)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
         this.componentRoot = componentRoot;
@@ -46,6 +48,7 @@ internal sealed partial class CommandTextReader
         this.inspectNested = inspectNested;
         this.runtimeDataVersion = runtimeDataVersion ?? MinecraftProfiles.EarliestDataVersion(profile);
         exactRuntimeDataVersion = runtimeDataVersion;
+        this.opaqueEquipment = opaqueEquipment;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
         byteBase = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 } ? 3 : 0;
@@ -104,7 +107,7 @@ internal sealed partial class CommandTextReader
         if (name == "give" && tokens.Count >= index + 3)
         { CountArgument(tokens, index + 3); ItemArgument(tokens[index + 2], At(path, "give.item")); return; }
         if (name == "data") { DataCommand(tokens, index, path, end); return; }
-        if (name == "item") { ItemCommand(tokens, index, path, end); return; }
+        if (name == "item") { opaqueEquipment?.Invoke(); ItemCommand(tokens, index, path, end); return; }
         if (name == "summon" && tokens.Count >= index + 6)
         {
             if (tokens.Count != index + 6) throw new CommandSyntaxException();
@@ -132,15 +135,24 @@ internal sealed partial class CommandTextReader
                 if (clause is "if" or "unless" && runtimeDataVersion >= ExecuteDimensionDataVersion
                     && cursor + 1 < tokens.Count && tokens[cursor].Text == "dimension"
                     && MinecraftIdentifier.ResourceLocation(tokens[cursor + 1].Text)) operands = 2;
+                if (clause is "if" or "unless" && runtimeDataVersion >= ExecuteBiomeDataVersion
+                    && cursor + 4 < tokens.Count && tokens[cursor].Text == "biome"
+                    && BlockCoordinates(tokens[cursor + 1].Text, tokens[cursor + 2].Text, tokens[cursor + 3].Text)
+                    && ResourceOrTag(tokens[cursor + 4].Text)) operands = 5;
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "data")
                 {
                     var dataPath = DataTargetEnd(tokens, cursor + 1);
                     if (dataPath >= 0 && dataPath < tokens.Count)
                     {
-                        var use = runtimeDataVersion >= StorageDataVersion && tokens[dataPath].Text.Split('.').All(PlainControlToken)
-                            ? CommandStorageUse.Presence : CommandStorageUse.Other;
-                        ObserveStorageOperand(tokens, cursor + 1, path, dataPath, use);
-                        if (StaticDataControlPath(tokens[cursor + 1].Text, tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
+                        if (StorageRootCondition(tokens, cursor + 1, dataPath, path)) operands = dataPath + 1 - cursor;
+                        else
+                        {
+                            var use = runtimeDataVersion >= StorageDataVersion && tokens[dataPath].Text.Split('.').All(PlainControlToken)
+                                ? CommandStorageUse.Presence : CommandStorageUse.Other;
+                            ObserveStorageOperand(tokens, cursor + 1, path, dataPath, use);
+                            ObserveUnprovenEquipment(tokens, cursor + 1, dataPath);
+                            if (StaticDataControlPath(tokens[cursor + 1].Text, tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
+                        }
                     }
                 }
                 if (clause == "store" && cursor + 3 < tokens.Count && tokens[cursor].Text is "result" or "success" && tokens[cursor + 1].Text == "score"
@@ -157,6 +169,7 @@ internal sealed partial class CommandTextReader
                             && Decimal(tokens[dataPath + 2].Text, out _))
                         {
                             ObserveStorageOperand(tokens, cursor + 1, path, dataPath);
+                            ObserveUnprovenEquipment(tokens, cursor + 1, dataPath);
                             if (staticPath) operands = dataPath + 3 - cursor;
                         }
                     }
@@ -218,7 +231,8 @@ internal sealed partial class CommandTextReader
     {
         var address = pending.Address;
         var nested = new CommandCandidate(new(address.Artifact, address.NodePath, address.SemanticRole, address.Dimension, address.Chunk), pending.Command);
-        var parsed = new CommandTextReader(nested, profile, limits, SnapshotScope.All, null, null, null, inspectNested: false, runtimeDataVersion: exactRuntimeDataVersion).Read();
+        var parsed = new CommandTextReader(nested, profile, limits, SnapshotScope.All, null, null, null, inspectNested: false,
+            runtimeDataVersion: exactRuntimeDataVersion, opaqueEquipment: opaqueEquipment).Read();
         return parsed.Complete && parsed.Text.Occurrences.IsEmpty && parsed.Text.TranslationKeys.IsEmpty && parsed.References.IsEmpty;
     }
     private SourceAddress BindComponent(SourceAddress address, TypedPath grammarPath, int start, bool syntaxResult, Dictionary<TypedPath, SnbtSpan>? spans)

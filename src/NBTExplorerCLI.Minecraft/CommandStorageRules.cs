@@ -42,12 +42,19 @@ internal sealed partial class CommandTextReader
         if (action == "get")
         {
             if (tokens.Count <= pathIndex + 1 || tokens.Count == pathIndex + 2 && Decimal(tokens[pathIndex + 1].Text, out _))
+            {
+                ObserveUnprovenEquipment(tokens, target, pathIndex);
                 ObserveStorageOperand(tokens, target, path, pathIndex);
+            }
             return;
         }
         if (action is "remove" or "merge")
         {
-            if (tokens.Count == pathIndex + 1) ObserveStorageOperand(tokens, target, path, action == "remove" ? pathIndex : null);
+            if (tokens.Count == pathIndex + 1)
+            {
+                ObserveUnprovenEquipment(tokens, target, action == "remove" ? pathIndex : tokens.Count);
+                ObserveStorageOperand(tokens, target, path, action == "remove" ? pathIndex : null);
+            }
             return;
         }
         if (action != "modify" || pathIndex + 3 >= tokens.Count) return;
@@ -66,12 +73,68 @@ internal sealed partial class CommandTextReader
             if (sourceEnd < 0 || tokens.Count > sourceEnd + (mode == "from" ? 1 : 3)) return;
             for (var offset = sourceEnd + 1; offset < tokens.Count; offset++)
                 if (!Integer(tokens[offset].Text, out _)) return;
-            if (mode == "from" && ObserveStorageListCopy(tokens, index, path, end, pathIndex, sourceEnd, operation)) return;
+            if (mode == "from" && storageAccess is not null && (ObserveEquipmentCopy(tokens, index, path, end, pathIndex, sourceEnd, operation)
+                || ObserveStorageListCopy(tokens, index, path, end, pathIndex, sourceEnd, operation))) return;
+            ObserveUnprovenEquipment(tokens, target, pathIndex);
+            ObserveUnprovenEquipment(tokens, sourceTarget, sourceEnd);
             ObserveStorageOperand(tokens, target, path, pathIndex);
             ObserveStorageOperand(tokens, sourceTarget, path, sourceEnd);
             return;
         }
-        if (mode == "value" && tokens.Count == sourceMode + 2) ObserveStorageOperand(tokens, target, path, pathIndex);
+        if (mode == "value" && tokens.Count == sourceMode + 2)
+        {
+            ObserveUnprovenEquipment(tokens, target, pathIndex);
+            ObserveStorageOperand(tokens, target, path, pathIndex);
+        }
+    }
+
+    private void ObserveUnprovenEquipment(List<CommandToken> tokens, int target, int path)
+    {
+        if (opaqueEquipment is null) return;
+        var field = path < tokens.Count ? tokens[path].Text : "";
+        if (tokens[target].Text == "entity" && field != "CustomName" && !NumericEntitySource(field)
+            || tokens[target].Text == "block" && !SignTextSource(field)) opaqueEquipment();
+    }
+
+    private bool StorageRootCondition(List<CommandToken> tokens, int target, int path, TypedPath commandPath)
+    {
+        var matcher = tokens[path].Text;
+        if (tokens[target].Text != "storage" || runtimeDataVersion < StorageDataVersion || !matcher.StartsWith('{')
+            || CompoundEnd(matcher, 0) != matcher.Length) return false;
+        var root = Snbt.ParseDocument(Utf8.GetBytes(matcher), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+        var jsonComponents = exactRuntimeDataVersion is int version
+            && MinecraftProfiles.ForDataVersion(version)?.Features[ProfileFacet.TextSchema].Schema == "java-text-json";
+        if (root.Value is not LogicalMinecraftCompound || root.Children.Any(field => field.Selector.Key is not { } key
+            || !PlainControlToken(key) || key.Contains('.') || field.Node.ContainsStringValues
+            && !(jsonComponents && field.Node.Value is LogicalMinecraftLeaf { Value: NbtString id } && MinecraftIdentifier.ResourceLocation(id.Value)))) return false;
+        if (storageAccess is not null)
+        {
+            var storage = tokens[target + 1];
+            var address = Address(commandPath, storage.Start, storage.Text.Length, source.Address.SemanticRole);
+            foreach (var field in root.Children) ObserveStorage(storage.Text, field.Selector.Key!, CommandStorageUse.Other, address);
+        }
+        return true;
+    }
+
+    private bool ObserveEquipmentCopy(List<CommandToken> tokens, int index, TypedPath path, int end, int targetPath, int sourcePath, string operation)
+    {
+        if (index != 0 || operation != "set" || source.Address.SemanticRole != "command.function" || tokens.Count != sourcePath + 1
+            || exactRuntimeDataVersion is not int version || version < StorageDataVersion
+            || profile.Features[ProfileFacet.ItemSchema].Schema != "java-item-tags-1.20.4"
+            || MinecraftProfiles.ForDataVersion(version)?.Features[ProfileFacet.ItemSchema] != profile.Features[ProfileFacet.ItemSchema]) return false;
+        var importing = tokens[2].Text == "storage" && tokens[sourcePath - 2].Text == "entity";
+        var exporting = tokens[2].Text == "entity" && tokens[sourcePath - 2].Text == "storage";
+        if (!importing && !exporting) return false;
+        var equipment = tokens[importing ? sourcePath : targetPath].Text;
+        var bracket = equipment.IndexOf('[');
+        if (bracket < 0 || equipment.Length != bracket + 3 || equipment[^1] != ']'
+            || !(equipment[..bracket] == "HandItems" && equipment[bracket + 1] is '0' or '1'
+                || equipment[..bracket] == "ArmorItems" && equipment[bracket + 1] is >= '0' and <= '3')) return false;
+        var storage = importing ? targetPath : sourcePath;
+        if (!tokens[storage].Text.Split('.').All(PlainControlToken)) return false;
+        ObserveStorage(tokens[storage - 1].Text, tokens[storage].Text, importing ? CommandStorageUse.EquipmentImport : CommandStorageUse.EquipmentExport,
+            Address(path, tokens[0].Start, end - tokens[0].Start, source.Address.SemanticRole));
+        return true;
     }
 
     private bool ObserveStorageListCopy(List<CommandToken> tokens, int index, TypedPath path, int end, int targetPath, int sourcePath, string operation)
@@ -93,7 +156,7 @@ internal sealed partial class CommandTextReader
         if (from == to) return false;
         var address = Address(path, tokens[0].Start, end - tokens[0].Start, source.Address.SemanticRole);
         Charge(address, from.Item1 + fromPath + to.Item1 + toPath);
-        storageAccess!.Invoke(new(to.Item1, toPath, CommandStorageUse.ListCopy, address) { CopySource = from });
+        storageAccess!.Invoke(new(to.Item1, toPath, CommandStorageUse.ListCopy, address) { CopySource = from, ReplacesList = operation == "set" });
         return true;
     }
 

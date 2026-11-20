@@ -49,14 +49,14 @@ public sealed partial class WorldTextExtraction
         ArgumentNullException.ThrowIfNull(storageAccess);
         return ReadSourcesCore(Discovery.Sources, storageAccess);
     }
-    internal IEnumerable<TextSourceExtraction> ReadStorageObservations(Action<CommandStorageAccess> observe, Action opaqueStorage)
-        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage);
+    internal IEnumerable<TextSourceExtraction> ReadStorageObservations(Action<CommandStorageAccess> observe, Action opaqueStorage, Action opaqueEquipment)
+        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage, opaqueEquipment: opaqueEquipment);
     internal IEnumerable<TextSourceExtraction> ReadStorageProjection(StorageDisplayPolicy storage, HashSet<string> pendingSeeds)
         => ReadSourcesCore(Discovery.Sources.Where(source => storage.SourceKeys.ContainsKey(source.Location.Artifact.RelativePath)
             || pendingSeeds.Contains(source.Location.Artifact.RelativePath)), previewStorage: storage);
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
     private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected, Action<CommandStorageAccess>? storageAccess = null, Action? opaqueStorage = null,
-        StorageDisplayPolicy? previewStorage = null)
+        StorageDisplayPolicy? previewStorage = null, Action? opaqueEquipment = null)
     {
         foreach (var group in selected.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
         {
@@ -88,11 +88,11 @@ public sealed partial class WorldTextExtraction
                 continue;
             }
             using (archive)
-                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage);
+                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage, opaqueEquipment);
         }
     }
     private TextSourceExtraction ReadOne(DiscoveredSource source, byte[] bytes, RegionFile? region, ZipArchive? archive, Action<CommandStorageAccess>? storageAccess, Action? opaqueStorage,
-        StorageDisplayPolicy? previewStorage)
+        StorageDisplayPolicy? previewStorage, Action? opaqueEquipment)
     {
         if (source.Outcome != SourceOutcome.Success) return Forward(source);
         if (source.Location.Role == WorldSourceRole.Archive || region is not null && source.Chunk is null)
@@ -112,6 +112,7 @@ public sealed partial class WorldTextExtraction
                 var document = (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && source.Location.Role == WorldSourceRole.Terrain
                     ? region.ReadClassicAnvilChunk(index, request.Limits) : region.ReadChunk(index, request.Limits)).Document;
                 if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(document.Root)) opaqueStorage();
+                if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(document.Root)) opaqueEquipment();
                 text = NbtTextExtractor.Extract(source.Location, document, chunk, request.Limits, scope: request.Scope, layoutProfile: LayoutProfile);
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
@@ -119,6 +120,7 @@ public sealed partial class WorldTextExtraction
             {
                 var document = ReadDat(bytes);
                 if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(document.Root)) opaqueStorage();
+                if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(document.Root)) opaqueEquipment();
                 var rules = StorageRules.GetValueOrDefault(source.Location.Artifact, []);
                 if (rules.IsEmpty && storageAccess is null && source.Location.Role == WorldSourceRole.SavedData && LayoutProfile is { } layout
                     && WorldLayoutLocator.CommandStorageNamespace(layout, source.Location.Artifact.RelativePath) is not null)
@@ -129,6 +131,7 @@ public sealed partial class WorldTextExtraction
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
             {
                 if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes)) opaqueStorage();
+                if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(bytes)) opaqueEquipment();
                 text = PackTextExtractor.Extract(source.Location, bytes, source.Pack ?? throw new InvalidDataException("Missing pack metadata snapshot"), request.Limits, request.Scope);
                 commandProfile = MinecraftProfiles.ForPackMetadata(source.Pack!);
             }
@@ -153,6 +156,7 @@ public sealed partial class WorldTextExtraction
             else if (source.Location.Role == WorldSourceRole.SavedData && Discovery.Metadata is { } metadata)
             {
                 if (opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes)) opaqueStorage();
+                if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(bytes)) opaqueEquipment();
                 text = DataTextExtractor.Json(source.Location, bytes, metadata, request.Limits, request.Scope);
             }
             else return new(source, SourceOutcome.Unsupported, null, "UnsupportedTextSource");
@@ -160,7 +164,7 @@ public sealed partial class WorldTextExtraction
             if (!text.PendingCommands.IsEmpty)
             {
                 if (commandProfile is null) return new(source, SourceOutcome.Unsupported, text, "CommandGrammarPending");
-                commands = ExtractCommands(text.PendingCommands, commandProfile, storageAccess, previewStorage);
+                commands = ExtractCommands(text.PendingCommands, commandProfile, storageAccess, previewStorage, opaqueEquipment);
                 text = text with { Occurrences = text.Occurrences.AddRange(commands.Text.Occurrences), TranslationKeys = text.TranslationKeys.AddRange(commands.Text.TranslationKeys),
                     Diagnostics = text.Diagnostics.AddRange(commands.Text.Diagnostics), PendingCommands = commands.Text.PendingCommands };
                 CheckRetention(text, commands.References);

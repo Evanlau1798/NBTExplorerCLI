@@ -42,6 +42,7 @@ internal static class StorageAndDataTextTests
         new("command-copy-sign-text-source", "discovery", _ => CopySignTextSource()),
         new("command-storage-structural-metadata-filters", "discovery", _ => StorageMetadataFilters()),
         new("text-storage-component-list-copy-chain", "discovery", _ => ComponentListCopyChain()),
+        new("text-storage-native-item-lore-copy", "discovery", _ => NativeItemLoreCopy()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
 
@@ -124,7 +125,8 @@ internal static class StorageAndDataTextTests
                 "a complete typed copy chain retains the original producer's text, including across sibling paths");
             var blocked = new List<string>();
             foreach (var control in new[] { "execute if data storage demo:messages staged run data modify storage demo:messages stats.count set value 7",
-                "data get storage demo:messages stats.items[0]", "data get storage demo:messages stats.items[{Slot:0b}].Count" })
+                "data get storage demo:messages stats.items[0]", "data get storage demo:messages stats.items[{Slot:0b}].Count",
+                "execute if data storage demo:messages {stats:{count:7}} run data modify storage demo:messages stats.ready set value 1" })
             {
                 Put(root, copy, Encoding.UTF8.GetBytes(commands + "\n" + control));
                 snapshot = WorldQueryTests.Query(root, cache);
@@ -147,6 +149,67 @@ internal static class StorageAndDataTextTests
             snapshot = WorldQueryTests.Query(root, cache);
             Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(),
                 "copying with an observed command result must remain unresolved");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+        static IEnumerable<string> Slots(WorldQuerySnapshot snapshot)
+            => snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == producer).Text!.Occurrences.Select(item => item.Text);
+    }
+
+    private static void NativeItemLoreCopy()
+    {
+        var root = ScratchDirectory.CreateChild();
+        var cache = ScratchDirectory.CreateChild();
+        const string producer = "datapacks/p/data/demo/functions/produce.mcfunction";
+        const string copies = "datapacks/p/data/demo/functions/deliver.mcfunction";
+        const string transfer = """
+            data modify storage demo:item stack set from entity @e[type=armor_stand,limit=1] HandItems[0]
+            data modify storage demo:item stack.tag.display.Lore set from storage demo:item lines
+            data modify entity @e[type=armor_stand,limit=1] HandItems[0] set from storage demo:item stack
+            """;
+        try
+        {
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            Put(root, "datapacks/p/pack.mcmeta", """{"pack":{"pack_format":15,"description":"Item transfer"}}"""u8.ToArray());
+            Put(root, producer, """data modify storage demo:item lines set value ['{"text":"First"}','{"text":"Second"}']"""u8.ToArray());
+            Put(root, copies, Encoding.UTF8.GetBytes(transfer));
+            var snapshot = WorldQueryTests.Query(root, cache);
+            Require(snapshot.Manifest.CoverageComplete && Slots(snapshot).SequenceEqual(new[] { "First", "Second" }),
+                "storage lore reaches a typed native item field without treating the copied commands as slots");
+            Put(root, copies, Encoding.UTF8.GetBytes(transfer[(transfer.IndexOf('\n') + 1)..]));
+            snapshot = WorldQueryTests.Query(root, cache);
+            Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(), "writing to equipment alone does not prove the origin of the copied item");
+            Put(root, copies, Encoding.UTF8.GetBytes(transfer + "\ndata get storage demo:item stack"));
+            snapshot = WorldQueryTests.Query(root, cache);
+            Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(), "raw reads of the whole copied item must revoke its translation proof");
+            Put(root, copies, Encoding.UTF8.GetBytes(transfer.Replace("HandItems[0] set from storage", "CustomName set from storage", StringComparison.Ordinal)));
+            snapshot = WorldQueryTests.Query(root, cache);
+            Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(), "an unrelated entity field cannot prove a visible item lore destination");
+            var authorized = new List<string>();
+            foreach (var raw in new[] {
+                "execute store result score #lore proof run data get entity @e[type=armor_stand,limit=1] HandItems[0].tag.display.Lore[0]",
+                "data modify storage demo:raw reread set from entity @e[type=armor_stand,limit=1] HandItems[0]\ndata get storage demo:raw reread.tag.display.Lore[0]" })
+            {
+                Put(root, copies, Encoding.UTF8.GetBytes(transfer + "\n" + raw));
+                snapshot = WorldQueryTests.Query(root, cache);
+                if (snapshot.Manifest.CoverageComplete || Slots(snapshot).Any()) authorized.Add(raw);
+            }
+            var steps = transfer.Split('\n');
+            foreach (var commands in new[] { new[] { steps[0], steps[1], steps[0], steps[2] }, new[] { steps[1], steps[0], steps[2] } })
+            {
+                Put(root, copies, Encoding.UTF8.GetBytes(string.Join('\n', commands)));
+                snapshot = WorldQueryTests.Query(root, cache);
+                if (snapshot.Manifest.CoverageComplete || Slots(snapshot).Any()) authorized.Add("equipment import overwrites the rebuilt lore");
+            }
+            Put(root, copies, Encoding.UTF8.GetBytes(transfer + "\n" + transfer.Replace("demo:item", "demo:second", StringComparison.Ordinal)
+                .Replace("from storage demo:second lines", "from storage demo:item lines", StringComparison.Ordinal)));
+            snapshot = WorldQueryTests.Query(root, cache);
+            if (snapshot.Manifest.CoverageComplete || Slots(snapshot).Any()) authorized.Add("two equipment exports may alias the same slot");
+            Put(root, copies, Encoding.UTF8.GetBytes(transfer));
+            Put(root, "datapacks/p/data/demo/item_modifiers/raw.json",
+                """{"function":"minecraft:copy_\u006e\u0062\u0074","source":"this","ops":[{"source":"HandItems[0]","target":"copy","op":"replace"}]}"""u8.ToArray());
+            snapshot = WorldQueryTests.Query(root, cache);
+            if (snapshot.Manifest.CoverageComplete || Slots(snapshot).Any()) authorized.Add("escaped equipment copy modifier");
+            Require(authorized.Count == 0, "potentially aliasing raw equipment uses must revoke the translated list: " + string.Join(", ", authorized));
         }
         finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
         static IEnumerable<string> Slots(WorldQuerySnapshot snapshot)

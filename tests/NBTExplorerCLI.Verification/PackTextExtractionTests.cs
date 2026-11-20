@@ -174,7 +174,7 @@ internal static class PackTextExtractionTests
              """{"type":"minecraft:overworld","generator":{"type":"test:generator","text":"Unknown payload"}}"""),
             ("dimension_type", """{"ultrawarm":false,"natural":true,"has_skylight":true,"effects":"minecraft:overworld","infiniburn":"#minecraft:infiniburn_overworld","min_y":-64,"height":384,"logical_height":384}""",
              """{"ultrawarm":"not a flag","height":384,"effects":{"text":"Unknown payload"}}"""),
-            ("worldgen/biome", """{"temperature":0.5,"downfall":0.4,"has_precipitation":true,"effects":{"fog_color":0,"water_color":1,"water_fog_color":2,"sky_color":3,"music":{"sound":"","min_delay":1,"max_delay":2,"replace_current_music":true},"particle":{"options":{"type":"minecraft:snowflake"},"probability":0.1}},"carvers":{"air":[]},"features":[],"spawners":{},"spawn_costs":{}}""",
+            ("worldgen/biome", """{"temperature":0.5,"downfall":0.4,"has_precipitation":true,"effects":{"fog_color":0,"water_color":1,"water_fog_color":2,"sky_color":3,"music":{"sound":"","min_delay":1,"max_delay":2,"replace_current_music":true},"particle":{"options":{"type":"minecraft:snowflake"},"probability":0.1}},"additions_sound":{"sound":"minecraft:ambient.cave","tick_chance":0.01},"carvers":{"air":[]},"features":[],"spawners":{},"spawn_costs":{}}""",
              """{"effects":{"fog_color":0,"water_color":1,"water_fog_color":2,"sky_color":3,"particle":{"options":{"type":"test:particle","text":"Unknown payload"},"probability":0.1}}}""")
         })
         {
@@ -183,6 +183,9 @@ internal static class PackTextExtractionTests
             TextExtractionResult Read(string value) => PackTextExtractor.Extract(source, Encoding.UTF8.GetBytes(value), Metadata(15));
             Require(Read(valid) is { Complete: true, Occurrences.IsEmpty: true }, "known vanilla worldgen has no display text: " + kind);
             Require(Read(unknown) is { Complete: false, Occurrences.IsEmpty: true }, "unknown worldgen remains protected: " + kind);
+            if (kind == "worldgen/biome")
+                Require(!Read(valid.Replace("minecraft:ambient.cave", "playsound ambient.cave", StringComparison.Ordinal)).Complete,
+                    "a malformed resource ID remains unresolved");
         }
     }
 }

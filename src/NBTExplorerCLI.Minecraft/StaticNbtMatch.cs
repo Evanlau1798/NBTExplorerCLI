@@ -23,7 +23,7 @@ internal static class StaticNbtMatch
             _ => false
         });
 
-    private static bool ItemTag(SnbtNode root) => root.Value is LogicalMinecraftCompound
+    internal static bool ItemTag(SnbtNode root) => root.Value is LogicalMinecraftCompound
         && root.Children.All(field => !field.Node.ContainsStringValues || field.Selector.Key switch
         {
             "Potion" => ResourceId(field.Node),

@@ -12,6 +12,72 @@ namespace NBTExplorerCLI.Verification;
 
 internal static class WorldCommandExtractionTests
 {
+    internal static void VanillaControlsAndNativeMetadata()
+    {
+        var address = new SourceAddress(new(World, "vanilla.mcfunction", ArtifactKind.McFunction), TypedPath.Root, "command.function");
+        const string commands = """
+            attribute @s minecraft:generic.knockback_resistance base set 0.5
+            attribute @s minecraft:generic.max_health modifier value get 00000000-0000-0000-0000-000000000001 2
+            forceload add ~ 508
+            forceload remove all
+            datapack enable "file/demo pack" after vanilla
+            datapack list available
+            loot spawn ^ ^ ^.2 mine 2 64 3 minecraft:iron_pickaxe{Damage:1}
+            loot replace entity @s container.0 loot demo:rewards
+            experience set @s 0 levels
+            xp add @s -1 points
+            gamemode adventure @s
+            spawnpoint @s ~ ~ ~ -90
+            particle item minecraft:amethyst_block ~ ~ ~ 0 0 0 0 1 force
+            particle shriek 10 ~ ~ ~ 0 0 0 1 2
+            clear @s #demo:token{Damage:0} 0
+            title @s reset
+            help
+            data modify entity @s Fire set from entity @e[type=minecraft:arrow,limit=1] Fire
+            data modify entity @s damage set from entity @e[type=minecraft:arrow,limit=1] damage
+            data merge entity @s {Fixed:1b,Invulnerable:1b,Item:{id:"minecraft:paper",Count:1b}}
+            data modify entity @s Item set value {id:"minecraft:moss_block",Count:1b,tag:{Potion:"minecraft:harming",CustomPotionEffects:[{Id:7,Amplifier:1b}]}}
+            data modify block 2 64 3 Items append from entity @s Item
+            execute if data storage demo:state {flags:{open:1b},mode:"minecraft:ready"} if biome ~ ~ ~ #minecraft:is_overworld run tellraw @a[name=Guard] {"text":"Ready"}
+            """;
+        var reads = new List<CommandStorageAccess>();
+        var result = Parse(commands, 3465, reads.Add);
+        Require(result.Complete && result.Text.Occurrences is [{ Text: "Ready" }] && result.References.Single().Name == "Guard",
+            "standard controls and metadata preserve the following display text and selector: " + string.Join(", ", result.Text.Diagnostics.Select(d => d.Code)));
+        Require(reads.Select(access => (access.Use, access.Path)).SequenceEqual(new[] {
+            (CommandStorageUse.Other, "flags"), (CommandStorageUse.Other, "mode") }), "root compound matching observes the exact independent keys");
+        foreach (var (command, oldVersion, newVersion) in new[] {
+            ("forceload query", 1625, 1626), ("attribute @s minecraft:generic.max_health get", 2528, 2529),
+            ("loot spawn 0 64 0 loot minecraft:empty", 1907, 1908), ("spawnpoint @s ~ ~ ~ 90", 2570, 2571),
+            ("particle sculk_charge .5", 3079, 3080), ("particle shriek 5", 3081, 3082),
+            ("execute if biome ~ ~ ~ minecraft:plains", 3209, 3210) })
+            Require(!Parse(command, oldVersion).Complete && Parse(command, newVersion).Complete, $"verified grammar boundary: {command}");
+        Require(Parse("particle dust 1 0 0 2", 3828).Complete && !Parse("particle dust 1 0 0 2", 3829).Complete
+            && Parse("particle minecraft:flame ~ ~ ~", 3829).Complete, "only particle payloads change at the options format boundary");
+        const string modifier = "attribute @s minecraft:generic.max_health modifier add ";
+        const string uuidModifier = modifier + "00000000-0000-0000-0000-000000000001 test 1 ";
+        const string resourceModifier = modifier + "demo:bonus 1 add_value";
+        Require(Parse(uuidModifier + "add", 3818).Complete && !Parse(uuidModifier + "add", 3819).Complete
+            && !Parse(uuidModifier + "add_value", 3818).Complete && Parse(uuidModifier + "add_value", 3819).Complete
+            && Parse(uuidModifier + "add_value", 3945).Complete && !Parse(uuidModifier + "add_value", 3946).Complete
+            && !Parse(resourceModifier, 3945).Complete && Parse(resourceModifier, 3946).Complete,
+            "modifier operations and IDs change at separate grammar boundaries");
+        var quoted = Parse("""execute if data entity @s Item.tag."demo.key" if data storage demo:state 'section.name'[0].'has spaces' run tellraw @a {"text":"Ready"}""", 3465);
+        Require(quoted.Complete && quoted.Text.Occurrences is [{ Text: "Ready" }],
+            "vanilla quoted NBT path keys preserve the following display text");
+        foreach (var command in new[] { "forceload add ^ ^", "attribute @s max_health base set NaN", "xp set @s -1 levels",
+            "datapack list recursive", "particle shriek -1", "?", "clear @s minecraft:paper{display:{Name:'Visible'}}",
+            "data modify entity @s damage set from entity @s damage", "data merge entity @s {CustomName:'Public name'}",
+            """execute if data entity @s Item.tag."bad\q" run tellraw @a {"text":"Unproven"}""",
+            """execute if data entity @s Item."bad"suffix run tellraw @a {"text":"Unproven"}""",
+            """execute if data entity @s Item.[0] run tellraw @a {"text":"Unproven"}""",
+            """execute if data storage demo:state {id:"Visible text"}""" })
+            Require(!Parse(command, 3465).Complete, $"unproven command payload remains unresolved: {command}");
+
+        CommandExtractionResult Parse(string body, int version, Action<CommandStorageAccess>? observe = null)
+            => CommandTextExtractor.Extract(new(address, body), MinecraftProfiles.ForDataVersion(version)!, storageAccess: observe, runtimeDataVersion: version);
+    }
+
     internal static void StaticTimeAndScheduling()
     {
         const string script = """

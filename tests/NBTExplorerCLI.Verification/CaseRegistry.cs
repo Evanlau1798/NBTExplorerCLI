@@ -1,5 +1,4 @@
 namespace NBTExplorerCLI.Verification;
-
 internal sealed record VerificationContext(string FixtureRoot, string? ArtifactRoot);
 internal sealed record VerificationCase(string Name, string Suite, Action<VerificationContext> Test);
 internal static class CaseRegistry
@@ -250,6 +249,7 @@ internal static class CaseRegistry
         new("command-component-selector-references", "discovery", _ => CommandTextExtractionTests.ComponentSelectorReferences()),
         new("world-command-functions-and-dat", "discovery", _ => WorldCommandExtractionTests.FunctionsAndPhysicalNbtCommands()),
         new("command-static-time-summon-schedule", "discovery", _ => WorldCommandExtractionTests.StaticTimeAndScheduling()),
+        new("command-vanilla-controls-and-native-metadata", "discovery", _ => WorldCommandExtractionTests.VanillaControlsAndNativeMetadata()),
         new("command-summon-setblock-classic-give", "discovery", _ => CommandTextExtractionTests.SummonSetblockAndTaggedGive()),
         new("command-old-item-tag-vanilla-identity", "discovery", _ => CommandKeyPreparationTests.OlderItemTagsUseVanillaItemIdentity()),
         new("command-item-component-snbt-fragments", "discovery", _ => CommandTextExtractionTests.ItemComponentFragments()),

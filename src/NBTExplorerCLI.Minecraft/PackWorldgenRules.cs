@@ -78,6 +78,8 @@ public static partial class PackTextExtractor
         {
             "effects" => true, "temperature" or "downfall" or "depth" or "scale" => NumberValue(member),
             "has_precipitation" => BooleanValue(member), "temperature_modifier" or "precipitation" or "category" => WorldgenId(member),
+            // Vanilla ignores this misplaced sound setting; preserve only its recognized, non-text shape.
+            "additions_sound" => BiomeAdditionsSound(member),
             "carvers" => Identifiers(member) || Fields(member, (key, carvers) => key is "air" or "liquid" && Identifiers(carvers)),
             "features" => ArrayOf(member, Identifiers),
             "spawners" => Fields(member, (_, spawns) => ArrayOf(spawns, spawn =>
@@ -96,12 +98,14 @@ public static partial class PackTextExtractor
             || key == "replace_current_music" && BooleanValue(field)),
         "mood_sound" => SoundSettings(member, (key, field) => key is "tick_delay" or "block_search_extent" && IntegerValue(field)
             || key == "offset" && NumberValue(field)),
-        "additions_sound" => SoundSettings(member, (key, field) => key == "tick_chance" && NumberValue(field)),
+        "additions_sound" => BiomeAdditionsSound(member),
         "particle" => member.TryGetNativeProperty("options", out var options) && options.TryGetNativeProperty("type", out var type)
             && WorldgenId(type) && Fields(options, (key, _) => key == "type")
             && Fields(member, (key, field) => key == "options" || key == "probability" && NumberValue(field)),
         _ => false
     });
+
+    private static bool BiomeAdditionsSound(JsonElement value) => SoundSettings(value, (key, field) => key == "tick_chance" && NumberValue(field));
 
     private static bool SoundSettings(JsonElement value, Func<string, JsonElement, bool> option) => value.TryGetNativeProperty("sound", out var sound)
         && WorldgenSound(sound) && Fields(value, (name, member) => name == "sound" || option(name, member));

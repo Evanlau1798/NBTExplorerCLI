@@ -1,5 +1,6 @@
 using System.Globalization;
 using NBTExplorerCLI.Domain;
+using NBTExplorerCLI.Formats;
 using static NBTExplorerCLI.Minecraft.MinecraftIdentifier;
 
 namespace NBTExplorerCLI.Minecraft;
@@ -9,6 +10,15 @@ internal sealed partial class CommandTextReader
     private const int UnitTimeDataVersion = 1901;
     private const int ExtendedScheduleDataVersion = 2205;
     private const int TitleDurationDataVersion = 3320;
+    private const int ForceLoadDataVersion = 1626;
+    private const int LootDataVersion = 1908;
+    private const int AttributeDataVersion = 2529;
+    private const int SpawnAngleDataVersion = 2571;
+    private const int SculkChargeDataVersion = 3080;
+    private const int ShriekDataVersion = 3082;
+    private const int AttributeOperationDataVersion = 3819;
+    private const int ParticleOptionsDataVersion = 3829;
+    private const int AttributeIdDataVersion = 3946;
 
     private int ScoreCondition(List<CommandToken> tokens, int cursor)
     {
@@ -39,6 +49,39 @@ internal sealed partial class CommandTextReader
                 };
             case "difficulty":
                 return count == 1 || count == 2 && Arg(1) is "peaceful" or "easy" or "normal" or "hard";
+            case "gamemode":
+                return count is 2 or 3 && Arg(1) is "survival" or "creative" or "adventure" or "spectator"
+                    && (count == 2 || EntityTarget(Arg(2)));
+            case "experience" or "xp":
+                return EntityTarget(Arg(2)) && (Arg(1) == "query" && count == 4 && Arg(3) is "points" or "levels"
+                    || Arg(1) is "add" or "set" && count is 4 or 5 && Integer(Arg(3), out var experience)
+                    && (Arg(1) == "add" || experience >= 0) && (count == 4 || Arg(4) is "points" or "levels"));
+            case "spawnpoint":
+                return count == 1 || EntityTarget(Arg(1)) && (count == 2 || count is 5 or 6 && BlockCoordinates(Arg(2), Arg(3), Arg(4))
+                    && (count == 5 || runtimeDataVersion >= SpawnAngleDataVersion && Angle(Arg(5))));
+            case "forceload":
+                if (runtimeDataVersion < ForceLoadDataVersion) return false;
+                var column = count >= 4 && BlockCoordinate(Arg(2)) && BlockCoordinate(Arg(3));
+                return Arg(1) switch
+                {
+                    "query" => count == 2 || count == 4 && column,
+                    "remove" when count == 3 => Arg(2) == "all",
+                    "add" or "remove" => column && (count == 4 || count == 6 && BlockCoordinate(Arg(4)) && BlockCoordinate(Arg(5))),
+                    _ => false
+                };
+            case "attribute":
+                return AttributeControl(count, Arg);
+            case "datapack":
+                return Arg(1) switch
+                {
+                    "list" => count == 2 || count == 3 && Arg(2) is "enabled" or "available",
+                    "disable" => count == 3 && CommandString(Arg(2)),
+                    "enable" => count is >= 3 and <= 5 && CommandString(Arg(2)) && (count == 3
+                        || count == 4 && Arg(3) is "first" or "last" || count == 5 && Arg(3) is "before" or "after" && CommandString(Arg(4))),
+                    _ => false
+                };
+            case "help":
+                return count == 1 || count == 2 && CommandString(Arg(1));
             case "tp" or "teleport":
                 if (count is 2 or 3) return EntityTarget(Arg(1)) && (count == 2 || EntityTarget(Arg(2)));
                 if (count == 4) return Position(1);
@@ -83,7 +126,7 @@ internal sealed partial class CommandTextReader
                 return count is 2 or 3 && MinecraftProfiles.UsesEarlyTaggedItemCommands(profile) && KnownGameRule(Arg(1), count == 2 ? null : Arg(2));
             case "clear":
                 return count is >= 1 and <= 4 && (count == 1 || EntityTarget(Arg(1)))
-                    && (count < 3 || ResourceOrTag(Arg(2)))
+                    && (count < 3 || StaticItemOperand(Arg(2), allowTag: true))
                     && (count < 4 || Integer(Arg(3), out var maximumItems) && maximumItems >= 0);
             case "team":
                 return Arg(1) switch
@@ -108,14 +151,17 @@ internal sealed partial class CommandTextReader
                 return count == 2 && Integer(Arg(1), out _);
             case "particle":
                 var particle = DefaultNamespace(Arg(1));
-                var positionalPayload = MinecraftProfiles.UsesEarlyTaggedItemCommands(profile);
+                var positionalPayload = runtimeDataVersion < ParticleOptionsDataVersion;
                 var position = particle switch
                 {
                     "minecraft:block" or "minecraft:block_marker" or "minecraft:falling_dust" =>
                         positionalPayload && StaticBlock(Arg(2)) ? 3 : -1,
                     "minecraft:dust" => positionalPayload && count >= 6 && tokens.Skip(index + 2).Take(4).All(token => Decimal(token.Text, out _)) ? 6 : -1,
                     "minecraft:dust_color_transition" => positionalPayload && count >= 9 && tokens.Skip(index + 2).Take(7).All(token => Decimal(token.Text, out _)) ? 9 : -1,
-                    "minecraft:item" or "minecraft:vibration" or "minecraft:shriek" or "minecraft:sculk_charge" => -1,
+                    "minecraft:item" => positionalPayload && StaticItemOperand(Arg(2)) ? 3 : -1,
+                    "minecraft:shriek" => positionalPayload && runtimeDataVersion >= ShriekDataVersion && Integer(Arg(2), out var delay) && delay >= 0 ? 3 : -1,
+                    "minecraft:sculk_charge" => positionalPayload && runtimeDataVersion >= SculkChargeDataVersion && Decimal(Arg(2), out _) ? 3 : -1,
+                    "minecraft:vibration" => -1,
                     _ => ResourceLocation(Arg(1)) ? 2 : -1
                 };
                 return position >= 0 && (count == position || count == position + 3 && Position(position)
@@ -125,15 +171,15 @@ internal sealed partial class CommandTextReader
                     && (count == position + 8 || Arg(position + 8) is "normal" or "force")
                     && (count < position + 10 || EntityTarget(Arg(position + 9))));
             case "title":
-                return count == 6 && EntityTarget(Arg(1)) && Arg(2) == "times"
+                return EntityTarget(Arg(1)) && (count == 3 && Arg(2) is "clear" or "reset" || count == 6 && Arg(2) == "times"
                     && tokens.Skip(index + 3).All(token => runtimeDataVersion >= TitleDurationDataVersion
-                        ? Duration(token.Text, 0) : Integer(token.Text, out _));
+                        ? Duration(token.Text, 0) : Integer(token.Text, out _)));
             case "kill":
                 return count == 2 && EntityTarget(Arg(1));
             case "function":
                 return count == 2 && ResourceOrTag(Arg(1));
             case "loot":
-                return count == 5 && Arg(1) == "give" && EntityTarget(Arg(2)) && Arg(3) == "loot" && ResourceLocation(Arg(4));
+                return LootControl(tokens, index);
             case "time":
                 return count == 3 && (Arg(1) is "set" or "add" && (runtimeDataVersion >= UnitTimeDataVersion ? Duration(Arg(2), 0)
                         : Integer(Arg(2), out var ticks) && ticks >= 0)
@@ -172,6 +218,82 @@ internal sealed partial class CommandTextReader
             default:
                 return false;
         }
+    }
+
+    private bool AttributeControl(int count, Func<int, string> arg)
+    {
+        if (runtimeDataVersion < AttributeDataVersion || !EntityTarget(arg(1)) || !ResourceLocation(arg(2))) return false;
+        var namespaced = runtimeDataVersion >= AttributeIdDataVersion;
+        bool Id(string value) => namespaced ? ResourceLocation(value) : Guid.TryParseExact(value, "D", out _);
+        bool Operation(string value) => runtimeDataVersion >= AttributeOperationDataVersion
+            ? value is "add_value" or "add_multiplied_base" or "add_multiplied_total"
+            : value is "add" or "multiply" or "multiply_base";
+        bool Number(int offset) => Decimal(arg(offset), out _);
+        bool Get(int length) => count == length || count == length + 1 && Number(length);
+        return arg(3) switch
+        {
+            "get" => Get(4),
+            "base" => arg(4) == "get" && Get(5) || count == 6 && arg(4) == "set" && Number(5),
+            "modifier" => arg(4) switch
+            {
+                "add" => Id(arg(5)) && (namespaced
+                    ? count == 8 && Number(6) && Operation(arg(7))
+                    : count == 9 && CommandString(arg(6)) && Number(7) && Operation(arg(8))),
+                "remove" => count == 6 && Id(arg(5)),
+                "value" => arg(5) == "get" && Id(arg(6)) && Get(7),
+                _ => false
+            },
+            _ => false
+        };
+    }
+
+    private bool LootControl(List<CommandToken> tokens, int index)
+    {
+        if (runtimeDataVersion < LootDataVersion) return false;
+        string Arg(int offset) => offset < tokens.Count ? tokens[offset].Text : "";
+        bool BlockAt(int offset) => BlockCoordinates(Arg(offset), Arg(offset + 1), Arg(offset + 2));
+        var source = Arg(index + 1) switch
+        {
+            "give" when EntityTarget(Arg(index + 2)) => index + 3,
+            "insert" when BlockAt(index + 2) => index + 5,
+            "spawn" when Coordinates(Arg(index + 2), Arg(index + 3), Arg(index + 4)) => index + 5,
+            "replace" => ItemTargetEnd(tokens, index + 2),
+            _ => -1
+        };
+        if (source < 0) return false;
+        if (Arg(index + 1) == "replace")
+        {
+            if (!SingleItemSlot(Arg(source++))) return false;
+            if (Integer(Arg(source), out var items))
+            {
+                if (items < 0) return false;
+                source++;
+            }
+        }
+        var position = source + (Arg(source) == "fish" ? 2 : 1);
+        return Arg(source) switch
+        {
+            "loot" => tokens.Count == source + 2 && ResourceLocation(Arg(source + 1)),
+            "kill" => tokens.Count == source + 2 && EntityTarget(Arg(source + 1)),
+            "fish" or "mine" => (Arg(source) == "mine" || ResourceLocation(Arg(source + 1))) && BlockAt(position)
+                && (tokens.Count == position + 3 || tokens.Count == position + 4
+                    && (Arg(position + 3) is "mainhand" or "offhand" || StaticItemOperand(Arg(position + 3)))),
+            _ => false
+        };
+    }
+
+    private bool CommandString(string text) => text.Length != 0
+        && (text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '_' or '-' or '+')
+            || text[0] is '\'' or '"' && Snbt.ParseDocument(Utf8.GetBytes(text), MinecraftProfiles.SnbtGrammar(profile), limits).Root.Value
+                is LogicalMinecraftLeaf { Value: NbtString });
+
+    private bool StaticItemOperand(string text, bool allowTag = false)
+    {
+        var separator = text.IndexOf('{');
+        var id = separator < 0 ? text : text[..separator];
+        if (!(allowTag ? ResourceOrTag(id) : ResourceLocation(id))) return false;
+        return separator < 0 || profile.Features[ProfileFacet.ItemSchema].Schema == "java-item-tags-1.20.4"
+            && StaticNbtMatch.ItemTag(Snbt.ParseCommandTag(Utf8.GetBytes(text[separator..]), MinecraftProfiles.SnbtGrammar(profile), limits).Root);
     }
 
     private int BlockOrItemCondition(List<CommandToken> tokens, int cursor)

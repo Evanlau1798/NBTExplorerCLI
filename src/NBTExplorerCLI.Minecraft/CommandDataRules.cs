@@ -15,7 +15,8 @@ internal sealed partial class CommandTextReader
         var storageElement = storageAccess is not null || storageDisplayLists is { Count: > 0 } ? StorageDisplayWrite(tokens, index) : null;
         var storageValue = storageElement is null ? null : Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
         var staticListWrite = storageValue is not null && StaticDataWrite(tokens, index, storageValue, keepEmptyListReset: true);
-        if (storageAccess is not null) ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue);
+        if (storageAccess is not null || opaqueEquipment is not null)
+            ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue);
         if (staticListWrite || ReadStorageDisplayWrite(tokens, index, path, storageElement)) return;
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;
@@ -51,6 +52,8 @@ internal sealed partial class CommandTextReader
             {
                 Structured(tokens[index + 4].Start, tokens[index + 4].Start + tokens[index + 4].Text.Length, At(path, "data.entity.nbt"), identity, false); return;
             }
+            var metadata = Snbt.ParseDocument(Utf8.GetBytes(tokens[index + 4].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+            if (StaticNbtMatch.Entity(metadata)) return;
         }
         Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownDataTextSchema");
     }
@@ -125,7 +128,7 @@ internal sealed partial class CommandTextReader
             if (operation == "merge" || sourcePath < 0 || tokens.Count != sourcePath + 1) return false;
             var sourceType = tokens[value + 1].Text;
             var source = tokens[sourcePath].Text;
-            return sourceType == "entity" && NumericEntitySource(source) || StaticItemSource(sourceType, source)
+            return sourceType == "entity" && NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[value + 2].Start)) || StaticItemSource(sourceType, source)
                 || sourceType == "block" && tokens[index + 2].Text == "storage"
                 && runtimeDataVersion >= StorageDataVersion && SignTextSource(source);
         }
@@ -133,11 +136,14 @@ internal sealed partial class CommandTextReader
         valueNode ??= Snbt.ParseDocument(Utf8.GetBytes(tokens[value + 1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
         if (keepEmptyListReset && operation == "set" && valueNode.Value is LogicalMinecraftList { Items.IsEmpty: true }) return false;
         return !valueNode.ContainsStringValues && (operation != "merge" || valueNode.Value is LogicalMinecraftCompound)
-            || StaticItemTagPayload(tokens[path].Text, valueNode, operation);
+            || StaticItemTagPayload(tokens[path].Text, valueNode, operation)
+            || operation == "set" && tokens[index + 2].Text == "entity" && tokens[path].Text == "Item" && StaticNbtMatch.ItemStack(valueNode);
     }
-    private static bool NumericEntitySource(string path)
+    private static bool NumericEntitySource(string path, string? entityType = null)
     {
-        if (path is "Health" or "UUID") return true;
+        if (path is "Health" or "UUID" or "Fire" or "Air" or "FallDistance" or "PortalCooldown"
+            or "Invulnerable" or "Silent" or "NoGravity" or "Glowing" or "OnGround") return true;
+        if (path == "damage" && entityType is "minecraft:arrow" or "minecraft:spectral_arrow" or "minecraft:trident") return true;
         var start = path.IndexOf('[');
         if ((start < 0 ? path : path[..start]) is not ("Pos" or "Motion" or "Rotation")) return false;
         return start < 0 || path[^1] == ']' && (start + 2 == path.Length || Integer(path[(start + 1)..^1], out _));
@@ -146,7 +152,7 @@ internal sealed partial class CommandTextReader
     {
         var bracket = path.IndexOf('[');
         var field = bracket < 0 ? path : path[..bracket];
-        if (target == "entity" && path == "SelectedItem") return true;
+        if (target == "entity" && path is "Item" or "SelectedItem") return true;
         if (!(target == "entity" && field is "Inventory" or "EnderItems" or "ArmorItems" or "HandItems"
             || target == "block" && field == "Items")) return false;
         if (bracket < 0) return true;
@@ -185,24 +191,43 @@ internal sealed partial class CommandTextReader
     }
     private static bool PlainDataPath(string path)
     {
-        foreach (var segment in path.Split('.'))
+        var offset = 0;
+        while (offset < path.Length)
         {
-            var bracket = segment.IndexOf('[');
-            if (!PlainControlToken(bracket < 0 ? segment : segment[..bracket])) return false;
-            while (bracket >= 0 && bracket < segment.Length)
+            if (path[offset] is '\'' or '"')
             {
-                if (segment[bracket] != '[') return false;
-                var close = segment.IndexOf(']', bracket + 1);
-                if (close < 0 || close > bracket + 1 && !Integer(segment[(bracket + 1)..close], out _)) return false;
-                bracket = close + 1;
+                var quote = path[offset++];
+                while (offset < path.Length && path[offset] != quote)
+                {
+                    if (path[offset++] != '\\') continue;
+                    if (offset == path.Length || path[offset] != quote && path[offset] != '\\') return false;
+                    offset++;
+                }
+                if (offset == path.Length) return false;
+                offset++;
             }
+            else
+            {
+                var start = offset;
+                while (offset < path.Length && path[offset] is not ('.' or '[')) offset++;
+                if (!PlainControlToken(path[start..offset])) return false;
+            }
+            while (offset < path.Length && path[offset] == '[')
+            {
+                var close = path.IndexOf(']', offset + 1);
+                if (close < 0 || close > offset + 1 && !Integer(path[(offset + 1)..close], out _)) return false;
+                offset = close + 1;
+            }
+            if (offset == path.Length) return true;
+            if (path[offset++] != '.') return false;
         }
-        return true;
+        return false;
     }
     private bool StaticDataPath(string path, bool storage)
     {
+        if (PlainDataPath(path)) return true;
         var start = path.IndexOf('{');
-        if (start < 0) return PlainDataPath(path);
+        if (start < 0) return false;
         if (start == 0)
             return CompoundEnd(path, 0) == path.Length
                 && !Snbt.ParseDocument(Utf8.GetBytes(path), MinecraftProfiles.SnbtGrammar(profile), limits).Root.ContainsStringValues;
