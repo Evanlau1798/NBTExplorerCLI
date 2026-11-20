@@ -11,13 +11,13 @@ internal sealed partial class CommandTextReader
     private const int DisplayEntityDataVersion = 3326;
     private const int VanillaArmorTrimDataVersion = 3442;
 
-    private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
+    private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end, bool resultObserved)
     {
-        var storageElement = storageAccess is not null || storageDisplayLists is { Count: > 0 } ? StorageDisplayWrite(tokens, index) : null;
+        var storageElement = !resultObserved && (storageAccess is not null || storageDisplayLists is { Count: > 0 }) ? StorageDisplayWrite(tokens, index) : null;
         var storageValue = storageElement is null ? null : Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
         var staticListWrite = storageValue is not null && StaticDataWrite(tokens, index, storageValue, keepEmptyListReset: true);
         if (storageAccess is not null || opaqueEquipment is not null)
-            ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue);
+            ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue, resultObserved);
         if (staticListWrite || ReadStorageDisplayWrite(tokens, index, path, storageElement)) return;
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;

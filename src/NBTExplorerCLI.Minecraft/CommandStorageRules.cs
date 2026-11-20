@@ -5,25 +5,31 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
-    private Action<SourceAddress>? StoredComponentCallback(TypedPath grammarPath, int start, int end)
+    private Action<SourceAddress>? StoredComponentCallback(TypedPath grammarPath, int start, int end, Dictionary<SnbtSpan, HashSet<TypedPath>>? bookPages = null)
     {
         var original = ComponentCallback(grammarPath, start, true);
-        if (storageAccess is null || profile.Features[ProfileFacet.TextSchema].Schema != "java-text-json") return original;
+        if ((storageAccess is null && bookPages is null) || profile.Features[ProfileFacet.TextSchema].Schema != "java-text-json") return original;
         var bytes = Utf8.GetBytes(source.Command[start..end]);
         var grammar = MinecraftProfiles.SnbtGrammar(profile);
         var visited = new HashSet<long>();
         return address =>
         {
             original?.Invoke(address);
+            var bookPage = bookPages is not null && address.SemanticRole == "book.page";
+            if (!bookPage && storageAccess is null) return;
             if (address.ComponentPath is null || address.Syntax is not { } syntax || !visited.Add(syntax.StartByte)) return;
             var parsed = Snbt.ParseFragment(bytes, checked((int)syntax.StartByte), grammar, limits);
             if (parsed.Root.Span.LengthBytes != syntax.LengthBytes || parsed.Root.Value is not LogicalMinecraftLeaf { Value: NbtString json }) return;
             var path = new TypedPath(grammarPath.Segments.Concat(syntax.NodePath!.Segments));
-            ComponentReferences(NativeJsonStrings.EncodeJavaDocument(json.Value, limits), start, end, path, false, parsed.Root.Span, observeStorageOnly: true);
+            if (bookPage && !json.Value.Contains("nbt", StringComparison.Ordinal) && !json.Value.Contains("\\u", StringComparison.Ordinal)) return;
+            var storageNodes = bookPage ? new HashSet<TypedPath>() : null;
+            ComponentReferences(NativeJsonStrings.EncodeJavaDocument(json.Value, limits), start, end, path, false, parsed.Root.Span,
+                observeStorageOnly: !bookPage, storageNodes: storageNodes);
+            if (storageNodes is { Count: > 0 }) bookPages!.Add(parsed.Root.Span, storageNodes);
         };
     }
 
-    private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, int end, (string Storage, string Path)? storageElement, SnbtNode? storageValue)
+    private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, int end, (string Storage, string Path)? storageElement, SnbtNode? storageValue, bool resultObserved)
     {
         if (storageElement is { } list)
         {
@@ -44,7 +50,10 @@ internal sealed partial class CommandTextReader
             if (tokens.Count <= pathIndex + 1 || tokens.Count == pathIndex + 2 && Decimal(tokens[pathIndex + 1].Text, out _))
             {
                 ObserveUnprovenEquipment(tokens, target, pathIndex);
-                ObserveStorageOperand(tokens, target, path, pathIndex);
+                var use = runtimeDataVersion >= StorageDataVersion && source.Address.SemanticRole == "command.function"
+                    && tokens.Count == pathIndex + 1 && tokens[pathIndex].Text.Split('.').All(PlainControlToken)
+                    ? CommandStorageUse.ListCardinality : CommandStorageUse.Other;
+                ObserveStorageOperand(tokens, target, path, pathIndex, use);
             }
             return;
         }
@@ -53,7 +62,8 @@ internal sealed partial class CommandTextReader
             if (tokens.Count == pathIndex + 1)
             {
                 ObserveUnprovenEquipment(tokens, target, action == "remove" ? pathIndex : tokens.Count);
-                ObserveStorageOperand(tokens, target, path, action == "remove" ? pathIndex : null);
+                if (action != "remove" || runtimeDataVersion < StorageDataVersion || PositionalListPath(tokens[pathIndex].Text) is null)
+                    ObserveStorageOperand(tokens, target, path, action == "remove" ? pathIndex : null);
             }
             return;
         }
@@ -73,7 +83,7 @@ internal sealed partial class CommandTextReader
             if (sourceEnd < 0 || tokens.Count > sourceEnd + (mode == "from" ? 1 : 3)) return;
             for (var offset = sourceEnd + 1; offset < tokens.Count; offset++)
                 if (!Integer(tokens[offset].Text, out _)) return;
-            if (mode == "from" && storageAccess is not null && (ObserveEquipmentCopy(tokens, index, path, end, pathIndex, sourceEnd, operation)
+            if (mode == "from" && !resultObserved && storageAccess is not null && (ObserveEquipmentCopy(tokens, index, path, end, pathIndex, sourceEnd, operation)
                 || ObserveStorageListCopy(tokens, index, path, end, pathIndex, sourceEnd, operation))) return;
             ObserveUnprovenEquipment(tokens, target, pathIndex);
             ObserveUnprovenEquipment(tokens, sourceTarget, sourceEnd);
@@ -139,25 +149,31 @@ internal sealed partial class CommandTextReader
 
     private bool ObserveStorageListCopy(List<CommandToken> tokens, int index, TypedPath path, int end, int targetPath, int sourcePath, string operation)
     {
-        // Keep execute wrappers unresolved until their use of the mutation's result is known.
-        if (index != 0 || source.Address.SemanticRole != "command.function" || runtimeDataVersion < StorageDataVersion
+        if (source.Address.SemanticRole != "command.function" || runtimeDataVersion < StorageDataVersion
             || profile.Features[ProfileFacet.TextSchema].Schema != "java-text-json" || tokens.Count != sourcePath + 1
-            || tokens[2].Text != "storage" || tokens[sourcePath - 2].Text != "storage") return false;
+            || tokens[index + 2].Text != "storage" || tokens[sourcePath - 2].Text != "storage") return false;
         var fromPath = tokens[sourcePath].Text;
         if (operation != "set")
         {
-            if (operation is not ("append" or "prepend") || !fromPath.EndsWith("[]", StringComparison.Ordinal)) return false;
-            fromPath = fromPath[..^2];
+            if (operation is not ("append" or "prepend" or "insert") || PositionalListPath(fromPath) is not { } list) return false;
+            fromPath = list;
         }
         var toPath = tokens[targetPath].Text;
         if (!fromPath.Split('.').All(PlainControlToken) || !toPath.Split('.').All(PlainControlToken)) return false;
         var from = (MinecraftIdentifier.DefaultNamespace(tokens[sourcePath - 1].Text), fromPath);
-        var to = (MinecraftIdentifier.DefaultNamespace(tokens[3].Text), toPath);
+        var to = (MinecraftIdentifier.DefaultNamespace(tokens[index + 3].Text), toPath);
         if (from == to) return false;
-        var address = Address(path, tokens[0].Start, end - tokens[0].Start, source.Address.SemanticRole);
+        var address = Address(path, tokens[index].Start, end - tokens[index].Start, source.Address.SemanticRole);
         Charge(address, from.Item1 + fromPath + to.Item1 + toPath);
         storageAccess!.Invoke(new(to.Item1, toPath, CommandStorageUse.ListCopy, address) { CopySource = from, ReplacesList = operation == "set" });
         return true;
+    }
+
+    private static string? PositionalListPath(string path)
+    {
+        var bracket = path.IndexOf('[');
+        return bracket > 0 && path.EndsWith(']') && (bracket + 2 == path.Length || Integer(path[(bracket + 1)..^1], out _))
+            && path[..bracket].Split('.').All(PlainControlToken) ? path[..bracket] : null;
     }
 
     private static (string Storage, string Path)? StorageDisplayWrite(List<CommandToken> tokens, int index)

@@ -75,6 +75,16 @@ public static class WorldLayoutLocator
         return new(artifact, WorldSourceRole.Unknown);
     }
 
+    public static string? FunctionId(WorldSourceLocation location)
+    {
+        var entry = location.Artifact.ContainerEntry ?? (location.PackRoot is { } root ? Under(location.Artifact.RelativePath, root) : null);
+        if (entry is null || !entry.EndsWith(".mcfunction", StringComparison.Ordinal)) return null;
+        var segments = entry[..^".mcfunction".Length].Split('/', 4);
+        if (segments.Length != 4 || segments[0] != "data" || segments[2] is not ("function" or "functions")) return null;
+        var id = segments[1] + ":" + segments[3];
+        return MinecraftIdentifier.ResourceLocation(id) ? id : null;
+    }
+
     public static string? CommandStorageNamespace(CapabilityProfile layout, string relativePath, bool ignoreCase = false)
     {
         var namespaced = layout.Features[ProfileFacet.Layout].Schema == "java-dimensions-namespaced";

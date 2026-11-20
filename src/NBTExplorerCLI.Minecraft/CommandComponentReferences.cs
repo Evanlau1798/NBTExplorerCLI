@@ -7,7 +7,8 @@ namespace NBTExplorerCLI.Minecraft;
 
 internal sealed partial class CommandTextReader
 {
-    private void ComponentReferences(byte[] bytes, int start, int end, TypedPath grammarPath, bool snbt, SnbtSpan? enclosingString = null, bool itemTree = false, bool commandTag = false, bool observeStorageOnly = false)
+    private void ComponentReferences(byte[] bytes, int start, int end, TypedPath grammarPath, bool snbt, SnbtSpan? enclosingString = null, bool itemTree = false,
+        bool commandTag = false, bool observeStorageOnly = false, IReadOnlyDictionary<SnbtSpan, HashSet<TypedPath>>? bookPages = null, ISet<TypedPath>? storageNodes = null)
     {
         if (snbt)
         {
@@ -15,7 +16,7 @@ internal sealed partial class CommandTextReader
             var parsed = commandTag ? Snbt.ParseCommandTag(bytes, grammar, limits) : Snbt.ParseDocument(bytes, grammar, limits);
             if (itemTree)
             {
-                if (PotentialReferences(parsed.Root.Value)) Unknown(grammarPath, start, end - start, "UnresolvedItemComponentReferences");
+                if (PotentialReferences(parsed.Root, bookPages)) Unknown(grammarPath, start, end - start, "UnresolvedItemComponentReferences");
                 return;
             }
             VisitNbt(parsed.Root.Value, TypedPath.Root);
@@ -59,21 +60,23 @@ internal sealed partial class CommandTextReader
         else
         {
             using var document = BoundedJson.ReadDecoded(bytes, limits);
-            var spans = observeStorageOnly ? null : NativeJsonStringSpans.Read(bytes, limits);
+            var spans = observeStorageOnly || storageNodes is not null ? null : NativeJsonStringSpans.Read(bytes, limits);
             VisitJson(document.RootElement, TypedPath.Root);
             void VisitJson(JsonElement value, TypedPath path)
             {
                 if (value.ValueKind == JsonValueKind.Array) { var index = 0; foreach (var child in value.EnumerateArray()) VisitJson(child, At(path, index++)); return; }
                 if (value.ValueKind != JsonValueKind.Object) return;
-                if (!observeStorageOnly && value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
-                    Selector(NativeJsonStrings.Read(selector), At(path, "selector"), spans![At(path, "selector")]);
-                if (storageAccess is not null && value.TryGetNativeProperty("nbt", out var nbtPath) && nbtPath.ValueKind == JsonValueKind.String
+                if (spans is not null && value.TryGetNativeProperty("selector", out var selector) && selector.ValueKind == JsonValueKind.String)
+                    Selector(NativeJsonStrings.Read(selector), At(path, "selector"), spans[At(path, "selector")]);
+                if ((storageAccess is not null || storageNodes is not null) && value.TryGetNativeProperty("nbt", out var nbtPath) && nbtPath.ValueKind == JsonValueKind.String
                     && value.TryGetNativeProperty("storage", out var storage) && storage.ValueKind == JsonValueKind.String)
                 {
                     var interpreted = value.TryGetNativeProperty("interpret", out var flag) && flag.ValueKind == JsonValueKind.True
                         && !OtherComponentContent(field => value.TryGetNativeProperty(field, out _));
                     var unknownClick = value.TryGetNativeProperty("clickEvent", out var clickData) && ComponentReferenceRules.Click(clickData, null, limits) is null;
-                    ReportStorage(NativeJsonStrings.Read(storage), NativeJsonStrings.Read(nbtPath), interpreted, path, unknownClick);
+                    var id = NativeJsonStrings.Read(storage);
+                    if (storageNodes is not null && MinecraftIdentifier.ResourceLocation(id)) storageNodes.Add(path);
+                    ReportStorage(id, NativeJsonStrings.Read(nbtPath), interpreted, path, unknownClick);
                 }
                 if (!observeStorageOnly && (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.HasFixedScoreHolder(score)
                     || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null))
@@ -105,37 +108,40 @@ internal sealed partial class CommandTextReader
         => hasField("text") || hasField("translate") || hasField("selector") || hasField("score") || hasField("keybind")
             || hasField("entity") || hasField("block");
 
-    private bool PotentialReferences(LogicalMinecraftValue value)
+    private bool PotentialReferences(SnbtNode node, IReadOnlyDictionary<SnbtSpan, HashSet<TypedPath>>? bookPages)
     {
-        if (value is LogicalMinecraftList list) return list.Items.Any(PotentialReferences);
-        if (value is LogicalMinecraftCompound compound)
-            return compound.Entries.Any(entry => entry.Name switch
+        if (node.Value is LogicalMinecraftList) return node.Children.Any(child => PotentialReferences(child.Node, bookPages));
+        if (node.Value is LogicalMinecraftCompound)
+            return node.Children.Any(child => child.Selector.Key switch
             {
                 "selector" or "nbt" => true,
-                "score" => !ComponentReferenceRules.HasFixedScoreHolder(entry.Value),
-                "click_event" => ComponentReferenceRules.Click(entry.Value, MinecraftProfiles.SnbtGrammar(profile), limits) is null,
-                "clickEvent" => ComponentReferenceRules.Click(entry.Value, null, limits) is null,
+                "score" => !ComponentReferenceRules.HasFixedScoreHolder(child.Node.Value),
+                "click_event" => ComponentReferenceRules.Click(child.Node.Value, MinecraftProfiles.SnbtGrammar(profile), limits) is null,
+                "clickEvent" => ComponentReferenceRules.Click(child.Node.Value, null, limits) is null,
                 "minecraft:custom_data" or "custom_data" or "title" or "filtered_title" or "author" or "generation" or "resolved" or "id" or "count" or "Count" or "slot" or "Slot" => false,
-                _ => PotentialReferences(entry.Value)
+                _ => PotentialReferences(child.Node, bookPages)
             });
-        if (value is LogicalMinecraftLeaf { Value: NbtString text } && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json")
+        if (node.Value is LogicalMinecraftLeaf { Value: NbtString text } && profile.Features[ProfileFacet.TextSchema].Schema == "java-text-json")
         {
             try
             {
                 using var document = BoundedJson.ReadDecoded(NativeJsonStrings.EncodeJavaDocument(text.Value, limits), limits);
-                return Contains(document.RootElement);
+                var handled = bookPages?.GetValueOrDefault(node.Span);
+                return Contains(document.RootElement, handled is null ? null : TypedPath.Root, handled);
             }
             catch (JsonException) { return false; }
         }
         return false;
-        bool Contains(JsonElement element)
-            => element.ValueKind == JsonValueKind.Array ? element.EnumerateArray().Any(Contains)
+        bool Contains(JsonElement element, TypedPath? path, HashSet<TypedPath>? handled)
+            => element.ValueKind == JsonValueKind.Array ? element.EnumerateArray().Select((child, index) => (child, index))
+                .Any(item => Contains(item.child, path is null ? null : At(path, item.index), handled))
                 : element.ValueKind == JsonValueKind.Object && element.EnumerateObject().Any(property => NativeJsonStrings.PropertyName(property) switch
                 {
-                    "selector" or "nbt" => true,
+                    "selector" => true,
+                    "nbt" => path is null || handled?.Contains(path) != true,
                     "score" => !ComponentReferenceRules.HasFixedScoreHolder(property.Value),
                     "clickEvent" => ComponentReferenceRules.Click(property.Value, null, limits) is null,
-                    _ => Contains(property.Value)
+                    var key => Contains(property.Value, path is null ? null : At(path, key), handled)
                 });
     }
 }

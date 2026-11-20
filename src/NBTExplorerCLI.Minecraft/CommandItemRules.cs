@@ -14,9 +14,13 @@ internal sealed partial class CommandTextReader
             var tag = value.IndexOf('{');
             if (tag < 0) return;
             var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, "item.tag", source.Address.Dimension, source.Address.Chunk);
-            var extracted = SnbtTextExtractor.ItemNbtTag(binding, value[tag..], profile, MinecraftIdentifier.DefaultNamespace(value[..tag]), limits, scope, StoredComponentCallback(path, token.Start + tag, token.Start + value.Length), commandTag: true);
+            var item = MinecraftIdentifier.DefaultNamespace(value[..tag]);
+            var bookPages = item == "minecraft:written_book" ? new Dictionary<SnbtSpan, HashSet<TypedPath>>() : null;
+            var extracted = SnbtTextExtractor.ItemNbtTag(binding, value[tag..], profile, item, limits, scope,
+                StoredComponentCallback(path, token.Start + tag, token.Start + value.Length, bookPages), commandTag: true);
             MergeComponent(extracted, path, token.Start + tag, token.Start + value.Length, true);
-            if (extracted.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(value[tag..]), token.Start + tag, token.Start + value.Length, path, true, itemTree: true, commandTag: true);
+            if (extracted.Diagnostics.IsEmpty) ComponentReferences(Utf8.GetBytes(value[tag..]), token.Start + tag, token.Start + value.Length, path, true, itemTree: true, commandTag: true,
+                bookPages: bookPages);
             return;
         }
         if (open < 0) return;

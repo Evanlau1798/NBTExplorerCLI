@@ -37,6 +37,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             || HasUnsafeSeedPath(extraction.Discovery))
             return StorageDisplayPolicy.Empty;
         var index = new WorldStorageUseIndex(extraction.Limits);
+        var functionResults = new StorageFunctionResults(index.Charge);
         var observed = new Dictionary<StorageCommandNode, CommandStorageAccess>();
         var copies = new Dictionary<SourceAddress, CommandStorageAccess>();
         var required = new HashSet<(string Storage, string Path)>();
@@ -46,6 +47,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         foreach (var row in extraction.ReadStorageObservations(access =>
         {
             index.Observe(access);
+            functionResults.ObserveMutation(access);
             if (covered && access.Use is CommandStorageUse.ListCopy or CommandStorageUse.EquipmentExport)
                 copies.TryAdd(access.Address, access);
             var use = access.Use == CommandStorageUse.ListReplacement ? CommandStorageUse.ListElementWrite : access.Use;
@@ -53,7 +55,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
                 && (use == CommandStorageUse.ListElementWrite
                     || use == CommandStorageUse.InterpretedDisplay && access.Path.EndsWith("[]", StringComparison.Ordinal)))
                 observed.TryAdd(new(use, access.Address.Artifact, access.Address.Chunk, access.Address.NodePath, syntax), access);
-        }, () => covered = false, () => index.opaqueEquipment = true))
+        }, () => covered = false, () => index.opaqueEquipment = true, functionResults.ObserveCall))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (row.Outcome is SourceOutcome.Failed or SourceOutcome.Cancelled) return StorageDisplayPolicy.Empty;
@@ -73,6 +75,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             observed.Clear();
             copies.Clear();
         }
+        if (!functionResults.BlockObservedMutations(extraction.Discovery, index.Block, cancellationToken)) covered = false;
         var compatible = index.ReadCompatibleLists(inventory, extraction).ToDictionary(candidate => candidate.List);
         var authorized = ClosedDisplayLists(compatible).ToHashSet();
         var equipment = index.uses.Values.SelectMany(storage => storage.Paths.Values).Where(list => list.EquipmentRoot is not null).ToArray();
@@ -168,6 +171,9 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         {
             case CommandStorageUse.Presence:
                 break;
+            case CommandStorageUse.ListCardinality when PlainPath(access.Path):
+                GetList(storage, access.Storage, access.Path);
+                break;
             case CommandStorageUse.InterpretedDisplay when access.Path.EndsWith("[]", StringComparison.Ordinal) && PlainPath(access.Path[..^2]):
                 GetList(storage, access.Storage, access.Path[..^2]).Display = true;
                 break;
@@ -203,11 +209,17 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
                 }
                 break;
             default:
-                var prefix = PlainAncestor(access.Path);
-                if (prefix.Length == 0) storage.Ambiguous = true;
-                else if (storage.OtherPaths.Add(prefix)) Charge(prefix.Length);
+                Block(access.Storage, access.Path);
                 break;
         }
+    }
+
+    private void Block(string id, string path)
+    {
+        var storage = GetStorage(id);
+        var prefix = PlainAncestor(path);
+        if (prefix.Length == 0) storage.Ambiguous = true;
+        else if (storage.OtherPaths.Add(prefix)) Charge(prefix.Length);
     }
 
     private void RecordEquipmentStep(ref SourceAddress? previous, SourceAddress address, ListUses list)

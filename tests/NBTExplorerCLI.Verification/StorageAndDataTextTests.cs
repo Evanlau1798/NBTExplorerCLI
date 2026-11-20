@@ -29,6 +29,7 @@ internal static class StorageAndDataTextTests
         new("text-storage-namespaced-trailing-dot", "discovery", _ => StorageCommandProofTests.NamespacedLogicalAliases(false)),
         new("text-storage-namespaced-trailing-dot-reader", "discovery", _ => StorageCommandProofTests.NamespacedLogicalAliases(true)),
         new("text-storage-world-evidence-budget", "discovery", _ => StorageCommandProofTests.WorldEvidenceBudget()),
+        new("text-storage-function-index-budget", "discovery", _ => StorageFunctionBudgetTests.CheckCatalogBudget()),
         new("prepare-world-storage-role-freshness", "preparation", _ => StorageCommandProofTests.PreparationRevalidatesStorageUses()),
         new("prepare-world-storage-alias-freshness", "preparation", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(false)),
         new("apply-storage-alias-forward-recovery", "apply", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(true)),
@@ -42,6 +43,7 @@ internal static class StorageAndDataTextTests
         new("command-copy-sign-text-source", "discovery", _ => CopySignTextSource()),
         new("command-storage-structural-metadata-filters", "discovery", _ => StorageMetadataFilters()),
         new("text-storage-component-list-copy-chain", "discovery", _ => ComponentListCopyChain()),
+        new("text-storage-written-book-pages", "discovery", _ => StorageBookTests.CheckKnownPages()),
         new("text-storage-native-item-lore-copy", "discovery", _ => NativeItemLoreCopy()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
@@ -123,6 +125,21 @@ internal static class StorageAndDataTextTests
             var snapshot = WorldQueryTests.Query(root, cache);
             Require(snapshot.Manifest.CoverageComplete && Slots(snapshot).SequenceEqual(new[] { "First", "Second" }),
                 "a complete typed copy chain retains the original producer's text, including across sibling paths");
+            var structural = new[]
+            {
+                "execute if data storage demo:messages interim[0] run data modify storage demo:messages lines append from storage demo:messages interim[0]",
+                "execute unless data storage demo:messages interim[] run data modify storage demo:messages stats.count set value 7",
+                "execute if data storage demo:messages interim[-1] run data remove storage demo:messages interim[-1]",
+                "execute store result score #size demo run data get storage demo:messages lines"
+            };
+            var failedStructure = new List<string>();
+            foreach (var control in structural.Append(string.Join('\n', structural)))
+            {
+                Put(root, copy, Encoding.UTF8.GetBytes(commands + "\n" + control));
+                snapshot = WorldQueryTests.Query(root, cache);
+                if (!snapshot.Manifest.CoverageComplete || !Slots(snapshot).SequenceEqual(new[] { "First", "Second" })) failedStructure.Add(control);
+            }
+            Require(failedStructure.Count == 0, "positional list operations and cardinality must preserve the display proof: " + string.Join(" | ", failedStructure));
             var blocked = new List<string>();
             foreach (var control in new[] { "execute if data storage demo:messages staged run data modify storage demo:messages stats.count set value 7",
                 "data get storage demo:messages stats.items[0]", "data get storage demo:messages stats.items[{Slot:0b}].Count",
@@ -149,6 +166,26 @@ internal static class StorageAndDataTextTests
             snapshot = WorldQueryTests.Query(root, cache);
             Require(!snapshot.Manifest.CoverageComplete && !Slots(snapshot).Any(),
                 "copying with an observed command result must remain unresolved");
+            foreach (var raw in new[] { "data get storage demo:messages lines 1", "data get storage demo:messages lines[]",
+                "execute store success score #saved demo run data modify storage demo:messages lines append value '{\"text\":\"Observed\"}'",
+                "execute store success score #saved demo run data modify storage demo:messages lines set value ['{\"text\":\"Observed\"}']",
+                "execute store success score #saved demo run execute if data storage demo:messages interim[0] run data modify storage demo:messages lines append from storage demo:messages interim[0]" })
+            {
+                Put(root, copy, Encoding.UTF8.GetBytes(commands + "\n" + raw));
+                snapshot = WorldQueryTests.Query(root, cache);
+                if (snapshot.Manifest.CoverageComplete || Slots(snapshot).Any()) blocked.Add(raw);
+            }
+            Put(root, folder + "relay.mcfunction", "function demo:copy"u8.ToArray());
+            Put(root, folder + "unrelated.mcfunction", "scoreboard players add #count demo 1"u8.ToArray());
+            Put(root, copy, Encoding.UTF8.GetBytes(commands));
+            foreach (var target in new[] { "demo:copy", "demo:relay", "demo:unrelated" })
+            {
+                Put(root, folder + "observe.mcfunction", Encoding.UTF8.GetBytes("execute store success score #saved demo run function " + target));
+                snapshot = WorldQueryTests.Query(root, cache);
+                var unrelated = target == "demo:unrelated";
+                if (snapshot.Manifest.CoverageComplete != unrelated || Slots(snapshot).Any() != unrelated) blocked.Add(target);
+            }
+            Require(blocked.Count == 0, "observed values or mutations must revoke only the affected display proof: " + string.Join(" | ", blocked));
         }
         finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
         static IEnumerable<string> Slots(WorldQuerySnapshot snapshot)
