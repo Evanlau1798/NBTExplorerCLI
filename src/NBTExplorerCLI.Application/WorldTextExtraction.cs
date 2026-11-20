@@ -126,10 +126,18 @@ public sealed partial class WorldTextExtraction
                 var document = ReadDat(bytes);
                 if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(document.Root)) opaqueEquipment();
                 var rules = StorageRules.GetValueOrDefault(source.Location.Artifact, []);
+                ImmutableHashSet<string>? retainedSeeds = null;
                 if (rules.IsEmpty && storageAccess is null && source.Location.Role == WorldSourceRole.SavedData && LayoutProfile is { } layout
                     && WorldLayoutLocator.CommandStorageNamespace(layout, source.Location.Artifact.RelativePath) is not null)
-                    rules = (previewStorage ?? StorageDisplays).SeedRules.GetValueOrDefault(source.Location.Artifact, []);
+                {
+                    var policy = previewStorage ?? StorageDisplays;
+                    rules = policy.SeedRules.GetValueOrDefault(source.Location.Artifact, []);
+                    retainedSeeds = policy.RetainedSeeds.GetValueOrDefault(source.Location.Artifact);
+                }
                 text = ReadNbtText(source, document, rules, storageAccess, opaqueStorage);
+                if (retainedSeeds is not null && !text.Unclassified.IsEmpty)
+                    text = text with { Unclassified = text.Unclassified.Where(candidate => WorldStorageUseIndex.SavedStorageLocalId(candidate.Address.NodePath) is not { } id
+                        || !retainedSeeds.Contains(id)).ToImmutableArray() };
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)

@@ -49,6 +49,7 @@ internal static class StorageAndDataTextTests
         new("prepare-storage-sign-native-command", "preparation", _ => StorageBlankProbeTests.ScopedSignRejectsObservedCopy(native: true)),
         new("prepare-world-storage-saved-list", "preparation", _ => StorageCommandProofTests.SavedDisplayList()),
         new("text-storage-native-seed-with-element-writes", "discovery", _ => StorageCommandProofTests.NativeSeedElementWrites()),
+        new("text-storage-unreferenced-seed-retention", "discovery", _ => StorageRetainedSeedTests.OnlyCompleteUseProofCanRetain()),
         new("text-storage-seed-runtime-component-schema", "discovery", _ => StorageCommandProofTests.NativeSeedRuntimeSchema()),
         new("command-copy-sign-text-source", "discovery", _ => CopySignTextSource()),
         new("command-storage-structural-metadata-filters", "discovery", _ => StorageMetadataFilters()),

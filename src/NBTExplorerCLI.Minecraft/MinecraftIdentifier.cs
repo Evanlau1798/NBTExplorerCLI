@@ -9,7 +9,7 @@ public static class MinecraftIdentifier
         return separator < 0 ? "minecraft:" + value : separator == 0 ? "minecraft" + value : value;
     }
 
-    internal static bool ResourceLocation(string text)
+    public static bool ResourceLocation(string text)
     {
         var separator = text.IndexOf(':');
         if (separator >= 0 && !text.AsSpan(0, separator).ToString().All(ResourceCharacter)) return false;

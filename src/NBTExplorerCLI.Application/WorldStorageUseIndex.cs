@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Text;
-using System.Text.Json;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Minecraft;
@@ -10,6 +9,8 @@ namespace NBTExplorerCLI.Application;
 internal sealed record StorageDisplayPolicy(ImmutableHashSet<(string Storage, string Path)> Lists, ImmutableDictionary<string, Hash256> SourceKeys,
     bool CanBindWrites, ImmutableHashSet<ExtractionDiagnostic> ResolvedDiagnostics, ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> SeedRules)
 {
+    internal ImmutableDictionary<ArtifactAddress, ImmutableHashSet<string>> RetainedSeeds { get; init; }
+        = ImmutableDictionary<ArtifactAddress, ImmutableHashSet<string>>.Empty;
     internal static StorageDisplayPolicy Empty { get; } = new([], ImmutableDictionary<string, Hash256>.Empty, false, [],
         ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>>.Empty);
     internal static bool Target(SourceAddress address) => TextSlot.IsInterpretedStorage(address);
@@ -30,7 +31,8 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
 
     internal static StorageDisplayPolicy Capture(WorldTextExtraction extraction, IWorldInventory inventory, CancellationToken cancellationToken)
     {
-        if (!CompleteScope(extraction.Discovery) || !extraction.Discovery.Sources.Any(source => source.MayUseCommandStorage)
+        if (!CompleteScope(extraction.Discovery) || !extraction.Discovery.Sources.Any(source => source.MayUseCommandStorage
+                || SavedStorageNamespace(extraction, source) is not null)
             || HasUnsafeSeedPath(extraction.Discovery))
             return StorageDisplayPolicy.Empty;
         var index = new WorldStorageUseIndex(extraction.Limits);
@@ -65,10 +67,10 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 var text = row.Text;
                 var artifact = row.Source.Location.Artifact;
                 if (row.DiagnosticCode == "UnclassifiedStorageText" && text is { Diagnostics.IsEmpty: true }
-                    && row.Source.Location.Role == WorldSourceRole.SavedData && artifact.Kind == ArtifactKind.Nbt
-                    && extraction.LayoutProfile is { } layout && WorldLayoutLocator.CommandStorageNamespace(layout, artifact.RelativePath) is not null)
+                    && SavedStorageNamespace(extraction, row.Source) is { } space)
                 {
                     if (pendingSeeds.Add(artifact.RelativePath)) index.Charge(artifact.RelativePath.Length);
+                    if (!extraction.StorageRules.ContainsKey(artifact)) index.RecordUnclassifiedSeed(artifact, space, text.Unclassified);
                 }
                 else covered = text is { Diagnostics.IsEmpty: false, Unclassified.IsEmpty: true }
                     && text.Diagnostics.All(diagnostic => index.MatchUse(diagnostic, observed, exact, required, resolvedDiagnostics));
@@ -90,7 +92,6 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
             authorized = ClosedDisplayLists(compatible).ToHashSet();
         }
         var lists = authorized.Select(list => (list.Storage, list.Path)).ToImmutableHashSet();
-        if (lists.IsEmpty && resolvedDiagnostics.Count == 0) return StorageDisplayPolicy.Empty;
         var seedRules = authorized.Select(list => compatible[list]).Where(candidate => candidate.Rule is not null)
             .GroupBy(candidate => candidate.Artifact!)
             .ToImmutableDictionary(group => group.Key, group => group.Select(candidate => candidate.Rule!).ToImmutableArray());
@@ -99,12 +100,12 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
             .ToImmutableDictionary(group => group.Key, group => Hash256.Compute(Encoding.UTF8.GetBytes(string.Join('\n', group
                 .OrderBy(item => item.List.Storage, StringComparer.Ordinal).ThenBy(item => item.List.Path, StringComparer.Ordinal)
                 .Select(item => item.List.Storage + "\0" + item.List.Path)))), StringComparer.Ordinal);
-        producers = producers.SetItems(seedRules.Select(pair => new KeyValuePair<string, Hash256>(pair.Key.RelativePath,
-            Hash256.Compute(Encoding.UTF8.GetBytes(string.Concat(pair.Value.Select(rule => SourceIdentity.Occurrence(
-                new SourceAddress(pair.Key, rule.Path, "policy.storage.interpreted")).Digest.Hex).Order(StringComparer.Ordinal)))))));
-        var preview = new StorageDisplayPolicy(lists, producers, false, [], seedRules);
+        var preview = new StorageDisplayPolicy(lists, WithSeedKeys(producers, seedRules), false, [], seedRules);
         if (!covered || !required.IsSubsetOf(lists)) return preview;
-        var policy = preview with { CanBindWrites = true, ResolvedDiagnostics = resolvedDiagnostics.ToImmutable() };
+        var retainedSeeds = index.RetainUnreferencedSeeds(seedRules);
+        if (lists.IsEmpty && resolvedDiagnostics.Count == 0 && retainedSeeds.IsEmpty) return StorageDisplayPolicy.Empty;
+        producers = WithSeedKeys(producers, seedRules, retainedSeeds);
+        var policy = preview with { CanBindWrites = true, ResolvedDiagnostics = resolvedDiagnostics.ToImmutable(), RetainedSeeds = retainedSeeds };
         var consumerKeys = policy.ResolvedDiagnostics.Select(diagnostic => diagnostic.Address).GroupBy(address => address.Artifact.RelativePath, StringComparer.Ordinal)
             .Select(group => new KeyValuePair<string, Hash256>(group.Key, Hash256.Compute(Encoding.UTF8.GetBytes(
                 (producers.GetValueOrDefault(group.Key)?.Hex ?? "") + string.Concat(group.Select(address => SourceIdentity.Occurrence(address).Digest.Hex).Order(StringComparer.Ordinal))))));
@@ -287,99 +288,10 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         return storage.Paths[path] = new(id, path);
     }
 
-    private IEnumerable<ListCandidate> ReadCompatibleLists(IWorldInventory inventory, WorldTextExtraction extraction)
-    {
-        var discovery = extraction.Discovery;
-        if (!CompleteScope(discovery) || discovery.Metadata is not { } metadata) yield break;
-        // Windows folds trailing dots in namespace directories, making even a separately named reader ambiguous.
-        if (NamespacedData(metadata.Profile) && uses.Keys.Any(storage => storage[..storage.IndexOf(':')].EndsWith('.'))) yield break;
-        var saved = new Dictionary<string, DiscoveredSource>(StringComparer.Ordinal);
-        foreach (var source in discovery.Sources)
-            if (source.Location is { Role: WorldSourceRole.SavedData, Artifact: { Kind: ArtifactKind.Nbt, ContainerEntry: null } artifact }
-                && source.Chunk is null && WorldLayoutLocator.CommandStorageNamespace(metadata.Profile, artifact.RelativePath) is { } space)
-                saved.Add(space, source);
-        var matching = uses.Where(pair => !pair.Value.Ambiguous
-            && pair.Value.Paths.Values.Any(path => path.Display || path.Copies));
-        foreach (var group in matching.GroupBy(pair => pair.Key[..pair.Key.IndexOf(':')], StringComparer.Ordinal))
-        {
-            NbtDocument? document = null;
-            if (saved.TryGetValue(group.Key, out var source))
-            {
-                if (source.Outcome != SourceOutcome.Success) continue;
-                var bytes = inventory.Read(source.Location.Artifact);
-                if (Hash256.Compute(bytes) != source.ContentHash) throw new ArtifactConflictException("Saved storage changed during analysis");
-                document = WorldArtifactEdits.ReadNbt(bytes, limits).Document;
-            }
-            var found = new List<ListCandidate>();
-            foreach (var (id, storage) in group)
-            {
-                var localId = id[(group.Key.Length + 1)..];
-                var rawPaths = storage.OtherPaths.Order(StringComparer.Ordinal).ToArray();
-                var listPaths = storage.Paths.Keys.Order(StringComparer.Ordinal).ToArray();
-                var equipmentRoots = storage.EquipmentRoots.Order(StringComparer.Ordinal).ToArray();
-                foreach (var (path, list) in storage.Paths)
-                {
-                    if ((!list.Display && !list.Copies) || list.GlyphLiterals is { } glyphs && !glyphs.All(CanPreserveGlyphs) || storage.OtherPaths.Contains(path)
-                        || RelatedPath(path, storage.OtherPaths, rawPaths) || RelatedPath(path, storage.Paths.Keys, listPaths)) continue;
-                    if (list.EquipmentRoot is { } equipment)
-                    {
-                        if (opaqueEquipment || !OrderedEquipmentSteps(list) || RelatedPath(equipment, storage.EquipmentRoots, equipmentRoots)) continue;
-                    }
-                    else if (storage.EquipmentRoots.Contains(path) || RelatedPath(path, storage.EquipmentRoots, equipmentRoots)) continue;
-                    var node = SeedPath(localId, path);
-                    var seed = document is null ? null : NbtLocator.Resolve(document.Root, node);
-                    if (list.RequiresScalar)
-                    {
-                        if (!list.RequiresList && seed is null or { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }) yield return new(list);
-                        continue;
-                    }
-                    var type = seed?.Value is NbtList existing ? existing.ElementType : NbtType.End;
-                    if (!CompatibleWriters(metadata.Profile, list, type)) continue;
-                    if (seed is null or { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }
-                        or { Status: ResolutionStatus.Found, Value: NbtList { Items.IsEmpty: true } })
-                    {
-                        yield return new(list);
-                    }
-                    else if (seed is { Status: ResolutionStatus.Found, Value: NbtList existingList } && source is not null
-                        && !extraction.StorageRules.ContainsKey(source.Location.Artifact) && CanInterpretSeed(source, document!, node, existingList, metadata.Profile))
-                    {
-                        Charge(localId.Length + path.Length);
-                        found.Add(new(list, source.Location.Artifact, new(node, StorageTextKind.InterpretedList)));
-                    }
-                }
-            }
-            if (found.Count <= 256)
-                foreach (var list in found) yield return list;
-        }
-    }
-
-    private static bool OrderedEquipmentSteps(ListUses list) => !list.RepeatedEquipmentStep
-        && list.EquipmentImport is { Syntax.StartByte: var import } source
-        && list.LoreReplacement is { Syntax.StartByte: var replace } rewrite
-        && list.EquipmentExport is { Syntax.StartByte: var export } destination
-        && source.Artifact == rewrite.Artifact && source.Artifact == destination.Artifact && import < replace && replace < export;
-
-    internal static bool HasUnsafeSeedPath(WorldDiscoveryResult discovery)
-    {
-        if (discovery.Metadata is not { } metadata) return false;
-        bool SeedPath(string path) => WorldLayoutLocator.CommandStorageNamespace(metadata.Profile, path, ignoreCase: true) is not null;
-        var namespaced = NamespacedData(metadata.Profile);
-        // A canonical lookup can load a differently cased file on Windows even if semantic discovery ignored it.
-        return discovery.Inventory.Entries.Any(entry => SeedPath(entry.RelativePath)
-                && (entry.IsDirectory || WorldLayoutLocator.CommandStorageNamespace(metadata.Profile, entry.RelativePath) is not { } space
-                    || namespaced && space.EndsWith('.')))
-            || discovery.Inventory.DirectoryPaths.Any(SeedPath);
-    }
-
-    private static bool NamespacedData(CapabilityProfile profile) => profile.Features[ProfileFacet.Layout].Schema == "java-dimensions-namespaced";
-
     private static bool CompleteScope(WorldDiscoveryResult discovery)
         => discovery.Complete && discovery.Scope is { Dimensions.IsEmpty: true, Regions.IsEmpty: true, Types.IsEmpty: true, ArtifactPaths.IsEmpty: true };
 
     private static string DisplayPath(string path) => path.EndsWith("[]", StringComparison.Ordinal) ? path[..^2] : path;
-
-    private static TypedPath SeedPath(string id, string path)
-        => new(new[] { "data", "contents", id }.Concat(path.Split('.')).Select(PathSegment.ForKey));
 
     private static bool PlainPath(string path) => path.Length != 0 && PlainAncestor(path) == path;
 
@@ -443,47 +355,6 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 || !connected.Any(list => list.Producers.Count != 0 || compatible[list].Rule is not null)) continue;
             foreach (var list in connected) yield return list;
         }
-    }
-
-    private bool CanInterpretSeed(DiscoveredSource source, NbtDocument document, TypedPath path, NbtList list, CapabilityProfile runtime)
-    {
-        try
-        {
-            var profile = NbtTextExtractor.Profile(source.Location, document, runtime);
-            var encoding = profile.Features[ProfileFacet.TextSchema];
-            if (runtime.Features[ProfileFacet.TextSchema] != encoding || runtime.Lists != profile.Lists) return false;
-            var modern = encoding.Schema == "java-text-nbt";
-            for (var index = 0; index < list.Items.Length; index++)
-            {
-                var item = list.Items[index];
-                var node = new TypedPath(path.Segments.Add(PathSegment.ForIndex(index)));
-                if (modern && profile.Lists.Encoding == LogicalListEncoding.CompoundWrapper && profile.Lists.WrapperKey == ""
-                    && item is NbtCompound { Entries.Length: 1 } wrapper && wrapper.Entries[0].Name == "")
-                {
-                    item = wrapper.Entries[0].Value;
-                    node = new(node.Segments.Add(PathSegment.ForKey("")));
-                }
-                var address = new SourceAddress(source.Location.Artifact, node, "command_storage.component.interpreted", source.Location.Dimension);
-                if (!modern && item is not NbtString) return false;
-                if (modern ? HasUnprovenNativeFont(item)
-                    : TextComponentExtractor.StorageJsonGlyphs(address, ((NbtString)item).Value, profile, limits) is not { } glyphs
-                        || !glyphs.Values.All(CanPreserveGlyphs)) return false;
-                var references = modern ? NativeComponentReferences.Nbt(address, item, runtime, limits)
-                    : NativeComponentReferences.EmbeddedJson(address, ((NbtString)item).Value, profile, limits);
-                if (!references.Selectors.IsEmpty || !references.Diagnostics.IsEmpty) return false;
-                var text = modern ? TextComponentExtractor.Nbt(address, item, profile, limits)
-                    : TextComponentExtractor.EmbeddedJsonString(address, ((NbtString)item).Value, profile, limits);
-                if (!text.Diagnostics.IsEmpty || text.Occurrences.Any(occurrence => occurrence.Address.SemanticRole == ClickCommandText.Role)) return false;
-                if (modern && profile != runtime)
-                {
-                    var live = TextComponentExtractor.Nbt(address, item, runtime, limits);
-                    if (!live.Occurrences.SequenceEqual(text.Occurrences) || !live.TranslationKeys.SequenceEqual(text.TranslationKeys)) return false;
-                }
-            }
-            return true;
-        }
-        catch (JsonException) { return false; }
-        catch (CodecException error) when (error.Code != CodecError.LimitExceeded) { return false; }
     }
 
     private void Charge(int characters)
