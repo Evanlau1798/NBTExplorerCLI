@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
 using static NBTExplorerCLI.Minecraft.TextExtractionCollector;
@@ -99,7 +100,15 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
             var lenient = profile == MinecraftProfiles.Java181 || earlyAnvil && classicEncoded;
             var input = lenient ? ClassicTextJson.Normalize(json.Value, limits, storedComponent: true) : json.Value;
             if (lenient && input == "null") return;
-            output.Merge(TextComponentExtractor.EmbeddedJsonString(source, input, jsonProfile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent));
+            var result = TextComponentExtractor.EmbeddedJsonString(source, input, jsonProfile, limits, output.Scope, output.ComponentRoot is null ? null : output.RegisterComponent);
+            if (role == "command_storage.component.interpreted")
+            {
+                var glyphs = TextComponentExtractor.StorageJsonGlyphs(source, input, jsonProfile, limits);
+                if (glyphs is null) { output.Diagnostic(path, "UnsupportedStorageComponentFont"); return; }
+                if (glyphs.Count > 0) result = result with { Occurrences = result.Occurrences
+                    .Where(item => item.Address.ComponentPath is not { } componentPath || !glyphs.ContainsKey(componentPath)).ToImmutableArray() };
+            }
+            output.Merge(result);
         }
         else output.Diagnostic(path, "InvalidJsonComponentString");
     }

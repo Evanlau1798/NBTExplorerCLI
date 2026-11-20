@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using NBTExplorerCLI.Domain;
@@ -8,33 +7,55 @@ namespace NBTExplorerCLI.Minecraft;
 
 public static partial class PackTextExtractor
 {
-    public static bool DefinesDefaultFont(WorldSourceLocation source)
-        => source.PackKind == PackSourceKind.ResourcePack && source.Role == WorldSourceRole.PackJson
-            && Entry(source).Equals("assets/minecraft/font/default.json", StringComparison.OrdinalIgnoreCase);
-
-    public static bool HasOnlyPrivateUseGlyphs(byte[] json, DecodeLimits limits)
+    public static string? StorageFontId(WorldSourceLocation source)
     {
-        using var document = BoundedJson.ReadDecoded(json, limits);
-        return FontProviders(document.RootElement, provider => KnownGlyphProvider(provider)
-            && (provider.TryGetNativeProperty("advances", out var advances)
-                ? Fields(advances, (glyph, _) => PrivateUseGlyphs(glyph))
-                : provider.TryGetNativeProperty("chars", out var chars)
-                    && ArrayOf(chars, row => PrivateUseGlyphs(NativeJsonStrings.Read(row)))));
+        if (source.PackKind != PackSourceKind.ResourcePack || source.Role != WorldSourceRole.PackJson) return null;
+        var entry = Entry(source);
+        if (entry.Equals("assets/minecraft/font/default.json", StringComparison.OrdinalIgnoreCase)) return "minecraft:default";
+        if (entry.Split('/', 4) is not ["assets", var space, "font", var file] || !file.EndsWith(".json", StringComparison.Ordinal)) return null;
+        var id = space + ":" + file[..^5];
+        return MinecraftIdentifier.ResourceLocation(id) ? id : null;
     }
 
-    private static bool PrivateUseGlyphs(string text)
+    public static HashSet<Rune>? ReadStorageFontGlyphs(byte[] json, DecodeLimits limits, Func<string, bool>? hasTexture = null)
     {
-        foreach (var glyph in text.EnumerateRunes())
-            if (Rune.GetUnicodeCategory(glyph) != UnicodeCategory.PrivateUse) return false;
-        return true;
+        using var document = BoundedJson.ReadDecoded(json, limits);
+        var glyphs = new HashSet<Rune>();
+        return FontProviders(document.RootElement, ReadProvider) ? glyphs : null;
+
+        bool ReadProvider(JsonElement provider)
+        {
+            if (!KnownGlyphProvider(provider)) return false;
+            if (provider.TryGetNativeProperty("advances", out var advances))
+                return Fields(advances, (glyph, _) => Rune.TryGetRuneAt(glyph, 0, out var scalar)
+                    && scalar.Utf16SequenceLength == glyph.Length && Add(scalar));
+            if (hasTexture is not null)
+            {
+                if (!provider.TryGetNativeProperty("file", out var file)) return false;
+                var parts = MinecraftIdentifier.DefaultNamespace(NativeJsonStrings.Read(file)).Split(':', 2);
+                if (!hasTexture($"assets/{parts[0]}/textures/{parts[1]}")) return false;
+            }
+            return provider.TryGetNativeProperty("chars", out var chars) && ArrayOf(chars, row =>
+            {
+                foreach (var scalar in NativeJsonStrings.Read(row).EnumerateRunes())
+                    if (!Add(scalar)) return false;
+                return true;
+            });
+        }
+
+        bool Add(Rune glyph)
+        {
+            if (glyph == Rune.ReplacementChar || glyph.Value == 0) return false;
+            glyphs.Add(glyph);
+            return true;
+        }
     }
 
     public static bool HasInertStorageShape(WorldSourceLocation source, byte[] json, DecodeLimits limits)
     {
         var metadata = source.Role == WorldSourceRole.PackMetadata && Entry(source) == "pack.mcmeta";
         var language = source.PackKind == PackSourceKind.ResourcePack && source.Role == WorldSourceRole.Language;
-        var font = source.PackKind == PackSourceKind.ResourcePack && source.Role == WorldSourceRole.PackJson
-            && Entry(source).Split('/', 4) is ["assets", _, "font", var name] && name.EndsWith(".json", StringComparison.Ordinal);
+        var font = StorageFontId(source) is not null;
         if (!metadata && !language && !font) return false;
         using var document = BoundedJson.ReadDecoded(json, limits);
         var root = document.RootElement;

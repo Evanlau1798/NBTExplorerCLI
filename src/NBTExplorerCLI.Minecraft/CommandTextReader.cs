@@ -212,7 +212,8 @@ internal sealed partial class CommandTextReader
         if (argument < 0) { Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownCommandGrammar"); return; }
         Component(tokens[argument].Start, end, At(path, name + ".text"));
     }
-    private void Component(int start, int end, TypedPath grammarPath, string? itemComponent = null, string? storedRole = null, bool storedList = false)
+    private void Component(int start, int end, TypedPath grammarPath, string? itemComponent = null, string? storedRole = null, bool storedList = false,
+        IReadOnlyDictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? protectedGlyphs = null)
     {
         var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, storedRole ?? source.Address.SemanticRole + ".text", source.Address.Dimension, source.Address.Chunk);
         var modern = itemComponent is not null || storedRole is not null || profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
@@ -222,6 +223,9 @@ internal sealed partial class CommandTextReader
         var result = itemComponent is not null ? SnbtTextExtractor.ItemComponent(binding, source.Command[start..end], profile, itemComponent, limits, scope, callback)
             : modern ? SnbtTextExtractor.Component(binding, source.Command[start..end], profile, limits, scope, callback, storedList)
             : TextComponentExtractor.NativeJson(binding, bytes, profile, limits, scope, callback);
+        if (protectedGlyphs is { Count: > 0 }) result = result with { Occurrences = result.Occurrences
+            .Where(text => text.Address.ComponentPath is not { } path || text.Address.Syntax?.NodePath is not { } node
+                || !protectedGlyphs.ContainsKey((node, path))).ToImmutableArray() };
         MergeComponent(result, grammarPath, start, end, modern, spans);
         if (result.Diagnostics.IsEmpty) ComponentReferences(bytes, start, end, grammarPath, modern,
             itemTree: itemComponent is not null && itemComponent is not ("minecraft:custom_name" or "minecraft:item_name" or "minecraft:lore"));

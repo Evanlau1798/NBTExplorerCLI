@@ -44,7 +44,6 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         var resolvedDiagnostics = ImmutableHashSet.CreateBuilder<ExtractionDiagnostic>();
         var pendingSeeds = new HashSet<string>(StringComparer.Ordinal);
         var covered = true;
-        var opaqueDefaultFont = false;
         foreach (var row in extraction.ReadStorageObservations(access =>
         {
             index.Observe(access);
@@ -56,10 +55,10 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 && (use == CommandStorageUse.ListElementWrite
                     || use == CommandStorageUse.InterpretedDisplay && PlainPath(DisplayPath(access.Path))))
                 observed.TryAdd(new(use, access.Address.Artifact, access.Address.Chunk, access.Address.NodePath, syntax), access);
-        }, () => covered = false, () => index.opaqueEquipment = true, functionResults.ObserveCall, () => opaqueDefaultFont = true))
+        }, () => covered = false, () => index.opaqueEquipment = true, functionResults.ObserveCall, index.ObserveFont))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (opaqueDefaultFont || row.Outcome is SourceOutcome.Failed or SourceOutcome.Cancelled) return StorageDisplayPolicy.Empty;
+            if (index.opaqueDefaultFont || row.Outcome is SourceOutcome.Failed or SourceOutcome.Cancelled) return StorageDisplayPolicy.Empty;
             if (covered && row.Outcome == SourceOutcome.Unsupported)
             {
                 var text = row.Text;
@@ -199,6 +198,9 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 }
                 var artifact = access.Address.Artifact.RelativePath;
                 if (list.Producers.Add(artifact)) Charge(artifact.Length);
+                if (access.GlyphLiterals is { } glyphs)
+                    foreach (var glyph in glyphs)
+                        if ((list.GlyphLiterals ??= []).Add(glyph)) Charge(glyph.Font.Length + glyph.Text.Length);
                 break;
             case CommandStorageUse.ListCopy when access.CopySource is { } source:
                 var from = GetList(GetStorage(source.Storage), source.Storage, source.Path);
@@ -304,7 +306,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 var equipmentRoots = storage.EquipmentRoots.Order(StringComparer.Ordinal).ToArray();
                 foreach (var (path, list) in storage.Paths)
                 {
-                    if ((!list.Display && !list.Copies) || storage.OtherPaths.Contains(path)
+                    if ((!list.Display && !list.Copies) || list.GlyphLiterals is { } glyphs && !glyphs.All(CanPreserveGlyphs) || storage.OtherPaths.Contains(path)
                         || RelatedPath(path, storage.OtherPaths, rawPaths) || RelatedPath(path, storage.Paths.Keys, listPaths)) continue;
                     if (list.EquipmentRoot is { } equipment)
                     {
@@ -450,6 +452,9 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 }
                 var address = new SourceAddress(source.Location.Artifact, node, "command_storage.component.interpreted", source.Location.Dimension);
                 if (!modern && item is not NbtString) return false;
+                if (modern ? HasUnprovenNativeFont(item)
+                    : TextComponentExtractor.StorageJsonGlyphs(address, ((NbtString)item).Value, profile, limits) is not { } glyphs
+                        || !glyphs.Values.All(CanPreserveGlyphs)) return false;
                 var references = modern ? NativeComponentReferences.Nbt(address, item, runtime, limits)
                     : NativeComponentReferences.EmbeddedJson(address, ((NbtString)item).Value, profile, limits);
                 if (!references.Selectors.IsEmpty || !references.Diagnostics.IsEmpty) return false;

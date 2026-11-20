@@ -17,31 +17,38 @@ internal static class ComponentReferenceRules
     }
 
     internal static bool UsesExplicitJsonFont(JsonElement value, TypedPath path)
+        => ExplicitJsonFont(value, path) is not null;
+
+    internal static string? ExplicitJsonFont(JsonElement value, TypedPath path)
     {
         var siblings = false;
+        string? font = null;
         foreach (var segment in path.Segments)
         {
-            if (value.TryGetNativeProperty("font", out _)) return true;
+            font = Font(value) ?? font;
             if (segment.Index is { } index)
             {
-                if (!siblings && index > 0 && FirstComponentHasFont(value[0])) return true;
+                if (!siblings && index > 0) font = FirstComponentFont(value[0]) ?? font;
                 value = value[index];
                 siblings = false;
             }
             else
             {
                 siblings = segment.Key is "extra" or "with";
-                if (!value.TryGetNativeProperty(segment.Key!, out value)) return true;
+                if (!value.TryGetNativeProperty(segment.Key!, out value)) return "";
             }
         }
-        return value.TryGetNativeProperty("font", out _);
+        return Font(value) ?? font;
     }
 
-    private static bool FirstComponentHasFont(JsonElement value)
+    private static string? FirstComponentFont(JsonElement value)
     {
         while (value.ValueKind == JsonValueKind.Array && value.GetArrayLength() > 0) value = value[0];
-        return value.TryGetNativeProperty("font", out _);
+        return Font(value);
     }
+
+    private static string? Font(JsonElement value) => !value.TryGetNativeProperty("font", out _) ? null
+        : Field(value, "font") is { } id && MinecraftIdentifier.ResourceLocation(id) ? MinecraftIdentifier.DefaultNamespace(id) : "";
 
     internal static bool OtherComponentContent(Func<string, bool> hasField)
         => hasField("text") || hasField("translate") || hasField("selector") || hasField("score") || hasField("keybind")

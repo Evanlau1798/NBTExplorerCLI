@@ -1,5 +1,6 @@
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
+using System.Collections.Immutable;
 using System.Text.Json;
 using static NBTExplorerCLI.Minecraft.TextExtractionCollector;
 
@@ -21,6 +22,47 @@ public static class TextComponentExtractor
         if (Check(source, profile)) throw Unsupported();
         return ReadJson(source, NativeJsonStrings.EncodeJavaDocument(component, limits), profile, limits, scope, true, componentRoot);
     }
+    public static IReadOnlyDictionary<TypedPath, StorageGlyphLiteral>? StorageJsonGlyphs(SourceAddress source, string component, CapabilityProfile profile, DecodeLimits limits)
+    {
+        if (Check(source, profile)) throw Unsupported();
+        try
+        {
+            using var document = BoundedJson.ReadDecoded(NativeJsonStrings.EncodeJavaDocument(component, limits), limits);
+            var root = document.RootElement;
+            if (root.ValueKind is not (JsonValueKind.String or JsonValueKind.Object or JsonValueKind.Array)) return null;
+            if (!ContainsFont(root)) return ImmutableDictionary<TypedPath, StorageGlyphLiteral>.Empty;
+            var styledDynamic = false;
+            var collector = new TextExtractionCollector(source, true, limits)
+            {
+                ComponentRoot = address =>
+                {
+                    var path = address.ComponentPath!;
+                    if (ComponentReferenceRules.ExplicitJsonFont(root, path) is null or "minecraft:default") return;
+                    var value = NativeComponentReferences.JsonAt(root, path);
+                    if (value.ValueKind == JsonValueKind.Object && !value.TryGetNativeProperty("text", out _)) styledDynamic = true;
+                }
+            };
+            JsonValue(root, TypedPath.Root, source.SemanticRole, profile, collector);
+            var result = collector.Finish();
+            if (styledDynamic || !result.Complete) return null;
+            var glyphs = new Dictionary<TypedPath, StorageGlyphLiteral>();
+            foreach (var occurrence in result.Occurrences)
+            {
+                var path = occurrence.Address.ComponentPath!;
+                if (ComponentReferenceRules.ExplicitJsonFont(root, path) is { } font && font != "minecraft:default")
+                    glyphs.Add(path, new(font, occurrence.Text));
+            }
+            return glyphs;
+        }
+        catch (JsonException) { return null; }
+    }
+
+    private static bool ContainsFont(JsonElement component) => component.ValueKind switch
+    {
+        JsonValueKind.Object => component.EnumerateObject().Any(field => field.NameEquals("font") || ContainsFont(field.Value)),
+        JsonValueKind.Array => component.EnumerateArray().Any(ContainsFont),
+        _ => false
+    };
     internal static TextExtractionResult NativeJson(SourceAddress source, byte[] component, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot = null)
     {
         _ = Check(source, profile); return ReadJson(source, component, profile, limits, scope, false, componentRoot);

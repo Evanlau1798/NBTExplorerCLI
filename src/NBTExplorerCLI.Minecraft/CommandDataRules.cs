@@ -15,12 +15,16 @@ internal sealed partial class CommandTextReader
     {
         var storageElement = !resultObserved && (storageAccess is not null || storageDisplayLists is { Count: > 0 }) ? StorageDisplayWrite(tokens, index) : null;
         var storageValue = storageElement is null ? null : Snbt.ParseDocument(Utf8.GetBytes(tokens[^1].Text), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
-        if (storageElement is not null && tokens[index + 5].Text == "set" && !tokens[^1].Text.StartsWith('[') && !IsScalarStorageComponent(storageValue!))
-            storageElement = null;
+        Dictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? glyphs = null;
+        if (storageValue is not null && JsonStorageRuntime())
+        {
+            glyphs = StorageGlyphs(storageValue, tokens[index + 5].Text == "set" && tokens[^1].Text.StartsWith('['));
+            if (glyphs is null) storageElement = null;
+        }
         var staticListWrite = storageValue is not null && StaticDataWrite(tokens, index, storageValue, keepEmptyListReset: true);
         if (storageAccess is not null || opaqueEquipment is not null)
-            ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue, resultObserved);
-        if (staticListWrite || ReadStorageDisplayWrite(tokens, index, path, storageElement)) return;
+            ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue, resultObserved, glyphs);
+        if (staticListWrite || ReadStorageDisplayWrite(tokens, index, path, storageElement, glyphs)) return;
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;
         var entityWrite = tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"

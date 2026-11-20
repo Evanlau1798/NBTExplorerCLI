@@ -13,6 +13,7 @@ public sealed partial class WorldTextExtraction
     private readonly IWorldInventory inventory;
     private readonly ScanRequest request;
     private readonly Lazy<StorageDisplayPolicy> storageDisplays;
+    private readonly Lazy<HashSet<string>> directoryTextures;
     internal StorageDisplayPolicy StorageDisplays => BoundStorageDisplays ?? storageDisplays.Value;
     internal StorageDisplayPolicy? BoundStorageDisplays { get; init; }
     public ImmutableDictionary<ArtifactAddress, ImmutableArray<StorageTextRule>> StorageRules { get; }
@@ -42,6 +43,10 @@ public sealed partial class WorldTextExtraction
             : (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil ? MinecraftProfiles.ForClassicVersion(request.ClassicVersion) : null)
                 ?? throw new CodecException(CodecError.UnsupportedProfile, 0, "Explicit Minecraft version requires recognized Classic Anvil metadata and a registered version");
         storageDisplays = new(() => WorldStorageUseIndex.Capture(this, inventory, cancellationToken));
+        directoryTextures = new(() => Discovery.Inventory.Entries
+            .Where(entry => !entry.IsDirectory && entry.Bytes > 0 && entry.Outcome == SourceOutcome.Success
+                && entry.RelativePath.Contains("/textures/", StringComparison.Ordinal))
+            .Select(entry => entry.RelativePath).ToHashSet(StringComparer.Ordinal));
     }
     public IEnumerable<TextSourceExtraction> ReadSources() => ReadSourcesCore(Discovery.Sources);
     public IEnumerable<TextSourceExtraction> ReadSources(Action<CommandStorageAccess> storageAccess)
@@ -50,14 +55,14 @@ public sealed partial class WorldTextExtraction
         return ReadSourcesCore(Discovery.Sources, storageAccess);
     }
     internal IEnumerable<TextSourceExtraction> ReadStorageObservations(Action<CommandStorageAccess> observe, Action opaqueStorage, Action opaqueEquipment,
-        Action<string?, CommandFunctionCall> functionCall, Action opaqueDefaultFont)
-        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage, opaqueEquipment: opaqueEquipment, functionCall: functionCall, opaqueDefaultFont: opaqueDefaultFont);
+        Action<string?, CommandFunctionCall> functionCall, Action<string, HashSet<Rune>?> observeFont)
+        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage, opaqueEquipment: opaqueEquipment, functionCall: functionCall, observeFont: observeFont);
     internal IEnumerable<TextSourceExtraction> ReadStorageProjection(StorageDisplayPolicy storage, HashSet<string> pendingSeeds)
         => ReadSourcesCore(Discovery.Sources.Where(source => storage.SourceKeys.ContainsKey(source.Location.Artifact.RelativePath)
             || pendingSeeds.Contains(source.Location.Artifact.RelativePath)), previewStorage: storage);
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
     private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected, Action<CommandStorageAccess>? storageAccess = null, Action? opaqueStorage = null,
-        StorageDisplayPolicy? previewStorage = null, Action? opaqueEquipment = null, Action<string?, CommandFunctionCall>? functionCall = null, Action? opaqueDefaultFont = null)
+        StorageDisplayPolicy? previewStorage = null, Action? opaqueEquipment = null, Action<string?, CommandFunctionCall>? functionCall = null, Action<string, HashSet<Rune>?>? observeFont = null)
     {
         foreach (var group in selected.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
         {
@@ -89,11 +94,11 @@ public sealed partial class WorldTextExtraction
                 continue;
             }
             using (archive)
-                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage, opaqueEquipment, functionCall, opaqueDefaultFont);
+                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage, opaqueEquipment, functionCall, observeFont);
         }
     }
     private TextSourceExtraction ReadOne(DiscoveredSource source, byte[] bytes, RegionFile? region, ZipArchive? archive, Action<CommandStorageAccess>? storageAccess, Action? opaqueStorage,
-        StorageDisplayPolicy? previewStorage, Action? opaqueEquipment, Action<string?, CommandFunctionCall>? functionCall, Action? opaqueDefaultFont)
+        StorageDisplayPolicy? previewStorage, Action? opaqueEquipment, Action<string?, CommandFunctionCall>? functionCall, Action<string, HashSet<Rune>?>? observeFont)
     {
         if (source.Outcome != SourceOutcome.Success) return Forward(source);
         if (source.Location.Role == WorldSourceRole.Archive || region is not null && source.Chunk is null)
@@ -129,8 +134,8 @@ public sealed partial class WorldTextExtraction
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
             {
-                if (opaqueDefaultFont is not null && PackTextExtractor.DefinesDefaultFont(source.Location)
-                    && !PackTextExtractor.HasOnlyPrivateUseGlyphs(bytes, Limits)) opaqueDefaultFont();
+                if (observeFont is not null && PackTextExtractor.StorageFontId(source.Location) is { } font)
+                    observeFont(font, PackTextExtractor.ReadStorageFontGlyphs(bytes, Limits, font == "minecraft:default" ? null : HasTexture));
                 var storageCandidate = opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes);
                 var equipmentCandidate = opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(bytes);
                 if ((storageCandidate || equipmentCandidate) && !PackTextExtractor.HasInertStorageShape(source.Location, bytes, Limits))
@@ -140,6 +145,9 @@ public sealed partial class WorldTextExtraction
                 }
                 text = PackTextExtractor.Extract(source.Location, bytes, source.Pack ?? throw new InvalidDataException("Missing pack metadata snapshot"), request.Limits, request.Scope);
                 commandProfile = MinecraftProfiles.ForPackMetadata(source.Pack!);
+
+                bool HasTexture(string entry) => archive is not null ? archive.GetEntry(entry) is { Length: > 0 }
+                    : directoryTextures.Value.Contains(source.Location.PackRoot + "/" + entry);
             }
             else if (source.Location.Role == WorldSourceRole.Function)
             {

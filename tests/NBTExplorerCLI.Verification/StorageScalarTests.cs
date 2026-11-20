@@ -15,6 +15,122 @@ internal static class StorageScalarTests
     private const string Producer = Folder + "producer.mcfunction";
     private const string Consumer = Folder + "consumer.mcfunction";
 
+    internal static void MappedFontSlices()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+        const string metadata = """{"pack":{"pack_format":15,"description":"Mapped glyph fixture"}}""";
+        const string font = """{"providers":[{"type":"space","advances":{"A":-3,"B":2}}]}""";
+        const string first = """[{"text":"A","font":"demo:meter"},{"text":"B"},{"text":"Welcome","font":"minecraft:default"}]""";
+        try
+        {
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            Put(root, "datapacks/p/pack.mcmeta", Encoding.UTF8.GetBytes(metadata));
+            Put(root, "resources.zip", Zip(("pack.mcmeta", metadata), ("assets/demo/font/meter.json", font)));
+            Put(root, Consumer, """tellraw @a {"nbt":"payload","storage":"demo:source","interpret":true}"""u8.ToArray());
+            Check(first, "Welcome");
+            Check("""[{"text":"Start"},{"text":"A","font":"demo:meter"},{"text":"Continue"}]""", "Start", "Continue");
+            Check(first.Replace("\"B\"", "\"Unmapped\"", StringComparison.Ordinal));
+            Check(first.Replace("demo:meter", "demo:absent", StringComparison.Ordinal));
+            Check(first, "Welcome");
+            const string listReader = """tellraw @a {"nbt":"payload[]","storage":"demo:source","interpret":true}""";
+            Put(root, Consumer, Encoding.UTF8.GetBytes(listReader));
+            foreach (var operation in new[] { "append", "prepend", "insert 0" })
+            {
+                CheckWrite($"{operation} value '{first}'", true, "Welcome");
+                CheckWrite($"{operation} value '{{\"text\":\"A\",\"font\":\"demo:meter\"}}'", true);
+            }
+            CheckWrite("set value ['" + first + "','{\"text\":\"A\"}']", true, "Welcome", "A");
+            CheckWrite("set value ['" + first.Replace("demo:meter", "demo:absent", StringComparison.Ordinal) + "']", false);
+            Put(root, Consumer, """tellraw @a {"nbt":"payload","storage":"demo:source","interpret":true}"""u8.ToArray());
+            Put(root, "resources.zip", Zip(("pack.mcmeta", metadata), ("assets/demo/font/meter.json", font.Replace("\"B\"", "\"C\"", StringComparison.Ordinal))));
+            Check(first);
+            const string missingTexture = """{"providers":[{"type":"bitmap","file":"demo:font/absent.png","ascent":1,"chars":["AB"]}]}""";
+            Put(root, "resources.zip", Zip(("pack.mcmeta", metadata), ("assets/demo/font/meter.json", missingTexture)));
+            Check(first);
+            File.Delete(Path.Combine(root, "resources.zip"));
+            Put(root, "world-resources/pack.mcmeta", Encoding.UTF8.GetBytes(metadata));
+            Put(root, "world-resources/assets/demo/font/meter.json", Encoding.UTF8.GetBytes(missingTexture));
+            Check(first);
+            Put(root, "world-resources/assets/demo/textures/font/absent.png", [1]);
+            Check(first, "Welcome");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+
+        void Check(string component, params string[] expected)
+            => CheckWrite($"set value '{component}'", expected.Length != 0, expected);
+
+        void CheckWrite(string write, bool complete, params string[] expected)
+        {
+            Put(root, Producer, Encoding.UTF8.GetBytes($"data modify storage demo:source payload {write}"));
+            var snapshot = WorldQueryTests.Query(root, cache);
+            var producer = snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == Producer);
+            Require(snapshot.Manifest.CoverageComplete == complete
+                && (producer.Text?.Occurrences.Select(slot => slot.Text) ?? []).SequenceEqual(expected),
+                $"only ordinary text beside fully mapped glyphs can be translated: {write}");
+        }
+    }
+
+    internal static void SavedMappedFontSlices()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+        const string seed = "data/command_storage_demo.dat";
+        const string metadata = """{"pack":{"pack_format":15,"description":"Saved glyph fixture"}}""";
+        const string font = """{"providers":[{"type":"space","advances":{"A":-3,"B":2}}]}""";
+        const string first = """[{"text":"A","font":"demo:meter"},"B",{"text":"Saved text","font":"minecraft:default"}]""";
+        try
+        {
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            Put(root, "datapacks/p/pack.mcmeta", Encoding.UTF8.GetBytes(metadata));
+            Put(root, Consumer, """tellraw @a {"nbt":"payload[]","storage":"demo:source","interpret":true}"""u8.ToArray());
+            Put(root, "resources.zip", Zip(("pack.mcmeta", metadata), ("assets/demo/font/meter.json", font)));
+            var items = new NbtList(NbtType.String, [new NbtString(first), new NbtString("""{"text":"A"}""")]);
+            var storage = new NbtCompound([new("source", new NbtCompound([new("payload", items)]))]);
+            var data = new NbtCompound([new("contents", storage)]);
+            var document = new NbtDocument("", new NbtCompound([new("DataVersion", new NbtInt(3465)), new("data", data)]));
+            Put(root, seed, CompressedNbt.WriteDocument(document, NbtCompression.GZip));
+            Check(true, "Saved text", "A");
+            Put(root, "resources.zip", Zip(("pack.mcmeta", metadata), ("assets/demo/font/meter.json", font.Replace("\"B\"", "\"C\"", StringComparison.Ordinal))));
+            Check(false);
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+
+        void Check(bool complete, params string[] expected)
+        {
+            var snapshot = WorldQueryTests.Query(root, cache);
+            var value = snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == seed);
+            Require(snapshot.Manifest.CoverageComplete == complete && value.Text!.Occurrences.Select(slot => slot.Text).SequenceEqual(expected),
+                "saved storage must preserve inherited mapped glyphs and require proof for every protected glyph");
+        }
+    }
+
+    internal static void SavedNativeFontGuard()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+        const string seed = "data/command_storage_demo.dat";
+        try
+        {
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(4308, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            Put(root, "datapacks/p/pack.mcmeta", """{"pack":{"pack_format":64,"description":"Saved native font fixture"}}"""u8.ToArray());
+            Put(root, "datapacks/p/data/demo/function/reader.mcfunction", """tellraw @a {nbt:"payload[]",storage:"demo:source",interpret:true}"""u8.ToArray());
+            Check("minecraft:default", true);
+            Check("demo:unproven", false);
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+
+        void Check(string font, bool authorized)
+        {
+            var items = new NbtList(NbtType.Compound, [new NbtCompound([new("text", new NbtString("A")), new("font", new NbtString(font))])]);
+            var storage = new NbtCompound([new("source", new NbtCompound([new("payload", items)]))]);
+            var data = new NbtCompound([new("contents", storage)]);
+            var document = new NbtDocument("", new NbtCompound([new("DataVersion", new NbtInt(4308)), new("data", data)]));
+            Put(root, seed, CompressedNbt.WriteDocument(document, NbtCompression.GZip));
+            var snapshot = WorldQueryTests.Query(root, cache);
+            var value = snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == seed);
+            Require(snapshot.Manifest.CoverageComplete == authorized && (value.Text!.Occurrences is [{ Text: "A" }]) == authorized,
+                $"saved native glyphs without a proven font must stay outside translation slots: {font}");
+        }
+    }
+
     internal static void ConsumerFont(bool defaultOverride = false)
     {
         var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
