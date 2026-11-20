@@ -8,6 +8,7 @@ namespace NBTExplorerCLI.Minecraft;
 internal sealed partial class CommandTextReader
 {
     private const int StorageDataVersion = 2205;
+    private const int DisplayEntityDataVersion = 3326;
     private const int VanillaArmorTrimDataVersion = 3442;
 
     private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end)
@@ -20,23 +21,30 @@ internal sealed partial class CommandTextReader
         if (staticListWrite || ReadStorageDisplayWrite(tokens, index, path, storageElement)) return;
         if (DataControl(tokens, index)) return;
         if (SignMessageWrite(tokens, index, path)) return;
-        if (tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"
-            && EntityTarget(tokens[index + 3].Text) && tokens[index + 4].Text == "CustomName" && tokens[index + 5].Text == "set" && tokens[index + 6].Text == "value")
+        var entityWrite = tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"
+            && EntityTarget(tokens[index + 3].Text) && tokens[index + 5].Text == "set" && tokens[index + 6].Text == "value";
+        var entityType = entityWrite ? selectorTypes.GetValueOrDefault(tokens[index + 3].Start) : null;
+        var member = entityWrite ? tokens[index + 4].Text : null;
+        var componentRole = member switch
         {
-            var target = tokens[index + 3]; var value = tokens[index + 7];
-            var role = selectorTypes.GetValueOrDefault(target.Start) == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name";
-            Component(value.Start, value.Start + value.Text.Length, At(path, "data.entity.CustomName"), storedRole: role);
+            "CustomName" => entityType == "minecraft:armor_stand" ? "armor_stand.name" : "entity.name",
+            "text" when entityType == "minecraft:text_display" && runtimeDataVersion >= DisplayEntityDataVersion => "text_display.text",
+            _ => null
+        };
+        if (componentRole is not null)
+        {
+            var value = tokens[index + 7];
+            Component(value.Start, value.Start + value.Text.Length, At(path, "data.entity." + member), storedRole: componentRole);
             return;
         }
         var blockItems = tokens.Count == index + 10 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "block"
             && BlockCoordinates(tokens[index + 3].Text, tokens[index + 4].Text, tokens[index + 5].Text)
             && tokens[index + 6].Text == "Items" && tokens[index + 7].Text is "append" or "prepend" && tokens[index + 8].Text == "value";
-        var droppedItem = tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"
-            && EntityTarget(tokens[index + 3].Text) && selectorTypes.GetValueOrDefault(tokens[index + 3].Start) == "minecraft:item"
-            && tokens[index + 4].Text == "Item" && tokens[index + 5].Text == "set" && tokens[index + 6].Text == "value";
-        if (blockItems || droppedItem)
+        var entityItem = member == "Item" && entityType is "minecraft:item" or "minecraft:item_frame" or "minecraft:glow_item_frame"
+            || member == "item" && entityType == "minecraft:item_display" && runtimeDataVersion >= DisplayEntityDataVersion;
+        if (blockItems || entityItem)
         {
-            var token = tokens[^1]; var grammarPath = At(path, blockItems ? "data.block.Items" : "data.entity.Item");
+            var token = tokens[^1]; var grammarPath = At(path, blockItems ? "data.block.Items" : "data.entity." + member);
             var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, "item.stack", source.Address.Dimension, source.Address.Chunk);
             var tokenEnd = token.Start + token.Text.Length;
             var result = SnbtTextExtractor.ItemStack(binding, token.Text, profile, limits, scope, StoredComponentCallback(grammarPath, token.Start, tokenEnd));
@@ -128,7 +136,10 @@ internal sealed partial class CommandTextReader
             if (operation == "merge" || sourcePath < 0 || tokens.Count != sourcePath + 1) return false;
             var sourceType = tokens[value + 1].Text;
             var source = tokens[sourcePath].Text;
-            return sourceType == "entity" && NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[value + 2].Start)) || StaticItemSource(sourceType, source)
+            var nativeNumericDestination = operation == "set" && tokens[index + 2].Text == "entity" && source == tokens[path].Text
+                && NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[index + 3].Start));
+            return sourceType == "entity" && (nativeNumericDestination || NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[value + 2].Start)))
+                || StaticItemSource(sourceType, source)
                 || sourceType == "block" && tokens[index + 2].Text == "storage"
                 && runtimeDataVersion >= StorageDataVersion && SignTextSource(source);
         }
@@ -137,16 +148,30 @@ internal sealed partial class CommandTextReader
         if (keepEmptyListReset && operation == "set" && valueNode.Value is LogicalMinecraftList { Items.IsEmpty: true }) return false;
         return !valueNode.ContainsStringValues && (operation != "merge" || valueNode.Value is LogicalMinecraftCompound)
             || StaticItemTagPayload(tokens[path].Text, valueNode, operation)
-            || operation == "set" && tokens[index + 2].Text == "entity" && tokens[path].Text == "Item" && StaticNbtMatch.ItemStack(valueNode);
+            || operation == "set" && (tokens[index + 2].Text == "entity" && tokens[path].Text == "Item" && StaticNbtMatch.ItemStack(valueNode)
+                || valueNode.Value is LogicalMinecraftLeaf { Value: NbtString id } && MinecraftIdentifier.ResourceLocation(id.Value)
+                && NativeItemIdPath(tokens[index + 2].Text, tokens[path].Text));
     }
     private static bool NumericEntitySource(string path, string? entityType = null)
     {
         if (path is "Health" or "UUID" or "Fire" or "Air" or "FallDistance" or "PortalCooldown"
             or "Invulnerable" or "Silent" or "NoGravity" or "Glowing" or "OnGround") return true;
-        if (path == "damage" && entityType is "minecraft:arrow" or "minecraft:spectral_arrow" or "minecraft:trident") return true;
+        if (path is "damage" or "crit" && entityType is "minecraft:arrow" or "minecraft:spectral_arrow" or "minecraft:trident") return true;
         var start = path.IndexOf('[');
         if ((start < 0 ? path : path[..start]) is not ("Pos" or "Motion" or "Rotation")) return false;
         return start < 0 || path[^1] == ']' && (start + 2 == path.Length || Integer(path[(start + 1)..^1], out _));
+    }
+    private bool NativeItemIdPath(string target, string path)
+    {
+        if (!path.EndsWith(".id", StringComparison.Ordinal)) return false;
+        var item = path[..^3];
+        if (target == "entity")
+        {
+            if (item is "Item" or "SelectedItem") return true;
+            if (MinecraftProfiles.UsesCompoundEquipment(profile) && item is "equipment.head" or "equipment.chest" or "equipment.legs"
+                or "equipment.feet" or "equipment.mainhand" or "equipment.offhand" or "equipment.body" or "equipment.saddle") return true;
+        }
+        return item.Contains('[') && StaticItemSource(target, item);
     }
     private bool StaticItemSource(string target, string path)
     {

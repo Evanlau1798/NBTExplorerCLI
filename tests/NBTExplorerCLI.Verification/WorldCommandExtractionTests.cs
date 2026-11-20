@@ -65,9 +65,33 @@ internal static class WorldCommandExtractionTests
         var quoted = Parse("""execute if data entity @s Item.tag."demo.key" if data storage demo:state 'section.name'[0].'has spaces' run tellraw @a {"text":"Ready"}""", 3465);
         Require(quoted.Complete && quoted.Text.Occurrences is [{ Text: "Ready" }],
             "vanilla quoted NBT path keys preserve the following display text");
+        var nativeWrites = Parse("""
+            data modify entity @s Item.id set value "minecraft:air"
+            data modify entity @s HandItems[0].id set value "minecraft:air"
+            data modify block 0 64 0 Items[0].id set value "minecraft:paper"
+            data modify entity @e[type=arrow,limit=1] damage set from entity @s damage
+            data modify entity @e[type=arrow,limit=1] crit set from entity @s crit
+            data modify entity @e[type=text_display,limit=1] text set value '{"text":"Display label"}'
+            data modify entity @e[type=item_display,limit=1] item set value {id:"minecraft:paper",Count:1b,tag:{display:{Name:'{"text":"Display item"}'}}}
+            data modify entity @e[type=item_frame,limit=1] Item set value {id:"minecraft:paper",Count:1b,tag:{display:{Name:'{"text":"Framed item"}'}}}
+            """, 3465);
+        Require(nativeWrites.Complete && nativeWrites.Text.Occurrences.Select(item => (item.Context, item.Text)).SequenceEqual(new[]
+        {
+            ("text_display.text", "Display label"), ("item.name", "Display item"), ("item.name", "Framed item")
+        }), "native data writes separate registry and projectile metadata from displayed text: "
+            + string.Join(", ", nativeWrites.Text.Diagnostics.Select(d => d.Code)));
+        const string displayWrite = """data modify entity @e[type=text_display,limit=1] text set value '{"text":"Display"}'""";
+        Require(!Parse(displayWrite, 3325).Complete && Parse(displayWrite, 3326).Complete, "display entity schema starts in 23w06a");
+        Require(Parse("""data modify entity @s equipment.mainhand.id set value "minecraft:paper" """, 4325).Complete
+            && Parse("""data modify entity @e[type=text_display,limit=1] text set value {text:"Display"}""", 4325)
+                .Text.Occurrences is [{ Text: "Display" }], "native component and equipment formats use their own paths");
         foreach (var command in new[] { "forceload add ^ ^", "attribute @s max_health base set NaN", "xp set @s -1 levels",
             "datapack list recursive", "particle shriek -1", "?", "clear @s minecraft:paper{display:{Name:'Visible'}}",
             "data modify entity @s damage set from entity @s damage", "data merge entity @s {CustomName:'Public name'}",
+            """data modify entity @s text set value '{"text":"Unproven target"}'""",
+            """data modify entity @s Item.id set value "Unproven registry value" """,
+            """data modify entity @s HandItems.id set value "minecraft:paper" """,
+            """data modify storage demo:state Item.id set value "minecraft:paper" """,
             """execute if data entity @s Item.tag."bad\q" run tellraw @a {"text":"Unproven"}""",
             """execute if data entity @s Item."bad"suffix run tellraw @a {"text":"Unproven"}""",
             """execute if data entity @s Item.[0] run tellraw @a {"text":"Unproven"}""",
