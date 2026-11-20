@@ -34,6 +34,7 @@ internal sealed partial class CommandTextReader
     private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, int end, (string Storage, string Path)? storageElement,
         SnbtNode? storageValue, bool resultObserved, IReadOnlyDictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? glyphs)
     {
+        var attribute = storageAccess is null ? null : AttributeStorage(tokens, index, path, end, storageValue);
         if (storageElement is { } list)
         {
             var value = tokens[^1];
@@ -43,7 +44,7 @@ internal sealed partial class CommandTextReader
             var elementType = use == CommandStorageUse.ListReplacement ? (encoded as NbtList)?.ElementType : encoded.Type;
             ObserveStorage(list.Storage, list.Path, use,
                 Address(path, value.Start, value.Text.Length, source.Address.SemanticRole), listElementType: elementType,
-                glyphLiterals: glyphs is { Count: > 0 } ? glyphs.Values : null);
+                glyphLiterals: glyphs is { Count: > 0 } ? glyphs.Values : null, attribute: attribute);
             if (storageAccess is not null && JsonStorageRuntime() && storageDisplayLists?.Contains(list) != true
                 && (value.Text.Contains("storage", StringComparison.Ordinal) || value.Text.Contains("\\u", StringComparison.Ordinal)))
                 ComponentReferences(Utf8.GetBytes(value.Text), value.Start, value.Start + value.Text.Length,
@@ -93,17 +94,17 @@ internal sealed partial class CommandTextReader
             for (var offset = sourceEnd + 1; offset < tokens.Count; offset++)
                 if (!Integer(tokens[offset].Text, out _)) return;
             if (mode == "from" && !resultObserved && storageAccess is not null && (ObserveEquipmentCopy(tokens, index, path, end, pathIndex, sourceEnd, operation)
-                || ObserveStorageListCopy(tokens, index, path, end, pathIndex, sourceEnd, operation))) return;
+                || ObserveStorageListCopy(tokens, index, path, end, pathIndex, sourceEnd, operation, attribute))) return;
             ObserveUnprovenEquipment(tokens, target, pathIndex);
             ObserveUnprovenEquipment(tokens, sourceTarget, sourceEnd);
-            ObserveStorageOperand(tokens, target, path, pathIndex);
+            ObserveStorageOperand(tokens, target, path, pathIndex, attribute: attribute);
             ObserveStorageOperand(tokens, sourceTarget, path, sourceEnd);
             return;
         }
         if (mode == "value" && tokens.Count == sourceMode + 2)
         {
             ObserveUnprovenEquipment(tokens, target, pathIndex);
-            ObserveStorageOperand(tokens, target, path, pathIndex);
+            ObserveStorageOperand(tokens, target, path, pathIndex, attribute: attribute);
         }
     }
 
@@ -157,7 +158,8 @@ internal sealed partial class CommandTextReader
         return true;
     }
 
-    private bool ObserveStorageListCopy(List<CommandToken> tokens, int index, TypedPath path, int end, int targetPath, int sourcePath, string operation)
+    private bool ObserveStorageListCopy(List<CommandToken> tokens, int index, TypedPath path, int end, int targetPath, int sourcePath, string operation,
+        StorageAttributeOperation? attribute)
     {
         if (source.Address.SemanticRole != "command.function" || runtimeDataVersion < StorageDataVersion
             || profile.Features[ProfileFacet.TextSchema].Schema != "java-text-json" || tokens.Count != sourcePath + 1
@@ -178,7 +180,7 @@ internal sealed partial class CommandTextReader
         var address = Address(path, tokens[index].Start, end - tokens[index].Start, source.Address.SemanticRole);
         Charge(address, from.Item1 + fromPath + to.Item1 + toPath);
         storageAccess!.Invoke(new(to.Item1, toPath, CommandStorageUse.ListCopy, address)
-        { CopySource = from, ReplacesList = operation == "set", AppendsScalar = appendsScalar });
+        { CopySource = from, ReplacesList = operation == "set", AppendsScalar = appendsScalar, AttributeOperation = attribute });
         return true;
     }
 
@@ -388,22 +390,23 @@ internal sealed partial class CommandTextReader
     }
 
     private void ObserveStorageOperand(List<CommandToken> tokens, int index, TypedPath path, int? pathIndex = null,
-        CommandStorageUse use = CommandStorageUse.Other)
+        CommandStorageUse use = CommandStorageUse.Other, StorageAttributeOperation? attribute = null)
     {
         if (storageAccess is null || tokens[index].Text != "storage") return;
         var id = tokens[index + 1];
         var member = pathIndex is { } field && field < tokens.Count ? tokens[field].Text : "";
-        ObserveStorage(id.Text, member, use, Address(path, id.Start, id.Text.Length, source.Address.SemanticRole));
+        ObserveStorage(id.Text, member, use, Address(path, id.Start, id.Text.Length, source.Address.SemanticRole), attribute: attribute);
     }
 
     private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address, bool hasUnclassifiedReferences = false,
-        NbtType? listElementType = null, IEnumerable<StorageGlyphLiteral>? glyphLiterals = null, (string Storage, string Path)? displayContainer = null)
+        NbtType? listElementType = null, IEnumerable<StorageGlyphLiteral>? glyphLiterals = null, (string Storage, string Path)? displayContainer = null,
+        StorageAttributeOperation? attribute = null)
     {
         if (!MinecraftIdentifier.ResourceLocation(storage)) return;
         var normalized = MinecraftIdentifier.DefaultNamespace(storage);
         retained = checked(retained + TextExtractionBudget.RecordBytes(address, (long)normalized.Length + path.Length));
         if (retained > limits.MaxDecodedBytes) Limit();
         storageAccess?.Invoke(new(normalized, path, use, address, hasUnclassifiedReferences)
-        { ListElementType = listElementType, GlyphLiterals = glyphLiterals, DisplayContainer = displayContainer });
+        { ListElementType = listElementType, GlyphLiterals = glyphLiterals, DisplayContainer = displayContainer, AttributeOperation = attribute });
     }
 }

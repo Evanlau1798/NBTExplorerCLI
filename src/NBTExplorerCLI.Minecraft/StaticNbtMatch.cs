@@ -38,6 +38,14 @@ internal static class StaticNbtMatch
     internal static bool AttributeModifier(SnbtNode root) => root.Value is LogicalMinecraftCompound
         && root.Children.All(member => !member.Node.ContainsStringValues || AttributeModifierField(member.Selector.Key, member.Node));
 
+    internal static bool AttributeModifierFields(SnbtNode root) => ExactFields(root) && root.Children.All(member => member.Selector.Key switch
+    {
+        "Amount" => member.Node.Value is LogicalMinecraftLeaf { Value: NbtByte or NbtShort or NbtInt or NbtLong or NbtFloat or NbtDouble },
+        "Operation" => member.Node.Value is LogicalMinecraftLeaf { Value: NbtInt { Value: >= 0 and <= 2 } },
+        "UUID" => member.Node.Value is LogicalMinecraftLeaf { Value: NbtIntArray { Values.Length: 4 } },
+        var name => AttributeModifierField(name, member.Node),
+    });
+
     internal static bool AttributeModifierField(string? field, SnbtNode node) => field switch
     {
         "AttributeName" or "Name" => ResourceId(node),

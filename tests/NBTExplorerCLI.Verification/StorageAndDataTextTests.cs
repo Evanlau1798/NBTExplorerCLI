@@ -57,6 +57,7 @@ internal static class StorageAndDataTextTests
         new("text-storage-interpreted-scalar-transfer", "discovery", _ => StorageScalarTests.InterpretedTransfer()),
         new("text-storage-interpreted-scalar-relay", "discovery", _ => StorageScalarTests.InterpretedTransfer(relay: true)),
         new("prepare-storage-nested-display-components", "preparation", _ => StorageNestedTests.BoundInterpretedDependencies()),
+        new("text-storage-attribute-transfers", "discovery", _ => StorageAttributeTests.TransferRoles()),
         new("text-storage-noncomponent-scalar", "discovery", _ => StorageScalarTests.InterpretedTransfer(unresolvedPayload: "unstructured string")),
         new("text-storage-custom-font-scalar", "discovery", _ => StorageScalarTests.InterpretedTransfer(unresolvedPayload: """[{"text":"Welcome"},{"text":"WW","font":"demo:meter"}]""")),
         new("text-storage-consumer-font", "discovery", _ => StorageScalarTests.ConsumerFont()),

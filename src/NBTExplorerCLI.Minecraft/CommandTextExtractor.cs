@@ -15,6 +15,7 @@ public sealed record CommandStorageAccess(string Storage, string Path, CommandSt
     public bool ReplacesList { get; init; }
     public bool AppendsScalar { get; init; }
     public IEnumerable<StorageGlyphLiteral>? GlyphLiterals { get; init; }
+    public StorageAttributeOperation? AttributeOperation { get; init; }
 }
 public sealed record CommandFunctionCall(string Target, bool ResultObserved);
 

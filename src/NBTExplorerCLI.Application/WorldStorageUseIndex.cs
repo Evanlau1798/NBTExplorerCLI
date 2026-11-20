@@ -38,17 +38,20 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
             return StorageDisplayPolicy.Empty;
         var index = new WorldStorageUseIndex(extraction.Limits);
         var functionResults = new StorageFunctionResults(index.Charge);
+        var attributeFlow = new WorldStorageAttributeRoles(index.Charge);
         var observed = new Dictionary<StorageCommandNode, CommandStorageAccess>();
         var nested = new Dictionary<StorageCommandNode, CommandStorageAccess>();
         var exact = new Dictionary<SourceAddress, CommandStorageAccess>();
         var required = new HashSet<(string Storage, string Path)>();
         var resolvedDiagnostics = ImmutableHashSet.CreateBuilder<ExtractionDiagnostic>();
         var pendingSeeds = new HashSet<string>(StringComparer.Ordinal);
+        var attributeDiagnostics = new List<(ExtractionDiagnostic Diagnostic, CommandStorageAccess? Use, CommandStorageAccess? Exact)>();
         var covered = true;
         foreach (var row in extraction.ReadStorageObservations(access =>
         {
             index.Observe(access);
             functionResults.ObserveMutation(access);
+            attributeFlow.Observe(access.AttributeOperation);
             if (covered && access.Use is CommandStorageUse.ListCopy or CommandStorageUse.EquipmentExport
                 or CommandStorageUse.IndexedBlankWrite or CommandStorageUse.ScratchComparison or CommandStorageUse.ScratchControlComparison)
             {
@@ -79,10 +82,17 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                     if (!extraction.StorageRules.ContainsKey(artifact)) index.RecordUnclassifiedSeed(artifact, space, text.Unclassified);
                 }
                 else covered = text is { Diagnostics.IsEmpty: false, Unclassified.IsEmpty: true }
-                    && text.Diagnostics.All(diagnostic => index.MatchUse(diagnostic, observed, exact, required, resolvedDiagnostics));
+                    && text.Diagnostics.All(Match);
             }
             observed.Clear();
             exact.Clear();
+        }
+        if (covered && attributeDiagnostics.Count != 0)
+        {
+            var roles = attributeFlow.Prove(cancellationToken);
+            covered = attributeDiagnostics.All(entry => attributeFlow.Covers(entry.Diagnostic.Address, roles)
+                ? index.Resolve(entry.Diagnostic, resolvedDiagnostics)
+                : index.MatchUse(entry.Diagnostic, entry.Use, entry.Exact, required, resolvedDiagnostics));
         }
         if (!functionResults.BlockObservedMutations(extraction.Discovery, index.Block, cancellationToken)) covered = false;
         index.BlockUnsafeScratchComparisons();
@@ -123,6 +133,25 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         if (!policy.ProjectedCoverage(extraction.ReadStorageProjection(policy, pendingSeeds), ResolveNested)) return preview;
         return resolvedDiagnostics.Count == policy.ResolvedDiagnostics.Count ? policy : BoundPolicy();
 
+        bool Match(ExtractionDiagnostic diagnostic)
+        {
+            var address = diagnostic.Address;
+            var use = diagnostic.Code switch
+            {
+                "UnknownDataTextSchema" or "UnresolvedStorageBlankComparison" => CommandStorageUse.ListElementWrite,
+                "DynamicComponentReference" => CommandStorageUse.InterpretedDisplay,
+                _ => CommandStorageUse.Other,
+            };
+            var access = address.Syntax?.NodePath is { } syntax
+                ? observed.GetValueOrDefault(new(use, address.Artifact, address.Chunk, address.NodePath, syntax)) : null;
+            var exactAccess = exact.GetValueOrDefault(address);
+            if (diagnostic.Code != "UnknownDataTextSchema" || !attributeFlow.Contains(address))
+                return index.MatchUse(diagnostic, access, exactAccess, required, resolvedDiagnostics);
+            index.Charge(address.Artifact.RelativePath.Length);
+            attributeDiagnostics.Add((diagnostic, access, exactAccess));
+            return true;
+        }
+
         bool ResolveNested(ExtractionDiagnostic diagnostic)
         {
             var address = diagnostic.Address;
@@ -134,44 +163,37 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         }
     }
 
-    private bool MatchUse(ExtractionDiagnostic diagnostic, Dictionary<StorageCommandNode, CommandStorageAccess> observed,
-        Dictionary<SourceAddress, CommandStorageAccess> exact, HashSet<(string Storage, string Path)> required,
+    private bool MatchUse(ExtractionDiagnostic diagnostic, CommandStorageAccess? access, CommandStorageAccess? exact,
+        HashSet<(string Storage, string Path)> required,
         ImmutableHashSet<ExtractionDiagnostic>.Builder resolvedDiagnostics)
     {
         if (diagnostic.Code is "UnresolvedStorageBlankComparison" or "UnresolvedStorageControlComparison"
-            && exact.TryGetValue(diagnostic.Address, out var comparison))
+            && exact is { } comparison)
         {
             if (comparison.Use != CommandStorageUse.ScratchControlComparison)
                 Require(comparison.CopySource ?? (comparison.Storage, comparison.Path));
-            Resolve();
-            return true;
+            return Resolve(diagnostic, resolvedDiagnostics);
         }
-        if (diagnostic.Code == "UnknownDataTextSchema" && exact.TryGetValue(diagnostic.Address, out var copy))
+        if (diagnostic.Code == "UnknownDataTextSchema" && exact is { } copy)
         {
             if (copy.CopySource is { } from) Require(from);
             Require((copy.Storage, copy.Use == CommandStorageUse.EquipmentExport ? copy.Path + TaggedItemLorePath : copy.Path));
-            Resolve();
-            return true;
+            return Resolve(diagnostic, resolvedDiagnostics);
         }
-        var use = diagnostic.Code switch
-        {
-            "UnknownDataTextSchema" or "UnresolvedStorageBlankComparison" => CommandStorageUse.ListElementWrite,
-            "DynamicComponentReference" => CommandStorageUse.InterpretedDisplay,
-            _ => CommandStorageUse.Other
-        };
-        var address = diagnostic.Address;
-        if (use == CommandStorageUse.Other || address.Syntax?.NodePath is not { } syntax
-            || !observed.TryGetValue(new(use, address.Artifact, address.Chunk, address.NodePath, syntax), out var access)) return false;
-        var reader = use == CommandStorageUse.InterpretedDisplay;
+        if (access is null) return false;
+        var reader = access.Use == CommandStorageUse.InterpretedDisplay;
         var requiredPath = reader ? DisplayPath(access.Path) : access.Path;
         Require((access.Storage, requiredPath));
-        if (reader) Resolve();
-        return true;
+        return !reader || Resolve(diagnostic, resolvedDiagnostics);
 
         void Require((string Storage, string Path) target)
         { if (required.Add(target)) Charge(target.Storage.Length + target.Path.Length); }
-        void Resolve()
-        { if (resolvedDiagnostics.Add(diagnostic)) Charge(diagnostic.Address.Artifact.RelativePath.Length); }
+    }
+
+    private bool Resolve(ExtractionDiagnostic diagnostic, ImmutableHashSet<ExtractionDiagnostic>.Builder resolvedDiagnostics)
+    {
+        if (resolvedDiagnostics.Add(diagnostic)) Charge(diagnostic.Address.Artifact.RelativePath.Length);
+        return true;
     }
 
     internal static bool HasOpaqueStorage(ReadOnlySpan<byte> json)
