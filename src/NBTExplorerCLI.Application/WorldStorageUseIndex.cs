@@ -38,10 +38,11 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
         foreach (var row in extraction.ReadStorageObservations(access =>
         {
             index.Observe(access);
+            var use = access.Use == CommandStorageUse.ListReplacement ? CommandStorageUse.ListElementWrite : access.Use;
             if (covered && !access.HasUnclassifiedReferences && access.Address.Syntax?.NodePath is { } syntax
-                && (access.Use == CommandStorageUse.ListElementWrite
-                    || access.Use == CommandStorageUse.InterpretedDisplay && access.Path.EndsWith("[]", StringComparison.Ordinal)))
-                observed.TryAdd(new(access.Use, access.Address.Artifact, access.Address.Chunk, access.Address.NodePath, syntax), access);
+                && (use == CommandStorageUse.ListElementWrite
+                    || use == CommandStorageUse.InterpretedDisplay && access.Path.EndsWith("[]", StringComparison.Ordinal)))
+                observed.TryAdd(new(use, access.Address.Artifact, access.Address.Chunk, access.Address.NodePath, syntax), access);
         }, () => covered = false))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -114,8 +115,9 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             case CommandStorageUse.InterpretedDisplay when access.Path.EndsWith("[]", StringComparison.Ordinal):
                 MatchPath(ref storage.DisplayPath, access.Path[..^2], storage);
                 break;
-            case CommandStorageUse.ListElementWrite when access.Address.SemanticRole == "command.function":
+            case CommandStorageUse.ListElementWrite or CommandStorageUse.ListReplacement when access.Address.SemanticRole == "command.function":
                 MatchPath(ref storage.WritePath, access.Path, storage);
+                storage.HasElementWrite |= access.Use == CommandStorageUse.ListElementWrite;
                 var artifact = access.Address.Artifact.RelativePath;
                 if (storage.Producers.Add(artifact)) Charge(artifact.Length);
                 break;
@@ -150,7 +152,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
             {
                 var path = storage.WritePath!;
                 var localId = id[(group.Key.Length + 1)..];
-                if (root is null || EmptySeed(root, localId, path)) yield return (id, path);
+                if (root is null || EmptySeed(root, localId, path, storage.HasElementWrite)) yield return (id, path);
             }
         }
     }
@@ -172,12 +174,13 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
     private static bool CompleteScope(WorldDiscoveryResult discovery)
         => discovery.Complete && discovery.Scope is { Dimensions.IsEmpty: true, Regions.IsEmpty: true, Types.IsEmpty: true, ArtifactPaths.IsEmpty: true };
 
-    private static bool EmptySeed(NbtValue root, string id, string path)
+    private static bool EmptySeed(NbtValue root, string id, string path, bool hasElementWrite)
     {
         var segments = new[] { "data", "contents", id }.Concat(path.Split('.')).Select(PathSegment.ForKey);
         var found = NbtLocator.Resolve(root, new(segments));
         return found is { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }
-            || found is { Status: ResolutionStatus.Found, Value: NbtList { Items.IsEmpty: true, ElementType: NbtType.End or NbtType.String } };
+            || found is { Status: ResolutionStatus.Found, Value: NbtList { Items.IsEmpty: true } list }
+            && (!hasElementWrite || list.ElementType is NbtType.End or NbtType.String);
     }
 
     private void MatchPath(ref string? current, string candidate, StorageUses storage)
@@ -196,6 +199,7 @@ internal sealed class WorldStorageUseIndex(DecodeLimits limits)
     {
         internal string? DisplayPath;
         internal string? WritePath;
+        internal bool HasElementWrite;
         internal bool Ambiguous;
         internal HashSet<string> Producers { get; } = new(StringComparer.Ordinal);
     }

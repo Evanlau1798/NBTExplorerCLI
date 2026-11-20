@@ -28,7 +28,8 @@ internal sealed partial class CommandTextReader
         if (storageElement is { } list)
         {
             var value = tokens[^1];
-            ObserveStorage(list.Storage, list.Path, CommandStorageUse.ListElementWrite,
+            var use = tokens[index + 5].Text == "set" ? CommandStorageUse.ListReplacement : CommandStorageUse.ListElementWrite;
+            ObserveStorage(list.Storage, list.Path, use,
                 Address(path, value.Start, value.Text.Length, source.Address.SemanticRole));
             return;
         }
@@ -73,15 +74,16 @@ internal sealed partial class CommandTextReader
     private static (string Storage, string Path)? StorageDisplayWrite(List<CommandToken> tokens, int index)
         => tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "storage"
             && MinecraftIdentifier.ResourceLocation(tokens[index + 3].Text) && tokens[index + 4].Text.Split('.').All(PlainControlToken)
-            && tokens[index + 5].Text is "append" or "prepend" && tokens[index + 6].Text == "value"
+            && (tokens[index + 5].Text is "append" or "prepend" || tokens[index + 5].Text == "set" && tokens[^1].Text.StartsWith('['))
+            && tokens[index + 6].Text == "value"
             ? (MinecraftIdentifier.DefaultNamespace(tokens[index + 3].Text), tokens[index + 4].Text) : null;
 
-    private bool ReadStorageDisplayWrite(List<CommandToken> tokens, TypedPath path, (string Storage, string Path)? storageElement)
+    private bool ReadStorageDisplayWrite(List<CommandToken> tokens, int index, TypedPath path, (string Storage, string Path)? storageElement)
     {
         if (storageDisplayLists is not { Count: > 0 } || storageElement is not { } list || !storageDisplayLists.Contains(list)) return false;
         var value = tokens[^1];
         Component(value.Start, value.Start + value.Text.Length, TextExtractionCollector.At(path, "storage.list.value"),
-            storedRole: source.Address.SemanticRole + ".storage.component");
+            storedRole: source.Address.SemanticRole + ".storage.component", storedList: tokens[index + 5].Text == "set");
         return true;
     }
 

@@ -81,6 +81,11 @@ internal sealed partial class NbtTextReader(SourceAddress binding, CapabilityPro
             yield return (child, childPath);
         }
     }
+    internal void ComponentList(NbtValue value, TypedPath path, string role)
+    {
+        foreach (var (item, itemPath) in Sequence(value, path)) Component(item, itemPath, role);
+    }
+
     internal void Component(NbtValue? value, TypedPath path, string role, bool classicEncoded = false)
     {
         if (value is null || !output.CouldInclude(role)) return;

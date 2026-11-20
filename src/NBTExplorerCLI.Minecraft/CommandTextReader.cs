@@ -181,7 +181,7 @@ internal sealed partial class CommandTextReader
         if (argument < 0) { Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownCommandGrammar"); return; }
         Component(tokens[argument].Start, end, At(path, name + ".text"));
     }
-    private void Component(int start, int end, TypedPath grammarPath, string? itemComponent = null, string? storedRole = null)
+    private void Component(int start, int end, TypedPath grammarPath, string? itemComponent = null, string? storedRole = null, bool storedList = false)
     {
         var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, storedRole ?? source.Address.SemanticRole + ".text", source.Address.Dimension, source.Address.Chunk);
         var modern = itemComponent is not null || storedRole is not null || profile.Features[ProfileFacet.TextSchema].Schema == "java-text-nbt";
@@ -189,7 +189,7 @@ internal sealed partial class CommandTextReader
         var spans = modern ? null : componentRoot is null ? NativeJsonStringSpans.Read(bytes, limits) : NativeJsonValueSpans.Read(bytes, limits);
         var callback = ComponentCallback(grammarPath, start, modern, spans);
         var result = itemComponent is not null ? SnbtTextExtractor.ItemComponent(binding, source.Command[start..end], profile, itemComponent, limits, scope, callback)
-            : modern ? SnbtTextExtractor.Component(binding, source.Command[start..end], profile, limits, scope, callback)
+            : modern ? SnbtTextExtractor.Component(binding, source.Command[start..end], profile, limits, scope, callback, storedList)
             : TextComponentExtractor.NativeJson(binding, bytes, profile, limits, scope, callback);
         MergeComponent(result, grammarPath, start, end, modern, spans);
         if (result.Diagnostics.IsEmpty) ComponentReferences(bytes, start, end, grammarPath, modern,

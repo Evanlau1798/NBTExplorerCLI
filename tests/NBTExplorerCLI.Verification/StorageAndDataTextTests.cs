@@ -35,6 +35,7 @@ internal static class StorageAndDataTextTests
         new("prepare-world-storage-late-namespaced-reader", "preparation", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(false, true)),
         new("apply-storage-late-namespaced-reader-forward-recovery", "apply", _ => StorageCommandProofTests.AliasedSeedAfterPreparation(true, true)),
         new("cli-session-write-storage-archive", "cli-session-write", _ => StorageCommandProofTests.CliArchiveSession()),
+        new("prepare-world-storage-list-replacements", "preparation", _ => StorageCommandProofTests.WholeListReplacements()),
         new("text-namespaced-data-json-literal-artifact", "discovery", _ => NamespacedDataJsonKeepsLiteralArtifact())
     ];
 

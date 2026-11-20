@@ -259,6 +259,71 @@ internal static class StorageCommandProofTests
         finally { Directory.Delete(root, true); Directory.Delete(work, true); }
     }
 
+    internal static void WholeListReplacements()
+    {
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild(); var state = ScratchDirectory.CreateChild();
+        const string alternate = Folder + "alternate.mcfunction";
+        const string reset = Folder + "reset.mcfunction";
+        const string first = """data modify storage demo:messages lines set value ['{"text":"First"}','{"text":"Heading"}']""";
+        const string second = """data modify storage demo:messages lines set value ['{"text":"Second"}','{"text":"Ending"}']""";
+        try
+        {
+            Create(root);
+            Put(root, Producer, Encoding.UTF8.GetBytes(first));
+            Put(root, alternate, Encoding.UTF8.GetBytes(second));
+            var snapshot = WorldQueryTests.Query(root, cache);
+            Require(snapshot.Manifest.CoverageComplete, "literal list replacements with an exclusive interpreted reader are fully projected");
+            var slots = snapshot.ReadSources().Where(row => row.Source.Location.Artifact.RelativePath is Producer or alternate)
+                .SelectMany(row => row.Text!.Occurrences).ToArray();
+            Require(slots.Select(slot => slot.Text).Order().SequenceEqual(new[] { "Ending", "First", "Heading", "Second" }),
+                "each whole-list writer contributes independent ordered component spans");
+            var operations = slots.Select((occurrence, index) =>
+            {
+                var slot = occurrence.ToSlot("en_us", "zh_tw");
+                return new LiteralPatch("list-text-" + index, new(slot, new(slot.Id, slot.SourceTextHash, "zh_tw", "譯：" + slot.SourceText)));
+            }).ToArray();
+            var inventory = new WorldInventory(root, World); var storage = new ArtifactStorage(root, World);
+            var plan = new WorldPlanBuilder(inventory).Build(snapshot, operations);
+            using var prepared = new WorldPlanPreparation(inventory, storage).Prepare(snapshot, plan, true);
+            var engine = WorldApplyTests.Engine(root, state, storage);
+            Require(engine.Apply(prepared, true).Success, "both independently bound list writers can be committed");
+            static string[] Values(string command)
+            {
+                var value = command[(command.IndexOf(" set value ", StringComparison.Ordinal) + 11)..];
+                var list = (LogicalMinecraftList)Snbt.ParseDocument(Encoding.UTF8.GetBytes(value)).Root.Value;
+                return list.Items.Select(item =>
+                {
+                    using var component = JsonDocument.Parse(((NbtString)((LogicalMinecraftLeaf)item).Value).Value);
+                    return component.RootElement.GetProperty("text").GetString()!;
+                }).ToArray();
+            }
+            Require(Values(File.ReadAllText(Path.Combine(root, Producer))).SequenceEqual(new[] { "譯：First", "譯：Heading" })
+                && Values(File.ReadAllText(Path.Combine(root, alternate))).SequenceEqual(new[] { "譯：Second", "譯：Ending" }), "candidate readback preserves each branch and its list order");
+            Require(engine.Recover(plan.PlanHash, true, rollback: true).Counts[OperationOutcome.RolledBack] == 4
+                && File.ReadAllText(Path.Combine(root, Producer)) == first && File.ReadAllText(Path.Combine(root, alternate)) == second,
+                "rollback restores both original command byte streams");
+            PutSeed(root, new NbtList(NbtType.Int, []));
+            Require(WorldQueryTests.Query(root, cache).Manifest.CoverageComplete,
+                "a replacement is independent of the declared element type of an empty saved list");
+            Put(root, alternate, Encoding.UTF8.GetBytes(Writer));
+            Require(!WorldQueryTests.Query(root, cache).Manifest.CoverageComplete,
+                "an element append still needs a compatible saved list type");
+            Put(root, alternate, Encoding.UTF8.GetBytes(second));
+            File.Delete(Path.Combine(root, "data/command_storage_demo.dat"));
+            Require(WorldQueryTests.Query(root, cache).Manifest.CoverageComplete,
+                "literal list replacements also work without a saved seed");
+            Put(root, reset, "data modify storage demo:messages lines set value [ ]"u8.ToArray());
+            var withReset = WorldQueryTests.Query(root, cache);
+            Require(withReset.Manifest.CoverageComplete && withReset.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == Producer).Text!.Occurrences.Length == 2,
+                "an empty list reset does not invalidate an exclusive interpreted use");
+            Put(root, Consumer, Encoding.UTF8.GetBytes(Reader + "\ndata get storage demo:messages lines[]"));
+            var mixed = WorldQueryTests.Query(root, cache);
+            Require(!mixed.Manifest.CoverageComplete && mixed.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == Producer).Text!.Occurrences.IsEmpty,
+                "a raw reader invalidates the cached whole-list interpretation");
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); Directory.Delete(state, true); }
+    }
+
     private static void Create(string root, bool seed = true)
     {
         var level = WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions);
