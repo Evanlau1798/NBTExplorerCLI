@@ -21,16 +21,20 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
 
 ## 步驟 1：開啟翻譯進度（`translate start`）
 
-對你的世界副本（`D:\WorldCopy`）執行 `translate start`，告訴工具地圖原本是什麼語言（`--source-language`）、你要翻成什麼語言（`--target-language`），以及每頁想要幾筆文字（`--page-size`）：
+對你的世界副本（`D:\WorldCopy`）執行 `translate start`。新建翻譯工作時可直接省略 `--source-language` 與 `--target-language`：來源會依可辨識的內容自動選取（無法確定時標為 `und`），目標採用目前 Windows 帳戶的系統顯示語言，兩者會在建立工作時顯示並綁定。只有需要指定其他語言時才傳入覆寫旗標：
 
 ```powershell title="PowerShell"
+# 自動偵測來源並以系統顯示語言開啟翻譯進度
+.\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30
+
+# 需要指定其他語言對時以旗標覆寫（例如日語翻德語）
 .\nbtcli.exe translate start 'D:\WorldCopy' `
-  --source-language en_us `
-  --target-language zh_tw `
+  --source-language ja-JP `
+  --target-language de-DE `
   --page-size 30
 ```
 
-會回傳類似這樣的結果：
+會回傳類似這樣的結果（以繁體中文目標為例）：
 
 ```json title="輸出結果"
 {
@@ -45,19 +49,23 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
       "revision": 0,
       "total": 60,
       "pending": 60
-    }
+    },
+    "sourceLocale": "en",
+    "targetLocale": "zh_tw"
   },
   "error": null
 }
 ```
 
 把 **`sessionId`** 記下來，後面每個步驟都會用到它：
+- `sourceLocale`／`targetLocale`：建立工作時解析並綁定的語言對。後續續作同一進度時即使變更系統顯示語言，仍會沿用已綁定語言。若系統未提供可用的顯示語言，CLI 會以英文提示傳入 `--target-language <語言>`。
+- 來源為 `und`：當內容只有短字串、專名或混合語言而無法確定來源時，會標為 `und`；仍可依原文繼續翻譯，或在新建工作時明示 `--source-language`。
 - `total`：這張地圖總共找到幾筆可翻譯文字。
 - `pending`：還有幾筆尚未翻譯。
 - `revision`：版本計數器，每成功提交一頁就會加 `1`。
 
 :::note[為什麼翻譯不會把顏色和指令弄壞？]
-每一行告示牌、每一頁書本或每個物品名稱都有自己獨立的 `slotId`，就算兩塊告示牌寫著同樣的英文，你也可以依不同場景翻成不同中文。而且你只需要修改純文字，底層的顏色、點擊／懸停事件與選擇器都安全保存在工具內，不怕手滑打錯符號把機關搞壞。
+每一行告示牌、每一頁書本或每個物品名稱都有自己獨立的 `slotId`，就算兩塊告示牌寫著相同的原文，你也可以依不同場景翻成不同譯文。而且你只需要修改純文字，底層的顏色、點擊／懸停事件與選擇器都安全保存在工具內，不怕手滑打錯符號把機關搞壞。
 :::
 
 ---
@@ -87,13 +95,13 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
      Set-Content -Encoding utf8 'D:\Translate\reply-0.json'
    ```
 
-   - `page-0-prompt.txt`：給你參考的原文清單與來源位置（看得出是告示牌、書本還是物品）。
-   - `reply-0.json`：實際要填寫譯文並交回去的檔案。
+   - `page-0-prompt.txt`：給你參考的原文清單、上下文與固定英文的翻譯指引（不論翻譯語言為何，CLI 自有操作指引皆為英文）。
+   - `reply-0.json`：實際要填寫譯文並交回去的檔案，保留工作階段綁定的 `targetLocale` 與識別欄位。
 
 2. **填寫 `reply-0.json`**
 
    用記事本或 VS Code 打開 `D:\Translate\reply-0.json`。裡面的編號欄位（如 `operationId`、`sessionId`、`slotId`、`sourceTextHash`）都保持原樣不要動，也不要刪減 `slots` 裡的任何一筆：
-   - **有翻譯的項目**：把 `"state"` 改成 `"translated"`，並在 `"text"` 填入中文譯文。
+   - **有翻譯的項目**：把 `"state"` 改成 `"translated"`，並在 `"text"` 填入目標語言譯文。
    - **刻意保留原文不翻**（例如特殊符號或人名）：把 `"state"` 改成 `"unchanged"`，並把 `"text"` 設為 `null`。
 
 3. **提交這一頁並前進到下一頁（`submit` 或 `advance`）**
@@ -150,7 +158,7 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
    <Tabs syncKey="translate-plan-mode">
      <TabItem label="直接把譯文寫進地圖 (--direct)">
 
-   **對玩家最簡單**：直接替換地圖裡的文字，玩家下載地圖打開就能看到中文，完全不用裝資源包：
+   **對玩家最簡單**：直接替換地圖裡的文字，玩家下載地圖打開就能看到譯文，完全不用裝資源包：
 
    ```powershell title="PowerShell"
    $opId = [guid]::NewGuid().ToString()
@@ -166,7 +174,7 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
      </TabItem>
      <TabItem label="轉成翻譯鍵並附加語言檔 (--keys)">
 
-   把地圖文字改成翻譯鍵，並把 `.json` 語言檔打包進資源包，支援多語言切換（詳見 **[資源包與語言檔輸出](../resources-and-packs/)**）：
+   把地圖文字改成翻譯鍵，並把 `.json` 語言檔打包進資源包，支援多語言切換（下例以目標語言 `zh_tw` 為示範，詳見 **[資源包與語言檔輸出](../resources-and-packs/)**）：
 
    ```powershell title="PowerShell"
    $opId = [guid]::NewGuid().ToString()
@@ -184,7 +192,7 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
      </TabItem>
    </Tabs>
 
-   *（如果你不想改動地圖本身，只想匯出獨立 `.zip` 資源包，請看 **[資源包與語言檔輸出](../resources-and-packs/)** 的 `export-lang` 與 `create-pack`。）*
+   *（如果你不想改動地圖本身，只想匯出獨立 `.zip` 資源包或雙語語系檔，請看 **[資源包與語言檔輸出](../resources-and-packs/)** 的 `export-lang` 與 `create-pack`。若翻譯進度的 `sourceLocale` 為 `und`，匯出雙語語系檔時須另以 `--original-lang <語言>` 指明來源。）*
 
 2. **關閉 Minecraft，離線套用計畫（`apply`）**
 
@@ -221,27 +229,43 @@ import WorkflowPipeline from '../../../../components/WorkflowPipeline.astro';
 
 ---
 
-## 遇到未支援來源時匯出翻譯草稿
+## 遇到未支援來源時匯出翻譯草稿（`translate fallback`）
 
-掃描能讀取來源、但尚未判定文字用途時，可用 `translate fallback` 匯出選定標籤或指令行、候選文字路徑與回覆範本。支援 NBT、JSON、SNBT 和 UTF-8 純文字。
+掃描能讀取來源（或單一檔案）、但尚未判定文字用途時，可用 `translate fallback` 匯出完整選取範圍作為上下文（`data.context`）、可編輯候選文字葉（`data.candidates`）、未驗證分支清單（`data.unverified`）與有版本的回覆範本（`data.replyTemplate`，`nbtcli.translation-draft-reply` v2）。支援 NBT、JSON、SNBT 與 UTF-8 純文字。
 
-```powershell
+與 `translate start` 相同，省略 `--source-language` 與 `--target-language` 時會自動解析來源（無法確定時為 `und`）與目前 Windows 顯示語言，並綁定至 `draftId`、`sourceLocale` 與 `targetLocale`；需要時也可明示旗標覆寫：
+
+```powershell title="單一 NBT 檔：匯出草稿、指定已確認自訂欄位與驗證回覆"
+# 1. 匯出 /dialogue 的上下文與已辨識的可編輯文字葉
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+
+# 2. 若已確認某個自訂欄位用於顯示，可用 --text-pointer 指定相對於選取範圍的精確路徑
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption
+
+# 3. 提交填好的回覆檔進行驗證（沿用草稿綁定語言，且須維持相同選取與 --text-pointer）
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --reply 'D:\reply.json'
+```
+
+也可以指定世界內的資料包函式行號（或用 `--entry` 指定 ZIP 成員、`--chunk x,z` 指定區塊、`--byte-range 起始,長度` 指定從 0 開始的 UTF-8 位元組範圍）：
+
+```powershell title="世界資料包函式指定行"
+New-Item -ItemType Directory -Path 'D:\Drafts' -Force | Out-Null
+
 .\nbtcli.exe translate fallback 'D:\WorldCopy' `
   --path 'datapacks/story/data/story/functions/dialogue.mcfunction' --line 12 `
   --output 'D:\Drafts\dialogue-context.json'
-```
 
-NBT 檔可以用 `--pointer` 選標籤，省略時會讀取根標籤。讀取區塊時需指定 `--chunk x,z`，獨立區域檔還需指定維度。ZIP 可用 `--entry` 選定成員。獨立 SNBT 片段使用 `--format snbt`。行號從 1 開始，預設讀取指令行末尾的結構化參數。若標籤嵌在其他格式中，可用 `--byte-range 起始,長度` 指定從 0 開始的 UTF-8 位元組位置，並選擇 `--format json`、`snbt` 或 `text`。指定 `--format text` 時會產生純文字草稿，結果會標明 `structureVerified: false`。
-
-把 `data.replyTemplate` 存成另一個 JSON 檔，只填入要翻譯欄位的 `text`，其餘可留 `null`。再次執行相同選取條件，加上 `--reply` 和新的輸出檔名。
-
-```powershell
 .\nbtcli.exe translate fallback 'D:\WorldCopy' `
   --path 'datapacks/story/data/story/functions/dialogue.mcfunction' --line 12 `
   --reply 'D:\Drafts\dialogue-reply.json' --output 'D:\Drafts\dialogue-validated.json'
 ```
 
-譯後片段在 `data.content`。CLI 會比對原始來源和候選欄位、驗證格式碼、數值和私用區字元，並保留結構化草稿的其他欄位。選取單行時，輸出必須維持一個物理行，能以跳脫表示的字串換行仍可保留。即使只選取單一檔案，也請將草稿匯出到 Minecraft 世界資料夾以外。結果會標明 `gameplayVerified: false`。請先在世界副本核對指令或畫面，再將草稿納入編輯。原始來源與掃描狀態會保留。
+使用與驗證重點：
+- **選取範圍與 `--text-pointer`**：NBT 或 JSON 檔可用 `--pointer` 選取標籤（省略則讀取根節點）。整個選取範圍會提供作為上下文，但回覆只能修改已確認的可編輯文字葉；若已確認某個自訂欄位用於畫面顯示，可用 `--text-pointer` 指定相對於選取範圍的精確路徑（例如 `/caption`）。提交 `--reply` 時須沿用完全相同的選取條件與 `--text-pointer`。
+- **語言綁定與回覆範本**：將 `data.replyTemplate` 另存成 JSON 檔，只填入要翻譯槽位的 `text`（其餘保留 `null`），並維持 `draftId`、`sourceLocale`、`targetLocale`、`slotId` 與 `sourceTextHash` 不變。提交 `--reply` 時省略語言旗標會沿用草稿綁定的語言（不受系統語言變更影響）；若明示語言旗標則須與草稿相符。
+- **逐層驗證與保護**：格式碼、佔位符、數值、私用區字元、羅馬級數後綴與未證明的自訂字型都會受到保護。未知用途或內層破損／歧義的分支會保留原值並記錄在 `data.unverified`（只要 `unverified` 非空或使用 `--format text`，`structureVerified` 即為 `false`），同層其餘可證明的文字葉仍可翻譯。
+- **行號、位元組與 SNBT 選項**：行號從 `1` 開始，預設讀取指令行末尾的結構化參數，且輸出須維持單一物理行。獨立 SNBT 片段可用 `--format snbt`（搭配選用 `--snbt-profile`），嵌入其他格式的片段則用 `--byte-range 起始,長度` 搭配 `--format json|snbt|text`。
+- **正式套用邊界**：即使只針對單一檔案，也請將草稿匯出到 Minecraft 世界資料夾之外。驗證結果會把譯後片段放在 `data.content` 並標註 `gameplayVerified: false`；僅通過草稿驗證的文字仍須符合正式套用條件，原始檔案與整圖掃描狀態都不會因此改變。
 
 ## 選用進階小幫手
 
@@ -279,17 +303,15 @@ NBT 檔可以用 `--pointer` 選標籤，省略時會讀取根標籤。讀取區
   --glossary-version '<術語表版本號>'
 ```
 
-### 為外部工具儲存預設語言偏好（`agent`）
+### 為外部工具儲存本機偏好（`agent`）
 
-如果想幫這個世界固定存下預設的來源／目標語言與每頁筆數，可選用 `agent` 指令：
+如果想幫外部腳本或 AI 工具記錄這個世界的本機偏好（例如 `preferredItemsPerPage` 與建議語言資訊），可選用 `agent` 指令：
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 
-# 1. 匯出偏好設定問卷
+# 1. 匯出偏好設定問卷（sourceLanguage 預設為 "auto"，targetLanguage 採用系統顯示語言；可視需要加上 --source-language / --target-language）
 .\nbtcli.exe agent setup 'D:\WorldCopy' `
-  --source-language en_us `
-  --target-language zh_tw `
   --output 'D:\Translate\agent-questionnaire.json'
 
 # 2. 在檔案裡填寫 configuration.agentName 後提交儲存
@@ -299,6 +321,6 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 .\nbtcli.exe agent status 'D:\WorldCopy'
 ```
 
-`agent` 只會把偏好存在本機狀態目錄內，絕不會主動連網，也不會修改你的世界存檔。
+`agent` 只會把偏好存在本機狀態目錄內，絕不會主動連網，也不會修改你的世界存檔。請注意：執行 `translate start` 省略語言旗標時仍採用自動來源辨識與系統顯示語言，欲為該次工作覆寫語言請直接傳入語言選項。
 
 </details>

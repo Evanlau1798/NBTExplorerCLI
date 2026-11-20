@@ -313,8 +313,8 @@ export const COMMAND_SURFACE: CommandEntry[] = [
     syntax: 'nbtcli convert <world> --lang <locale>',
     tier: 'preview',
     requiredArgs: {
-      en: 'World folder and --lang <locale> (such as en_us or zh_tw)',
-      'zh-tw': '世界資料夾與 --lang <語言代碼>（例如 en_us 或 zh_tw）',
+      en: 'World folder and --lang <locale> (such as en_us or de_de)',
+      'zh-tw': '世界資料夾與 --lang <語言代碼>（例如 zh_tw 或 en_us）',
     },
     summary: {
       en: 'Converts in-world text into translation keys and builds a matching language file in one go, without starting a paginated translation session.',
@@ -328,15 +328,15 @@ export const COMMAND_SURFACE: CommandEntry[] = [
   {
     id: 'translate',
     group: 'translate',
-    syntax: 'nbtcli translate <subcommand> <world> [options]',
+    syntax: 'nbtcli translate <subcommand> <world-or-file> [options]',
     tier: 'preview',
     requiredArgs: {
       en: 'Subcommand (start, status, export, advance, submit, get, jump, note, glossary, reset, groups, memory, plan, export-lang, create-pack, seal, fallback, help)',
       'zh-tw': '子命令（start、status、export、advance、submit、get、jump、note、glossary、reset、groups、memory、plan、export-lang、create-pack、seal、fallback、help）',
     },
     summary: {
-      en: 'Runs the full page-by-page adventure map translation workflow, glossary management, resource pack export, and completion sealing.',
-      'zh-tw': '管理整套分頁式冒險地圖翻譯流程，包含進度追蹤、術語表、產生寫入計畫、匯出資源包與完成封存。',
+      en: 'Runs paginated adventure map translation with automatic language detection, glossary management, resource pack export, validated fallback drafts, and completion sealing.',
+      'zh-tw': '管理分頁式冒險地圖翻譯流程，支援自動語言辨識、術語表、寫入計畫、資源包匯出、fallback 草稿驗證與完成封存。',
     },
     resultAndNext: {
       en: 'All progress stays outside your world. Run nbtcli translate <subcommand> --help for options.',
@@ -353,8 +353,8 @@ export const COMMAND_SURFACE: CommandEntry[] = [
       'zh-tw': '子命令（setup、submit、status 或 help）與世界資料夾',
     },
     summary: {
-      en: 'Optionally saves default source/target languages and page-size preferences for external translation scripts or AI tools.',
-      'zh-tw': '選用功能：幫這個世界記住預設的來源語言、目標語言與每頁筆數，方便外部翻譯腳本或 AI 工具沿用。',
+      en: 'Optionally stores local client preferences (such as preferred page size and suggested languages) for external scripts or AI tools. Omitting language flags on translate start still uses automatic defaults.',
+      'zh-tw': '選用功能：在本機儲存外部腳本或 AI 工具的偏好設定（如預設每頁筆數與建議語言）；執行 translate start 省略語言旗標時仍沿用自動預設。',
     },
     resultAndNext: {
       en: 'Stored locally outside your world; never connects to the internet.',

@@ -15,15 +15,18 @@ import SafetyBanner from '../../../../components/SafetyBanner.astro';
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 ```
 
-看輸出裡的 `data.value`，對照常見版本號：
-- `3465` = Java `1.20.1`
-- `3700` = Java `1.20.4`
-- `3953` = Java `1.21`
-- `4325` = Java `1.21.5`
-- `4671` = Java `1.21.11`
-- `4774` = Java `26.1-snapshot-6`
+看輸出裡的 `data.value`，對照格式家族區間（NBTExplorerCLI 支援 `DataVersion 100` 至 `4774+`；可執行 `.\nbtcli.exe capabilities` 或查閱 [支援版本與疑難排解](../support-and-troubleshooting/) 的完整 17 個家族）：
+- `3463–3566` = `java-1.20.1` 家族（代表值：`3465`）
+- `3567–3689` = `java-1.20.2` 家族（代表值：`3578`）
+- `3690–3818` = `java-1.20.4` 家族（代表值：`3700`）
+- `3821–3945` = `java-1.20.5` 家族（代表值：`3837`）
+- `3946–4297` = `java-1.21` 家族（代表值：`3953`）
+- `4317–4535` = `java-1.21.5` 家族（代表值：`4325`）
+- `4536–4670` = `java-1.21.9` 家族（代表值：`4554`）
+- `4671–4773` = `java-1.21.11` 家族（代表值：`4671`）
+- `4774+` = `java-26.1-snapshot-6` 命名空間結構家族
 
-*（1.9 之前的老舊 Anvil 存檔沒有 `DataVersion`，請參閱 [支援版本與疑難排解](../support-and-troubleshooting/) 使用 `--minecraft-version`。）*
+*（1.9 之前的老舊 Anvil 存檔沒有 `DataVersion`，請參閱 [支援版本與疑難排解](../support-and-troubleshooting/) 搭配 `--minecraft-version` 使用 `1.2.5`、`1.5.2`、`1.6.4` 或 `1.8` 至 `1.8.9`。）*
 
 ---
 
@@ -80,17 +83,17 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 
 ---
 
-## 任務 4：把英文冒險地圖翻成繁體中文
+## 任務 4：翻譯一張冒險地圖
 
-以下是把英文地圖（`en_us`）翻成繁體中文（`zh_tw`）的標準起手式：
+省略 `--source-language` 與 `--target-language` 即可自動偵測來源並以 Windows 帳戶顯示語言作為目標，需要時再用旗標覆寫（例如日語翻德語）：
 
 ```powershell title="PowerShell"
-# 1. 開啟翻譯進度（每頁 30 筆文字，完全不改動原存檔）
-$start = .\nbtcli.exe translate start 'D:\WorldCopy' `
-  --source-language en_us `
-  --target-language zh_tw `
-  --page-size 30 | ConvertFrom-Json
+# 1a. 自動選取語言開啟翻譯進度（每頁 30 筆文字，完全不改動原存檔）
+$start = .\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30 | ConvertFrom-Json
 $sid = $start.data.status.sessionId
+
+# 1b. 或明確覆寫來源與目標語言（例如日語翻德語）
+# .\nbtcli.exe translate start 'D:\WorldCopy' --source-language ja-JP --target-language de-DE --page-size 30
 
 # 2. 匯出第 0 頁，並把可直接填寫譯文的範本存成 reply-0.json
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
@@ -111,7 +114,7 @@ $page.data.replyTemplate | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8
 
 ## 任務 5：不改地圖，只匯出客戶端 `.zip` 資源包
 
-翻譯進度全部完成（`pending: 0`）後，可以把譯文打包成獨立的 `.zip` 資源包（請將 `--pack-format 34` 換成符合你 Minecraft 版本的數值，見 [支援版本](../support-and-troubleshooting/)）：
+翻譯進度全部完成（`pending: 0`）後，可以把譯文打包成獨立的 `.zip` 資源包（以下以 `en_us` 翻成 `zh_tw` 為例；請將 `--pack-format 34` 換成符合你 Minecraft 版本的數值，見 [支援版本](../support-and-troubleshooting/)）。若翻譯進度的 `sourceLocale` 為 `und`，請務必加上 `--original-lang <語言>` 指明來源：
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-Null
@@ -172,3 +175,22 @@ New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
 ```
 
 看到 `success: true` 代表檔案結構正常；若有壞檔或不支援的項目，輸出會直接告訴你是哪一個檔案出問題。
+
+---
+
+## 任務 8：為尚未判定用途的檔案匯出並驗證草稿（`translate fallback`）
+
+針對掃描能讀取但尚未確認文字用途的標籤或單一檔案，可在不改動原檔的情況下匯出上下文與回覆範本並驗證譯文：
+
+```powershell title="PowerShell"
+# 1. 匯出 /dialogue 的上下文與可編輯文字葉（自動選取語言）
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+
+# 2. 若已確認某個自訂欄位用於顯示，用 --text-pointer 指定相對路徑
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption
+
+# 3. 驗證填寫完成的回覆 JSON（須維持相同選取範圍與 --text-pointer）
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --reply 'D:\reply.json'
+```
+
+將 `data.replyTemplate`（`nbtcli.translation-draft-reply` v2）另存填寫 `text`（不改動的槽位保留 `null`），再檢視 `data.content`、`data.structureVerified` 與 `data.unverified`。完整規則見 **[冒險地圖翻譯教學](../translation-workflow/)**。

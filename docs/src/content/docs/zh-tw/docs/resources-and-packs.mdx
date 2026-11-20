@@ -11,17 +11,17 @@ import { FileTree, Tabs, TabItem } from '@astrojs/starlight/components';
 
 | 交付方式 | 使用指令 | 會改地圖存檔嗎？ | 會產出資源包或語言檔嗎？ | 最推薦用在什麼情況 |
 | --- | --- | --- | --- | --- |
-| **直接把譯文寫進地圖** | `translate plan --direct` -> `apply` | 會 | 不會 | **對玩家最省事。** 載入地圖就能直接看中文，完全不需要掛載資源包。 |
+| **直接把譯文寫進地圖** | `translate plan --direct` -> `apply` | 會 | 不會 | **對玩家最省事。** 載入地圖就能直接看到譯文，完全不需要掛載資源包。 |
 | **多語言地圖（翻譯鍵 + 資源包）** | `translate plan --keys` -> `apply` | 會 | 會 | 希望同一張地圖支援多國語言，玩家切換 Minecraft 語言就能自動換字幕。 |
 | **只匯出獨立資源包** | `translate create-pack` | 不會（需指定外部 `--output`） | 會（`.zip` 或資料夾） | 不改動地圖本身的 NBT，只把譯文打包或合併成客戶端資源包。 |
-| **只匯出純語言 JSON 檔** | `translate export-lang` | 不會（需指定外部 `--output`） | 會（`en_us.json`、`zh_tw.json`） | 只需要原始 `.json` 語言檔交給其他翻譯或資源包作者使用。 |
+| **只匯出純語言 JSON 檔** | `translate export-lang` | 不會（需指定外部 `--output`） | 會（例如 `en_us.json`、`zh_tw.json`） | 只需要原始 `.json` 語言檔交給其他翻譯或資源包作者使用。 |
 | **單次全文抽成翻譯鍵** | `convert <world> --lang <locale>` | 會（加 `--apply` 時） | 會 | 不經分頁翻譯，直接把現有地圖的文字一次抽離成翻譯鍵與語言檔。 |
 
 ---
 
 ## 2. 把翻譯進度轉成翻譯鍵與資源包（`translate plan --keys`）
 
-如果希望地圖支援多語言，`--keys` 會把每一筆文字換成翻譯鍵（例如 `map.<代碼>`），同時在**同一份計畫**中產生對應的 `.json` 語言檔：
+如果希望地圖支援多語言，`--keys` 會把每一筆文字換成翻譯鍵（例如 `map.<代碼>`），同時在**同一份計畫**中產生對應的 `.json` 語言檔（以下以目標語言 `zh_tw` 為示範）：
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
@@ -39,7 +39,7 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 
 ### `--language-output` 支援的三種寫法
 
-`--language-output` 用來指定語言檔要放在世界內的哪裡：
+`--language-output` 用來指定語言檔要放在世界內的哪裡（請將 `zh_tw.json` 換成該翻譯進度綁定的目標語言檔名）：
 
 - **`generated.zip#assets/example/lang/zh_tw.json`**：自動新建一個 `.zip` 資源包。
 - **`resources.zip#assets/example/lang/zh_tw.json`**：安全合併進地圖原本就有的 `resources.zip`，原有的材質、音效與 `pack.png` 都會完整保留。
@@ -52,12 +52,12 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
   - assets/
     - adventure/
       - lang/
-        - **en_us.json** (原始語言文字)
-        - **zh_tw.json** (你的翻譯結果)
+        - **en_us.json** (原始語言文字範例)
+        - **zh_tw.json** (目標語言譯文範例)
 </FileTree>
 
 :::note[語言檔名要和目標語言一致]
-`--language-output` 結尾的語言檔名（例如 `zh_tw.json`）必須跟翻譯進度的目標語言一致，且既有資源包的 `pack.mcmeta` 版本必須相容你的世界版本。
+`--language-output` 結尾的語言檔名（例如 `zh_tw.json`）必須跟翻譯進度綁定的目標語言一致，且既有資源包的 `pack.mcmeta` 版本必須相容你的世界格式家族。
 :::
 
 ---
@@ -73,7 +73,7 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 <Tabs syncKey="pack-export-mode">
   <TabItem label="建立或合併客戶端資源包 (create-pack)">
 
-```powershell title="PowerShell"
+```powershell title="PowerShell（以 en_us 翻成 zh_tw 為例）"
 New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-Null
 
 # 先預覽（要直接輸出檔案時，加上 --apply --world-offline）
@@ -94,7 +94,7 @@ New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-N
   </TabItem>
   <TabItem label="匯出純語言 JSON 檔 (export-lang)">
 
-```powershell title="PowerShell"
+```powershell title="PowerShell（以 en_us 翻成 zh_tw 為例）"
 New-Item -ItemType Directory -Path 'D:\Exports\LangFiles', 'D:\Plans' -Force | Out-Null
 
 # 預覽獨立語言檔匯出
@@ -113,9 +113,10 @@ New-Item -ItemType Directory -Path 'D:\Exports\LangFiles', 'D:\Plans' -Force | O
 
 ### 常用選項說明
 
+- **`--original-lang` 與 `--target-lang`**：預設沿用翻譯進度綁定的 `sourceLocale` 與 `targetLocale`，且兩者不可相同。若進度的來源語言為 `und`，匯出成雙語語系檔時**必須**以 `--original-lang <語言>` 明示來源。
 - **`--output <資料夾>` vs. `--plan-output <計畫檔>`**：`--output` 指定匯出的 `.zip` 或 `.json` 要放哪裡；`--plan-output` 則是另存預覽計畫檔的位置。
 - **`--format zip|directory`**：選擇打包成單一 `.zip`（直接丟進 Minecraft 的 `resourcepacks` 資料夾就能用）或是解開的資料夾。
-- 匯出到世界外時，請填寫 **`--pack-format <版本號>`**。1.20.1 用 `15`、1.20.4 用 `22`、1.21 用 `34`、1.21.5 用 `55`、1.21.11 用 `75`、26.1-snapshot-6 用 `80`。
+- 匯出到世界外、或目標世界的預設資源包格式無法自動驗證時，請填寫 **`--pack-format <版本號>`**。常見代表版本值：1.20.1 用 `15`、1.20.2 用 `18`、1.20.4 用 `22`、1.20.5 用 `32`、1.21 用 `34`、1.21.5 用 `55`、1.21.9 用 `69`、1.21.11 用 `75`、26.1-snapshot-6 用 `80`。完整 17 個格式家族見 **[支援版本與疑難排解](../support-and-troubleshooting/)**。
 - **`--merge <路徑>`**：選用！把新翻好的語言檔合併進你原本的材質／音效資源包中，貼圖、音效與 `pack.png` 都會保留；若遇到衝突的翻譯鍵會主動提醒並中止，不會偷蓋掉原檔。
 
 <details>
@@ -149,7 +150,7 @@ New-Item -ItemType Directory -Path 'D:\Plans' -Force | Out-Null
 
 ## 5. 翻譯實體名稱時，避免把地圖指令方塊搞壞
 
-很多冒險地圖的指令方塊會用名字來抓特定的盔甲座或 NPC，例如 `@e[name="QuestGuide"]`。如果只把實體的名字翻成中文，卻沒同步改到抓它的指令，劇情或機關就可能卡關！
+很多冒險地圖的指令方塊會用名字來抓特定的盔甲座或 NPC，例如 `@e[name="QuestGuide"]`。如果只把實體的名字翻譯成其他語言，卻沒同步改到抓它的指令，劇情或機關就可能卡關！
 
 因此 NBTExplorerCLI 內建兩層保護：
 1. **預設安全攔截**：一般執行 `translate plan` 或 `convert` 時，如果改到具有識別用途的實體或盔甲座名稱，預設會先攔截提醒，防止意外破壞地圖機關。

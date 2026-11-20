@@ -207,6 +207,22 @@ export const TRANSLATE_SUBCOMMANDS: TranslateSubcommandEntry[] = [
       'zh-tw': '在確認世界更新（apply）成功後，將這份翻譯進度正式標記為已完成並封存。',
     },
   },
+  {
+    subcommand: 'fallback',
+    tier: 'safe',
+    summary: {
+      en: 'Exports a read-only context draft and validated reply template (v2) for an unresolved NBT, JSON, SNBT, or UTF-8 text source, with optional --text-pointer and --reply verification.',
+      'zh-tw': '針對尚未判定文字用途的 NBT、JSON、SNBT 或 UTF-8 純文字來源，匯出唯讀上下文草稿與回覆範本（v2），並支援以 --text-pointer 指定已確認顯示欄位及 --reply 驗證。',
+    },
+  },
+  {
+    subcommand: 'help',
+    tier: 'safe',
+    summary: {
+      en: 'Lists available translate subcommands and accepted options.',
+      'zh-tw': '列出所有可用的 translate 子命令與支援參數。',
+    },
+  },
 ];
 
 export interface ExitCodeEntry {
@@ -388,8 +404,17 @@ export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
   },
   {
     profile: 'java-1.20.1',
-    dataVersionRange: '3463–3689',
+    dataVersionRange: '3463–3566',
     packFormat: 15,
+    layout: 'java-dimensions-directory',
+    itemSchema: 'java-item-tags-1.20.4',
+    textSchema: 'java-text-json (v1)',
+    packLayout: 'java-pack-plural',
+  },
+  {
+    profile: 'java-1.20.2',
+    dataVersionRange: '3567–3689',
+    packFormat: 18,
     layout: 'java-dimensions-directory',
     itemSchema: 'java-item-tags-1.20.4',
     textSchema: 'java-text-json (v1)',

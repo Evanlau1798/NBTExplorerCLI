@@ -98,7 +98,13 @@ const filteredCommands =
             ? TRANSLATE_SUBCOMMANDS.find((entry) => entry.subcommand === sub.subcommand)
             : undefined;
         const tier = detail?.tier ?? (sub.subcommand === 'setup' || sub.subcommand === 'submit' ? 'preview' : 'safe');
-        const syntax = `nbtcli ${subcommandGroup} ${sub.subcommand}${sub.subcommand === 'help' ? '' : ' <world>'}`;
+        const targetArg =
+          sub.subcommand === 'help'
+            ? ''
+            : subcommandGroup === 'translate' && sub.subcommand === 'fallback'
+              ? ' <world-or-file>'
+              : ' <world>';
+        const syntax = `nbtcli ${subcommandGroup} ${sub.subcommand}${targetArg}`;
         const summary = detail ? (detail.summary[lang] ?? detail.summary.en) : '';
         const searchIndex = [syntax, summary, ...sub.options].join(' ').toLowerCase();
         return (

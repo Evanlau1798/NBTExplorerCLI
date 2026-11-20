@@ -35,14 +35,14 @@
 
 ## What You Can Do
 
-- **Inspect Worlds Without Risk**: Read `level.dat`, map regions (`.mca`), datapacks, and resource pack ZIPs in read-only mode — your save files stay untouched.
-- **Translate Entire Adventure Maps**: Automatically find text across signs, books, items, entities, scoreboards, bossbars, command blocks, and datapacks, translate page by page with a glossary, and apply cleanly.
+- **Inspect Worlds Without Risk**: Read `level.dat`, map regions (`.mca`), datapacks, and resource pack ZIPs across Java Edition format families (`DataVersion 100` through `4774+` plus classic Anvil) in read-only mode — your save files stay untouched.
+- **Translate Entire Adventure Maps Across Languages**: Automatically find text across signs, books, items, entities, scoreboards, bossbars, command blocks, and datapacks, resolve source/target languages automatically or by explicit flags, translate page by page with a glossary, and export validated `translate fallback` drafts for unresolved files.
 - **Export Language Files & Resource Packs**: Replace text directly inside the map, convert text into translation keys, or build/merge a client `.zip` resource pack without touching gameplay data.
 - **Edit Worlds With Built-in Safety Nets**: Every edit creates a reviewable plan first, saves an automatic backup outside your world folder before writing, and can finish or undo cleanly if interrupted.
 - **Ready for Scripts & AI Assistants**: Every command prints clean, structured JSON so PowerShell scripts and AI coding tools (Claude, ChatGPT, Codex, Cursor) can inspect or translate maps reliably.
 
 > [!NOTE]
-> **Built for Minecraft Java Edition on Windows x64.** No separate .NET installation is required. Always close Minecraft before applying edits, and test on a copy of your world first. Bedrock Edition saves and 3D visual block editing are not supported.
+> **Built for Minecraft Java Edition on Windows x64.** No separate .NET installation is required. CLI help, diagnostics, and translation prompt instructions are always in English, while map content can be translated between any valid language tags. Always close Minecraft before applying edits, and test on a copy of your world first. Bedrock Edition saves and 3D visual block editing are not supported.
 
 ---
 
@@ -97,12 +97,23 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 
 ### Start Translating an Adventure Map
 
+You can omit `--source-language` and `--target-language` when starting a translation job: source language is detected from recognizable content (or marked `und` if undetermined), target language uses your Windows account display language, and both languages are shown and bound to the session. Pass explicit flags only when you want to override them:
+
 ```powershell
-# Start a translation session (world files are NOT modified)
-.\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30
+# Start a translation session using automatic source detection and your Windows display language (world files are NOT modified)
+.\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30
+
+# Override source and target explicitly (for example, Japanese to German)
+.\nbtcli.exe translate start 'D:\WorldCopy' --source-language ja-JP --target-language de-DE --page-size 30
 ```
 
-See the **[Map Translation Guide][doc-translation]** for exporting pages, submitting translations, and applying results to your map or resource pack.
+Need to draft and validate translations for an unresolved NBT, JSON, SNBT, or text snippet outside a full map session? Use `translate fallback`:
+
+```powershell
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+```
+
+See the **[Map Translation Guide][doc-translation]** for exporting pages, submitting translations, using `translate fallback`, and applying results to your map or resource pack.
 
 ### Back Up a World Before Making Changes
 
@@ -125,13 +136,14 @@ Every command falls into one of three clear safety levels:
 | What you want to do | Command | Safety |
 | :--- | :--- | :--- |
 | Check version or command options | `.\nbtcli.exe --version` / `.\nbtcli.exe help <cmd>` | Read Only |
-| Switch error/help text to English or Traditional Chinese | Add `--ui-locale en-US` or `--ui-locale zh-TW` | Read Only |
+| Inspect supported Java Edition format families | `.\nbtcli.exe capabilities` | Read Only |
 | List world dimensions or chunk coordinates | `.\nbtcli.exe list 'D:\WorldCopy'` | Read Only |
 | Read a single value (e.g., world name or version) | `.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName` | Read Only |
 | Search tags by name or text | `.\nbtcli.exe search 'D:\WorldCopy' --path level.dat --name Spawn` | Read Only |
 | Count all translatable text in a map | `.\nbtcli.exe scan 'D:\WorldCopy' --summary` | Read Only |
 | Check a world for broken files or unsupported formats | `.\nbtcli.exe validate 'D:\WorldCopy'` | Read Only |
-| Start or continue a map translation session | `.\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw` | Preview Only |
+| Start a map translation session (auto languages) | `.\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30` | Preview Only |
+| Export a validated fallback draft from a tag or line | `.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue` | Read Only |
 | Back up a world before editing | `.\nbtcli.exe backup 'D:\WorldCopy' --suffix before-edit` | Read Only |
 | Apply a reviewed edit or translation plan | `.\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Plans\plan.json' --world-offline` | Modifies World |
 
@@ -147,7 +159,7 @@ Looking for ready-to-copy recipes? See **[Common Tasks (Recipes)][doc-recipes]**
 - **In-Repository File**: [`docs/public/llms.txt`](docs/public/llms.txt)
 - **Web Guide & Copy-Paste Prompts**: **[AI Agent Quickstart][doc-ai-agents]**
 
-`llms.txt` contains the full command surface, every flag, all 6 input JSON schemas, exit-code branching rules, step-by-step edit/translation/recovery SOPs, and common pitfalls in one fast-to-read document.
+`llms.txt` contains the full command surface, every flag, all 7 input JSON schemas, all 17 supported Java Edition format families, exit-code branching rules, step-by-step edit/translation/fallback/recovery SOPs, and common pitfalls in one fast-to-read document.
 
 ---
 

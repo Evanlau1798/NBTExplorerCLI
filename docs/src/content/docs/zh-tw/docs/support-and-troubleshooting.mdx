@@ -17,7 +17,7 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
 
 ### 含 DataVersion 的 Java 版存檔（自動辨識）
 
-`capabilities` 會列出各格式適用的 `minimumDataVersion` 與 `maximumDataVersion`，包含上下限。Java 1.20.2、1.20.6、1.21.1 與 1.21.4 可用下表對應的格式讀取。下表列出代表版本以及該版本的資源包格式。若 `create-pack` 無法驗證目標世界的資源包格式，請以 `--pack-format` 指定遊戲版本使用的格式。
+`capabilities` 會列出全部 17 個格式家族適用的 `minimumDataVersion` 與 `maximumDataVersion`（包含上下限）。中間版本（例如 Java 1.20.3、1.20.6、1.21.1 與 1.21.4）會自動對應至下表所屬的格式家族。下表列出各家族的 `DataVersion` 區間與代表版本的資源包格式；若 `create-pack` 無法驗證目標世界的資源包格式，請以 `--pack-format` 指定遊戲版本使用的格式。
 
 <ProfileTable lang="zh-tw" />
 
@@ -33,11 +33,9 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
 - **純讀取查閱**會自動支援（`java-classic-anvil`）。
 - **翻譯或直接編輯**時，在 `scan`、`extract`、`validate` 或 `translate start` 加上 `--minecraft-version` 指定遊戲版本。目前支援 **`1.2.5`**、**`1.5.2`**、**`1.6.4`** 與 **`1.8` 至 `1.8.9`**。
 
-```powershell title="範例：開始翻譯 Java 1.8.1 的經典冒險地圖"
+```powershell title="範例：開始翻譯 Java 1.8.1 的經典冒險地圖（自動語言；需要時可加 --source-language / --target-language 覆寫）"
 .\nbtcli.exe translate start 'D:\ClassicWorldCopy' `
-  --minecraft-version 1.8.1 `
-  --source-language en_us `
-  --target-language zh_tw
+  --minecraft-version 1.8.1
 ```
 
 翻譯工作階段及其直接更新計畫會記錄指定版本使用的格式設定。
@@ -131,6 +129,13 @@ import ProfileTable from '../../../../components/ProfileTable.astro';
 - 用 `--dimension`、`--region`、`--path` 或 `--types` 分批處理。
 - 翻譯時把 `--page-size` 或 `--page-bytes` 調小。
 - 簡化 `--match-pattern` 的篩選語法。
+
+### 狀況 7：語言解析、`und` 來源、`--ui-locale` 或 Fallback 回覆衝突
+
+- **系統未提供可用的顯示語言（退出碼 `2`）**：省略 `--target-language` 時若 Windows 未回傳可用的顯示語言，CLI 會以英文提示手動指定，例如 `--target-language de-DE`。
+- **辨識出的 `sourceLocale` 為 `und`**：短字串、專名或混合語言無法自動證明來源時會使用 `und`。仍可依原文繼續翻譯，或在新建工作時明示 `--source-language`；若要從 `und` 進度執行 `translate export-lang` 或 `translate create-pack` 匯出雙語語系檔，須另以 `--original-lang <語言>` 指明來源。
+- **傳入非 `en-US` 的 `--ui-locale` 被拒（退出碼 `2`）**：CLI 說明、錯誤、診斷與翻譯操作指引固定使用英文，請移除 `--ui-locale` 或改用 `--ui-locale en-US`。
+- **`translate fallback --reply` 回報 `CONFLICT`（退出碼 `3`）**：確認沿用與匯出草稿完全相同的輸入選取範圍與 `--text-pointer`，保留 `draftId`、`sourceLocale`、`targetLocale`、`slotId` 與 `sourceTextHash` 不變，並維持受保護的佔位符、數值、私用區字元與羅馬級數後綴。
 
 ---
 

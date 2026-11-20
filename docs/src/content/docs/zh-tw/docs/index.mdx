@@ -14,7 +14,7 @@ import DocsHub from '../../../../components/DocsHub.astro';
 :::
 
 <details>
-<summary>指令 JSON 輸出格式與提示語言切換（--ui-locale）</summary>
+<summary>指令 JSON 輸出格式與 CLI 訊息語言</summary>
 
 每個指令都會輸出一行結構化 JSON，日常使用看這三個欄位即可：
 
@@ -34,7 +34,7 @@ import DocsHub from '../../../../components/DocsHub.astro';
 - **`data`**：查到的數值、掃描統計或計畫資訊。
 - **`error`**：當 `success` 為 `false` 時，看 `error.message` 即可知道原因。
 
-在任何指令加上 `--ui-locale zh-TW`（預設）或 `--ui-locale en-US` 可切換錯誤與說明文字的語言，不會影響地圖翻譯語言設定。
+CLI 本身的說明、診斷與翻譯操作指引固定使用英文（可選用 `--ui-locale en-US` 明示英文入口）。線上文件提供英文與繁體中文，地圖內容則可翻譯為任意合法語言。
 
 </details>
 

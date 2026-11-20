@@ -15,7 +15,7 @@ Every command and flag in **NBTExplorerCLI** (`nbtcli.exe`), synchronized direct
 
 - **Getting Help**: Run `.\nbtcli.exe help <command>` for root commands, or `.\nbtcli.exe <command> <subcommand> --help` for subcommands (for example, `.\nbtcli.exe translate start --help`). Running `nbtcli help translate start` exits with code `2`.
 - **Shortcuts**: `--help` / `-h` works on any command; `--version` / `-v` prints the version.
-- **Switching Message Language**: Add `--ui-locale en-US` or `--ui-locale zh-TW` anywhere in a command to change help and error text without affecting JSON keys or map translation languages.
+- **CLI Message Language**: CLI help, errors, diagnostics, and translation prompt instructions are fixed in English. Passing `--ui-locale en-US` is accepted explicitly; any other value exits with code `2`. Map content translation works across any valid language tags.
 - **Option Format**: Options with values accept `--option value` or `--option=value`. Use `--` before a path that starts with `-`.
 - **Consistent JSON Output**: Every command prints exactly one single-line UTF-8 JSON object (`schemaFamily: "nbtcli.cli"`, `schemaVersion: 1`) to `stdout`.
 
@@ -51,7 +51,7 @@ One-shot key conversion, paginated translation sessions, and optional local assi
 
 ## `translate` Subcommands
 
-All `translate` subcommands (except `translate help`) take `<world>` and accept `--state-root`, `--output`, `--help`, and `--ui-locale`.
+Session subcommands (`start` through `seal`) take `<world>` and accept `--state-root`, `--output`, `--help`, and `--ui-locale`. `translate fallback` takes `<world-or-file>` and accepts `--output`, `--help`, and `--ui-locale` (without `--state-root`).
 
 <CommandReferenceList lang="en" group="translate-sub" />
 
@@ -66,16 +66,17 @@ All `agent` subcommands (except `agent help`) take `<world>` and store local pre
 <details>
 <summary>Advanced: Structured JSON Input Templates & PowerShell Automation Pattern</summary>
 
-Commands that read structured JSON from a file (or `-` for standard input) check exact `schemaFamily` and `schemaVersion: 1` before running:
+Commands that read structured JSON from a file (or `-` for standard input) enforce exact `schemaFamily` and `schemaVersion` (`1` for session/edit/agent schemas, `2` for `nbtcli.translation-draft-reply`) before running:
 
-| Input Schema Family | Accepted By |
-| --- | --- |
-| `nbtcli.typed-nbt` | `set --value <json>` or `set --value-file <file\|->` |
-| `nbtcli.operations` | `batch <file\|-> --world <dir>` or `plan <dir> --request <file\|->` |
-| `nbtcli.patch-plan` | `apply <dir> --plan <file\|->` |
-| `nbtcli.session-reply` | `translate submit --reply <file\|->` or `translate advance --reply <file\|->` |
-| `nbtcli.session-command` | `translate jump`, `note`, `glossary`, or `reset` via `--request <file\|->` |
-| `nbtcli.agent-questionnaire` | `agent submit <dir> --request <file\|->` |
+| Input Schema Family | Version | Accepted By |
+| --- | --- | --- |
+| `nbtcli.typed-nbt` | `1` | `set --value <json>` or `set --value-file <file\|->` |
+| `nbtcli.operations` | `1` | `batch <file\|-> --world <dir>` or `plan <dir> --request <file\|->` |
+| `nbtcli.patch-plan` | `1` | `apply <dir> --plan <file\|->` |
+| `nbtcli.session-reply` | `1` | `translate submit --reply <file\|->` or `translate advance --reply <file\|->` |
+| `nbtcli.translation-draft-reply` | `2` | `translate fallback <world-or-file> ... --reply <file\|->` |
+| `nbtcli.session-command` | `1` | `translate jump`, `note`, `glossary`, or `reset` via `--request <file\|->` |
+| `nbtcli.agent-questionnaire` | `1` | `agent submit <dir> --request <file\|->` |
 
 ### Copy-Paste JSON Templates
 
@@ -128,16 +129,38 @@ Used by `translate submit --reply` and `translate advance --reply`. Always start
     "snapshotId": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "page": 0,
     "pageId": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-    "targetLocale": "zh_tw",
+    "targetLocale": "en_us",
     "slots": [
       {
         "slotId": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
         "sourceTextHash": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
         "state": "translated",
-        "text": "歡迎來到冒險大廳"
+        "text": "Welcome to the Adventure Hall"
       }
     ]
   }
+}
+```
+
+  </TabItem>
+  <TabItem label="nbtcli.translation-draft-reply">
+
+Used by `translate fallback --reply`. Always start from `data.replyTemplate` returned by `translate fallback` (`schemaVersion: 2`, flat object without a `data` wrapper). Keep `draftId`, `sourceLocale`, `targetLocale`, `slotId`, and `sourceTextHash` unchanged; set `text` to the translated string or `null` to leave unchanged:
+
+```json title="fallback-reply.json"
+{
+  "schemaFamily": "nbtcli.translation-draft-reply",
+  "schemaVersion": 2,
+  "draftId": "965ee055954214cae9c4c9beda14038bd18a5ea7f936f245f58b259bd6cce310",
+  "sourceLocale": "ja",
+  "targetLocale": "en_us",
+  "slots": [
+    {
+      "slotId": "36e1641c6f840a0ab394a38325ccbeb9b0b956f0c981eef88d053c9ec263e1b0",
+      "sourceTextHash": "aa5ae91e8e61aa574c5f560d6e86a0bbbc29cf1be0cf3ee199dbd490b67e2470",
+      "text": "The ancient gate opens slowly before you."
+    }
+  ]
 }
 ```
 
@@ -157,8 +180,8 @@ Used by `translate jump`, `translate note`, `translate glossary`, and `translate
     "kind": "glossary",
     "page": null,
     "slotId": null,
-    "text": "聖殿騎士",
-    "source": "Templar Knight",
+    "text": "Templar Knight",
+    "source": "Tempelritter",
     "origin": "translator",
     "confirmed": false,
     "resetSlots": []
@@ -169,11 +192,11 @@ Used by `translate jump`, `translate note`, `translate glossary`, and `translate
   </TabItem>
   <TabItem label="nbtcli.agent-questionnaire">
 
-Generated by `nbtcli agent setup <world> --output <file>`. Fill in `configuration.agentName`, check languages, retain IDs/revision, then submit via `nbtcli agent submit <world> --request <file|->`:
+Generated by `nbtcli agent setup <world> --output <file>`. Defaults `sourceLanguage` to `"auto"` and `targetLanguage` to the current Windows display language (optionally override with `--source-language` / `--target-language`). Fill in `configuration.agentName`, retain IDs/revision, then submit via `nbtcli agent submit <world> --request <file|->`:
 
 ```powershell title="Export the questionnaire"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
-.\nbtcli.exe agent setup 'D:\WorldCopy' --source-language en_us --target-language zh_tw `
+.\nbtcli.exe agent setup 'D:\WorldCopy' `
   --output 'D:\Translate\agent-questionnaire.json'
 ```
 
@@ -183,7 +206,7 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 ### PowerShell Scripting Pattern
 
 ```powershell title="PowerShell"
-$raw = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion --ui-locale en-US
+$raw = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 $exitCode = $LASTEXITCODE
 $response = $raw | ConvertFrom-Json
 

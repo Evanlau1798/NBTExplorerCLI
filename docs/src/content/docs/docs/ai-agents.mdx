@@ -22,10 +22,10 @@ Simply give your AI our single-file, high-density **`llms.txt`** manual:
 ```text title="Copy & paste to your AI assistant"
 Please read https://nbtcli.evanlau1798.com/llms.txt first to learn the exact CLI protocol and safety rules for nbtcli.exe.
 
-Using C:\Tools\nbtcli\nbtcli.exe, help me translate the Minecraft world copy at D:\WorldCopy from en_us to zh_tw:
-1. First run capabilities and scan --summary to verify support and text volume.
-2. Start a translation session (translate start), then loop through every page (export -> translate -> submit/advance) keeping terminology consistent and preserving placeholders/formatting.
-3. Keep all working files and plans under D:\Translate (never inside D:\WorldCopy).
+Using C:\Tools\nbtcli\nbtcli.exe, help me translate the Minecraft world copy at D:\WorldCopy into English (en_us):
+1. First run capabilities and scan --summary to verify format-family support and text volume.
+2. Start a translation session (translate start, omitting language flags for automatic defaults or passing --target-language en-US if needed), then loop through every page (export -> translate -> submit/advance) keeping terminology consistent and preserving placeholders/formatting. If sourceLocale is und, infer the source from the original text.
+3. Keep all working files and plans under D:\Translate (never inside D:\WorldCopy). Use translate fallback only for unresolved snippets without claiming gameplay verification.
 4. Once pending reaches 0, create a --direct plan (or ask me before applying) and wait for my confirmation that Minecraft is closed before running apply --world-offline and translate seal.
 ```
 
@@ -33,7 +33,7 @@ Using C:\Tools\nbtcli\nbtcli.exe, help me translate the Minecraft world copy at 
 
 ## 2. High-Density Protocol Summary (For Agents)
 
-For the full exhaustive flag matrix, all 6 schema templates, classic Anvil limits, and all 8 SOPs, read **[`llms.txt`](../../llms.txt)** directly. Below is the compact executive contract:
+For the full exhaustive flag matrix, all 7 input schemas, all 17 Java format families, classic Anvil limits, and all 9 SOPs, read **[`llms.txt`](../../llms.txt)** directly. Below is the compact executive contract:
 
 ### Core Invariants
 
@@ -41,7 +41,8 @@ For the full exhaustive flag matrix, all 6 schema templates, classic Anvil limit
 | :--- | :--- |
 | **Output Envelope** | Every call writes one newline-delimited UTF-8 JSON object (`schemaFamily: "nbtcli.cli"`, `schemaVersion: 1`) to `stdout`. Check both `$LASTEXITCODE` and `response.success`. |
 | **Help Syntax** | Root: `nbtcli help <cmd>` or `nbtcli <cmd> --help`. Subcommand: `nbtcli translate <subcmd> --help` / `nbtcli agent <subcmd> --help`. (`nbtcli help translate start` exits `2`.) |
-| **UI Locale** | Pass `--ui-locale en-US` or `--ui-locale zh-TW` anywhere in argv. Changes only human-readable `error.message`/help text; never alters JSON keys or translation locales. |
+| **Fixed English CLI** | Help, errors, diagnostics, and translation prompt instructions are always English. `--ui-locale en-US` is accepted explicitly; any other value exits `2`. Map content languages are independent. |
+| **Auto & Bound Languages** | `translate start` and `translate fallback` allow omitting `--source-language` (auto-detected or `und`) and `--target-language` (Windows display language). Languages bind at creation and persist across resumes/replies. If source is `und`, `export-lang`/`create-pack` require `--original-lang <language>`. |
 | **External Paths** | Never place `--output`, `--plan-output`, `--state-root`, or `--cache-root` inside `<world>`. Pre-create parent directories before calling export commands. |
 | **Offline Writes** | All world-modifying commands require `--world-offline` while Minecraft and other editors are closed. Prefer preview -> inspect -> `apply --plan <file> --world-offline`. |
 | **Resource Export Default** | `translate export-lang` and `translate create-pack` default to inside `<world>` if `--output` is omitted. Always pass an explicit external `--output` to keep `<world>` untouched. |
@@ -77,7 +78,8 @@ $val | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\val.json'
 
 ```powershell title="2. Paginated Translation Loop (translate start -> export/advance -> plan -> apply -> seal)"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
-$s = .\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30 | ConvertFrom-Json
+# Omit language flags for automatic source detection + Windows display target, or add --source-language ja-JP --target-language de-DE
+$s = .\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30 | ConvertFrom-Json
 $sid = $s.data.status.sessionId
 # Loop: export page -> mutate data.replyTemplate slots ("translated" + text, or "unchanged" + null) -> submit/advance until pending == 0
 # Finish:
@@ -87,6 +89,13 @@ $rev = (.\nbtcli.exe translate status 'D:\WorldCopy' --session-id $sid | Convert
 .\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Translate\plan.json' --world-offline --output 'D:\Translate\receipt.json'
 $planHash = (Get-Content -Raw 'D:\Translate\plan.json' | ConvertFrom-Json).data.planHash
 .\nbtcli.exe translate seal 'D:\WorldCopy' --session-id $sid --revision $rev --operation-id $opId --plan-hash $planHash
+```
+
+```powershell title="3. Validated Fallback Draft for Unresolved Sources (translate fallback)"
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption
+# Fill data.replyTemplate (nbtcli.translation-draft-reply, schemaVersion 2) and repeat the exact selection + --text-pointer:
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption --reply 'D:\reply.json'
 ```
 
 ### Top Pitfalls Agents Must Avoid

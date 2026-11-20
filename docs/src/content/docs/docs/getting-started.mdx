@@ -60,12 +60,12 @@ This guide walks through downloading, extracting, and running your first read-on
    Because this is an open-source GitHub release without a paid Microsoft signing certificate, Windows may show **"Windows protected your PC"** the first time you run it. As long as you downloaded it from the official GitHub Releases page above, click **More info** -> **Run anyway**.
    :::
 
-   To see all available commands or help for a specific command:
+   To see all available commands or help for a specific command (CLI help, diagnostics, and translation prompt instructions are always in English):
 
    ```powershell title="PowerShell"
-   .\nbtcli.exe --help --ui-locale en-US
-   .\nbtcli.exe help get --ui-locale en-US
-   .\nbtcli.exe translate start --help --ui-locale en-US
+   .\nbtcli.exe --help
+   .\nbtcli.exe help get
+   .\nbtcli.exe translate start --help
    ```
 
 5. **Make a Safe Test Copy of Your Minecraft World**
@@ -80,9 +80,9 @@ This guide walks through downloading, extracting, and running your first read-on
 
 ---
 
-## Part 2: Your First Four Read-Only Commands
+## Part 2: Your First Safe Commands
 
-All commands below are **Read Only** — they never change a single byte inside `D:\WorldCopy`. Replace `D:\WorldCopy` with the path to your copied world folder.
+All commands below leave `D:\WorldCopy` completely untouched (`list`, `get`, `search`, `scan`, and `extract` are **Read Only**; `translate start` is **Preview Only** and stores session state outside your world). Replace `D:\WorldCopy` with the path to your copied world folder.
 
 ### 1. See What Dimensions and Regions Exist (`list`)
 
@@ -160,6 +160,22 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 :::tip[Why Create `D:\Exports` Outside the World?]
 NBTExplorerCLI never allows writing export files or plan files inside your Minecraft world folder, so your save stays clean and uncluttered. Always point `--output` to an existing folder outside your world.
 :::
+
+### 5. Preview Your First Translation Project (`translate start`)
+
+When starting a new map translation project, you can omit `--source-language` and `--target-language`. The CLI detects the source language from recognizable content (or uses `und` if undetermined), selects your current Windows account display language as the target, and displays and binds both languages to the session:
+
+```powershell title="PowerShell"
+# Automatic source detection + Windows account display language (Preview Only — world stays untouched)
+.\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30
+
+# Override source and target explicitly when translating between other languages (for example, Japanese to German)
+.\nbtcli.exe translate start 'D:\WorldCopy' --source-language ja-JP --target-language de-DE --page-size 30
+```
+
+- If Windows does not provide a usable display language, the CLI prompts in English to pass `--target-language <language>`.
+- Bound languages stay locked to the session so you can resume later even if your system display language changes.
+- If the detected source is `und`, you can still translate by reading the original text, or start a new session with an explicit `--source-language`.
 
 ---
 

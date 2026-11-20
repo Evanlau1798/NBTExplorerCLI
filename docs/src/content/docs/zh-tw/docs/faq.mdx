@@ -45,7 +45,7 @@ NBTExplorerCLI 內建四道防呆保護：
 ### 這個工具跟傳統視窗版 NBTExplorer（GUI）有什麼不同？
 
 - **傳統 GUI 版 NBTExplorer**：適合打開視窗，用手動滑鼠點開改一兩個欄位。
-- **NBTExplorerCLI** 用於**大量處理、冒險地圖翻譯、匯出資源包、安全批次修改、PowerShell 腳本與 AI 助手整合**，並提供預覽與自動備份。[相容性表](../support-and-troubleshooting/)列出支援的 Java 版本，包含 `1.20.1` 及經典 Anvil 存檔。
+- **NBTExplorerCLI** 用於**大量處理、跨語系冒險地圖翻譯、匯出資源包、安全批次修改、PowerShell 腳本與 AI 助手整合**，並提供預覽與自動備份，涵蓋廣範圍 Java 版格式家族（`DataVersion 100` 至 `4774+` 與經典 Anvil 存檔，見[相容性表](../support-and-troubleshooting/)）。
 
 ### 支援基岩版（Bedrock）或模組（Mod）世界嗎？
 
@@ -56,14 +56,14 @@ NBTExplorerCLI 內建四道防呆保護：
 
 **完全可以！** 這也是本工具最方便的使用方式之一。只要把專用說明書網址（`https://nbtcli.evanlau1798.com/llms.txt`）貼給你的 AI 助手，或直接使用 **[AI Agent 快速整合指南](../ai-agents/)** 裡的現成提示詞即可。
 
-### 怎麼把錯誤訊息切換成繁體中文或英文？
+### CLI 訊息是什麼語言？地圖可以翻譯成哪些語言？
 
-在任何指令加上 `--ui-locale zh-TW` 或 `--ui-locale en-US` 即可：
+- **CLI 訊息**：說明、錯誤、診斷與翻譯操作指引固定使用**英文**（可選用 `--ui-locale en-US` 明示英文入口，傳入其他 `--ui-locale` 值會以退出碼 `2` 拒絕）。
+- **地圖內容**：支援任意合法語言代碼互譯。省略 `--source-language` 與 `--target-language` 時會自動偵測來源（無法確定時標為 `und`）並採用目前 Windows 帳戶的系統顯示語言作為目標；需要指定其他語言對時再以旗標覆寫（例如 `--source-language ja-JP --target-language de-DE`）。
 
-```powershell title="PowerShell"
-.\nbtcli.exe help get --ui-locale zh-TW
-.\nbtcli.exe help get --ui-locale en-US
-```
+### `translate fallback` 是做什麼用的？
+
+當掃描能讀取某個檔案或標籤、但尚未確認其文字在遊戲中的用途時，`translate fallback` 會將整個選取範圍作為上下文，連同可編輯文字葉與有版本的回覆範本（`nbtcli.translation-draft-reply` v2）匯出。若已確認某個自訂欄位用於畫面顯示，可用 `--text-pointer` 指定相對路徑（如 `/caption`），並在提交 `--reply` 時沿用相同選取。驗證結果會標示 `gameplayVerified: false`，且不會改動原始檔案或整圖掃描狀態。
 
 ---
 
@@ -78,7 +78,8 @@ NBTExplorerCLI 內建四道防呆保護：
 | **JSON Pointer（`--pointer`）** | 像資料夾路徑一樣用 `/` 串起來的欄位地址，用來指明要看哪一個值（例如 `/Data/LevelName`）。 |
 | **保留型別（`--types` / `typed-nbt`）** | Minecraft 對資料型別很嚴格（例如某個數字一定要是 `Byte`、`Short`、`Int` 還是純文字 `String`），加上 `--types` 就會把型別一起記下來，改值時才不會存壞。 |
 | **預覽計畫（Patch Plan / `plan.json`）** | 正式動手改存檔前產生的「修改草稿清單」，寫清楚等一下要改哪些檔案與內容；確認沒問題後才交給 `apply` 套用。 |
-| **翻譯進度（Session）與槽位（Slot）** | 存在世界資料夾外的翻譯專案紀錄。地圖裡每一行告示牌、每一頁書或每個物品名稱都會編成一個獨立槽位（Slot），方便分頁翻譯且不會互相搞混。 |
+| **翻譯進度（Session）與槽位（Slot）** | 存在世界資料夾外的翻譯專案紀錄，並綁定來源與目標語言（來源無法確定時為 `und`）。每一行告示牌、每一頁書或每個物品名稱皆為獨立槽位（Slot），方便分頁翻譯。 |
+| **Fallback 草稿（`translate fallback`）** | 針對未判定用途的 NBT、JSON、SNBT 或 UTF-8 純文字片段提供的唯讀上下文與回覆驗證流程（`nbtcli.translation-draft-reply` v2），可用相對 `--text-pointer` 指定已確認顯示欄位。 |
 | **翻譯鍵（Translation Key / `--keys`）** | 把地圖裡寫死的文字（如 `"Welcome!"`）換成代碼（如 `map.abc123`），實際文字則交給資源包的 `.json` 語言檔管理，玩家切換遊戲語言時就能自動切換字幕。 |
 | **外部狀態目錄（State Root / `--state-root`）** | 存在 `%LOCALAPPDATA%\nbtcli\`（或你自訂路徑）的外部資料夾，專門存放備份、翻譯進度、快取與復原日誌，不汙染原本的世界資料夾。 |
 | **`--world-offline`** | 修改存檔指令必加的安全確認旗標，提醒你在執行前務必關閉 Minecraft 與其他編輯器。 |
