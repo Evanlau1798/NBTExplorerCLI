@@ -71,7 +71,9 @@ internal sealed partial class CommandTextReader
         {
             if (tokens.Count == pathIndex + 1)
             {
-                ObserveUnprovenEquipment(tokens, target, action == "remove" ? pathIndex : tokens.Count);
+                if (opaqueEquipment is not null && (action != "merge" || tokens[target].Text != "entity"
+                    || !NonEquipmentMerge(tokens[pathIndex].Text)))
+                    ObserveUnprovenEquipment(tokens, target, action == "remove" ? pathIndex : tokens.Count);
                 if (action != "remove" || runtimeDataVersion < StorageDataVersion || PositionalListPath(tokens[pathIndex].Text) is null)
                     ObserveStorageOperand(tokens, target, path, action == "remove" ? pathIndex : null);
             }
@@ -129,8 +131,26 @@ internal sealed partial class CommandTextReader
     {
         if (opaqueEquipment is null) return;
         var field = path < tokens.Count ? tokens[path].Text : "";
-        if (tokens[target].Text == "entity" && field != "CustomName" && !NumericEntitySource(field)
+        if (tokens[target].Text == "entity" && field != "CustomName" && !NumericEntitySource(field) && !NonEquipmentMetadata(field)
             || tokens[target].Text == "block" && !SignTextSource(field)) opaqueEquipment();
+    }
+
+    private bool NonEquipmentMerge(string payload)
+    {
+        var root = Snbt.ParseDocument(Utf8.GetBytes(payload), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+        return root.Value is LogicalMinecraftCompound && root.Children.All(member =>
+            member.Selector.Key is { } field && field != "UUID" && (NumericEntitySource(field) || NonEquipmentMetadata(field))
+            && !member.Node.ContainsStringValues);
+    }
+
+    private static bool NonEquipmentMetadata(string path)
+    {
+        if (path is "AbsorptionAmount" or "CustomNameVisible" or "DisabledSlots" or "Fixed" or "Fuse" or "Invisible" or "NoAI"
+            or "BeamTarget" or "BeamTarget.X" or "BeamTarget.Y" or "BeamTarget.Z" or "Pose") return true;
+        if (!path.StartsWith("Pose.", StringComparison.Ordinal)) return false;
+        var bracket = path.IndexOf('[');
+        if ((bracket < 0 ? path[5..] : path[5..bracket]) is not ("Head" or "Body" or "LeftArm" or "RightArm" or "LeftLeg" or "RightLeg")) return false;
+        return bracket < 0 || path[^1] == ']' && Integer(path.AsSpan(bracket + 1, path.Length - bracket - 2), out _);
     }
 
     private bool StorageRootCondition(List<CommandToken> tokens, int target, int path, TypedPath commandPath)

@@ -162,8 +162,10 @@ internal sealed partial class CommandTextReader
                             var use = runtimeDataVersion >= StorageDataVersion && PlainDataPath(tokens[dataPath].Text)
                                 ? CommandStorageUse.Presence : CommandStorageUse.Other;
                             ObserveStorageOperand(tokens, cursor + 1, path, dataPath, use);
-                            ObserveUnprovenEquipment(tokens, cursor + 1, dataPath);
-                            if (StaticDataControlPath(tokens[cursor + 1].Text, tokens[dataPath].Text)) operands = dataPath + 1 - cursor;
+                            var target = tokens[cursor + 1].Text;
+                            var staticPath = StaticDataControlPath(target, tokens[dataPath].Text);
+                            if (target != "entity" || !staticPath) ObserveUnprovenEquipment(tokens, cursor + 1, dataPath);
+                            if (staticPath) operands = dataPath + 1 - cursor;
                         }
                     }
                 }

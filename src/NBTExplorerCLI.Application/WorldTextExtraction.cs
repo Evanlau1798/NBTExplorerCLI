@@ -149,15 +149,16 @@ public sealed partial class WorldTextExtraction
             {
                 if (observeFont is not null && PackTextExtractor.StorageFontId(source.Location) is { } font)
                     observeFont(font, PackTextExtractor.ReadStorageFontGlyphs(bytes, Limits, font == "minecraft:default" ? null : HasTexture));
+                var packMetadata = source.Pack ?? throw new InvalidDataException("Missing pack metadata snapshot");
                 var storageCandidate = opaqueStorage is not null && WorldStorageUseIndex.HasOpaqueStorage(bytes);
                 var equipmentCandidate = opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(bytes);
-                if ((storageCandidate || equipmentCandidate) && !PackTextExtractor.HasInertStorageShape(source.Location, bytes, Limits))
+                if ((storageCandidate || equipmentCandidate) && !PackTextExtractor.HasInertStorageShape(source.Location, bytes, packMetadata, Limits))
                 {
                     if (storageCandidate) opaqueStorage!();
                     if (equipmentCandidate) opaqueEquipment!();
                 }
-                text = PackTextExtractor.Extract(source.Location, bytes, source.Pack ?? throw new InvalidDataException("Missing pack metadata snapshot"), request.Limits, request.Scope);
-                commandProfile = MinecraftProfiles.ForPackMetadata(source.Pack!);
+                text = PackTextExtractor.Extract(source.Location, bytes, packMetadata, request.Limits, request.Scope);
+                commandProfile = MinecraftProfiles.ForPackMetadata(packMetadata);
 
                 bool HasTexture(string entry) => archive is not null ? archive.GetEntry(entry) is { Length: > 0 }
                     : directoryTextures.Value.Contains(source.Location.PackRoot + "/" + entry);

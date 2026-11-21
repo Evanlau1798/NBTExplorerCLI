@@ -52,14 +52,22 @@ public static partial class PackTextExtractor
         }
     }
 
-    public static bool HasInertStorageShape(WorldSourceLocation source, byte[] json, DecodeLimits limits)
+    public static bool HasInertStorageShape(WorldSourceLocation source, byte[] json, PackMetadata packMetadata, DecodeLimits limits)
     {
         var metadata = source.Role == WorldSourceRole.PackMetadata && Entry(source) == "pack.mcmeta";
         var language = source.PackKind == PackSourceKind.ResourcePack && source.Role == WorldSourceRole.Language;
         var font = StorageFontId(source) is not null;
-        if (!metadata && !language && !font) return false;
+        var profile = source.Role == WorldSourceRole.PackJson && source.PackKind == PackSourceKind.Datapack
+            ? MinecraftProfiles.ForPackMetadata(packMetadata) : null;
+        var plural = profile?.Features[ProfileFacet.PackLayout].Schema == "java-pack-plural";
+        var kind = profile is not null && Entry(source).Split('/', 4) is ["data", _, var directory, var file]
+            && file.EndsWith(".json", StringComparison.Ordinal) ? directory : null;
+        var predicate = kind == (plural ? "predicates" : "predicate");
+        var advancement = kind == (plural ? "advancements" : "advancement");
+        if (!metadata && !language && !font && !predicate && !advancement) return false;
         using var document = BoundedJson.ReadDecoded(json, limits);
         var root = document.RootElement;
+        if (predicate || advancement) return KnownStaticPredicate(root, profile!, limits, advancement ? source : null);
         if (language) return Fields(root, (_, value) => value.ValueKind == JsonValueKind.String);
         if (metadata)
             return Fields(root, (key, _) => key == "pack") && root.TryGetNativeProperty("pack", out var pack)
