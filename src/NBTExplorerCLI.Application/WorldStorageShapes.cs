@@ -60,6 +60,28 @@ internal sealed partial class WorldStorageUseIndex
         }
     }
 
+    private void PropagateGlyphFonts()
+    {
+        var pending = new Queue<ListUses>(uses.Values.SelectMany(storage => storage.Paths.Values)
+            .Where(list => list.GlyphFonts is not null));
+        while (pending.TryDequeue(out var target))
+        {
+            if (target.NestedRead || target.HasRegularWriters || target.HasCrossStorageCopy) continue;
+            foreach (var source in target.Incoming)
+            {
+                if (source == target) continue;
+                var added = false;
+                foreach (var font in target.GlyphFonts!)
+                {
+                    if (!(source.GlyphFonts ??= new(StringComparer.Ordinal)).Add(font)) continue;
+                    Charge(font.Length);
+                    added = true;
+                }
+                if (added) pending.Enqueue(source);
+            }
+        }
+    }
+
     private sealed class StorageUses
     {
         internal Dictionary<string, ListUses> Paths { get; } = new(StringComparer.Ordinal);
@@ -89,6 +111,15 @@ internal sealed partial class WorldStorageUseIndex
         internal HashSet<ListUses> Outgoing { get; } = [];
         internal HashSet<ListUses> Assignments { get; } = [];
         internal HashSet<StorageGlyphLiteral>? GlyphLiterals;
+        internal HashSet<string>? RawGlyphs;
+        internal HashSet<string>? GlyphFonts;
+        internal bool HasRegularWriters;
+        internal bool HasIntegralWriter;
+        internal ListUses? NumericSource;
+        internal bool HasIncompatibleTransform;
+        internal bool HasSelfStringTransform;
+        internal bool UsedByStringTransform;
+        internal bool HasCrossStorageCopy;
     }
 
     private sealed record ListCandidate(ListUses List, ArtifactAddress? Artifact = null, StorageTextRule? Rule = null);

@@ -3,7 +3,7 @@ using NBTExplorerCLI.Formats;
 
 namespace NBTExplorerCLI.Minecraft;
 
-public enum CommandStorageUse { InterpretedDisplay, LiteralDisplay, ListElementWrite, Other, ListReplacement, ListCopy, Presence, EquipmentImport, EquipmentExport, ListCardinality, ScalarWrite, ScratchComparison, IndexedBlankWrite, ScratchControlComparison, SignImport }
+public enum CommandStorageUse { InterpretedDisplay, LiteralDisplay, ListElementWrite, Other, ListReplacement, ListCopy, Presence, EquipmentImport, EquipmentExport, ListCardinality, ScalarWrite, ScratchComparison, IndexedBlankWrite, ScratchControlComparison, SignImport, IntegralWrite, StringTransform }
 public readonly record struct StorageGlyphLiteral(string Font, string Text);
 public sealed record CommandStorageAccess(string Storage, string Path, CommandStorageUse Use, SourceAddress Address, bool HasUnclassifiedReferences = false)
 {
@@ -16,6 +16,8 @@ public sealed record CommandStorageAccess(string Storage, string Path, CommandSt
     public bool AppendsScalar { get; init; }
     public IEnumerable<StorageGlyphLiteral>? GlyphLiterals { get; init; }
     public StorageAttributeOperation? AttributeOperation { get; init; }
+    public string? GlyphFont { get; init; }
+    public string? RawGlyph { get; init; }
 }
 public sealed record CommandFunctionCall(string Target, bool ResultObserved)
 {

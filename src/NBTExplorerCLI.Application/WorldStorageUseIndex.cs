@@ -105,6 +105,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         if (!functionResults.BlockObservedMutations(extraction.Discovery, index.Block, cancellationToken)) covered = false;
         index.BlockUnsafeScratchComparisons();
         index.PropagateAssignmentShapes();
+        index.PropagateGlyphFonts();
         var compatible = index.ReadCompatibleLists(inventory, extraction).ToDictionary(candidate => candidate.List);
         var authorized = ClosedDisplayLists(compatible).ToHashSet();
         var equipment = index.uses.Values.SelectMany(storage => storage.Paths.Values).Where(list => list.EquipmentRoot is not null).ToArray();
@@ -243,6 +244,23 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 break;
             case CommandStorageUse.Presence:
                 break;
+            case CommandStorageUse.IntegralWrite:
+                GetList(storage, access.Storage, access.Path).HasIntegralWriter = true;
+                break;
+            case CommandStorageUse.StringTransform when access.CopySource is { } origin:
+                var destination = GetList(storage, access.Storage, access.Path);
+                var numeric = GetList(GetStorage(origin.Storage), origin.Storage, origin.Path);
+                destination.UsedByStringTransform = true;
+                numeric.UsedByStringTransform = true;
+                if (access.AppendsScalar && origin.Storage == access.Storage)
+                {
+                    if (destination.NumericSource is not null && destination.NumericSource != numeric) destination.HasIncompatibleTransform = true;
+                    destination.NumericSource = numeric;
+                    destination.RequiresList = true;
+                }
+                else if (access.AppendsScalar || origin != (destination.Storage, destination.Path)) destination.HasIncompatibleTransform = true;
+                else destination.HasSelfStringTransform = true;
+                break;
             case CommandStorageUse.ListCardinality when PlainPath(access.Path):
                 GetList(storage, access.Storage, access.Path).RequiresList = true;
                 break;
@@ -255,7 +273,12 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                     Link(subject, owner);
                 }
                 else subject.Display = true;
-                if (access.Path.EndsWith("[]", StringComparison.Ordinal)) subject.RequiresList = true;
+                if (access.GlyphFont is { } font)
+                {
+                    if ((subject.GlyphFonts ??= new(StringComparer.Ordinal)).Add(font)) Charge(font.Length);
+                    subject.RequiresList = true;
+                }
+                else if (access.Path.EndsWith("[]", StringComparison.Ordinal)) subject.RequiresList = true;
                 else subject.RequiresScalar = true;
                 break;
             case CommandStorageUse.ListElementWrite or CommandStorageUse.ListReplacement or CommandStorageUse.ScalarWrite or CommandStorageUse.IndexedBlankWrite
@@ -274,6 +297,11 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                     else if (type != NbtType.End) list.ReplacementTypes.Add(type);
                 }
                 var artifact = access.Address.Artifact.RelativePath;
+                if (access.RawGlyph is { } raw)
+                {
+                    if ((list.RawGlyphs ??= new(StringComparer.Ordinal)).Add(raw)) Charge(raw.Length);
+                }
+                else if (access.ListElementType != NbtType.End) list.HasRegularWriters = true;
                 if (list.Producers.Add(artifact)) Charge(artifact.Length);
                 if (access.GlyphLiterals is { } glyphs)
                     foreach (var glyph in glyphs)
@@ -282,6 +310,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
             case CommandStorageUse.ListCopy when access.CopySource is { } source:
                 var from = GetList(GetStorage(source.Storage), source.Storage, source.Path);
                 var to = GetList(storage, access.Storage, access.Path);
+                if (from.Storage != to.Storage) from.HasCrossStorageCopy = to.HasCrossStorageCopy = true;
                 Link(from, to);
                 if (access.ReplacesList)
                 {

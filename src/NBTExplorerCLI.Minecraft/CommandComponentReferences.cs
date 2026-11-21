@@ -74,8 +74,10 @@ internal sealed partial class CommandTextReader
                 if ((storageAccess is not null || storageNodes is not null) && ComponentReferenceRules.JsonStorage(value, limits) is { } storage)
                 {
                     storageNodes?.Add(path);
+                    var font = ComponentReferenceRules.ExplicitJsonFont(document.RootElement, path);
+                    var glyphFont = storage.Interpreted && font is { Length: > 0 } && font != "minecraft:default" ? font : null;
                     ReportStorage(storage.Id, storage.Path, storage.Interpreted, path,
-                        storage.OpaqueClick || ComponentReferenceRules.UsesExplicitJsonFont(document.RootElement, path));
+                        storage.OpaqueClick || font is not null && glyphFont is null, glyphFont);
                 }
                 if (!observeStorageOnly && (value.TryGetNativeProperty("nbt", out _) || value.TryGetNativeProperty("score", out var score) && !ComponentReferenceRules.HasFixedScoreHolder(score)
                     || value.TryGetNativeProperty("clickEvent", out var click) && ComponentReferenceRules.Click(click, null, limits) is null))
@@ -90,12 +92,12 @@ internal sealed partial class CommandTextReader
                 }
             }
         }
-        void ReportStorage(string storage, string path, bool interpreted, TypedPath component, bool hasUnclassifiedReferences)
+        void ReportStorage(string storage, string path, bool interpreted, TypedPath component, bool hasUnclassifiedReferences, string? glyphFont = null)
         {
             var address = Address(new(grammarPath.Segments.Concat(component.Segments)), start, end - start, source.Address.SemanticRole,
                 enclosingString?.StartByte, enclosingString?.LengthBytes);
             ObserveStorage(storage, path, interpreted ? CommandStorageUse.InterpretedDisplay : CommandStorageUse.LiteralDisplay,
-                address, hasUnclassifiedReferences, displayContainer: displayContainer);
+                address, hasUnclassifiedReferences, displayContainer: displayContainer, glyphFont: glyphFont);
         }
         void Selector(string selector, TypedPath path, SnbtSpan span)
         {

@@ -22,7 +22,7 @@ public static class TextComponentExtractor
         if (Check(source, profile)) throw Unsupported();
         return ReadJson(source, NativeJsonStrings.EncodeJavaDocument(component, limits), profile, limits, scope, true, componentRoot);
     }
-    public static IReadOnlyDictionary<TypedPath, StorageGlyphLiteral>? StorageJsonGlyphs(SourceAddress source, string component, CapabilityProfile profile, DecodeLimits limits)
+    public static IReadOnlyDictionary<TypedPath, StorageGlyphLiteral>? StorageJsonGlyphs(SourceAddress source, string component, CapabilityProfile profile, DecodeLimits limits, bool allowGlyphBank = false)
     {
         if (Check(source, profile)) throw Unsupported();
         try
@@ -37,9 +37,12 @@ public static class TextComponentExtractor
                 ComponentRoot = address =>
                 {
                     var path = address.ComponentPath!;
-                    if (ComponentReferenceRules.ExplicitJsonFont(root, path) is null or "minecraft:default") return;
+                    var font = ComponentReferenceRules.ExplicitJsonFont(root, path);
+                    if (font is null or "minecraft:default") return;
                     var value = NativeComponentReferences.JsonAt(root, path);
-                    if (value.ValueKind == JsonValueKind.Object && !value.TryGetNativeProperty("text", out _)) styledDynamic = true;
+                    if (value.ValueKind == JsonValueKind.Object && !value.TryGetNativeProperty("text", out _)
+                        && !(allowGlyphBank && font.Length > 0 && ComponentReferenceRules.JsonStorage(value, limits) is { Interpreted: true, OpaqueClick: false }))
+                        styledDynamic = true;
                 }
             };
             JsonValue(root, TypedPath.Root, source.SemanticRole, profile, collector);

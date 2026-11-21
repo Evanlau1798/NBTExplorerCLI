@@ -182,7 +182,10 @@ internal sealed partial class CommandTextReader
                         if (tokens[dataPath + 1].Text is "byte" or "short" or "int" or "long" or "float" or "double"
                             && Decimal(tokens[dataPath + 2].Text, out _))
                         {
-                            ObserveStorageOperand(tokens, cursor + 1, path, dataPath);
+                            var integral = exactRuntimeDataVersion is >= DataStringSourceVersion && tokens[dataPath + 1].Text == "int"
+                                && source.Address.SemanticRole == "command.function" && staticPath
+                                && tokens[dataPath].Text.Split('.').All(PlainControlToken);
+                            ObserveStorageOperand(tokens, cursor + 1, path, dataPath, integral ? CommandStorageUse.IntegralWrite : CommandStorageUse.Other);
                             ObserveUnprovenEquipment(tokens, cursor + 1, dataPath);
                             if (staticPath) operands = dataPath + 3 - cursor;
                         }

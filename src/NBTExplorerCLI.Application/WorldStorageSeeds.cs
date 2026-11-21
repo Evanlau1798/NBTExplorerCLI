@@ -102,6 +102,26 @@ internal sealed partial class WorldStorageUseIndex
                     else if (storage.EquipmentRoots.Contains(path) || RelatedPath(path, storage.EquipmentRoots, equipmentRoots)) continue;
                     var node = SeedPath(localId, path);
                     var seed = document is null ? null : NbtLocator.Resolve(document.Root, node);
+                    if (list.GlyphFonts is not null || list.RawGlyphs is not null || list.NumericSource is not null)
+                    {
+                        if (list is { GlyphFonts: { } fonts, HasRegularWriters: false, HasIntegralWriter: false, HasIncompatibleTransform: false,
+                                HasSelfStringTransform: false, HasCrossStorageCopy: false, RequiresScalar: false, NestedRead: false }
+                            && (list.RawGlyphs is not null || list.NumericSource is not null || list.Incoming.Count != 0)
+                            && fonts.All(font => list.RawGlyphs?.All(glyph => CanPreserveGlyphs(new(font, glyph))) != false)
+                            && (list.NumericSource is not { } input
+                                || input is { HasIntegralWriter: true, HasRegularWriters: false, HasIncompatibleTransform: false,
+                                    RawGlyphs: null, NumericSource: null, Incoming.Count: 0 }
+                                && !storage.OtherPaths.Contains(input.Path) && !RelatedPath(input.Path, storage.OtherPaths, rawPaths)
+                                && !RelatedPath(input.Path, storage.Paths.Keys, listPaths)
+                                && !storage.EquipmentRoots.Contains(input.Path) && !RelatedPath(input.Path, storage.EquipmentRoots, equipmentRoots)
+                                && (document is null || NbtLocator.Resolve(document.Root, SeedPath(localId, input.Path)) is
+                                    { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 } or { Status: ResolutionStatus.Found, Value: NbtInt })
+                                && fonts.All(font => CanPreserveGlyphs(new(font, "-0123456789"))))
+                            && seed is null or { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }
+                                or { Status: ResolutionStatus.Found, Value: NbtList { Items.IsEmpty: true } }) yield return new(list);
+                        continue;
+                    }
+                    if (list.HasIntegralWriter || list.UsedByStringTransform) continue;
                     if (list.RequiresScalar)
                     {
                         if (!list.RequiresList && seed is null or { Status: ResolutionStatus.Missing, SegmentOffset: >= 2 }) yield return new(list);

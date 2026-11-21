@@ -32,7 +32,7 @@ internal sealed partial class CommandTextReader
     }
 
     private void ObserveDataStorage(List<CommandToken> tokens, int index, TypedPath path, int end, (string Storage, string Path)? storageElement,
-        SnbtNode? storageValue, bool resultObserved, IReadOnlyDictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? glyphs)
+        SnbtNode? storageValue, bool resultObserved, IReadOnlyDictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? glyphs, string? rawGlyph)
     {
         var attribute = storageAccess is null ? null : AttributeStorage(tokens, index, path, end, storageValue);
         if (storageElement is { } list)
@@ -44,7 +44,7 @@ internal sealed partial class CommandTextReader
             var elementType = use == CommandStorageUse.ListReplacement ? (encoded as NbtList)?.ElementType : encoded.Type;
             ObserveStorage(list.Storage, list.Path, use,
                 Address(path, value.Start, value.Text.Length, source.Address.SemanticRole), listElementType: elementType,
-                glyphLiterals: glyphs is { Count: > 0 } ? glyphs.Values : null, attribute: attribute);
+                glyphLiterals: glyphs is { Count: > 0 } ? glyphs.Values : null, attribute: attribute, rawGlyph: rawGlyph);
             if (storageAccess is not null && JsonStorageRuntime() && storageDisplayLists?.Contains(list) != true
                 && (value.Text.Contains("storage", StringComparison.Ordinal) || value.Text.Contains("\\u", StringComparison.Ordinal)))
                 ComponentReferences(Utf8.GetBytes(value.Text), value.Start, value.Start + value.Text.Length,
@@ -97,6 +97,8 @@ internal sealed partial class CommandTextReader
                 if (!Integer(tokens[offset].Text, out _)) return;
             if (mode == "from" && !resultObserved && storageAccess is not null && (ObserveEquipmentCopy(tokens, index, path, end, pathIndex, sourceEnd, operation)
                 || ObserveStorageListCopy(tokens, index, path, end, pathIndex, sourceEnd, operation, attribute))) return;
+            if (mode == "string" && !resultObserved
+                && ObserveStorageStringTransform(tokens, target, pathIndex, sourceTarget, sourceEnd, path, operation)) return;
             ObserveUnprovenEquipment(tokens, target, pathIndex);
             ObserveUnprovenEquipment(tokens, sourceTarget, sourceEnd);
             var signImport = signEffect is not null && tokens[sourceTarget].Text == "block" && sourceEnd < tokens.Count && SignTextSource(tokens[sourceEnd].Text);
@@ -125,6 +127,22 @@ internal sealed partial class CommandTextReader
             ObserveUnprovenEquipment(tokens, target, pathIndex);
             ObserveStorageOperand(tokens, target, path, pathIndex, attribute: attribute);
         }
+    }
+
+    private bool ObserveStorageStringTransform(List<CommandToken> tokens, int target, int targetPath, int origin, int originPath,
+        TypedPath path, string operation)
+    {
+        if (storageAccess is null || operation == "merge" || exactRuntimeDataVersion is not >= DataStringSourceVersion || !JsonStorageRuntime()
+            || source.Address.SemanticRole != "command.function"
+            || tokens[target].Text != "storage" || tokens[origin].Text != "storage" || originPath >= tokens.Count
+            || !tokens[targetPath].Text.Split('.').All(PlainControlToken) || !tokens[originPath].Text.Split('.').All(PlainControlToken)) return false;
+        var destination = MinecraftIdentifier.DefaultNamespace(tokens[target + 1].Text);
+        var input = (Storage: MinecraftIdentifier.DefaultNamespace(tokens[origin + 1].Text), Path: tokens[originPath].Text);
+        var write = tokens[targetPath];
+        if (input.Storage != destination || operation == "set" && input.Path != write.Text) return false;
+        ObserveStorage(destination, write.Text, CommandStorageUse.StringTransform, Address(path, write.Start, write.Text.Length, source.Address.SemanticRole),
+            copySource: input, appendsScalar: operation != "set");
+        return true;
     }
 
     private void ObserveUnprovenEquipment(List<CommandToken> tokens, int target, int path)
@@ -246,9 +264,10 @@ internal sealed partial class CommandTextReader
     }
 
     private bool ReadStorageDisplayWrite(List<CommandToken> tokens, int index, TypedPath path, (string Storage, string Path)? storageElement,
-        IReadOnlyDictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? glyphs)
+        IReadOnlyDictionary<(TypedPath Node, TypedPath Component), StorageGlyphLiteral>? glyphs, bool rawGlyph)
     {
         if (storageDisplayLists is not { Count: > 0 } || storageElement is not { } list || !storageDisplayLists.Contains(list)) return false;
+        if (rawGlyph) return true;
         var value = tokens[^1];
         Component(value.Start, value.Start + value.Text.Length, TextExtractionCollector.At(path, "storage.list.value"),
             storedRole: source.Address.SemanticRole + ".storage.component", storedList: tokens[index + 5].Text == "set" && value.Text.StartsWith('['),
@@ -421,7 +440,7 @@ internal sealed partial class CommandTextReader
     {
         if (node.Value is not LogicalMinecraftLeaf { Value: NbtString text }) return false;
         var binding = new SourceAddress(source.Address.Artifact, TypedPath.Root, source.Address.SemanticRole + ".storage.component");
-        if (TextComponentExtractor.StorageJsonGlyphs(binding, text.Value, profile, limits) is not { } protectedGlyphs) return false;
+        if (TextComponentExtractor.StorageJsonGlyphs(binding, text.Value, profile, limits, allowGlyphBank: true) is not { } protectedGlyphs) return false;
         foreach (var (path, glyph) in protectedGlyphs) glyphs.Add((nodePath, path), glyph);
         return true;
     }
@@ -437,13 +456,15 @@ internal sealed partial class CommandTextReader
 
     private void ObserveStorage(string storage, string path, CommandStorageUse use, SourceAddress address, bool hasUnclassifiedReferences = false,
         NbtType? listElementType = null, IEnumerable<StorageGlyphLiteral>? glyphLiterals = null, (string Storage, string Path)? displayContainer = null,
-        StorageAttributeOperation? attribute = null)
+        StorageAttributeOperation? attribute = null, string? glyphFont = null, string? rawGlyph = null,
+        (string Storage, string Path)? copySource = null, bool appendsScalar = false)
     {
         if (!MinecraftIdentifier.ResourceLocation(storage)) return;
         var normalized = MinecraftIdentifier.DefaultNamespace(storage);
         retained = checked(retained + TextExtractionBudget.RecordBytes(address, (long)normalized.Length + path.Length));
         if (retained > limits.MaxDecodedBytes) Limit();
         storageAccess?.Invoke(new(normalized, path, use, address, hasUnclassifiedReferences)
-        { ListElementType = listElementType, GlyphLiterals = glyphLiterals, DisplayContainer = displayContainer, AttributeOperation = attribute });
+        { ListElementType = listElementType, GlyphLiterals = glyphLiterals, DisplayContainer = displayContainer, AttributeOperation = attribute,
+            GlyphFont = glyphFont, RawGlyph = rawGlyph, CopySource = copySource, AppendsScalar = appendsScalar });
     }
 }

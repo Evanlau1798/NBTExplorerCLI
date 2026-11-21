@@ -38,8 +38,9 @@ public static partial class PackTextExtractor
             }
             return provider.TryGetNativeProperty("chars", out var chars) && ArrayOf(chars, row =>
             {
+                // Vanilla bitmap grids reserve zero for an empty cell.
                 foreach (var scalar in NativeJsonStrings.Read(row).EnumerateRunes())
-                    if (!Add(scalar, available)) return false;
+                    if (scalar.Value != 0 && !Add(scalar, available)) return false;
                 return true;
             });
         }

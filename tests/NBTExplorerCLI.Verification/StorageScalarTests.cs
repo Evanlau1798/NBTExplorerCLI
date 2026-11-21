@@ -3,6 +3,7 @@ using NBTExplorerCLI.Application;
 using NBTExplorerCLI.Domain;
 using NBTExplorerCLI.Formats;
 using NBTExplorerCLI.Infrastructure;
+using NBTExplorerCLI.Minecraft;
 using static NBTExplorerCLI.Verification.CandidateIoTests;
 using static NBTExplorerCLI.Verification.TextSlotTests;
 using static NBTExplorerCLI.Verification.WorldDiscoveryTests;
@@ -14,6 +15,73 @@ internal static class StorageScalarTests
     private const string Folder = "datapacks/p/data/demo/functions/";
     private const string Producer = Folder + "producer.mcfunction";
     private const string Consumer = Folder + "consumer.mcfunction";
+
+    internal static void GlyphControlLists()
+    {
+        const string metadata = """{"pack":{"pack_format":15,"description":""}}""";
+        const string font = """{"providers":[{"type":"space","advances":{"+":1,"-":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,"7":1,"8":1,"9":1,"a":1,"∑":1}}]}""";
+        const string numbers = """
+            data modify storage demo:source staging set value []
+            execute store result storage demo:source scratch int 1 run scoreboard players get #count proof_counter
+            data modify storage demo:source scratch set string storage demo:source scratch
+            data modify storage demo:source staging append string storage demo:source scratch 0 1
+            data modify storage demo:source glyphs set from storage demo:source staging
+            data modify storage demo:source glyphs append value '+'
+            """;
+        var root = ScratchDirectory.CreateChild(); var cache = ScratchDirectory.CreateChild();
+        var failures = new List<string>();
+        try
+        {
+            Put(root, "level.dat", CompressedNbt.WriteDocument(WorldMetadataTests.Level(3465, WorldMetadataTests.Dimensions), NbtCompression.GZip));
+            Put(root, "datapacks/p/pack.mcmeta", Encoding.UTF8.GetBytes(metadata));
+            Put(root, "resources.zip", Zip(("pack.mcmeta", metadata), ("assets/demo/font/meter.json", font)));
+            Put(root, Consumer, """
+                data modify storage demo:source panel set value ['{"text":"Bienvenue"}','{"nbt":"glyphs","storage":"demo:source","interpret":true,"font":"demo:meter"}']
+                tellraw @a {"nbt":"panel[]","storage":"demo:source","interpret":true}
+                """u8.ToArray());
+            Check("mapped constants", "data modify storage demo:source glyphs set value []\ndata modify storage demo:source glyphs append value 'a'", true);
+            Check("mapped symbol", "data modify storage demo:source glyphs set value []\ndata modify storage demo:source glyphs append value '∑'", true);
+            Check("numeric slice and transfer", numbers, true);
+            Check("cross-storage glyph copy", """
+                data modify storage demo:other staging set value []
+                data modify storage demo:other staging append value 'a'
+                data modify storage demo:source glyphs set from storage demo:other staging
+                """, false);
+            Check("unknown origin", numbers.Replace("scratch 0 1", "unknown 0 1", StringComparison.Ordinal), false);
+            Check("raw mutation", numbers + "\ndata modify storage demo:source scratch set value 'not numeric'", false);
+            Check("unmapped glyph", numbers + "\ndata modify storage demo:source glyphs append value 'B'", false);
+            Check("mixed text", numbers + "\ndata modify storage demo:source glyphs append value '{\"text\":\"ordinary text\"}'", false);
+            Check("list overwritten by its serialized string", numbers + "\ndata modify storage demo:source glyphs set string storage demo:source glyphs", false);
+            var bitmap = """{"providers":[{"type":"bitmap","file":"demo:font/meter.png","ascent":1,"chars":["A\u0000"]}]}"""u8.ToArray();
+            var glyphs = PackTextExtractor.ReadStorageFontGlyphs(bitmap, DecodeLimits.Default, _ => true);
+            if (glyphs is null || !glyphs.SetEquals([new Rune('A')])) failures.Add("bitmap padding");
+            if (PackTextExtractor.ReadStorageFontGlyphs(bitmap, DecodeLimits.Default, _ => false) is not { Count: 0 }) failures.Add("absent bitmap asset");
+            Require(failures.Count == 0, "only unchanged glyph controls with verified inputs may feed translated text: " + string.Join(", ", failures));
+        }
+        finally { Directory.Delete(root, true); Directory.Delete(cache, true); }
+
+        void Check(string name, string commands, bool expected)
+        {
+            Put(root, Producer, Encoding.UTF8.GetBytes(commands));
+            var snapshot = WorldQueryTests.Query(root, cache);
+            var visible = snapshot.ReadSources().Single(row => row.Source.Location.Artifact.RelativePath == Consumer).Text!.Occurrences;
+            if (snapshot.Manifest.CoverageComplete != expected || expected && visible is not [{ Text: "Bienvenue" }])
+                failures.Add(name);
+            if (name is "cross-storage glyph copy" or "mixed text") Draft(Consumer, 1, "Bienvenue");
+            if (name == "mixed text") Draft(Producer, commands.Split('\n').Length, "ordinary text");
+        }
+
+        void Draft(string path, int line, string expected)
+        {
+            using var result = CliScanTests.Success(CliScanTests.Run(root, "translate", "fallback", root,
+                "--path", path, "--line", line.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "--source-language", "fr-fr", "--target-language", "de-de"));
+            var data = result.RootElement.GetProperty("data");
+            Require(data.GetProperty("unverified").GetArrayLength() == 0
+                && data.GetProperty("candidates").EnumerateArray().Single().GetProperty("text").GetString() == expected,
+                "unproven glyph operations must leave the exact prose accessible through fallback");
+        }
+    }
 
     internal static void MappedFontSlices()
     {

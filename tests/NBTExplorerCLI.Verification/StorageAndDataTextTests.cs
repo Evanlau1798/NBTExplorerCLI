@@ -73,6 +73,7 @@ internal static class StorageAndDataTextTests
         new("text-storage-default-font-override", "discovery", _ => StorageScalarTests.ConsumerFont(defaultOverride: true)),
         new("prepare-storage-literal-keeps-private-glyphs", "preparation", _ => StorageScalarTests.PlanPreservesPrivateGlyphs()),
         new("text-storage-mapped-font-slices", "discovery", _ => StorageScalarTests.MappedFontSlices()),
+        new("text-storage-glyph-control-lists", "discovery", _ => StorageScalarTests.GlyphControlLists()),
         new("text-storage-saved-mapped-font-slices", "discovery", _ => StorageScalarTests.SavedMappedFontSlices()),
         new("text-storage-saved-native-font-guard", "discovery", _ => StorageScalarTests.SavedNativeFontGuard()),
         new("text-storage-written-book-pages", "discovery", _ => StorageBookTests.CheckKnownPages()),
