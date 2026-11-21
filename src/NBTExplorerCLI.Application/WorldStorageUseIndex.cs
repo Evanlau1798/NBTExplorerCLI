@@ -16,6 +16,14 @@ internal sealed record StorageDisplayPolicy(ImmutableHashSet<(string Storage, st
     internal static bool Target(SourceAddress address) => TextSlot.IsInterpretedStorage(address);
     internal static bool TargetsStorage(IEnumerable<PatchOperation> operations) => operations.Any(operation => operation.Targets.Any(Target));
     internal bool Covers(ExtractionDiagnostic diagnostic) => ResolvedDiagnostics.Contains(diagnostic);
+    internal ImmutableArray<ExtractionDiagnostic> Remaining(ImmutableArray<ExtractionDiagnostic> diagnostics)
+        => CanBindWrites && !diagnostics.IsEmpty ? diagnostics.Where(diagnostic => !Covers(diagnostic)).ToImmutableArray() : diagnostics;
+    internal static bool ReferencesComplete(CommandExtractionResult result, ImmutableArray<ExtractionDiagnostic> remaining)
+        => result.ReferenceCompleteness == ReferenceCompleteness.Complete || !result.Text.Diagnostics.IsEmpty && remaining.IsEmpty;
+    internal static TextExtractionResult RetainSeeds(TextExtractionResult text, ImmutableHashSet<string>? retainedSeeds)
+        => retainedSeeds is null || text.Unclassified.IsEmpty ? text
+            : text with { Unclassified = text.Unclassified.Where(candidate => WorldStorageUseIndex.SavedStorageLocalId(candidate.Address.NodePath) is not { } id
+                || !retainedSeeds.Contains(id)).ToImmutableArray() };
 
     internal bool ProjectedCoverage(IEnumerable<TextSourceExtraction> rows, Func<ExtractionDiagnostic, bool>? resolve = null)
         => rows.All(row => row.Outcome is SourceOutcome.Success or SourceOutcome.Irrelevant
@@ -67,7 +75,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 if (access.DisplayContainer is null) observed.TryAdd(node, access);
                 else if (nested.TryAdd(node, access)) index.Charge(access.Address.Artifact.RelativePath.Length + access.Path.Length);
             }
-        }, () => covered = false, () => index.opaqueEquipment = true, functionResults.ObserveCall, index.ObserveFont))
+        }, () => covered = false, () => index.opaqueEquipment = true, functionResults.ObserveCall, index.ObserveFont, functionResults.ObserveSign))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (index.opaqueDefaultFont || row.Outcome is SourceOutcome.Failed or SourceOutcome.Cancelled) return StorageDisplayPolicy.Empty;
@@ -347,7 +355,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
 
     private static bool PlainPath(string path) => path.Length != 0 && PlainAncestor(path) == path;
 
-    private static string PlainAncestor(string path)
+    internal static string PlainAncestor(string path)
     {
         var segment = 0;
         for (var index = 0; index < path.Length; index++)
@@ -361,7 +369,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
         return segment == path.Length && segment > 0 ? path[..(segment - 1)] : path;
     }
 
-    private static bool RelatedPath(string path, ICollection<string> paths, string[] ordered)
+    internal static bool RelatedPath(string path, ICollection<string> paths, string[] ordered)
     {
         for (var dot = path.IndexOf('.'); dot >= 0; dot = path.IndexOf('.', dot + 1))
             if (paths.Contains(path[..dot])) return true;

@@ -11,9 +11,10 @@ internal sealed partial class CommandTextReader
     private const int DisplayEntityDataVersion = 3326;
     private const int VanillaArmorTrimDataVersion = 3442;
 
-    private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end, bool resultObserved)
+    private void DataCommand(List<CommandToken> tokens, int index, TypedPath path, int end, bool resultObserved, bool valueStored)
     {
-        if (ReadIndexedBlankWrite(tokens, index, path)
+        if ((resultObserved || signEffect is not null) && ReadObservedSignResult(tokens, index, path, end, resultObserved, valueStored)
+            || ReadIndexedBlankWrite(tokens, index, path)
             || resultObserved && ReadScratchComparison(tokens, index, path)
             || ReadStorageScratchReset(tokens, index, path)) return;
         var storageElement = !resultObserved && (storageAccess is not null || storageDisplayLists is { Count: > 0 }) ? StorageDisplayWrite(tokens, index) : null;
@@ -29,7 +30,7 @@ internal sealed partial class CommandTextReader
             ObserveDataStorage(tokens, index, path, end, staticListWrite ? null : storageElement, storageValue, resultObserved, glyphs);
         if (staticListWrite || ReadStorageDisplayWrite(tokens, index, path, storageElement, glyphs)) return;
         if (DataControl(tokens, index)) return;
-        if (SignMessageWrite(tokens, index, path)) return;
+        if (SignMessageWrite(tokens, index, path, resultObserved)) return;
         var entityWrite = tokens.Count == index + 8 && tokens[index + 1].Text == "modify" && tokens[index + 2].Text == "entity"
             && EntityTarget(tokens[index + 3].Text) && tokens[index + 5].Text == "set" && tokens[index + 6].Text == "value";
         var entityType = entityWrite ? selectorTypes.GetValueOrDefault(tokens[index + 3].Start) : null;
@@ -75,7 +76,7 @@ internal sealed partial class CommandTextReader
         }
         Unknown(path, tokens[index].Start, end - tokens[index].Start, "UnknownDataTextSchema");
     }
-    private bool SignMessageWrite(List<CommandToken> tokens, int index, TypedPath path)
+    private bool SignMessageWrite(List<CommandToken> tokens, int index, TypedPath path, bool resultObserved)
     {
         if (tokens.Count != index + 10 || tokens[index + 1].Text != "modify" || tokens[index + 2].Text != "block"
             || DataTargetEnd(tokens, index + 2) != index + 6 || tokens[index + 7].Text != "set" || tokens[index + 8].Text != "value") return false;
@@ -88,7 +89,11 @@ internal sealed partial class CommandTextReader
         {
             var linePath = At(grammarPath, line);
             try { Component(start, end, linePath, storedRole: role); }
-            catch (DuplicateJsonMemberException) { Unknown(linePath, start, end - start, "UnsupportedSignCommandComponent"); }
+            catch (DuplicateJsonMemberException)
+            {
+                if (!resultObserved && ReadRepeatedSignStyles(start, end, linePath)) return;
+                Unknown(linePath, start, end - start, "UnsupportedSignCommandComponent");
+            }
         }
         if (selector.Length != 0)
         {
@@ -108,24 +113,48 @@ internal sealed partial class CommandTextReader
         }
         return true;
     }
-    private static bool SignMessageField(string path, out string side, out string field, out string selector)
+    private static bool SignMessageField(ReadOnlySpan<char> path, out string side, out string field, out ReadOnlySpan<char> selector)
+        => SignMessagePrefix(path, out side, out field, out selector)
+            && (selector.IsEmpty || selector.Length >= 2 && selector[0] == '[' && selector[^1] == ']');
+
+    private static bool SignMessagePrefix(ReadOnlySpan<char> path, out string side, out string field, out ReadOnlySpan<char> tail)
     {
-        side = field = selector = "";
-        var fields = path.Split('.');
-        if (fields.Length != 2 || fields[0] is not ("front_text" or "back_text")) return false;
-        side = fields[0];
-        var bracket = fields[1].IndexOf('[');
-        field = bracket < 0 ? fields[1] : fields[1][..bracket];
-        if (bracket >= 0) selector = fields[1][bracket..];
-        return field is "messages" or "filtered_messages";
+        field = "";
+        tail = default;
+        side = TakeSignKey(ref path, "front_text") ? "front_text" : TakeSignKey(ref path, "back_text") ? "back_text" : "";
+        if (side.Length == 0 || path.IsEmpty || path[0] != '.') return false;
+        path = path[1..];
+        field = TakeSignKey(ref path, "messages") ? "messages" : TakeSignKey(ref path, "filtered_messages") ? "filtered_messages" : "";
+        tail = path;
+        return field.Length != 0;
     }
 
-    private static bool SignTextSource(string path)
+    private static bool TakeSignKey(ref ReadOnlySpan<char> path, string key)
     {
-        var singleLine = path.StartsWith("Filtered", StringComparison.Ordinal) ? path[8..] : path;
-        if (singleLine is "Text1" or "Text2" or "Text3" or "Text4") return true;
-        return SignMessageField(path, out _, out _, out var selector) && (selector is "" or "[]"
-            || selector.EndsWith(']') && Integer(selector[1..^1], out var line) && line is >= -4 and <= 3);
+        if (path.IsEmpty) return false;
+        if (path[0] is '\'' or '"')
+        {
+            if (path.Length < key.Length + 2 || path[key.Length + 1] != path[0] || !path.Slice(1, key.Length).SequenceEqual(key)) return false;
+            path = path[(key.Length + 2)..];
+            return true;
+        }
+        if (!path.StartsWith(key, StringComparison.Ordinal)) return false;
+        path = path[key.Length..];
+        return true;
+    }
+
+    private static bool SignTextSource(string path) => SignTextSource(path, out _);
+    private static bool SignTextSource(ReadOnlySpan<char> path, out bool isCollection)
+    {
+        isCollection = false;
+        if (SignMessageField(path, out _, out _, out var selector))
+        {
+            isCollection = selector.IsEmpty;
+            return isCollection || selector.SequenceEqual("[]") || Integer(selector[1..^1], out var line) && line is >= -4 and <= 3;
+        }
+        if (path.Length >= 2 && path[0] is '\'' or '"' && path[^1] == path[0]) path = path[1..^1];
+        if (path.StartsWith("Filtered", StringComparison.Ordinal)) path = path[8..];
+        return path is "Text1" or "Text2" or "Text3" or "Text4";
     }
 
     private bool StaticDataWrite(List<CommandToken> tokens, int index, SnbtNode? valueNode = null,
@@ -200,7 +229,7 @@ internal sealed partial class CommandTextReader
         var end = path.LastIndexOf("].", StringComparison.Ordinal);
         if (start < 0 || start > 0 && path[start - 1] != '.' || end < start + list.Length) return false;
         var selector = start + list.Length;
-        if (end != selector && !Integer(path[selector..end], out _) && !(path[selector] == '{' && CompoundEnd(path, selector) == end)) return false;
+        if (end != selector && !Integer(path.AsSpan(selector, end - selector), out _) && !(path[selector] == '{' && CompoundEnd(path, selector) == end)) return false;
         field = path[(end + 2)..];
         return true;
     }
@@ -212,7 +241,7 @@ internal sealed partial class CommandTextReader
         if (path is "damage" or "crit" && entityType is "minecraft:arrow" or "minecraft:spectral_arrow" or "minecraft:trident") return true;
         var start = path.IndexOf('[');
         if ((start < 0 ? path : path[..start]) is not ("Pos" or "Motion" or "Rotation")) return false;
-        return start < 0 || path[^1] == ']' && (start + 2 == path.Length || Integer(path[(start + 1)..^1], out _));
+        return start < 0 || path[^1] == ']' && (start + 2 == path.Length || Integer(path.AsSpan(start + 1, path.Length - start - 2), out _));
     }
     private bool NativeItemIdPath(string target, string path)
     {
@@ -293,7 +322,7 @@ internal sealed partial class CommandTextReader
             while (offset < path.Length && path[offset] == '[')
             {
                 var close = path.IndexOf(']', offset + 1);
-                if (close < 0 || close > offset + 1 && !Integer(path[(offset + 1)..close], out _)) return false;
+                if (close < 0 || close > offset + 1 && !Integer(path.AsSpan(offset + 1, close - offset - 1), out _)) return false;
                 offset = close + 1;
             }
             if (offset == path.Length) return true;

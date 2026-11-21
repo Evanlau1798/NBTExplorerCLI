@@ -6,12 +6,16 @@ namespace NBTExplorerCLI.Application;
 internal sealed class StorageFunctionResults(Action<int> charge)
 {
     private readonly HashSet<string> observed = new(StringComparer.Ordinal);
+    private readonly HashSet<string> observedValues = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> calls = new(StringComparer.Ordinal);
     private readonly Dictionary<ArtifactAddress, HashSet<(string Storage, string Path)>> mutations = [];
+    private readonly HashSet<ArtifactAddress> signReads = [];
+    private readonly HashSet<ArtifactAddress> signMutations = [];
 
     internal void ObserveCall(string? caller, CommandFunctionCall call)
     {
         if (call.ResultObserved && observed.Add(call.Target)) charge(call.Target.Length);
+        if (call.StoresValue && observedValues.Add(call.Target)) charge(call.Target.Length);
         if (caller is null) return;
         if (!calls.TryGetValue(caller, out var targets))
         {
@@ -19,6 +23,27 @@ internal sealed class StorageFunctionResults(Action<int> charge)
             calls.Add(caller, targets = new(StringComparer.Ordinal));
         }
         if (targets.Add(call.Target)) charge(call.Target.Length);
+    }
+
+    internal void ObserveSign(SourceAddress address, CommandSignEffect effect)
+    {
+        var artifacts = effect == CommandSignEffect.ReadsStringValue ? signReads : signMutations;
+        if (artifacts.Add(address.Artifact)) charge(address.Artifact.RelativePath.Length);
+    }
+
+    internal bool HasObservedSignEffects(WorldDiscoveryResult discovery, CancellationToken cancellationToken)
+    {
+        // 23w41a changed function stores to observe explicit return results.
+        if (discovery.Metadata?.DataVersion is not < 3681) return false;
+        return Reaches(observedValues, signReads) || Reaches(observed, signMutations);
+
+        bool Reaches(HashSet<string> roots, HashSet<ArtifactAddress> effects)
+        {
+            if (roots.Count == 0 || effects.Count == 0) return false;
+            var reachable = Reachable(roots, cancellationToken);
+            return reachable.Any(id => id.StartsWith('#')) || discovery.Sources.Any(source => effects.Contains(source.Location.Artifact)
+                && WorldLayoutLocator.FunctionId(source.Location) is { } id && reachable.Contains(id));
+        }
     }
 
     internal void ObserveMutation(CommandStorageAccess access)
@@ -39,15 +64,8 @@ internal sealed class StorageFunctionResults(Action<int> charge)
     internal bool BlockObservedMutations(WorldDiscoveryResult discovery, Action<string, string> block, CancellationToken cancellationToken)
     {
         if (observed.Count == 0) return true;
-        var reachable = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Queue<string>();
-        foreach (var id in observed) Visit(id);
-        while (pending.TryDequeue(out var id))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (calls.TryGetValue(id, out var targets))
-                foreach (var target in targets) Visit(target);
-        }
+        if (HasObservedSignEffects(discovery, cancellationToken)) return false;
+        var reachable = Reachable(observed, cancellationToken);
         var defined = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in discovery.Sources)
         {
@@ -60,6 +78,20 @@ internal sealed class StorageFunctionResults(Action<int> charge)
                 foreach (var path in paths) block(path.Storage, path.Path);
         }
         return defined.Count == reachable.Count;
+    }
+
+    private HashSet<string> Reachable(HashSet<string> roots, CancellationToken cancellationToken)
+    {
+        var reachable = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Queue<string>();
+        foreach (var id in roots) Visit(id);
+        while (pending.TryDequeue(out var id))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (calls.TryGetValue(id, out var targets))
+                foreach (var target in targets) Visit(target);
+        }
+        return reachable;
 
         void Visit(string target)
         {

@@ -34,6 +34,8 @@ internal sealed partial class CommandTextReader
             }
             path = At(path, "execute");
         }
+        if (signEffect is not null && ClassicSignComparison(verb, body, cursor))
+            signEffect(Address(path, offset, body.Length, source.Address.SemanticRole), CommandSignEffect.ComparesClassicText);
         if (verb is "give" or "summon" or "entitydata" or "setblock")
         {
             var identity = Word();
@@ -92,6 +94,16 @@ internal sealed partial class CommandTextReader
             Charge(address, message);
             texts.Add(new(address, message, role, AllowedEmpty: false));
         }
+    }
+
+    private bool ClassicSignComparison(string verb, string body, int cursor)
+    {
+        if (verb == "testforblocks") return true;
+        if (verb is not ("testforblock" or "blockdata")) return false;
+        var tag = body.IndexOf('{', cursor);
+        if (tag < 0) return false;
+        var matcher = Snbt.ParseDocument(Utf8.GetBytes(body[tag..]), MinecraftProfiles.SnbtGrammar(profile), limits).Root;
+        return matcher.Children.Any(field => field.Selector.Key is "Text1" or "Text2" or "Text3" or "Text4");
     }
 
     private void ClassicTag(string verb, string identity, string tag, int start, TypedPath path)

@@ -74,7 +74,7 @@ internal static class SessionWorldCommands
         catch (FileNotFoundException error) when (seal)
         { throw new CliFailure("FILE_NOT_FOUND", error.Message, Repair("inspect-apply-status-and-retry-seal")); }
         catch (ReferencePolicyException error) when (seal)
-        { throw new CliFailure("UNSUPPORTED_SOURCE", error.Message, Repair("rollback-and-create-new-reference-plan")); }
+        { throw new CliFailure("UNSUPPORTED_SOURCE", error.Message, Repair(error.Repair)); }
         catch (Exception error) when (seal && error is ArgumentException or ArtifactConflictException)
         { throw new CliFailure("CONFLICT", error.Message, Repair("inspect-session-status-and-apply-proof")); }
         catch (Exception error) when (seal && error is IOException or UnauthorizedAccessException && CliApplication.Code(error) != "RESOURCE_LIMIT")

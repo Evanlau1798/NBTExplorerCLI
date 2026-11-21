@@ -22,6 +22,7 @@ internal sealed partial class CommandTextReader
     private readonly Action<CommandStorageAccess>? storageAccess;
     private readonly Action? opaqueEquipment;
     private readonly Action<CommandFunctionCall>? functionCall;
+    private readonly Action<SourceAddress, CommandSignEffect>? signEffect;
     private readonly IReadOnlySet<(string Storage, string Path)>? storageDisplayLists;
     private readonly bool inspectNested;
     private readonly int runtimeDataVersion;
@@ -39,7 +40,7 @@ internal sealed partial class CommandTextReader
     private int lineStart;
     private long lineByte;
     private (string Storage, string Path, SourceAddress Address, bool Blank)? previousReset, lineReset;
-    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null, Action? opaqueEquipment = null, Action<CommandFunctionCall>? functionCall = null)
+    internal CommandTextReader(CommandCandidate source, CapabilityProfile profile, DecodeLimits limits, SnapshotScope scope, Action<SourceAddress>? componentRoot, Action<CommandSelectorReference>? selectorReference, Action<CommandNameTemplate>? nameTemplate, bool inspectNested = true, Action<CommandStorageAccess>? storageAccess = null, IReadOnlySet<(string Storage, string Path)>? storageDisplayLists = null, int? runtimeDataVersion = null, Action? opaqueEquipment = null, Action<CommandFunctionCall>? functionCall = null, Action<SourceAddress, CommandSignEffect>? signEffect = null)
     {
         (this.source, this.profile, this.limits, this.scope) = (source, profile, limits, scope);
         this.componentRoot = componentRoot;
@@ -52,6 +53,7 @@ internal sealed partial class CommandTextReader
         exactRuntimeDataVersion = runtimeDataVersion;
         this.opaqueEquipment = opaqueEquipment;
         this.functionCall = functionCall;
+        this.signEffect = signEffect;
         var length = Utf8.GetByteCount(source.Command);
         if (length > limits.MaxDecodedBytes || TextExtractionBudget.RecordBytes(source.Address, source.Command.Length) > limits.MaxDecodedBytes) Limit();
         byteBase = source.Address.Syntax is { Encoding: "utf8-bom", StartByte: 3 } ? 3 : 0;
@@ -104,14 +106,14 @@ internal sealed partial class CommandTextReader
         }
         return new(new(texts.ToImmutableArray(), keys.ToImmutableArray(), diagnostics.ToImmutableArray(), [], []), references.ToImmutableArray(), completeness);
     }
-    private void Command(List<CommandToken> tokens, int index, TypedPath path, int end, bool resultObserved = false)
+    private void Command(List<CommandToken> tokens, int index, TypedPath path, int end, bool resultObserved = false, bool valueStored = false)
     {
         if (index >= tokens.Count) throw new CommandSyntaxException();
         var name = tokens[index].Text;
         if (index == 0 && source.Address.SemanticRole == "command.block" && name.StartsWith('/')) name = name[1..];
         if (name == "give" && tokens.Count >= index + 3)
         { CountArgument(tokens, index + 3); ItemArgument(tokens[index + 2], At(path, "give.item")); return; }
-        if (name == "data") { DataCommand(tokens, index, path, end, resultObserved); return; }
+        if (name == "data") { DataCommand(tokens, index, path, end, resultObserved, valueStored); return; }
         if (name == "item") { opaqueEquipment?.Invoke(); ItemCommand(tokens, index, path, end); return; }
         if (name == "summon" && tokens.Count >= index + 6)
         {
@@ -130,8 +132,12 @@ internal sealed partial class CommandTextReader
             while (cursor < tokens.Count)
             {
                 var clause = tokens[cursor++].Text;
-                if (clause == "run") { Command(tokens, cursor, At(path, "run"), end, resultObserved); return; }
-                if (clause == "store") resultObserved = true;
+                if (clause == "run") { Command(tokens, cursor, At(path, "run"), end, resultObserved, valueStored); return; }
+                if (clause == "store")
+                {
+                    resultObserved = true;
+                    valueStored |= cursor < tokens.Count && tokens[cursor].Text == "result";
+                }
                 var operands = clause switch { "as" or "at" or "in" or "anchored" or "align" or "on" or "summon" => 1, "positioned" => 3, "rotated" => 2, "facing" => 3, _ => -1 };
                 if (clause is "if" or "unless" && cursor + 1 < tokens.Count && tokens[cursor].Text == "entity") operands = 2;
                 if (clause is "if" or "unless" && cursor < tokens.Count && tokens[cursor].Text == "score") operands = ScoreCondition(tokens, cursor);
@@ -190,7 +196,8 @@ internal sealed partial class CommandTextReader
         if (functionCall is not null && name == "function" && tokens.Count == index + 2 && ResourceOrTag(tokens[index + 1].Text))
         {
             var target = tokens[index + 1].Text;
-            functionCall(new(target.StartsWith('#') ? target : MinecraftIdentifier.DefaultNamespace(target), resultObserved));
+            functionCall(new(target.StartsWith('#') ? target : MinecraftIdentifier.DefaultNamespace(target), resultObserved)
+            { StoresValue = valueStored });
         }
         if (storageAccess is not null && name == "function" && MinecraftProfiles.SupportsFunctionMacros(profile)
             && index + 4 < tokens.Count && ResourceOrTag(tokens[index + 1].Text)

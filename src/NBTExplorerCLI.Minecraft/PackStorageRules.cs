@@ -29,24 +29,25 @@ public static partial class PackTextExtractor
             if (provider.TryGetNativeProperty("advances", out var advances))
                 return Fields(advances, (glyph, _) => Rune.TryGetRuneAt(glyph, 0, out var scalar)
                     && scalar.Utf16SequenceLength == glyph.Length && Add(scalar));
+            var available = true;
             if (hasTexture is not null)
             {
                 if (!provider.TryGetNativeProperty("file", out var file)) return false;
                 var parts = MinecraftIdentifier.DefaultNamespace(NativeJsonStrings.Read(file)).Split(':', 2);
-                if (!hasTexture($"assets/{parts[0]}/textures/{parts[1]}")) return false;
+                available = hasTexture($"assets/{parts[0]}/textures/{parts[1]}");
             }
             return provider.TryGetNativeProperty("chars", out var chars) && ArrayOf(chars, row =>
             {
                 foreach (var scalar in NativeJsonStrings.Read(row).EnumerateRunes())
-                    if (!Add(scalar)) return false;
+                    if (!Add(scalar, available)) return false;
                 return true;
             });
         }
 
-        bool Add(Rune glyph)
+        bool Add(Rune glyph, bool available = true)
         {
             if (glyph == Rune.ReplacementChar || glyph.Value == 0) return false;
-            glyphs.Add(glyph);
+            if (available) glyphs.Add(glyph);
             return true;
         }
     }

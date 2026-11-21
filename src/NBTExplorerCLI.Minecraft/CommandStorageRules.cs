@@ -97,7 +97,8 @@ internal sealed partial class CommandTextReader
                 || ObserveStorageListCopy(tokens, index, path, end, pathIndex, sourceEnd, operation, attribute))) return;
             ObserveUnprovenEquipment(tokens, target, pathIndex);
             ObserveUnprovenEquipment(tokens, sourceTarget, sourceEnd);
-            ObserveStorageOperand(tokens, target, path, pathIndex, attribute: attribute);
+            var signImport = signEffect is not null && tokens[sourceTarget].Text == "block" && sourceEnd < tokens.Count && SignTextSource(tokens[sourceEnd].Text);
+            ObserveStorageOperand(tokens, target, path, pathIndex, signImport ? CommandStorageUse.SignImport : CommandStorageUse.Other, attribute);
             ObserveStorageOperand(tokens, sourceTarget, path, sourceEnd);
             return;
         }
@@ -187,7 +188,7 @@ internal sealed partial class CommandTextReader
     private static string? PositionalListPath(string path)
     {
         var bracket = path.IndexOf('[');
-        return bracket > 0 && path.EndsWith(']') && (bracket + 2 == path.Length || Integer(path[(bracket + 1)..^1], out _))
+        return bracket > 0 && path.EndsWith(']') && (bracket + 2 == path.Length || Integer(path.AsSpan(bracket + 1, path.Length - bracket - 2), out _))
             && path[..bracket].Split('.').All(PlainControlToken) ? path[..bracket] : null;
     }
 

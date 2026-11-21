@@ -24,14 +24,16 @@ internal static class WriteExecution
             throw new JsonOutputLimitException("Recovery identity exceeds reserved command envelope space");
         ApplyReceipt? receipt = null;
         string? policyError = null;
+        string? policyRepair = null;
         try
         {
             try { if (execute is not null) receipt = execute(); }
             catch (ReferencePolicyException error)
             {
                 policyError = error.Message;
+                policyRepair = error.Repair;
                 var current = WriteCommands.Status(engine.ReadStatus(hash));
-                return current with { Data = new { journal = current.Data, repair = "rollback-and-create-new-reference-plan", policyError }, Code = "UNSUPPORTED_SOURCE", Outcome = "Unsupported", Exit = 4, Export = null };
+                return current with { Data = new { journal = current.Data, repair = policyRepair, policyError }, Code = "UNSUPPORTED_SOURCE", Outcome = "Unsupported", Exit = 4, Export = null };
             }
             if (execute is not null && receipt is null) return null;
             var currentStatus = engine.ReadStatus(hash);
@@ -46,14 +48,14 @@ internal static class WriteExecution
         catch (Exception error) when (StateFailure(error))
         {
             var missing = error is ApplyJournalMissingException;
-            recovery = new { recovery.world, recovery.stateRoot, repair = policyError is null ? "inspect-status-then-resume-same-journal" : "rollback-and-create-new-reference-plan" };
+            recovery = new { recovery.world, recovery.stateRoot, repair = policyRepair ?? "inspect-status-then-resume-same-journal" };
             if (receipt is null && error is AggregateException)
                 try { receipt = engine.ReadReceipt(hash); } catch (Exception unavailable) when (StateFailure(unavailable)) { }
             var raw = receipt is null ? null : ApplyReceiptJson.Write(receipt);
             using var json = raw is null ? null : JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 1024 });
             return new(new { planHash = hash, receiptIsTerminal = false, receipt = json is null ? (JsonElement?)null : json.RootElement.Clone(),
                 unconfirmedOperations = receipt is null && operationIds is not null ? CommandOutputJson.UnconfirmedOperations(operationIds) : null,
-                recovery, journalMayBeAbsent = receipt is null, policyError, policyRepair = policyError is null ? null : "rollback-and-create-new-reference-plan",
+                recovery, journalMayBeAbsent = receipt is null, policyError, policyRepair,
                 diagnosticCode = CliApplication.Code(error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions[0] : error) }, missing ? "FILE_NOT_FOUND" : "RECOVERY_REQUIRED", missing ? "Failed" : "RecoveryRequired", missing ? 5 : 7, raw);
         }
     }

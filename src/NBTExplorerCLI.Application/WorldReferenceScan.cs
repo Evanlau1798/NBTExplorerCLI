@@ -75,7 +75,15 @@ internal sealed class WorldReferenceScan
         var roots = new List<SourceAddress>(); TextExtractionResult text;
         var profile = document is not null ? NbtTextExtractor.Profile(source.Location, document) : source.Pack is { } pack ? MinecraftProfiles.ForPackMetadata(pack) : metadata.Profile;
         if (profile is null) { Reject("Unknown reference grammar profile"); return; }
-        if (document is not null) text = NbtTextExtractor.Extract(source.Location, document, source.Chunk, limits, snapshot.StorageRules.GetValueOrDefault(source.Location.Artifact, []), layoutProfile: metadata.Profile, componentRoot: roots.Add);
+        if (document is not null)
+        {
+            var artifact = source.Location.Artifact;
+            var rules = snapshot.StorageRules.GetValueOrDefault(artifact, []);
+            var storage = rules.IsEmpty && snapshot.StorageDisplays.CanBindWrites ? snapshot.StorageDisplays : StorageDisplayPolicy.Empty;
+            if (rules.IsEmpty) rules = storage.SeedRules.GetValueOrDefault(artifact, []);
+            text = StorageDisplayPolicy.RetainSeeds(NbtTextExtractor.Extract(source.Location, document, source.Chunk, limits,
+                rules, layoutProfile: metadata.Profile, componentRoot: roots.Add), storage.RetainedSeeds.GetValueOrDefault(artifact));
+        }
         else if (source.Location.Role == WorldSourceRole.Function)
             text = new([], [], [], [WorldCommandEdits.BindFunction(source.Location.Artifact, bytes, profile, source.Location.Dimension)], []);
         else if (source.Pack is { } sourcePack) text = PackTextExtractor.Extract(source.Location, bytes, sourcePack, limits, componentRoot: roots.Add);
@@ -85,6 +93,8 @@ internal sealed class WorldReferenceScan
         {
             var grammar = profile.Features[ProfileFacet.CommandGrammar];
             var declared = new HashSet<SourceAddress>();
+            var storage = command.Address.SemanticRole == "command.function" && snapshot.StorageDisplays.CanBindWrites
+                ? snapshot.StorageDisplays : StorageDisplayPolicy.Empty;
             var result = CommandTextExtractor.Extract(command, profile, limits, selectorReference: binding =>
             {
                 var reference = binding.Reference; Charge(reference.Address, binding.Selector);
@@ -100,8 +110,10 @@ internal sealed class WorldReferenceScan
                     Charge(part.Address, part.Text);
                 }
                 Targets.Add(target);
-            }, runtimeDataVersion: source.RuntimeDataVersion);
-            if (!result.Complete || result.Text.Occurrences.Any(item => Identifying(item.Address.SemanticRole) && !declared.Contains(item.Address)))
+            }, storageDisplayLists: storage.Lists, runtimeDataVersion: source.RuntimeDataVersion);
+            var remaining = storage.Remaining(result.Text.Diagnostics);
+            if (!remaining.IsEmpty || !StorageDisplayPolicy.ReferencesComplete(result, remaining)
+                || result.Text.Occurrences.Any(item => Identifying(item.Address.SemanticRole) && !declared.Contains(item.Address)))
                 Reject("Command reference domain is dynamic or contains unsupported named templates");
         }
         if (text.Occurrences.Any(item => Identifying(item.Address.SemanticRole) && (document is null || item.Address.Syntax is not null))) Reject("Named templates require their explicit reference grammar");
@@ -117,6 +129,9 @@ internal sealed class WorldReferenceScan
                 var binding = new SourceAddress(root.Artifact, root.NodePath, root.SemanticRole, root.Dimension, root.Chunk);
                 var references = root.ComponentPath is not null && value is NbtString encoded ? NativeComponentReferences.EmbeddedJson(binding, encoded.Value, profile, limits)
                     : NativeComponentReferences.Nbt(binding, value, profile, limits);
+                if (!references.Diagnostics.IsEmpty && root.ComponentPath is not null && value is NbtString bookPage
+                    && root.SemanticRole is "book.page" or "lectern.book.page" && snapshot.StorageDisplays.CanBindWrites)
+                    references = ProveNativeBookReads(references, bookPage.Value, roots.Where(component => component.NodePath == root.NodePath).ToArray(), snapshot.StorageDisplays);
                 Add(references, profile);
             }
         }
@@ -131,6 +146,21 @@ internal sealed class WorldReferenceScan
                 Add(NativeComponentReferences.Json(root, Encoding.UTF8.GetBytes(value.GetRawText()), profile, limits), profile);
             }
         }
+    }
+    private ComponentReferenceResult ProveNativeBookReads(ComponentReferenceResult result, string page,
+        IReadOnlyList<SourceAddress> roots, StorageDisplayPolicy storage)
+    {
+        var authorized = new HashSet<TypedPath>();
+        if (!NativeBookStorage.Observe(page, roots, limits, read =>
+        {
+            if (read.Use != CommandStorageUse.InterpretedDisplay || read.HasUnclassifiedReferences || read.Address.ComponentPath is not { } path) return;
+            var member = read.Path.EndsWith("[]", StringComparison.Ordinal) ? read.Path[..^2] : read.Path;
+            if (storage.Lists.Contains((read.Storage, member))) authorized.Add(path);
+        }) || authorized.Count == 0) return result;
+        using var json = BoundedJson.ReadDecoded(NativeJsonStrings.EncodeJavaDocument(page, limits), limits);
+        return result with { Diagnostics = result.Diagnostics.Where(diagnostic => diagnostic.Code != "DynamicComponentReference"
+            || diagnostic.Address.ComponentPath is not { } path || !authorized.Contains(path)
+            || JsonValue(json.RootElement, path).TryGetNativeProperty("hoverEvent", out _)).ToImmutableArray() };
     }
     private static bool Covered(HashSet<TypedPath> roots, TypedPath path)
     {

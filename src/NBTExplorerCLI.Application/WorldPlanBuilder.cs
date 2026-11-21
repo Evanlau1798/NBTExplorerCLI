@@ -8,10 +8,20 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
 {
     internal const string Policy = "world-prepare-v1";
     private const string MultipleReferencePolicy = "world-prepare-name-groups-v2";
+    private const string TextResultPolicy = "+text-result-proof-v2";
     internal static void RequireReferencePolicy(PatchPlan plan)
     {
         RequireReferenceComposition(plan.Operations);
-        if (plan.Operations.OfType<ReferencePatch>().Skip(1).Any() && plan.PolicyVersion != MultipleReferencePolicy) throw new ReferencePolicyException();
+        var expected = PreparationPolicy(plan.Operations);
+        if (expected != plan.PolicyVersion && expected.EndsWith(TextResultPolicy, StringComparison.Ordinal))
+            throw new ReferencePolicyException("Sign and storage edits require the current command-result proof. Roll back any unfinished journal and create a fresh plan.",
+                plan.Operations.Any(operation => operation is ReferencePatch) ? "rollback-and-create-new-reference-plan" : "rollback-and-create-new-plan");
+        if (expected == MultipleReferencePolicy && plan.PolicyVersion != expected) throw new ReferencePolicyException();
+    }
+    private static string PreparationPolicy(IEnumerable<PatchOperation> operations)
+    {
+        var policy = operations.OfType<ReferencePatch>().Skip(1).Any() ? MultipleReferencePolicy : Policy;
+        return StorageDisplayPolicy.TargetsStorage(operations) || WorldStorageSignSafety.Targets(operations) ? policy + TextResultPolicy : policy;
     }
     private static void RequireReferenceComposition(IEnumerable<PatchOperation> operations)
     {
@@ -76,12 +86,12 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
         }
         foreach (var metadata in snapshot.Discovery.MetadataSources.IsDefault ? [] : snapshot.Discovery.MetadataSources) Input(metadata.Artifact, ArtifactImage.Present(metadata.ContentHash!));
         foreach (var input in referenceInputs) Input(input.Artifact, input.Image);
-        var storageDependencies = storageDisplays.CanBindWrites ? snapshot.Discovery
-            : WorldStorageSignSafety.Targets(requested) ? WorldStorageSignSafety.Bind(inventory, snapshot.Limits, classicVersion) : null;
+        var storageDependencies = WorldStorageSignSafety.Targets(requested) ? WorldStorageSignSafety.Bind(inventory, snapshot.Limits, classicVersion)
+            : storageDisplays.CanBindWrites ? snapshot.Discovery : null;
         if (storageDependencies is not null)
             foreach (var source in WorldReferenceScan.Relevant(storageDependencies).Where(source => source.Chunk is null && source.Location.Artifact.ContainerEntry is null))
                 Input(source.Location.Artifact, ArtifactImage.Present(source.ContentHash!));
-        var policy = requested.OfType<ReferencePatch>().Skip(1).Any() ? MultipleReferencePolicy : Policy;
+        var policy = PreparationPolicy(requested);
         var plan = new PatchPlan(inventory.WorldId, snapshot.Manifest.SnapshotId, snapshot.Manifest.Versions.Profile, policy, requested,
             inputs.Values, outputs.Select(artifact => new OutputDeclaration(artifact, OutputIntent.Write, Checks)), []);
         CheckPreimages(inventory, plan);
@@ -278,4 +288,8 @@ public sealed class WorldPlanBuilder(IWorldInventory inventory)
 
 internal sealed record BoundWorldPlan(PatchPlan Plan, ImmutableDictionary<(ArtifactAddress Artifact, ChunkPosition? Chunk), DiscoveredSource> Sources, StorageDisplayPolicy StorageDisplays);
 
-public sealed class ReferencePolicyException(string message = "Multiple reference groups require the verified group policy; roll back any pending journal before creating a fresh plan.") : NotSupportedException(message);
+public sealed class ReferencePolicyException(string message = "Multiple reference groups require the verified group policy; roll back any pending journal before creating a fresh plan.",
+    string repair = "rollback-and-create-new-reference-plan") : NotSupportedException(message)
+{
+    public string Repair { get; } = repair;
+}

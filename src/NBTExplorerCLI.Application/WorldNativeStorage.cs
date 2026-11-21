@@ -6,7 +6,7 @@ namespace NBTExplorerCLI.Application;
 public sealed partial class WorldTextExtraction
 {
     private TextExtractionResult ReadNbtText(DiscoveredSource source, NbtDocument document, IReadOnlyList<StorageTextRule> rules,
-        Action<CommandStorageAccess>? storageAccess, Action? opaqueStorage)
+        Action<CommandStorageAccess>? storageAccess, Action? opaqueStorage, bool inspectSignDependencies)
     {
         if (opaqueStorage is null || !WorldStorageUseIndex.HasOpaqueStorage(document.Root))
             return NbtTextExtractor.Extract(source.Location, document, source.Chunk, Limits, rules, request.Scope, LayoutProfile);
@@ -19,6 +19,9 @@ public sealed partial class WorldTextExtraction
             roots.Add(root);
         });
         var covered = new HashSet<TypedPath>();
+        if (inspectSignDependencies)
+            foreach (var command in result.PendingCommands)
+                covered.Add(command.Address.NodePath);
         if (storageAccess is not null && pages.Count != 0 && LayoutProfile?.Features[ProfileFacet.TextSchema].Schema == "java-text-json"
             && NbtTextExtractor.Profile(source.Location, document, LayoutProfile).Features[ProfileFacet.TextSchema].Schema == "java-text-json")
         {

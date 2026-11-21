@@ -414,7 +414,7 @@ internal sealed partial class CommandTextReader
     private static bool Decimal(ReadOnlySpan<char> text, out double value)
         => double.TryParse(text, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out value) && double.IsFinite(value);
 
-    private static bool Integer(string text, out int number) => int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out number) && !text.StartsWith('+');
+    private static bool Integer(ReadOnlySpan<char> text, out int number) => int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out number) && text[0] != '+';
 
     private static bool Duration(string text, int minimum)
     {

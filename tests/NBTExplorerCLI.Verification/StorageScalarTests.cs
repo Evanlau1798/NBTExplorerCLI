@@ -47,6 +47,11 @@ internal static class StorageScalarTests
             const string missingTexture = """{"providers":[{"type":"bitmap","file":"demo:font/absent.png","ascent":1,"chars":["AB"]}]}""";
             Put(root, "resources.zip", Zip(("pack.mcmeta", metadata), ("assets/demo/font/meter.json", missingTexture)));
             Check(first);
+            const string mixedProviders = """{"providers":[{"type":"space","advances":{"A":-3}},{"type":"bitmap","file":"demo:font/absent.png","ascent":1,"chars":["B"]}]}""";
+            Put(root, "resources.zip", Zip(("pack.mcmeta", metadata), ("assets/demo/font/meter.json", mixedProviders)));
+            const string presentGlyph = """[{"text":"Welcome"},{"text":"A","font":"demo:meter"}]""";
+            Check(presentGlyph, "Welcome");
+            Check(presentGlyph.Replace("\"A\"", "\"B\"", StringComparison.Ordinal));
             File.Delete(Path.Combine(root, "resources.zip"));
             Put(root, "world-resources/pack.mcmeta", Encoding.UTF8.GetBytes(metadata));
             Put(root, "world-resources/assets/demo/font/meter.json", Encoding.UTF8.GetBytes(missingTexture));

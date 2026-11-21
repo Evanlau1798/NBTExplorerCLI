@@ -55,14 +55,20 @@ public sealed partial class WorldTextExtraction
         return ReadSourcesCore(Discovery.Sources, storageAccess);
     }
     internal IEnumerable<TextSourceExtraction> ReadStorageObservations(Action<CommandStorageAccess> observe, Action opaqueStorage, Action opaqueEquipment,
-        Action<string?, CommandFunctionCall> functionCall, Action<string, HashSet<Rune>?> observeFont)
-        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage, opaqueEquipment: opaqueEquipment, functionCall: functionCall, observeFont: observeFont);
+        Action<string?, CommandFunctionCall> functionCall, Action<string, HashSet<Rune>?> observeFont, Action<SourceAddress, CommandSignEffect> signEffect)
+        => ReadSourcesCore(Discovery.Sources, observe, opaqueStorage, opaqueEquipment: opaqueEquipment, functionCall: functionCall,
+            observeFont: observeFont, signEffect: signEffect);
+    internal IEnumerable<TextSourceExtraction> ReadSignDependencies(Action<string?, CommandFunctionCall> functionCall,
+        Action<SourceAddress, CommandSignEffect> signEffect, Action<CommandStorageAccess> storageAccess, Action opaqueStorage)
+        => ReadSourcesCore(Discovery.Sources, storageAccess, opaqueStorage, previewStorage: StorageDisplays, functionCall: functionCall,
+            signEffect: signEffect, inspectSignDependencies: true);
     internal IEnumerable<TextSourceExtraction> ReadStorageProjection(StorageDisplayPolicy storage, HashSet<string> pendingSeeds)
         => ReadSourcesCore(Discovery.Sources.Where(source => storage.SourceKeys.ContainsKey(source.Location.Artifact.RelativePath)
             || pendingSeeds.Contains(source.Location.Artifact.RelativePath)), previewStorage: storage);
     internal IEnumerable<TextSourceExtraction> ReadGroup(ImmutableArray<DiscoveredSource> sources) => ReadSourcesCore(sources);
     private IEnumerable<TextSourceExtraction> ReadSourcesCore(IEnumerable<DiscoveredSource> selected, Action<CommandStorageAccess>? storageAccess = null, Action? opaqueStorage = null,
-        StorageDisplayPolicy? previewStorage = null, Action? opaqueEquipment = null, Action<string?, CommandFunctionCall>? functionCall = null, Action<string, HashSet<Rune>?>? observeFont = null)
+        StorageDisplayPolicy? previewStorage = null, Action? opaqueEquipment = null, Action<string?, CommandFunctionCall>? functionCall = null,
+        Action<string, HashSet<Rune>?>? observeFont = null, Action<SourceAddress, CommandSignEffect>? signEffect = null, bool inspectSignDependencies = false)
     {
         foreach (var group in selected.GroupBy(source => source.Location.Artifact.RelativePath, StringComparer.Ordinal))
         {
@@ -94,11 +100,13 @@ public sealed partial class WorldTextExtraction
                 continue;
             }
             using (archive)
-                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage, opaqueEquipment, functionCall, observeFont);
+                foreach (var source in sources) yield return ReadOne(source, bytes!, region, archive, storageAccess, opaqueStorage, previewStorage,
+                    opaqueEquipment, functionCall, observeFont, signEffect, inspectSignDependencies);
         }
     }
     private TextSourceExtraction ReadOne(DiscoveredSource source, byte[] bytes, RegionFile? region, ZipArchive? archive, Action<CommandStorageAccess>? storageAccess, Action? opaqueStorage,
-        StorageDisplayPolicy? previewStorage, Action? opaqueEquipment, Action<string?, CommandFunctionCall>? functionCall, Action<string, HashSet<Rune>?>? observeFont)
+        StorageDisplayPolicy? previewStorage, Action? opaqueEquipment, Action<string?, CommandFunctionCall>? functionCall,
+        Action<string, HashSet<Rune>?>? observeFont, Action<SourceAddress, CommandSignEffect>? signEffect, bool inspectSignDependencies)
     {
         if (source.Outcome != SourceOutcome.Success) return Forward(source);
         if (source.Location.Role == WorldSourceRole.Archive || region is not null && source.Chunk is null)
@@ -118,7 +126,7 @@ public sealed partial class WorldTextExtraction
                 var document = (Discovery.Metadata?.Profile == MinecraftProfiles.ClassicAnvil && source.Location.Role == WorldSourceRole.Terrain
                     ? region.ReadClassicAnvilChunk(index, request.Limits) : region.ReadChunk(index, request.Limits)).Document;
                 if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(document.Root)) opaqueEquipment();
-                text = ReadNbtText(source, document, [], storageAccess, opaqueStorage);
+                text = ReadNbtText(source, document, [], storageAccess, opaqueStorage, inspectSignDependencies);
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Artifact.Kind == ArtifactKind.Nbt || source.Location.Role == WorldSourceRole.Structure)
@@ -127,17 +135,14 @@ public sealed partial class WorldTextExtraction
                 if (opaqueEquipment is not null && WorldStorageUseIndex.HasOpaqueEquipment(document.Root)) opaqueEquipment();
                 var rules = StorageRules.GetValueOrDefault(source.Location.Artifact, []);
                 ImmutableHashSet<string>? retainedSeeds = null;
-                if (rules.IsEmpty && storageAccess is null && source.Location.Role == WorldSourceRole.SavedData && LayoutProfile is { } layout
+                if (rules.IsEmpty && (storageAccess is null || inspectSignDependencies) && source.Location.Role == WorldSourceRole.SavedData && LayoutProfile is { } layout
                     && WorldLayoutLocator.CommandStorageNamespace(layout, source.Location.Artifact.RelativePath) is not null)
                 {
                     var policy = previewStorage ?? StorageDisplays;
                     rules = policy.SeedRules.GetValueOrDefault(source.Location.Artifact, []);
                     retainedSeeds = policy.RetainedSeeds.GetValueOrDefault(source.Location.Artifact);
                 }
-                text = ReadNbtText(source, document, rules, storageAccess, opaqueStorage);
-                if (retainedSeeds is not null && !text.Unclassified.IsEmpty)
-                    text = text with { Unclassified = text.Unclassified.Where(candidate => WorldStorageUseIndex.SavedStorageLocalId(candidate.Address.NodePath) is not { } id
-                        || !retainedSeeds.Contains(id)).ToImmutableArray() };
+                text = StorageDisplayPolicy.RetainSeeds(ReadNbtText(source, document, rules, storageAccess, opaqueStorage, inspectSignDependencies), retainedSeeds);
                 if (!text.PendingCommands.IsEmpty) commandProfile = NbtTextExtractor.Profile(source.Location, document, LayoutProfile);
             }
             else if (source.Location.Role is WorldSourceRole.Language or WorldSourceRole.PackMetadata or WorldSourceRole.PackJson)
@@ -188,7 +193,7 @@ public sealed partial class WorldTextExtraction
                 if (commandProfile is null) return new(source, SourceOutcome.Unsupported, text, "CommandGrammarPending");
                 var caller = functionCall is null || source.Location.Role != WorldSourceRole.Function ? null : WorldLayoutLocator.FunctionId(source.Location);
                 commands = ExtractCommands(text.PendingCommands, commandProfile, storageAccess, previewStorage, opaqueEquipment,
-                    functionCall is null ? null : call => functionCall(caller, call));
+                    functionCall is null ? null : call => functionCall(caller, call), signEffect);
                 text = text with { Occurrences = text.Occurrences.AddRange(commands.Text.Occurrences), TranslationKeys = text.TranslationKeys.AddRange(commands.Text.TranslationKeys),
                     Diagnostics = text.Diagnostics.AddRange(commands.Text.Diagnostics), PendingCommands = commands.Text.PendingCommands };
                 CheckRetention(text, commands.References);
