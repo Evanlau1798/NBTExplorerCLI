@@ -230,7 +230,13 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
     internal void Observe(CommandStorageAccess access)
     {
         var storage = GetStorage(access.Storage);
-        switch (access.Use)
+        var use = access.Use;
+        if (use == CommandStorageUse.SignImport && access.ListElementType == NbtType.String && PlainPath(access.Path))
+        {
+            if (access.AppendsScalar) use = CommandStorageUse.ListElementWrite;
+            else use = access.ReplacesList ? CommandStorageUse.ListReplacement : CommandStorageUse.ScalarWrite;
+        }
+        switch (use)
         {
             case CommandStorageUse.ScratchComparison or CommandStorageUse.ScratchControlComparison when access.CopySource is { } input:
                 ObserveScratchComparison((access.Storage, access.Path), input, access.Use == CommandStorageUse.ScratchControlComparison);
@@ -256,7 +262,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 when access.Address.SemanticRole == "command.function":
                 var list = GetList(storage, access.Storage, access.Path);
                 if (access.ListElementType is not { } type) storage.Ambiguous = true;
-                else if (access.Use == CommandStorageUse.ScalarWrite)
+                else if (use == CommandStorageUse.ScalarWrite)
                 {
                     list.RequiresScalar = true;
                     if (type != NbtType.String) Block(access.Storage, access.Path);
@@ -264,7 +270,7 @@ internal sealed partial class WorldStorageUseIndex(DecodeLimits limits)
                 else
                 {
                     list.RequiresList = true;
-                    if (access.Use is CommandStorageUse.ListElementWrite or CommandStorageUse.IndexedBlankWrite) list.ElementWrites.Add(type);
+                    if (use is CommandStorageUse.ListElementWrite or CommandStorageUse.IndexedBlankWrite) list.ElementWrites.Add(type);
                     else if (type != NbtType.End) list.ReplacementTypes.Add(type);
                 }
                 var artifact = access.Address.Artifact.RelativePath;

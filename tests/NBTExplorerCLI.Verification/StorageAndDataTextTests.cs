@@ -66,6 +66,7 @@ internal static class StorageAndDataTextTests
         new("prepare-sign-results-before-storage", "preparation", _ => StorageSignResultTests.PreStorageResultCannotRebind()),
         new("command-sign-result-bounded-path-analysis", "discovery", _ => StorageSignResultTests.NonSignPathDoesNotAllocateSegments()),
         .. StorageSignResultTests.IndirectCases,
+        .. StorageTransferProofTests.Cases,
         new("text-storage-noncomponent-scalar", "discovery", _ => StorageScalarTests.InterpretedTransfer(unresolvedPayload: "unstructured string")),
         new("text-storage-custom-font-scalar", "discovery", _ => StorageScalarTests.InterpretedTransfer(unresolvedPayload: """[{"text":"Welcome"},{"text":"WW","font":"demo:meter"}]""")),
         new("text-storage-consumer-font", "discovery", _ => StorageScalarTests.ConsumerFont()),

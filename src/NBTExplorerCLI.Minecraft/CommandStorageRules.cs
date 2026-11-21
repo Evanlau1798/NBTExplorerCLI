@@ -98,6 +98,22 @@ internal sealed partial class CommandTextReader
             ObserveUnprovenEquipment(tokens, target, pathIndex);
             ObserveUnprovenEquipment(tokens, sourceTarget, sourceEnd);
             var signImport = signEffect is not null && tokens[sourceTarget].Text == "block" && sourceEnd < tokens.Count && SignTextSource(tokens[sourceEnd].Text);
+            if (signImport && !resultObserved && mode == "from" && operation != "merge" && JsonStorageRuntime()
+                && storageAccess is not null && tokens[target].Text == "storage" && PlainDataPath(tokens[pathIndex].Text)
+                && SignTextSource(tokens[sourceEnd].Text, out var collection) && (operation == "set" || !collection))
+            {
+                var storage = MinecraftIdentifier.DefaultNamespace(tokens[target + 1].Text);
+                var member = tokens[pathIndex].Text;
+                var address = Address(path, tokens[index].Start, end - tokens[index].Start, source.Address.SemanticRole);
+                Charge(address, storage + member);
+                storageAccess(new(storage, member, CommandStorageUse.SignImport, address)
+                {
+                    ListElementType = NbtType.String,
+                    ReplacesList = operation == "set" && collection,
+                    AppendsScalar = operation != "set",
+                });
+                return;
+            }
             ObserveStorageOperand(tokens, target, path, pathIndex, signImport ? CommandStorageUse.SignImport : CommandStorageUse.Other, attribute);
             ObserveStorageOperand(tokens, sourceTarget, path, sourceEnd);
             return;

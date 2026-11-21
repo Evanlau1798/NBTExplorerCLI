@@ -50,7 +50,7 @@ internal sealed class StorageFunctionResults(Action<int> charge)
     {
         if (access.Address.SemanticRole != "command.function" || access.Use is not (CommandStorageUse.ListElementWrite
             or CommandStorageUse.ListReplacement or CommandStorageUse.ListCopy or CommandStorageUse.EquipmentImport or CommandStorageUse.EquipmentExport
-            or CommandStorageUse.ScalarWrite or CommandStorageUse.ScratchComparison or CommandStorageUse.IndexedBlankWrite)) return;
+            or CommandStorageUse.ScalarWrite or CommandStorageUse.ScratchComparison or CommandStorageUse.IndexedBlankWrite or CommandStorageUse.SignImport)) return;
         if (!mutations.TryGetValue(access.Address.Artifact, out var paths)) mutations.Add(access.Address.Artifact, paths = []);
         Add((access.Storage, access.Path));
         if (access.CopySource is { } copied) Add(copied);

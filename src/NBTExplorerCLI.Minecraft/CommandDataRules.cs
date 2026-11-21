@@ -8,6 +8,7 @@ namespace NBTExplorerCLI.Minecraft;
 internal sealed partial class CommandTextReader
 {
     private const int StorageDataVersion = MinecraftProfiles.CommandStorageDataVersion;
+    private const int DataStringSourceVersion = 3320;
     private const int DisplayEntityDataVersion = 3326;
     private const int VanillaArmorTrimDataVersion = 3442;
 
@@ -170,12 +171,17 @@ internal sealed partial class CommandTextReader
             if (!Integer(tokens[value++].Text, out _)) return false;
         }
         else if (operation is not ("set" or "append" or "prepend" or "merge")) return false;
+        if (tokens[value].Text == "string")
+            return exactRuntimeDataVersion is >= DataStringSourceVersion && operation != "merge"
+                && tokens[index + 2].Text == "storage" && StaticStorageStringSource(tokens, value + 1);
         if (tokens[value].Text == "from")
         {
             var sourcePath = DataTargetEnd(tokens, value + 1);
             if (operation == "merge" || sourcePath < 0 || tokens.Count != sourcePath + 1) return false;
             var sourceType = tokens[value + 1].Text;
             var source = tokens[sourcePath].Text;
+            if (sourceType == "storage" && tokens[index + 2].Text == "storage" && exactRuntimeDataVersion is >= StorageDataVersion
+                && PlainDataPath(tokens[path].Text) && PlainDataPath(source)) return true;
             var nativeNumericDestination = operation == "set" && tokens[index + 2].Text == "entity" && source == tokens[path].Text
                 && NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[index + 3].Start));
             return sourceType == "entity" && (nativeNumericDestination || NumericEntitySource(source, selectorTypes.GetValueOrDefault(tokens[value + 2].Start)))
@@ -196,6 +202,19 @@ internal sealed partial class CommandTextReader
                 || valueNode.Value is LogicalMinecraftLeaf { Value: NbtString id } && MinecraftIdentifier.ResourceLocation(id.Value)
                 && NativeItemIdPath(tokens[index + 2].Text, tokens[path].Text));
     }
+
+    private static bool StaticStorageStringSource(List<CommandToken> tokens, int source)
+    {
+        if (source >= tokens.Count || tokens[source].Text != "storage") return false;
+        var path = DataTargetEnd(tokens, source);
+        if (path < 0 || tokens.Count > path + 3) return false;
+        if (path == tokens.Count) return true;
+        if (!PlainDataPath(tokens[path].Text)) return false;
+        for (var index = path + 1; index < tokens.Count; index++)
+            if (!Integer(tokens[index].Text, out _)) return false;
+        return true;
+    }
+
     private bool TaggedStorageItems()
     {
         var items = profile.Features[ProfileFacet.ItemSchema];
