@@ -14,14 +14,14 @@ When you finish translating a Minecraft Java Edition map, you can deliver the re
 | **Put Text Directly in the Map** | `translate plan --direct` -> `apply` | Yes | No | **Simplest for players.** Just open the map in Minecraft — no resource pack needed. |
 | **Multi-Language Map (Keys + Pack)** | `translate plan --keys` -> `apply` | Yes | Yes | Players can switch languages by switching Minecraft's language setting with the map's resource pack. |
 | **Standalone Resource Pack Only** | `translate create-pack` | No (if you pass external `--output`) | Yes (`.zip` or folder) | Creating or merging a client resource pack from a finished session without editing map NBT. |
-| **Standalone Language JSON Only** | `translate export-lang` | No (if you pass external `--output`) | Yes (`en_us.json`, `zh_tw.json`) | Exporting raw `.json` language files to hand to translators or pack builders. |
+| **Standalone Language JSON Only** | `translate export-lang` | No (if you pass external `--output`) | Yes (e.g., `ja_jp.json`, `en_us.json`) | Exporting raw `.json` language files to hand to translators or pack builders. |
 | **One-Shot Convert Without Translating** | `convert <world> --lang <locale>` | Yes (when `--apply` is used) | Yes | Extracting an existing map's literal text into translation keys in one step. |
 
 ---
 
 ## 2. Converting a Translated Map to Translation Keys (`translate plan --keys`)
 
-Instead of overwriting text with one fixed language, `--keys` turns every translated text slot into a Minecraft translation key (like `map.<id>`) and builds the matching `.json` language file in the **same** plan:
+Instead of overwriting text with one fixed language, `--keys` turns every translated text slot into a Minecraft translation key (like `map.<id>`) and builds the matching `.json` language file in the **same** plan (using `en_us.json` below as an English-target example):
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
@@ -31,7 +31,7 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
   --revision 2 `
   --keys `
   --prefix map. `
-  --language-output 'resources.zip#assets/adventure/lang/zh_tw.json' `
+  --language-output 'resources.zip#assets/adventure/lang/en_us.json' `
   --output 'D:\Translate\keys-plan.json'
 ```
 
@@ -39,11 +39,11 @@ Then close Minecraft and run `nbtcli apply 'D:\WorldCopy' --plan 'D:\Translate\k
 
 ### Where `--language-output` Writes the Language File
 
-`--language-output` accepts three convenient formats inside your world folder:
+`--language-output` accepts three convenient formats inside your world folder (replace `en_us.json` with your session's target locale):
 
-- **`generated.zip#assets/example/lang/zh_tw.json`** — Creates a brand-new `.zip` resource pack if it does not exist yet.
-- **`resources.zip#assets/example/lang/zh_tw.json`** — Safely merges your language file into the map's existing `resources.zip` while keeping all existing textures, sounds, and `pack.png`.
-- **`resourcepacks/client/assets/example/lang/zh_tw.json`** — Writes or merges into an unpacked folder resource pack.
+- **`generated.zip#assets/example/lang/en_us.json`** — Creates a brand-new `.zip` resource pack if it does not exist yet.
+- **`resources.zip#assets/example/lang/en_us.json`** — Safely merges your language file into the map's existing `resources.zip` while keeping all existing textures, sounds, and `pack.png`.
+- **`resourcepacks/client/assets/example/lang/en_us.json`** — Writes or merges into an unpacked folder resource pack.
 
 <FileTree>
 - D:\Exports\Packs\adventure-pack.zip
@@ -52,12 +52,12 @@ Then close Minecraft and run `nbtcli apply 'D:\WorldCopy' --plan 'D:\Translate\k
   - assets/
     - adventure/
       - lang/
-        - **en_us.json** (original text)
-        - **zh_tw.json** (your translations)
+        - **ja_jp.json** (original text, example)
+        - **en_us.json** (translated text, example)
 </FileTree>
 
 :::note[Language Code Must Match]
-The filename in `--language-output` (for example `zh_tw.json`) must match your session's target language, and an existing pack's `pack.mcmeta` must match your world's Minecraft version.
+The filename in `--language-output` (for example `en_us.json`) must match your session's bound target language, and an existing pack's `pack.mcmeta` must match your world's Minecraft format family.
 :::
 
 ---
@@ -73,15 +73,15 @@ If you leave out `--output`, `export-lang` defaults to writing inside `<world>\.
 <Tabs syncKey="pack-export-mode">
   <TabItem label="Build or Merge a Resource Pack (create-pack)">
 
-```powershell title="PowerShell"
+```powershell title="PowerShell (example: ja_jp source to en_us target)"
 New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-Null
 
 # Preview first (omit --apply to preview, or add --apply --world-offline to write right away)
 .\nbtcli.exe translate create-pack 'D:\WorldCopy' `
   --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
   --revision 2 `
-  --original-lang en_us `
-  --target-lang zh_tw `
+  --original-lang ja_jp `
+  --target-lang en_us `
   --prefix map. `
   --name 'adventure-pack.zip' `
   --format zip `
@@ -94,15 +94,15 @@ New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-N
   </TabItem>
   <TabItem label="Export Raw Language JSON Files (export-lang)">
 
-```powershell title="PowerShell"
+```powershell title="PowerShell (example: ja_jp source to en_us target)"
 New-Item -ItemType Directory -Path 'D:\Exports\LangFiles', 'D:\Plans' -Force | Out-Null
 
 # Preview standalone language file export
 .\nbtcli.exe translate export-lang 'D:\WorldCopy' `
   --session-id '6f9619ff-8b86-d011-b42d-00cf4fc964ff' `
   --revision 2 `
-  --original-lang en_us `
-  --target-lang zh_tw `
+  --original-lang ja_jp `
+  --target-lang en_us `
   --prefix map. `
   --output 'D:\Exports\LangFiles' `
   --plan-output 'D:\Plans\export-lang-plan.json'
@@ -113,9 +113,10 @@ New-Item -ItemType Directory -Path 'D:\Exports\LangFiles', 'D:\Plans' -Force | O
 
 ### Key Options
 
+- **`--original-lang` & `--target-lang`**: Default to the session's bound `sourceLocale` and `targetLocale`, and must be distinct Minecraft locale codes. If the session's `sourceLocale` is `und`, you **must** pass `--original-lang <language>` explicitly to emit bilingual language files.
 - **`--output <folder>` vs. `--plan-output <file>`**: `--output` is where your generated `.zip` or `.json` files go; `--plan-output` is where the optional preview plan file is saved.
 - **`--format zip|directory`**: Choose a `.zip` file (ready to drop into Minecraft's `resourcepacks` folder) or an unzipped folder.
-- Set **`--pack-format <number>`** when exporting outside the world. Use `15` for 1.20.1, `22` for 1.20.4, `34` for 1.21, `55` for 1.21.5, `75` for 1.21.11, or `80` for 26.1-snapshot-6.
+- Set **`--pack-format <number>`** when exporting outside the world or when the world's default resource format cannot be verified automatically. Representative values: `15` (1.20.1), `18` (1.20.2), `22` (1.20.4), `32` (1.20.5), `34` (1.21), `55` (1.21.5), `69` (1.21.9), `75` (1.21.11), `80` (26.1-snapshot-6). See **[Supported Versions](../support-and-troubleshooting/)** for all 17 format families.
 - **`--merge <path>`**: Optional! Merges your new language files into an existing resource pack while preserving all textures, audio, and `pack.png`. If a translation key conflicts with an existing file, `nbtcli` stops and tells you instead of silently overwriting.
 
 <details>

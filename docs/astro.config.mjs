@@ -46,6 +46,23 @@ export default defineConfig({
         dark: './src/assets/logo.svg',
         replacesTitle: false,
       },
+      head: [
+        {
+          tag: 'link',
+          attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        },
+        {
+          tag: 'link',
+          attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'stylesheet',
+            href: 'https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400..700&family=Geist:wght@400..800&family=Noto+Sans+TC:wght@400;500;600;700&display=swap',
+          },
+        },
+      ],
       defaultLocale: 'root',
       locales: {
         root: {
@@ -61,10 +78,13 @@ export default defineConfig({
       customCss: ['./src/styles/custom.css'],
       expressiveCode: {
         styleOverrides: {
-          borderRadius: '0.625rem',
+          borderRadius: '0.5rem',
           borderWidth: '1px',
+          codeFontFamily: "var(--sl-font-mono)",
+          uiFontFamily: "var(--sl-font)",
           frames: {
-            editorTabBorderRadius: '0.5rem',
+            editorTabBorderRadius: '0.45rem',
+            shadowColor: 'transparent',
           },
         },
       },

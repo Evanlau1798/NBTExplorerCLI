@@ -14,7 +14,7 @@ Always test on a **copy** of your world (such as `D:\WorldCopy`) and **close Min
 :::
 
 <details>
-<summary>Reading Command Output (JSON) & Switching UI Language</summary>
+<summary>Reading Command Output (JSON) & CLI Message Language</summary>
 
 Every command prints one clean line of JSON with three key fields:
 
@@ -34,7 +34,7 @@ Every command prints one clean line of JSON with three key fields:
 - **`data`**: The value, summary, or plan metadata you requested.
 - **`error`**: When `success` is `false`, `error.message` explains what went wrong.
 
-Add `--ui-locale en-US` or `--ui-locale zh-TW` to switch help and error text language at any time (this never changes your world's translation languages).
+CLI help, diagnostics, and translation prompt instructions are always in English (`--ui-locale en-US` is accepted explicitly). This website provides English and Traditional Chinese guides, and map content can be translated between any valid language tags.
 
 </details>
 

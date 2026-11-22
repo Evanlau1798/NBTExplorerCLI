@@ -15,7 +15,7 @@ import CommandSearch from '../../../../components/CommandSearch.astro';
 
 - **查詢指令說明**：主指令請打 `.\nbtcli.exe help <指令>`；子命令請把 `--help` 放在最後，例如 `.\nbtcli.exe translate start --help`（打 `nbtcli help translate start` 會回傳退出碼 `2`）。
 - **常用縮寫**：任何指令都能用 `-h` 代替 `--help`；`--version` 或 `-v` 會印出版本號。
-- **切換訊息語言**：在任何指令加上 `--ui-locale zh-TW`（預設）或 `--ui-locale en-US`，即可切換錯誤與說明語言，不影響 JSON 鍵名或翻譯目標語言。
+- **CLI 訊息語言**：CLI 的說明、錯誤、診斷與翻譯操作指引固定使用英文。傳入 `--ui-locale en-US` 可明示英文入口，其他值會回傳退出碼 `2`。地圖翻譯內容本身支援任意合法語言代碼。
 - **參數寫法**：帶值選項支援 `--option value` 或 `--option=value`；如果路徑以 `-` 開頭，先加 `--` 分隔。
 - **統一輸出格式**：每個指令都會向 `stdout` 輸出單行 UTF-8 JSON（`schemaFamily: "nbtcli.cli"`、`schemaVersion: 1`）。
 
@@ -51,7 +51,7 @@ import CommandSearch from '../../../../components/CommandSearch.astro';
 
 ## `translate` 子命令總覽
 
-除了 `translate help` 外，所有 `translate` 子命令皆須帶入 `<world>` 路徑，並接受 `--state-root`、`--output`、`--help` 與 `--ui-locale`。
+Session 類子命令（`start` 至 `seal`）須帶入 `<world>`，並接受 `--state-root`、`--output`、`--help` 與 `--ui-locale`。單筆 `translate fallback` 可讀世界或檔案。批次 `translate fallback <world> --batch <file>` 可用 `--session-id` 綁定工作階段；工作階段若使用自訂狀態位置，再加上 `--state-root`。詳見[批次操作流程](../translation-workflow/)。
 
 <CommandReferenceList lang="zh-tw" group="translate-sub" />
 
@@ -66,16 +66,18 @@ import CommandSearch from '../../../../components/CommandSearch.astro';
 <details>
 <summary>進階參考：JSON 輸入格式範本與 PowerShell 腳本寫法</summary>
 
-會從檔案或標準輸入（`-`）讀取 JSON 的命令，執行前都會嚴格檢查 `schemaFamily` 與 `schemaVersion: 1`：
+會從檔案或標準輸入（`-`）讀取 JSON 的命令，執行前都會嚴格檢查 `schemaFamily` 與 `schemaVersion`（Session／編輯／Agent 類為 `1`，`nbtcli.translation-draft-reply` 為 `2`）：
 
-| 輸入 Schema Family | 對應指令與參數 |
-| --- | --- |
-| `nbtcli.typed-nbt` | `set --value <json>` 或 `set --value-file <檔案\|->` |
-| `nbtcli.operations` | `batch <檔案\|-> --world <目錄>` 或 `plan <目錄> --request <檔案\|->` |
-| `nbtcli.patch-plan` | `apply <目錄> --plan <檔案\|->` |
-| `nbtcli.session-reply` | `translate submit --reply <檔案\|->` 或 `translate advance --reply <檔案\|->` |
-| `nbtcli.session-command` | `translate jump`、`note`、`glossary` 或 `reset`（`--request <檔案\|->`） |
-| `nbtcli.agent-questionnaire` | `agent submit <目錄> --request <檔案\|->` |
+| 輸入 Schema Family | 版本 | 對應指令與參數 |
+| --- | --- | --- |
+| `nbtcli.typed-nbt` | `1` | `set --value <json>` 或 `set --value-file <檔案\|->` |
+| `nbtcli.operations` | `1` | `batch <檔案\|-> --world <目錄>` 或 `plan <目錄> --request <檔案\|->` |
+| `nbtcli.patch-plan` | `1` | `apply <目錄> --plan <檔案\|->` |
+| `nbtcli.session-reply` | `1` | `translate submit --reply <檔案\|->` 或 `translate advance --reply <檔案\|->` |
+| `nbtcli.translation-draft-reply` | `2` | `translate fallback <世界或檔案> ... --reply <檔案\|->` |
+| `nbtcli.translation-draft-batch` | `1` | `translate fallback <世界> --batch <檔案\|->`（[JSON 範例](../../../llms.txt)） |
+| `nbtcli.session-command` | `1` | `translate jump`、`note`、`glossary` 或 `reset`（`--request <檔案\|->`） |
+| `nbtcli.agent-questionnaire` | `1` | `agent submit <目錄> --request <檔案\|->` |
 
 ### 可直接複製的 JSON 範本
 
@@ -115,7 +117,7 @@ $preview = Get-Content -Raw 'D:\Plans\level-name-plan.json' | ConvertFrom-Json
   </TabItem>
   <TabItem label="nbtcli.session-reply">
 
-供 `translate submit --reply` 與 `translate advance --reply` 使用。請務必從 `translate export` 回傳的 `data.replyTemplate` 開始填寫：
+供 `translate submit --reply` 與 `translate advance --reply` 使用（下例以目標語言 `zh_tw` 為示範）。請務必從 `translate export` 回傳的 `data.replyTemplate` 開始填寫：
 
 ```json title="reply-page-0.json"
 {
@@ -138,6 +140,28 @@ $preview = Get-Content -Raw 'D:\Plans\level-name-plan.json' | ConvertFrom-Json
       }
     ]
   }
+}
+```
+
+  </TabItem>
+  <TabItem label="nbtcli.translation-draft-reply">
+
+供 `translate fallback --reply` 使用（`schemaVersion: 2`，頂層直接放欄位，不含外層 `data` 包裝）。請務必從 `translate fallback` 回傳的 `data.replyTemplate` 開始填寫，保留 `draftId`、`sourceLocale`、`targetLocale`、`slotId` 與 `sourceTextHash`，將要修改槽位的 `text` 改為譯文（不改動則留 `null`）：
+
+```json title="fallback-reply.json"
+{
+  "schemaFamily": "nbtcli.translation-draft-reply",
+  "schemaVersion": 2,
+  "draftId": "965ee055954214cae9c4c9beda14038bd18a5ea7f936f245f58b259bd6cce310",
+  "sourceLocale": "en",
+  "targetLocale": "zh_tw",
+  "slots": [
+    {
+      "slotId": "36e1641c6f840a0ab394a38325ccbeb9b0b956f0c981eef88d053c9ec263e1b0",
+      "sourceTextHash": "aa5ae91e8e61aa574c5f560d6e86a0bbbc29cf1be0cf3ee199dbd490b67e2470",
+      "text": "古老的石門在你眼前緩緩開啟。"
+    }
+  ]
 }
 ```
 
@@ -169,11 +193,11 @@ $preview = Get-Content -Raw 'D:\Plans\level-name-plan.json' | ConvertFrom-Json
   </TabItem>
   <TabItem label="nbtcli.agent-questionnaire">
 
-由 `nbtcli agent setup <世界> --output <檔案>` 匯出，填寫 `configuration.agentName` 並核對語言後，保留世界 ID、revision 與 operationId 透過 `nbtcli agent submit <世界> --request <檔案|->` 提交：
+由 `nbtcli agent setup <世界> --output <檔案>` 匯出（預設 `sourceLanguage` 為 `"auto"`、`targetLanguage` 採用系統顯示語言，也可選用 `--source-language`／`--target-language`），填寫 `configuration.agentName` 並保留世界 ID、revision 與 operationId 後透過 `nbtcli agent submit <世界> --request <檔案|->` 提交：
 
 ```powershell title="匯出偏好設定問卷"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
-.\nbtcli.exe agent setup 'D:\WorldCopy' --source-language en_us --target-language zh_tw `
+.\nbtcli.exe agent setup 'D:\WorldCopy' `
   --output 'D:\Translate\agent-questionnaire.json'
 ```
 
@@ -183,7 +207,7 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 ### PowerShell 自動化腳本範本
 
 ```powershell title="PowerShell"
-$raw = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion --ui-locale zh-TW
+$raw = .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 $exitCode = $LASTEXITCODE
 $response = $raw | ConvertFrom-Json
 

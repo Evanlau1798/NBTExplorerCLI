@@ -22,10 +22,10 @@ description: 專為 Claude、ChatGPT、Codex、Cursor 等 AI 助手準備的高�
 ```text title="複製貼給你的 AI 助手"
 請先完整閱讀 https://nbtcli.evanlau1798.com/llms.txt，掌握 nbtcli.exe 的指令契約、安全規範與標準流程。
 
-請使用 C:\Tools\nbtcli\nbtcli.exe，幫我將位於 D:\WorldCopy 的 Minecraft 世界副本從 en_us 翻譯成 zh_tw：
-1. 先執行 capabilities 與 scan --summary，回報支援狀態與文字總量。
-2. 啟動翻譯工作階段（translate start），逐頁執行 export -> 翻譯 -> submit/advance，保持專有名詞一致，保留原格式與佔位符。
-3. 所有暫存檔與計畫檔請放在 D:\Translate（不可寫進 D:\WorldCopy）。
+請使用 C:\Tools\nbtcli\nbtcli.exe，幫我將位於 D:\WorldCopy 的 Minecraft 世界副本翻譯成繁體中文（zh_tw）：
+1. 先執行 capabilities 與 scan --summary，回報格式家族支援狀態與文字總量。
+2. 啟動翻譯工作階段（translate start，可直接省略語言旗標使用自動偵測與系統顯示語言，或於需要時傳入 --target-language zh-TW），逐頁執行 export -> 翻譯 -> submit/advance，保持專有名詞一致並保留原格式與佔位符；若 sourceLocale 為 und，請依原文判斷來源。
+3. 所有暫存檔與計畫檔請放在 D:\Translate（不可寫進 D:\WorldCopy）。遇到未判定來源的片段才使用 translate fallback，並如實區分草稿驗證與正式套用狀態。
 4. 待 pending 歸零後，產生 --direct 更新計畫並先向我確認 Minecraft 已關閉，再執行 apply --world-offline 與 translate seal。
 ```
 
@@ -33,7 +33,7 @@ description: 專為 Claude、ChatGPT、Codex、Cursor 等 AI 助手準備的高�
 
 ## 2. 高密度協定摘要（供 AI Agent 快速讀取）
 
-如需完整旗標矩陣、6 種輸入 JSON Schema、經典舊版限制與 8 套標準 SOP，請直接讀取 **[`llms.txt`](../../../llms.txt)**。以下為核心執行契約摘要：
+如需旗標矩陣、8 種輸入 JSON Schema、17 個 Java 格式家族、經典舊版限制與 9 套操作流程，請直接讀取 **[`llms.txt`](../../../llms.txt)**。
 
 ### 不可違反的核心不變量（Invariants）
 
@@ -41,7 +41,8 @@ description: 專為 Claude、ChatGPT、Codex、Cursor 等 AI 助手準備的高�
 | :--- | :--- |
 | **單行 JSON 輸出** | 每次呼叫僅向 `stdout` 輸出單行 UTF-8 JSON（`schemaFamily: "nbtcli.cli"`、`schemaVersion: 1`）。務必同時檢查 `$LASTEXITCODE` 與 `response.success`。 |
 | **查詢說明語法** | 根命令：`nbtcli help <cmd>` 或 `nbtcli <cmd> --help`。子命令：`nbtcli translate <subcmd> --help` / `nbtcli agent <subcmd> --help`。（`nbtcli help translate start` 會以退出碼 `2` 失敗。） |
-| **訊息語言** | 在任意位置傳入 `--ui-locale en-US` 或 `--ui-locale zh-TW`，只改變人讀的 `error.message`／說明文字，不改變 JSON 鍵名或翻譯語言設定。 |
+| **固定英文 CLI** | 說明、錯誤、診斷與翻譯指引固定英文。僅接受 `--ui-locale en-US` 明示英文入口，其他值回退出碼 `2`。地圖翻譯內容語言不受此限制。 |
+| **自動與綁定語言** | `translate start` 與 `translate fallback` 均可省略 `--source-language`（自動偵測或 `und`）與 `--target-language`（Windows 顯示語言）；建立後綁定語言供續作沿用。來源為 `und` 時，`export-lang`／`create-pack` 須另傳 `--original-lang <語言>`。 |
 | **外部路徑規範** | 禁止將 `--output`、`--plan-output`、`--state-root`、`--cache-root` 放在 `<world>` 內。呼叫輸出指令前務必先建立父資料夾。 |
 | **離線寫入保護** | 所有會修改世界的命令均須在關閉 Minecraft 與編輯器後帶入 `--world-offline`。優先採用「預覽 -> 檢視計畫 -> `apply --plan <file> --world-offline`」。 |
 | **資源匯出預設值** | `translate export-lang` 與 `translate create-pack` 若省略 `--output` 會預設寫入 `<world>` 內。要保持原世界完全不動，務必明確指定外部 `--output`。 |
@@ -77,7 +78,8 @@ $val | ConvertTo-Json -Depth 50 | Set-Content -Encoding utf8 'D:\Plans\val.json'
 
 ```powershell title="2. 分頁地圖翻譯閉環（start -> export/advance -> plan -> apply -> seal）"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
-$s = .\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30 | ConvertFrom-Json
+# 省略語言旗標即自動辨識來源並採系統顯示語言，需要時可加 --source-language ja-JP --target-language de-DE
+$s = .\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30 | ConvertFrom-Json
 $sid = $s.data.status.sessionId
 # 迴圈：export 分頁 -> 填寫 data.replyTemplate 的 slots（"translated"+譯文 或 "unchanged"+null）-> submit/advance 至 pending == 0
 # 收尾：
@@ -87,6 +89,13 @@ $rev = (.\nbtcli.exe translate status 'D:\WorldCopy' --session-id $sid | Convert
 .\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Translate\plan.json' --world-offline --output 'D:\Translate\receipt.json'
 $planHash = (Get-Content -Raw 'D:\Translate\plan.json' | ConvertFrom-Json).data.planHash
 .\nbtcli.exe translate seal 'D:\WorldCopy' --session-id $sid --revision $rev --operation-id $opId --plan-hash $planHash
+```
+
+```powershell title="3. 未判定來源草稿驗證（translate fallback）"
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption
+# 填寫 data.replyTemplate（nbtcli.translation-draft-reply，schemaVersion 2）並沿用相同選取與 --text-pointer：
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption --reply 'D:\reply.json'
 ```
 
 ### AI Agent 最常見五大踩坑

@@ -60,12 +60,12 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
    因為這是沒有付費商業數位簽章的開源工具，第一次執行時 Windows 可能會跳出提醒畫面。只要你確實是從上方官方 GitHub Releases 下載的，點選「**其他資訊**」->「**仍要執行**」即可。
    :::
 
-   隨時可以查看所有指令或單一指令的說明：
+   隨時可以查看所有指令或單一指令的說明（CLI 說明、診斷與翻譯操作指引固定使用英文）：
 
    ```powershell title="PowerShell"
-   .\nbtcli.exe --help --ui-locale zh-TW
-   .\nbtcli.exe help get --ui-locale zh-TW
-   .\nbtcli.exe translate start --help --ui-locale zh-TW
+   .\nbtcli.exe --help
+   .\nbtcli.exe help get
+   .\nbtcli.exe translate start --help
    ```
 
 5. **複製一份測試用的 Minecraft 世界副本**
@@ -80,9 +80,9 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 ---
 
-## 第二部分：試跑前四個「純讀取」指令
+## 第二部分：試跑前五個安全指令
 
-以下四個指令都屬於**純讀取模式**，保證不會修改 `D:\WorldCopy` 裡的任何檔案。操作時請把 `D:\WorldCopy` 換成你自己的世界副本路徑。
+以下指令都不會更動 `D:\WorldCopy` 中的任何檔案（`list`、`get`、`search`、`scan`、`extract` 為**純讀取**；`translate start` 為**僅預覽**，進度只會存在世界資料夾外）。操作時請把 `D:\WorldCopy` 換成你自己的世界副本路徑。
 
 ### 1. 查看世界有哪些維度與區塊（`list`）
 
@@ -160,6 +160,22 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 :::tip[為什麼 `D:\Exports` 要建在世界資料夾外面？]
 為了避免在你的存檔裡留下多餘檔案，NBTExplorerCLI 規定所有匯出檔與計畫檔都必須存放在世界資料夾以外的既有資料夾中。
 :::
+
+### 5. 建立首份翻譯進度（`translate start`）
+
+新建翻譯工作時可以直接省略 `--source-language` 與 `--target-language`。來源會依可辨識的內容自動選取（無法確定時使用 `und`），目標會採用目前 Windows 帳戶的系統顯示語言，兩者會在建立工作時顯示並綁定：
+
+```powershell title="PowerShell"
+# 自動偵測來源並以系統顯示語言開啟翻譯進度（僅預覽，不會修改原世界）
+.\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30
+
+# 需要指定其他語言對時，以旗標明確覆寫（例如日語翻德語）
+.\nbtcli.exe translate start 'D:\WorldCopy' --source-language ja-JP --target-language de-DE --page-size 30
+```
+
+- 如果系統沒有提供可用的顯示語言，CLI 會以英文提示手動指定 `--target-language <語言>`。
+- 語言會在建立工作時綁定，後續即使變更系統顯示語言，同一工作仍可繼續。
+- 若來源為 `und`，仍可直接依原文翻譯，或在建立新工作時明示 `--source-language`。
 
 ---
 

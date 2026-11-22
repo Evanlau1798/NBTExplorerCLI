@@ -15,15 +15,18 @@ Know what you want to accomplish and just want the shortest clear steps? Pick a 
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 ```
 
-Look at `data.value` in the output and match it against common versions:
-- `3465` = Java `1.20.1`
-- `3700` = Java `1.20.4`
-- `3953` = Java `1.21`
-- `4325` = Java `1.21.5`
-- `4671` = Java `1.21.11`
-- `4774` = Java `26.1-snapshot-6`
+Look at `data.value` in the output and check which format family it falls into (NBTExplorerCLI supports `DataVersion` ranges from `100` through `4774+`; run `.\nbtcli.exe capabilities` or see [Supported Versions](../support-and-troubleshooting/) for all 17 ranges):
+- `3463–3566` = `java-1.20.1` family (representative: `3465`)
+- `3567–3689` = `java-1.20.2` family (representative: `3578`)
+- `3690–3818` = `java-1.20.4` family (representative: `3700`)
+- `3821–3945` = `java-1.20.5` family (representative: `3837`)
+- `3946–4297` = `java-1.21` family (representative: `3953`)
+- `4317–4535` = `java-1.21.5` family (representative: `4325`)
+- `4536–4670` = `java-1.21.9` family (representative: `4554`)
+- `4671–4773` = `java-1.21.11` family (representative: `4671`)
+- `4774+` = `java-26.1-snapshot-6` namespaced layout family
 
-*(Older pre-1.9 Anvil saves have no `DataVersion` — see [Supported Versions](../support-and-troubleshooting/) for using `--minecraft-version`.)*
+*(Older pre-1.9 Anvil saves have no `DataVersion` — see [Supported Versions](../support-and-troubleshooting/) for using `--minecraft-version` with `1.2.5`, `1.5.2`, `1.6.4`, or `1.8` through `1.8.9`.)*
 
 ---
 
@@ -82,15 +85,15 @@ Open `D:\Exports\map-text.json` in Notepad or VS Code to browse all the text.
 
 ## Recipe 4: Translate an Adventure Map Into Another Language
 
-Here is the big-picture loop for translating an English map (`en_us`) into Traditional Chinese (`zh_tw`):
+Omit `--source-language` and `--target-language` to detect the source language automatically and target your Windows account display language, or pass explicit override flags (such as Japanese to German):
 
 ```powershell title="PowerShell"
-# 1. Start a translation project (splits map text into pages of 30 items)
-$start = .\nbtcli.exe translate start 'D:\WorldCopy' `
-  --source-language en_us `
-  --target-language zh_tw `
-  --page-size 30 | ConvertFrom-Json
+# 1a. Start a translation project using automatic language selection (splits map text into pages of 30 items)
+$start = .\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30 | ConvertFrom-Json
 $sid = $start.data.status.sessionId
+
+# 1b. Or override source and target explicitly (example: Japanese to German)
+# .\nbtcli.exe translate start 'D:\WorldCopy' --source-language ja-JP --target-language de-DE --page-size 30
 
 # 2. Export page 0 and save its ready-to-fill reply template
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
@@ -111,7 +114,7 @@ Read the full walkthrough in **[Map Translation Guide](../translation-workflow/)
 
 ## Recipe 5: Export a Client Resource Pack (`.zip`) Without Editing the Map
 
-Once your translation session has `pending: 0`, you can build a standalone `.zip` resource pack outside the world folder (replace `--pack-format 34` with the number matching your Minecraft version — see [Supported Versions](../support-and-troubleshooting/)):
+Once your translation session has `pending: 0`, you can build a standalone `.zip` resource pack outside the world folder (using `ja_jp` -> `en_us` below as an English-target example; replace `--pack-format 34` with the number matching your Minecraft version — see [Supported Versions](../support-and-troubleshooting/)). If the session's `sourceLocale` is `und`, pass `--original-lang <language>` explicitly:
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-Null
@@ -119,8 +122,8 @@ New-Item -ItemType Directory -Path 'D:\Exports\Packs', 'D:\Plans' -Force | Out-N
 .\nbtcli.exe translate create-pack 'D:\WorldCopy' `
   --session-id '<YOUR-SESSION-ID>' `
   --revision 2 `
-  --original-lang en_us `
-  --target-lang zh_tw `
+  --original-lang ja_jp `
+  --target-lang en_us `
   --prefix map. `
   --name 'my-translation-pack.zip' `
   --format zip `
@@ -172,3 +175,22 @@ See **[Backups & Where Files Live](../backups-and-state/)** for full details.
 ```
 
 If `success` is `true`, everything parsed cleanly. If any file is broken or unsupported, the output tells you the exact file path so you can fix or skip it.
+
+---
+
+## Recipe 8: Draft and Validate Text From an Unresolved File (`translate fallback`)
+
+When a file or tag contains text whose gameplay role is not yet established, export a context draft and validate a completed reply without modifying the original file:
+
+```powershell title="PowerShell"
+# 1. Export context and recognized editable text leaves under /dialogue (automatic languages)
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+
+# 2. Designate a confirmed custom display field relative to the selection
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption
+
+# 3. Validate a completed reply JSON (keep the exact same selection and --text-pointer if used)
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption --reply 'D:\reply.json'
+```
+
+Copy `data.replyTemplate` (`nbtcli.translation-draft-reply`, v2), fill in translated `text` values (or leave `null` to keep unchanged), and inspect `data.content`, `data.structureVerified`, and `data.unverified`. See **[Map Translation Guide](../translation-workflow/)** for full details.

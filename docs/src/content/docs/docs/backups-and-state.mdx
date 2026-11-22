@@ -90,7 +90,7 @@ By default, all external files live inside Windows' local app data folder (`%LOC
     - 4a8b9c1d2e3f... (one folder per world)
       - cache\ (fast scan cache for translation & editing)
       - sessions\ (saved translation progress & glossaries)
-      - agent\ (optional saved language defaults)
+      - agent\ (optional local client preferences)
       - objects\ (actual backup & undo data — KEEP!)
       - journals\ (write history & crash recovery logs — KEEP!)
       - backup_before-translation_20261118T070000Z_a1b2c3.json
@@ -104,7 +104,7 @@ By default, all external files live inside Windows' local app data folder (`%LOC
 | --- | --- | --- |
 | `scan/` and `worlds/<id>/cache/` | Speeds up repeated scans. | **Yes.** Automatically rebuilt the next time you scan (or refresh with `scan --refresh`). |
 | `sessions/` | Your translation progress, submitted pages, notes, and glossaries. | **Keep while translating.** Only delete once your map translation is completely done. |
-| `agent/` | Saved default language/page preferences from `agent setup`. | **Optional.** Safe to delete if you no longer need saved defaults. |
+| `agent/` | Optional local client preferences (such as `preferredItemsPerPage` and suggested language metadata) from `agent setup`. | **Optional.** Safe to delete if you no longer need saved preferences. |
 | `objects/` & `backup_*.json` | The real backup file data used by `restore` and `recover --rollback`. | **Do NOT delete** if you want to restore backups or undo writes! |
 | `journals/` | Active and past write logs used by `status` and `recover`. | **Never delete** if a write was interrupted (exit code `7`). |
 

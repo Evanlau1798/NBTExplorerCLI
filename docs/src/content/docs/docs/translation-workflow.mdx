@@ -21,16 +21,20 @@ You can follow this guide by hand, or hand our [`llms.txt`](../../llms.txt) manu
 
 ## Step 1: Start a Translation Project (`translate start`)
 
-Run `translate start` on your copied world folder (`D:\WorldCopy`), telling it the map's original language (`--source-language`), your target language (`--target-language`), and how many items you want per page (`--page-size`):
+Run `translate start` on your copied world folder (`D:\WorldCopy`). You can omit `--source-language` and `--target-language`: the CLI automatically detects the source language from recognizable content (or uses `und` if undetermined), picks your current Windows account display language as the target, and binds both languages to the session. Pass explicit language flags only when you want to override them:
 
 ```powershell title="PowerShell"
+# Automatic source detection + Windows account display language
+.\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30
+
+# Explicit override for the Japanese-to-English example below
 .\nbtcli.exe translate start 'D:\WorldCopy' `
-  --source-language en_us `
-  --target-language zh_tw `
+  --source-language ja `
+  --target-language en-US `
   --page-size 30
 ```
 
-You will get back a JSON response like this:
+You will get back a JSON response like this (showing an example targeting `en_us`):
 
 ```json title="Output"
 {
@@ -45,19 +49,23 @@ You will get back a JSON response like this:
       "revision": 0,
       "total": 60,
       "pending": 60
-    }
+    },
+    "sourceLocale": "ja",
+    "targetLocale": "en_us"
   },
   "error": null
 }
 ```
 
 Write down your **`sessionId`** — you will pass it to the next commands.
+- `sourceLocale` / `targetLocale`: The resolved language pair bound when the session is created. Resuming the same session later keeps these bound languages even if your system display language changes. If Windows does not provide a usable display language, the CLI prompts in English to pass `--target-language <language>`.
+- `und` source: When the source language cannot be proven (for example, short labels or mixed text), `sourceLocale` is set to `und`. You can still translate by reading the original text, or start a new session with an explicit `--source-language`.
 - `total`: Total number of text items found across the map.
 - `pending`: How many items are still waiting to be translated.
 - `revision`: Progress counter that goes up by `1` each time you submit a page.
 
 :::note[Why Your Formatting and Commands Stay Safe]
-Every individual sign line, book page, or item name gets its own `slotId`, so even two identical English lines can be translated differently depending on context. You only edit the plain text — underlying Minecraft colors, hover/click events, scores, and selectors are kept safely hidden inside the tool so a typo cannot break map mechanics.
+Every individual sign line, book page, or item name gets its own `slotId`, so even two identical source lines can be translated differently depending on context. You only edit the plain text — underlying Minecraft colors, hover/click events, scores, and selectors are kept safely hidden inside the tool so a typo cannot break map mechanics.
 :::
 
 ---
@@ -87,8 +95,8 @@ Every individual sign line, book page, or item name gets its own `slotId`, so ev
      Set-Content -Encoding utf8 'D:\Translate\reply-0.json'
    ```
 
-   - `page-0-prompt.txt` shows each line's original text and where it appears (for example, a sign, a book, or an item name).
-   - `reply-0.json` is the template you edit and send back.
+   - `page-0-prompt.txt` shows each line's original text, context, and English translation instructions (CLI guidance is fixed in English regardless of map languages).
+   - `reply-0.json` is the template you edit and send back, retaining the session's bound `targetLocale` and IDs.
 
 2. **Fill In `reply-0.json`**
 
@@ -166,7 +174,7 @@ Then finish in three clear steps:
      </TabItem>
      <TabItem label="Use Translation Keys + Resource Pack (--keys)">
 
-   Converts map text into translation keys and bundles the matching `.json` language file inside a resource pack (see **[Resource Packs & Language Files](../resources-and-packs/)**):
+   Converts map text into translation keys and bundles the matching `.json` language file inside a resource pack. This example uses `en_us.json`. If `translate start` returned a different `targetLocale`, use that value for the filename. See **[Resource Packs & Language Files](../resources-and-packs/)**.
 
    ```powershell title="PowerShell"
    $opId = [guid]::NewGuid().ToString()
@@ -176,7 +184,7 @@ Then finish in three clear steps:
      --revision 2 `
      --keys `
      --prefix map. `
-     --language-output 'resources.zip#assets/adventure/lang/zh_tw.json' `
+     --language-output 'resources.zip#assets/adventure/lang/en_us.json' `
      --operation-id $opId `
      --output 'D:\Translate\world-translate-plan.json'
    ```
@@ -184,7 +192,7 @@ Then finish in three clear steps:
      </TabItem>
    </Tabs>
 
-   *(If you only want a standalone `.zip` resource pack without modifying the map at all, jump to **[Resource Packs & Language Files](../resources-and-packs/)** for `export-lang` and `create-pack`.)*
+   *(If you only want a standalone `.zip` resource pack or bilingual language files without modifying the map at all, jump to **[Resource Packs & Language Files](../resources-and-packs/)** for `export-lang` and `create-pack`. When a session's `sourceLocale` is `und`, pass `--original-lang <language>` explicitly to those commands.)*
 
 2. **Close Minecraft and Apply the Plan (`apply`)**
 
@@ -221,27 +229,43 @@ Then finish in three clear steps:
 
 ---
 
-## Draft Text From an Unresolved Source
+## Draft Text From an Unresolved Source (`translate fallback`)
 
-Use `translate fallback` when a scan can read an artifact but cannot establish how its text is used. The draft includes the selected tag or line as context, candidate string paths, and a reply template. It works with NBT, JSON, SNBT, and UTF-8 text.
+Use `translate fallback` when a scan can read an artifact (or standalone file) but cannot establish how its text is used. The selected tag or line is returned as context (`data.context`), along with editable candidate paths (`data.candidates`), any unverified branches (`data.unverified`), and a versioned reply template (`data.replyTemplate`, `nbtcli.translation-draft-reply` v2). It supports NBT, JSON, SNBT, and UTF-8 text.
 
-```powershell
+Just like `translate start`, you can omit `--source-language` and `--target-language` to resolve languages automatically and bind them into `draftId`, `sourceLocale`, and `targetLocale`, or pass explicit override flags:
+
+```powershell title="Standalone NBT file: export draft, designate a confirmed custom field, and validate a reply"
+# 1. Export context and recognized translatable text leaves under /dialogue
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+
+# 2. If a custom field under the selection is confirmed as display text, specify its relative path with --text-pointer
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption
+
+# 3. Validate a completed reply (reuses the bound languages and requires the same selection and --text-pointer)
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption --reply 'D:\reply.json'
+```
+
+You can also target a specific line inside a world's datapack function (or a ZIP member via `--entry`, a region chunk via `--chunk x,z`, or a zero-based UTF-8 `--byte-range start,length`):
+
+```powershell title="World datapack function line"
+New-Item -ItemType Directory -Path 'D:\Drafts' -Force | Out-Null
+
 .\nbtcli.exe translate fallback 'D:\WorldCopy' `
   --path 'datapacks/story/data/story/functions/dialogue.mcfunction' --line 12 `
   --output 'D:\Drafts\dialogue-context.json'
-```
 
-For an NBT file, use `--pointer` to select a tag, or omit it to inspect the root. A region lookup also needs `--chunk x,z` and a dimension when the input is a standalone region file. Use `--entry` for an exact ZIP member. Use `--format snbt` for a standalone SNBT snippet. Line numbers start at 1 and select a trailing structured command operand by default. For a fragment in an unfamiliar file, select `--byte-range start,length` using zero-based UTF-8 byte offsets and choose `--format json`, `snbt`, or `text` as appropriate. Explicit `--format text` produces a plain-text draft and reports `structureVerified: false`.
-
-Copy `data.replyTemplate` to a separate JSON file. Fill in the `text` values for the slots you want to translate. Leave other values as `null`. Run the same selection again with `--reply` and a new output filename.
-
-```powershell
 .\nbtcli.exe translate fallback 'D:\WorldCopy' `
   --path 'datapacks/story/data/story/functions/dialogue.mcfunction' --line 12 `
   --reply 'D:\Drafts\dialogue-reply.json' --output 'D:\Drafts\dialogue-validated.json'
 ```
 
-The result contains the translated snippet in `data.content`. The CLI matches the original source and selected slots, validates protected formatting, numbers, and private-use glyphs, and preserves other members of structured drafts. A line selection retains one physical line, including when the format can escape a newline inside a string. Place draft exports outside Minecraft world folders, even when selecting an individual file. The result reports `gameplayVerified: false`. Review the draft on a world copy before incorporating it into an edit. The fallback leaves the original artifact and scan verdict intact.
+Key validation and safety rules:
+- **Selection and `--text-pointer`**: For an NBT or JSON file, use `--pointer` (or omit it to inspect the root). The selection provides full context, while replies may only edit recognized translatable text leaves unless you explicitly designate a confirmed custom display field with a relative `--text-pointer` (such as `/caption`). Repeat the exact same selection and `--text-pointer` when submitting `--reply`.
+- **Language binding**: Copy `data.replyTemplate` to a separate JSON file, fill in `text` for slots you translate (leaving unchanged slots as `null`), and preserve `draftId`, `sourceLocale`, `targetLocale`, `slotId`, and `sourceTextHash`. Submitting `--reply` without language flags reuses the draft's bound languages even if your system display language changes; explicit language flags must match.
+- **Layered protection**: Formatting codes, placeholders, numbers, private-use glyphs, Roman level suffixes, and unproven custom fonts are protected. Unknown-purpose fields or malformed/ambiguous inner branches are preserved untouched and listed in `data.unverified` (setting `structureVerified: false`), while valid sibling leaves remain translatable. Explicit `--format text` drafts also report `structureVerified: false`.
+- **Line, byte-range, and SNBT options**: Line numbers start at `1` and select a trailing structured command operand by default (keeping one physical line on output). Use `--format snbt` (and optional `--snbt-profile`) for standalone SNBT snippets, or `--byte-range start,length` with `--format json|snbt|text`.
+- **Formal apply boundary**: Place draft exports outside Minecraft world folders even for individual files. Validated drafts return the rewritten snippet in `data.content` with `gameplayVerified: false`, leave the original artifact and whole-world scan verdict intact, and still require meeting formal apply conditions before editing a save.
 
 For several selections in one world, use `translate fallback <world> --batch draft-batch.json`. The request uses `schemaFamily: "nbtcli.translation-draft-batch"`, `schemaVersion: 1`, and a `selections` array. Each selection contains the whole file's SHA-256 as `sourceHash` and an `options` object, for example `{"path":"datapacks/example/data/demo/functions/read.mcfunction","line":"12"}`. An archive selection also needs its member's `entryHash`. Use the returned `data.drafts` in selection order. To validate translations, copy a draft's `replyTemplate` to the corresponding selection's `reply` field, fill the slot texts, and run the same command again. Batch requests accept up to 1,024 selections and use the same read-only draft validation as a single selection.
 
@@ -283,17 +307,15 @@ If the map was updated and you started a new translation session, look up matchi
   --glossary-version '<glossary-version>'
 ```
 
-### Saving Default Languages for External Tools (`agent`)
+### Saving Client Preferences for External Tools (`agent`)
 
-If you reuse the same languages and settings on a world with scripts or AI tools, you can optionally store local preferences with `agent`:
+If you use scripts or AI assistants on a world, you can optionally store local client preferences (such as `preferredItemsPerPage` and suggested language metadata) with `agent`:
 
 ```powershell title="PowerShell"
 New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 
-# 1. Export the preference questionnaire
+# 1. Export the preference questionnaire (defaults sourceLanguage to "auto" and targetLanguage to your Windows display language; optionally add --source-language / --target-language)
 .\nbtcli.exe agent setup 'D:\WorldCopy' `
-  --source-language en_us `
-  --target-language zh_tw `
   --output 'D:\Translate\agent-questionnaire.json'
 
 # 2. Fill in configuration.agentName inside the file, then save it
@@ -303,6 +325,6 @@ New-Item -ItemType Directory -Path 'D:\Translate' -Force | Out-Null
 .\nbtcli.exe agent status 'D:\WorldCopy'
 ```
 
-`agent` commands only save settings locally inside your state folder — they never connect to the internet or modify your world.
+`agent` commands only save settings locally inside your state folder — they never connect to the internet or modify your world. Note that omitting language flags on `translate start` still uses automatic source detection and your Windows display language; pass explicit language options when overriding for a session.
 
 </details>

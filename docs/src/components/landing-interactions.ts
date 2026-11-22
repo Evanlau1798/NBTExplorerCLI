@@ -1,17 +1,45 @@
+import { copyCommand } from './copy-command';
+
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 document.documentElement.dataset.enhanced = 'true';
 
-// 1. Sticky glass header elevation on scroll
+// 1. Sticky translucent header border on scroll
 const header = document.querySelector<HTMLElement>('[data-header]');
 if (header) {
   const updateHeader = () => {
-    header.dataset.scrolled = window.scrollY > 12 ? 'true' : 'false';
+    header.dataset.scrolled = window.scrollY > 10 ? 'true' : 'false';
   };
   updateHeader();
   window.addEventListener('scroll', updateHeader, { passive: true });
 }
 
-// 2. Mobile navigation drawer
+// 2. Dark / Light theme toggle synced with Starlight (localStorage 'starlight-theme')
+const themeToggle = document.getElementById('landing-theme-toggle') as HTMLButtonElement | null;
+if (themeToggle) {
+  const syncThemeAria = (theme: 'dark' | 'light') => {
+    const label = theme === 'light' ? themeToggle.dataset.labelDark : themeToggle.dataset.labelLight;
+    if (label) {
+      themeToggle.setAttribute('aria-label', label);
+      themeToggle.setAttribute('title', label);
+    }
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#ffffff' : '#09090b');
+  };
+
+  const currentTheme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  syncThemeAria(currentTheme);
+
+  themeToggle.addEventListener('click', () => {
+    const next: 'dark' | 'light' = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem('starlight-theme', next);
+    } catch {}
+    syncThemeAria(next);
+  });
+}
+
+// 3. Mobile navigation drawer
 const menuToggle = document.querySelector<HTMLButtonElement>('.menu-toggle');
 const navigation = document.querySelector<HTMLElement>('.site-nav');
 const mobile = window.matchMedia('(max-width: 760px)');
@@ -46,17 +74,19 @@ if (menuToggle && navigation) {
   menuToggle.hidden = false;
 }
 
-// 3. Hero Stage scene switcher + animated sliding pill
+// 4. Hero Stage scene switcher + sliding indicator + synced CLI quick command
 const stageTabs = [...document.querySelectorAll<HTMLButtonElement>('.stage-tab')];
 const stagePanels = [...document.querySelectorAll<HTMLElement>('[data-scene-panel]')];
 const stagePill = document.querySelector<HTMLElement>('.stage-tab-pill');
 const heroToggleBtn = document.getElementById('hero-translate-toggle') as HTMLButtonElement | null;
 const translatePanel = document.getElementById('stage-panel-translate');
+const cliCodeEl = document.getElementById('hero-cli-code');
+const cliCopyBtn = document.getElementById('hero-cli-copy') as HTMLButtonElement | null;
 
 const movePill = (activeBtn: HTMLButtonElement) => {
   if (!stagePill) return;
   stagePill.style.width = `${activeBtn.offsetWidth}px`;
-  stagePill.style.transform = `translateX(${activeBtn.offsetLeft - 4}px)`;
+  stagePill.style.transform = `translateX(${activeBtn.offsetLeft - 3}px)`;
 };
 
 const selectScene = (index: number) => {
@@ -79,6 +109,9 @@ const selectScene = (index: number) => {
     movePill(currentTab);
     if (heroToggleBtn) {
       heroToggleBtn.hidden = currentTab.dataset.scene !== 'translate';
+    }
+    if (cliCodeEl && currentTab.dataset.cliCmd) {
+      cliCodeEl.textContent = currentTab.dataset.cliCmd;
     }
   }
 };
@@ -107,10 +140,31 @@ if (stageTabs.length) {
   });
 }
 
-// 4. Hero live EN <-> ZH morph toggle
+// 5. Copyable Hero CLI command button
+if (cliCopyBtn && cliCodeEl) {
+  const copyTextEl = cliCopyBtn.querySelector<HTMLElement>('.cli-copy-text');
+  let resetTimer = 0;
+  cliCopyBtn.addEventListener('click', async () => {
+    const cmd = cliCodeEl.textContent?.trim() ?? '';
+    if (!cmd) return;
+    const copied = await copyCommand(cmd);
+    cliCopyBtn.dataset.copied = String(copied);
+    const feedback = copied ? (cliCopyBtn.dataset.copiedLabel ?? 'Copied') : (cliCopyBtn.dataset.copyFailedLabel ?? 'Copy failed');
+    cliCopyBtn.setAttribute('aria-label', feedback);
+    if (copyTextEl) copyTextEl.textContent = feedback;
+    window.clearTimeout(resetTimer);
+    resetTimer = window.setTimeout(() => {
+      cliCopyBtn.dataset.copied = 'false';
+      const defaultLabel = cliCopyBtn.dataset.copyLabel ?? 'Copy command';
+      cliCopyBtn.setAttribute('aria-label', defaultLabel);
+      if (copyTextEl) copyTextEl.textContent = defaultLabel;
+    }, 1800);
+  });
+}
+
+// 6. Hero live Original <-> Translated toggle (defaults to crisp translated state)
 if (heroToggleBtn && translatePanel) {
   const flipText = heroToggleBtn.querySelector<HTMLElement>('.flip-text');
-  let userToggledHero = false;
   const setHeroLang = (mode: 'original' | 'translated') => {
     heroToggleBtn.dataset.mode = mode;
     heroToggleBtn.setAttribute('aria-pressed', String(mode === 'translated'));
@@ -123,19 +177,13 @@ if (heroToggleBtn && translatePanel) {
     }
   };
   heroToggleBtn.addEventListener('click', () => {
-    userToggledHero = true;
     const next = heroToggleBtn.dataset.mode === 'translated' ? 'original' : 'translated';
     setHeroLang(next);
   });
-  if (!prefersReducedMotion) {
-    setHeroLang('original');
-    window.setTimeout(() => {
-      if (!userToggledHero) setHeroLang('translated');
-    }, 1500);
-  }
+  setHeroLang('translated');
 }
 
-// 5. Bento Card 1: Live EN / ZH switch
+// 7. Bento Cell 1: Live Original / Translated switch
 const bentoTranslateVisual = document.querySelector<HTMLElement>('[data-bento-lang]');
 if (bentoTranslateVisual) {
   const buttons = [...bentoTranslateVisual.querySelectorAll<HTMLButtonElement>('[data-set-bento-lang]')];
@@ -152,7 +200,7 @@ if (bentoTranslateVisual) {
   });
 }
 
-// 6. Bento Card 2: Interactive NBT Tree expand/collapse
+// 8. Bento Cell 2: Interactive NBT Tree expand/collapse
 document.querySelectorAll<HTMLElement>('[data-tree-branch]').forEach((branch) => {
   const btn = branch.querySelector<HTMLButtonElement>('.nbt-branch-toggle');
   if (!btn) return;
@@ -163,7 +211,7 @@ document.querySelectorAll<HTMLElement>('[data-tree-branch]').forEach((branch) =>
   });
 });
 
-// 7. Bento Card 3: Direct Map / Resource Pack .zip toggle
+// 9. Bento Cell 3: Direct Map / Resource Pack .zip toggle
 const bentoPackVisual = document.querySelector<HTMLElement>('[data-pack-mode]');
 if (bentoPackVisual) {
   const buttons = [...bentoPackVisual.querySelectorAll<HTMLButtonElement>('[data-set-pack-mode]')];
@@ -180,7 +228,7 @@ if (bentoPackVisual) {
   });
 }
 
-// 8. Bento Card 4: Safety timeline checkpoints
+// 10. Bento Cell 4: State-driven Safety Timeline checkpoints
 const safetyVisual = document.querySelector<HTMLElement>('[data-active-step]');
 if (safetyVisual) {
   const nodes = [...safetyVisual.querySelectorAll<HTMLButtonElement>('[data-safety-step]')];
@@ -189,114 +237,39 @@ if (safetyVisual) {
     safetyVisual.dataset.activeStep = String(idx);
     nodes.forEach((n, i) => {
       const active = i === idx;
+      const reached = i <= idx;
       n.classList.toggle('is-active', active);
+      n.classList.toggle('is-reached', reached);
       n.setAttribute('aria-pressed', String(active));
     });
     details.forEach((d, i) => d.classList.toggle('is-active', i === idx));
   };
   nodes.forEach((node, idx) => node.addEventListener('click', () => selectStep(idx)));
+  selectStep(0);
 }
 
-// 9. Cursor spotlight + responsive rAF-interpolated 3D tilt (zero transition-delay lag)
+// 11. Precision 1px border & hairline spotlight tracking (zero 3D tilt)
 const finePointer = window.matchMedia('(pointer: fine)').matches;
 if (finePointer && !prefersReducedMotion) {
-  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
   document.querySelectorAll<HTMLElement>('[data-spotlight]').forEach((el) => {
-    const hasTilt = el.hasAttribute('data-tilt');
-    let targetRx = 0;
-    let targetRy = 0;
-    let targetScale = 1;
-    let currentRx = 0;
-    let currentRy = 0;
-    let currentScale = 1;
-    let hovering = false;
-    let rafId = 0;
-
-    const tickTilt = () => {
-      const ease = hovering ? 0.3 : 0.16;
-      currentRx += (targetRx - currentRx) * ease;
-      currentRy += (targetRy - currentRy) * ease;
-      currentScale += (targetScale - currentScale) * ease;
-
-      el.style.setProperty('--rx', `${currentRx.toFixed(3)}deg`);
-      el.style.setProperty('--ry', `${currentRy.toFixed(3)}deg`);
-      el.style.setProperty('--card-scale', currentScale.toFixed(4));
-
-      const settled =
-        Math.abs(targetRx - currentRx) < 0.015 &&
-        Math.abs(targetRy - currentRy) < 0.015 &&
-        Math.abs(targetScale - currentScale) < 0.0005;
-
-      if (settled) {
-        currentRx = targetRx;
-        currentRy = targetRy;
-        currentScale = targetScale;
-        el.style.setProperty('--rx', `${currentRx.toFixed(2)}deg`);
-        el.style.setProperty('--ry', `${currentRy.toFixed(2)}deg`);
-        el.style.setProperty('--card-scale', currentScale.toFixed(3));
-        rafId = 0;
-        if (!hovering) el.classList.remove('is-tilting');
-        return;
-      }
-      rafId = requestAnimationFrame(tickTilt);
-    };
-
-    const startTiltLoop = () => {
-      if (!rafId) rafId = requestAnimationFrame(tickTilt);
-    };
-
-    const updateFromEvent = (event: PointerEvent) => {
+    const updatePointer = (event: PointerEvent) => {
       const rect = el.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      el.style.setProperty('--mx', `${x.toFixed(1)}px`);
-      el.style.setProperty('--my', `${y.toFixed(1)}px`);
-      if (hasTilt && rect.width > 0 && rect.height > 0) {
-        const nx = clamp(x / rect.width - 0.5, -0.5, 0.5);
-        const ny = clamp(y / rect.height - 0.5, -0.5, 0.5);
-        targetRx = -ny * 8.4;
-        targetRy = nx * 8.4;
-        startTiltLoop();
-      }
+      el.style.setProperty('--mx', `${(event.clientX - rect.left).toFixed(1)}px`);
+      el.style.setProperty('--my', `${(event.clientY - rect.top).toFixed(1)}px`);
     };
-
-    el.addEventListener('pointerenter', (event) => {
-      hovering = true;
-      if (hasTilt) {
-        el.classList.add('is-visible', 'is-revealed', 'is-tilting');
-        targetScale = 1.008;
-      }
-      updateFromEvent(event);
-    });
-
-    el.addEventListener('pointermove', updateFromEvent);
-
-    const resetTilt = () => {
-      hovering = false;
-      if (hasTilt) {
-        targetRx = 0;
-        targetRy = 0;
-        targetScale = 1;
-        startTiltLoop();
-      }
-    };
-
-    el.addEventListener('pointerleave', resetTilt);
-    el.addEventListener('pointercancel', resetTilt);
+    el.addEventListener('pointerenter', updatePointer);
+    el.addEventListener('pointermove', updatePointer);
   });
 }
 
-// 10. Scroll-triggered stagger reveal (also reveals elements passed when jumping straight to bottom)
+// 12. Crisp scroll-triggered reveal
 const revealNodes = [...document.querySelectorAll<HTMLElement>('[data-reveal]')];
 if (!prefersReducedMotion && 'IntersectionObserver' in window && revealNodes.length) {
   const markVisible = (node: HTMLElement) => {
-    if (node.classList.contains('is-visible')) return;
     node.classList.add('is-visible');
-    const delayMs = parseFloat(node.style.getPropertyValue('--reveal-delay')) || 0;
-    window.setTimeout(() => node.classList.add('is-revealed'), delayMs + 620);
   };
   const revealPassed = () => {
-    const thresholdY = window.innerHeight + 80;
+    const thresholdY = window.innerHeight + 60;
     revealNodes.forEach((node) => {
       if (!node.classList.contains('is-visible') && node.getBoundingClientRect().top <= thresholdY) {
         markVisible(node);
@@ -313,10 +286,10 @@ if (!prefersReducedMotion && 'IntersectionObserver' in window && revealNodes.len
       });
       revealPassed();
     },
-    { threshold: 0.08, rootMargin: '0px 0px -24px 0px' }
+    { threshold: 0.06, rootMargin: '0px 0px -16px 0px' }
   );
   revealNodes.forEach((node, idx) => {
-    node.style.setProperty('--reveal-delay', `${Math.min(idx * 60, 220)}ms`);
+    node.style.setProperty('--reveal-delay', `${Math.min(idx * 45, 160)}ms`);
     io.observe(node);
   });
   let scrollScheduled = false;
@@ -334,68 +307,5 @@ if (!prefersReducedMotion && 'IntersectionObserver' in window && revealNodes.len
   );
   revealPassed();
 } else {
-  revealNodes.forEach((node) => node.classList.add('is-visible', 'is-revealed'));
-}
-
-// 11. Lightweight floating digitized voxel pixels (Grass -> Cyan sparks)
-const canvas = document.getElementById('voxel-canvas') as HTMLCanvasElement | null;
-if (canvas && !prefersReducedMotion) {
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    type Voxel = { x: number; y: number; size: number; vy: number; alpha: number; color: string; phase: number };
-    const colors = ['#6AA04C', '#4ADE80', '#38BDF8', '#7DD3FC'];
-    let width = 0;
-    let height = 0;
-    let voxels: Voxel[] = [];
-    let rafId = 0;
-    let running = true;
-
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = window.innerWidth;
-      height = Math.min(window.innerHeight, 920);
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const count = Math.max(14, Math.min(34, Math.floor(width / 46)));
-      voxels = Array.from({ length: count }, () => ({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        size: Math.random() > 0.55 ? 5 : 3.5,
-        vy: 0.18 + Math.random() * 0.32,
-        alpha: 0.14 + Math.random() * 0.28,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        phase: Math.random() * Math.PI * 2,
-      }));
-    };
-
-    const draw = (time: number) => {
-      if (!running) return;
-      ctx.clearRect(0, 0, width, height);
-      for (const v of voxels) {
-        v.y -= v.vy;
-        if (v.y < -16) {
-          v.y = height + 16;
-          v.x = Math.random() * width;
-        }
-        const twinkle = 0.55 + 0.45 * Math.sin(time * 0.0014 + v.phase);
-        const edgeFade = Math.min(1, v.y / 140, (height - v.y) / 140);
-        ctx.globalAlpha = Math.max(0, v.alpha * twinkle * edgeFade);
-        ctx.fillStyle = v.color;
-        ctx.fillRect(Math.round(v.x), Math.round(v.y), v.size, v.size);
-      }
-      rafId = requestAnimationFrame(draw);
-    };
-
-    resize();
-    window.addEventListener('resize', resize, { passive: true });
-    document.addEventListener('visibilitychange', () => {
-      running = !document.hidden;
-      if (running) rafId = requestAnimationFrame(draw);
-      else cancelAnimationFrame(rafId);
-    });
-    rafId = requestAnimationFrame(draw);
-  }
+  revealNodes.forEach((node) => node.classList.add('is-visible'));
 }

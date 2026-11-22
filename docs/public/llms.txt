@@ -33,29 +33,37 @@
 
    - Always check both process exit code (`$LASTEXITCODE`) and `response.success`.
 
-2. **Global UI Locale (`--ui-locale`)**
-   - Accepts `zh-TW` (default) or `en-US` anywhere in `argv`.
-   - Changes only human-readable `error.message` and help text; never changes JSON keys, `error.code`, or translation locales (`--source-language`, `--target-language`, `--lang`, `--original-lang`, `--target-lang`).
+2. **Fixed English CLI Interface (`--ui-locale`)**
+   - CLI help, errors, diagnostics, agent questionnaire instructions, and session translation prompts are always in English.
+   - `--ui-locale en-US` is accepted anywhere in `argv` as an explicit English entry point; any other `--ui-locale` value fails with exit code `2` (`INVALID_ARGUMENTS`).
+   - Map content languages (`--source-language`, `--target-language`, `--lang`, `--original-lang`, `--target-lang`) are independent of CLI UI language and accept any valid bounded language tag (`ja-JP` and `ja_jp` normalize to `ja_jp`; script/region tags like `zh_hant_tw` and `zh_hans_cn` stay distinct).
 
-3. **Subcommand Help Syntax**
+3. **Automatic & Bound Translation Languages**
+   - Both `translate start` and `translate fallback` allow omitting `--source-language` and `--target-language`.
+   - Source resolution: omitting `--source-language` (or passing `auto`) checks trusted resource-pack language paths (`assets/<ns>/lang/<locale>.json`), then offline Windows ELS text recognition, falling back to `und` when short, mixed, or ambiguous. Explicit `--source-language <tag|auto|und>` overrides.
+   - Target resolution: omitting `--target-language` uses the current Windows account display language (`GetUserPreferredUILanguages`); if unavailable, the CLI returns exit code `2` in English prompting `--target-language <language>`. Explicit `--target-language <tag>` overrides.
+   - Binding: resolved languages are shown and bound at creation. Resuming a session (`--session-id`) or validating a fallback `--reply` reuses the bound languages even if system display language changes; explicit language flags on resume/reply must match.
+   - `und` source: translation may proceed using the original text; exporting bilingual language files via `translate export-lang` or `translate create-pack` requires explicit `--original-lang <language>` when `sourceLocale` is `und`.
+
+4. **Subcommand Help Syntax**
    - Root command help: `nbtcli help <cmd>` or `nbtcli <cmd> --help`.
    - Subcommand help: `nbtcli translate <subcmd> --help` or `nbtcli agent <subcmd> --help`.
    - `nbtcli help translate start` is invalid and exits with code `2`.
 
-4. **External Path & Parent Directory Rules**
+5. **External Path & Parent Directory Rules**
    - Never place `--output`, `--plan-output`, `--state-root`, or `--cache-root` inside `<world>`.
    - Always ensure the parent directory of `--output` / `--plan-output` exists before calling export commands (`New-Item -ItemType Directory -Path <dir> -Force | Out-Null`).
    - Default standalone scan cache (`scan`, `extract`, `validate`): `%LOCALAPPDATA%\nbtcli\scan\<world-id>`.
    - Default world state root (`plan`, `apply`, `status`, `recover`, `backup`, `restore`, `translate`, `agent`): `%LOCALAPPDATA%\nbtcli\worlds\<world-id>` (`cache/`, `sessions/`, `agent/`, `objects/`, `journals/`).
    - Reuse the identical `--state-root` across related operations on the same world.
 
-5. **World-Write Authorization & Fail-Closed Recovery**
+6. **World-Write Authorization & Fail-Closed Recovery**
    - All world-modifying operations (`apply`, `recover`, or `--apply` on `set`, `batch`, `restore`, `convert`, `translate export-lang`, `translate create-pack`) require `--world-offline` while Minecraft and all other editors are closed.
    - Prefer `preview -> inspect plan -> apply --plan <file> --world-offline` on a disposable world copy.
    - On exit code `7` (`RECOVERY_REQUIRED`) or if `data.pendingPlanHash` is returned: do not open the world or start new writes. Keep `.nbtcli-pending-write` and the state root intact, run `status`, then run `recover` (forward complete, exit `0`) or `recover --rollback` (exit `8`).
    - On `translate export-lang` and `translate create-pack`: omitting `--output` defaults to inside `<world>` (`.nbtcli.language`, world root, or `resourcepacks/` depending on profile). Pass an explicit external `--output` to keep `<world>` untouched.
 
-6. **Hard Resource Limits (Exit Code `6`)**
+7. **Hard Resource Limits (Exit Code `6`)**
    - 64 MiB output/artifact limit; 100,000-slot session or batch operation limit; 256-segment pointer depth limit; 100 ms regex timeout (`--match-pattern`).
    - Narrow scope with `--dimension`, `--region`, `--path`, `--types`, or lower `--page-size` / `--page-bytes`.
 
@@ -79,7 +87,7 @@
 ### SOP A: World Discovery & Read-Only Inspection
 
 ```powershell
-.\nbtcli.exe capabilities --ui-locale en-US
+.\nbtcli.exe capabilities
 .\nbtcli.exe list 'D:\WorldCopy'
 .\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/DataVersion
 .\nbtcli.exe validate 'D:\WorldCopy' --quick
@@ -116,16 +124,20 @@ Build `nbtcli.operations` (1..100,000 unique `id` items; seed from `data.operati
 
 ### SOP D: Paginated Adventure Map Translation Loop
 
-1. Start session (optionally scope with `--dimension`, `--region`, `--types`, `--path`, `--match-pattern`, or `--minecraft-version`):
+1. Start session (omit language flags to resolve automatically, or override with `--source-language` / `--target-language`; optionally scope with `--dimension`, `--region`, `--types`, `--path`, `--match-pattern`, or `--minecraft-version`):
 
 ```powershell
-$s = .\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30 | ConvertFrom-Json
+# Automatic source detection + Windows account display language
+$s = .\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30 | ConvertFrom-Json
 $sid = $s.data.status.sessionId
+
+# Or override languages explicitly (example: Japanese to German)
+# $s = .\nbtcli.exe translate start 'D:\WorldCopy' --source-language ja-JP --target-language de-DE --page-size 30 | ConvertFrom-Json
 ```
 
 2. Loop until `pending == 0`:
    - Export page `p`: `translate export 'D:\WorldCopy' --session-id $sid --page $p --output 'D:\Translate\page.txt'`.
-   - Start from `data.replyTemplate`, preserving `operationId`, `sessionId`, `revision`, `snapshotId`, `page`, `pageId`, `targetLocale`, every `slotId`, and every `sourceTextHash` unchanged.
+   - Start from `data.replyTemplate`, preserving `operationId`, `sessionId`, `revision`, `snapshotId`, `page`, `pageId`, `targetLocale`, every `slotId`, and every `sourceTextHash` unchanged. If `sourceLocale` is `und`, infer the source language from each slot's `sourceText`.
    - For every slot in `slots`: set `"state": "translated"` + `"text": "<translation>"`, or `"state": "unchanged"` + `"text": null`.
    - Submit (and optionally fetch the next page in one call via `advance`):
 
@@ -144,10 +156,10 @@ $sid = $s.data.status.sessionId
 
      Add `--synchronize-references` only if intentionally translating identifying entity/armor-stand `CustomName` referenced by `@e[name=...]` (fails closed if ambiguous).
 
-   - Translation keys + language file:
+   - Translation keys + language file (example targeting `en_us`):
 
 ```powershell
-.\nbtcli.exe translate plan 'D:\WorldCopy' --session-id $sid --revision $rev --keys --prefix map. --language-output 'resources.zip#assets/adventure/lang/zh_tw.json' --operation-id $opId --output 'D:\Translate\plan.json'
+.\nbtcli.exe translate plan 'D:\WorldCopy' --session-id $sid --revision $rev --keys --prefix map. --language-output 'resources.zip#assets/adventure/lang/en_us.json' --operation-id $opId --output 'D:\Translate\plan.json'
 ```
 
 4. Apply offline and seal session using exact `revision`, `operationId`, and `planHash`:
@@ -160,12 +172,12 @@ $planHash = (Get-Content -Raw 'D:\Translate\plan.json' | ConvertFrom-Json).data.
 
 ### SOP E: Standalone Language Files or Resource Pack (No Gameplay NBT Edits)
 
-Does not edit gameplay NBT and does not seal the session. Always pass external `--output` + `--plan-output` (and `--pack-format` for external `create-pack`):
+Does not edit gameplay NBT and does not seal the session. Always pass external `--output` + `--plan-output` (and `--pack-format` for external `create-pack` or when world default pack format is unverified). If `session.SourceLocale` is `und`, you **must** pass `--original-lang <language>` explicitly (example below targets `en_us` from `ja_jp`):
 
 ```powershell
 New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
 .\nbtcli.exe translate create-pack 'D:\WorldCopy' --session-id $sid --revision $rev `
-  --original-lang en_us --target-lang zh_tw --prefix map. `
+  --original-lang ja_jp --target-lang en_us --prefix map. `
   --name 'adventure-pack.zip' --format zip --pack-format 34 `
   --merge 'D:\BaseAssets\base-pack.zip' `
   --output 'D:\Exports\Packs' --plan-output 'D:\Plans\pack-plan.json'
@@ -176,11 +188,11 @@ New-Item -ItemType Directory -Path 'D:\Exports', 'D:\Plans' -Force | Out-Null
 ### SOP F: Classic Anvil Worlds (No `DataVersion`, Storage Version `19133`)
 
 - Read-only inspection works automatically (`java-classic-anvil`).
-- For translation or direct edits on known classic versions, pass `--minecraft-version <1.2.5|1.5.2|1.6.4|1.8.1>` to `scan`, `extract`, `validate`, or `translate start` (retained by session and direct plan).
+- For translation or direct edits on known classic versions, pass `--minecraft-version <1.2.5|1.5.2|1.6.4|1.8|1.8.1..1.8.9>` to `scan`, `extract`, `validate`, or `translate start` (retained by session and direct plan).
 - Version limits and scope:
   - `1.2.5`: vanilla signs only (plain text, max 15 UTF-16 code units/line, no line breaks).
   - `1.5.2`, `1.6.4`: signs (15 units/line, no breaks), plain-text books (title <= 16, page <= 256), scoreboard display names (<= 32), team prefix/suffix (<= 16), display fields, recognized command text.
-  - `1.8.1`: JSON signs/books, display fields, recognized command text.
+  - `1.8` through `1.8.9`: JSON signs/books, display fields, recognized command text.
 - Keep entity selector identifier names unchanged. Use `--types` to exclude bundled classic resource packs when out of scope.
 
 ### SOP G: Backup & Restore
@@ -211,9 +223,29 @@ New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
 - Never interpret `journalMayBeAbsent: true` or `receiptIsTerminal: false` as "nothing was written" without investigating first.
 - If a prior `Conflict` blocks new writes, restore the plan's verified preimages offline and re-run `recover --rollback` to clear the block.
 
+### SOP I: Validated Fallback Drafts (`translate fallback`)
+
+Use for readable NBT, JSON, SNBT, or UTF-8 text sources whose gameplay text role is unresolved:
+
+```powershell
+# 1. Export full tag context, editable leaves, unverified branches, and replyTemplate (v2) with auto languages
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+
+# 2. Designate a confirmed custom display field using a relative JSON pointer inside the selection
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption
+
+# 3. Validate a filled nbtcli.translation-draft-reply (v2) using the exact same selection and --text-pointer
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue --text-pointer /caption --reply 'D:\reply.json'
+```
+
+- Supports world files (`--path`, `--chunk x,z`, `--dimension`, `--entry`), 1-based `--line` (trailing structured command operand, preserving one physical line), zero-based `--byte-range start,length`, `--format auto|json|snbt|text`, and `--snbt-profile through-1.21.4|1.21.5|mixed-lists|1.8.1`.
+- Draft exports (`--output`) must be outside Minecraft world folders even for individual files.
+- Replies may only edit recognized text leaves (or the confirmed `--text-pointer` leaf). Protected formatting, placeholders, numbers, private-use glyphs, Roman level suffixes, and unproven fonts remain preserved; unknown-purpose or malformed/ambiguous inner branches are preserved and listed in `data.unverified` (`structureVerified: false` whenever `unverified` is non-empty or `--format text`).
+- Validated replies return rewritten text in `data.content` with `gameplayVerified: false`, leave original files and whole-world scan verdicts intact, and still require meeting formal apply conditions.
+
 ## Command Reference
 
-Global option on every command: `--ui-locale <zh-TW|en-US>`. Option alias: `-h` -> `--help`. Root aliases: `--help`/`-h` -> `help`, `--version`/`-v` -> `version`. Use `--` before paths starting with `-`.
+Global option on every command: `--ui-locale en-US` (CLI output is fixed English; any other value exits `2`). Option alias: `-h` -> `--help`. Root aliases: `--help`/`-h` -> `help`, `--version`/`-v` -> `version`. Use `--` before paths starting with `-`.
 
 ### Inspection & Scanning (Read-Only)
 
@@ -263,6 +295,8 @@ Global option on every command: `--ui-locale <zh-TW|en-US>`. Option alias: `-h` 
 | `translate export-lang <world>` | `--session-id --state-root --output --revision --original-lang --target-lang --prefix --plan-output --apply --world-offline --help --ui-locale` |
 | `translate create-pack <world>` | `--session-id --state-root --output --revision --original-lang --target-lang --prefix --plan-output --apply --world-offline --name --format --merge --pack-format --help --ui-locale` |
 | `translate seal <world>` | `--session-id --state-root --output --revision --operation-id --plan-hash --help --ui-locale` |
+| `translate fallback <world-or-file>` | `--path --pointer --segments --chunk --dimension --entry --compression --format --line --byte-range --snbt-profile --text-pointer --source-language --target-language --reply --output --help --ui-locale` |
+| `translate fallback <world> --batch <file>` | `--source-language --target-language --session-id --state-root --output --help --ui-locale` |
 | `translate help` | `--help --ui-locale` |
 
 ### `agent` Subcommands (Local Preferences Only, No Network)
@@ -276,7 +310,7 @@ Global option on every command: `--ui-locale <zh-TW|en-US>`. Option alias: `-h` 
 
 ## Input JSON Schemas
 
-All JSON inputs accept a file path or `-` for `stdin`. Exact `schemaFamily` and `schemaVersion: 1` are enforced.
+All JSON inputs accept a file path or `-` for `stdin`. Exact `schemaFamily` and `schemaVersion` are enforced (`schemaVersion: 1`, except `nbtcli.translation-draft-reply` uses `schemaVersion: 2`).
 
 ### 1. `nbtcli.typed-nbt` (`set --value` / `--value-file`)
 
@@ -329,7 +363,7 @@ Always start from `data.replyTemplate` returned by `translate export`. Keep ever
     "snapshotId": "<sha256>",
     "page": 0,
     "pageId": "<sha256>",
-    "targetLocale": "zh_tw",
+    "targetLocale": "en_us",
     "slots": [
       {
         "slotId": "<sha256>",
@@ -342,7 +376,28 @@ Always start from `data.replyTemplate` returned by `translate export`. Keep ever
 }
 ```
 
-### 5. `nbtcli.session-command` (`translate jump|note|glossary|reset --request`)
+### 5. `nbtcli.translation-draft-reply` (`translate fallback --reply`, `schemaVersion: 2`)
+
+Always start from `data.replyTemplate` returned by `translate fallback` (flat top-level JSON without a `data` wrapper). Keep `draftId`, `sourceLocale`, `targetLocale`, `slotId`, and `sourceTextHash` unchanged; set `text` to the translated string or `null` to keep unchanged:
+
+```json
+{
+  "schemaFamily": "nbtcli.translation-draft-reply",
+  "schemaVersion": 2,
+  "draftId": "<sha256>",
+  "sourceLocale": "ja",
+  "targetLocale": "en_us",
+  "slots": [
+    {
+      "slotId": "<sha256>",
+      "sourceTextHash": "<sha256>",
+      "text": "..."
+    }
+  ]
+}
+```
+
+### 6. `nbtcli.session-command` (`translate jump|note|glossary|reset --request`)
 
 ```json
 {
@@ -364,45 +419,74 @@ Always start from `data.replyTemplate` returned by `translate export`. Keep ever
 }
 ```
 
-### 6. `nbtcli.agent-questionnaire` (`agent submit --request`)
+### 7. `nbtcli.agent-questionnaire` (`agent submit --request`)
 
-Generate with `agent setup <world> --output <file>`, fill `configuration.agentName` and preferences, retain world ID / revision / operationId, then submit.
+Generate with `agent setup <world> --output <file>` (defaults `sourceLanguage` to `"auto"` and `targetLanguage` to the Windows display language), fill `configuration.agentName` and preferences, retain world ID / revision / operationId, then submit. Saved `agent` preferences supply `preferredItemsPerPage` when `translate start` omits `--page-size`, but do not override `translate start`'s automatic language defaults when language flags are omitted.
+
+### 8. `nbtcli.translation-draft-batch` (`translate fallback <world> --batch`)
+
+Use the exact outer file SHA-256 for `sourceHash` and add `entryHash` for an archive member. Each selection takes string-valued `options` and, when validating, its filled v2 `reply` object. Selections are processed in order (1 to 1,024 per request).
+
+```json
+{
+  "schemaFamily": "nbtcli.translation-draft-batch",
+  "schemaVersion": 1,
+  "selections": [{
+    "sourceHash": "<64 hexadecimal characters>",
+    "options": {"path": "datapacks/example/data/demo/functions/read.mcfunction", "line": "12"}
+  }]
+}
+```
+
+Use `--session-id` to inherit session languages and receive exact matches in `data.sessionReplySlots`. Include `--state-root` if that session uses a custom state location. Merge returned rows by `slotId` into full `translate export` reply pages and submit them through `translate submit`.
 
 ## Supported Versions & Text Roles
 
-### Modern Format Families (`capabilities`)
+### Modern Format Families (`capabilities` — All 17 Families)
 
-Check `minimumDataVersion` and `maximumDataVersion` for each family's inclusive bounds. This table lists the representative versions and their pack formats. With `create-pack`, specify `--pack-format` if the world's default resource pack format cannot be verified.
+Check `minimumDataVersion` and `maximumDataVersion` for each family's inclusive bounds. `DataVersion 100–1513` uses read-only early Anvil profiles (raw command block text; custom names, scoreboard names, and item lore switched to JSON at `1458`, `1514`, and `1803`). With `create-pack`, specify `--pack-format` when exporting outside the world or if the world's default resource pack format cannot be verified.
 
-The scanner reads supported Anvil layouts, including Java 1.14.4-era `Level`-wrapped chunks retained within newer worlds. Use the full scan result to check coverage for a particular save.
+The scanner reads supported Anvil layouts per chunk, including Java 1.14.4-era `Level`-wrapped chunks retained within newer worlds. Use the full scan result to check coverage for a particular save.
 
-The namespaced layout introduced in 26.1 Snapshot 6 has `maximumDataVersion: null`. Later versions using the same layout can share it. This was verified with an original 26.4 Snapshot 10 save.
+The namespaced layout introduced in 26.1 Snapshot 6 has `maximumDataVersion: null`. Later versions using the same layout can share it (verified with an original 26.4 Snapshot 10 save).
 
-| Profile | `DataVersion` | Resource `pack_format` | Datapack Format | Text Schema | Pack / Layout |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `java-1.20.1` | `3465` | `15` | `15` | `java-text-json (v1)` | `java-pack-plural` |
-| `java-1.20.4` | `3700` | `22` | `26` | `java-text-json (v1)` | `java-pack-plural` |
-| `java-1.20.5` | `3837` | `32` | `41` | `java-text-json (v1)` | `java-pack-plural` |
-| `java-1.21` | `3953` | `34` | `48` | `java-text-json (v1)` | `java-pack-singular` |
-| `java-1.21.5` | `4325` | `55` | `71` | `java-text-nbt (v1)` | `java-pack-singular` |
-| `java-1.21.11` | `4671` | `75` | `94.1` | `java-text-nbt (v2)` | `java-pack-singular` |
-| `java-26.1-snapshot-6` | `4774` | `80` | `99` | `java-text-nbt (v2)` | `java-dimensions-namespaced` |
+| Profile | `DataVersion` Range | Rep. `DataVersion` | Rep. Resource `pack_format` | Item Schema | Text Schema | Pack / Layout |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `java-early-anvil` | `100–1457` (read-only) | `169` | `—` | `java-item-tags-1.20.4` | `java-early-anvil-text (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-early-anvil-json-names` | `1458–1513` (read-only) | `1513` | `—` | `java-item-tags-1.20.4` | `java-early-anvil-json-names (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-1.13` | `1514–1802` | `1631` | `—` | `java-item-tags-1.20.4` | `java-text-json (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-1.14.4` | `1803–3462` | `1976` | `—` | `java-item-tags-1.20.4` | `java-text-json (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-1.20.1` | `3463–3566` | `3465` | `15` | `java-item-tags-1.20.4` | `java-text-json (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-1.20.2` | `3567–3689` | `3578` | `18` | `java-item-tags-1.20.4` | `java-text-json (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-1.20.4` | `3690–3818` | `3700` | `22` | `java-item-tags-1.20.4` | `java-text-json (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-item-components-initial` | `3819–3820` | `3819` | `28` | `java-item-components-1.20.5` | `java-text-json (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-1.20.5` | `3821–3945` | `3837` | `32` | `java-item-components-1.20.5` | `java-text-json (v1)` | `java-pack-plural` / `java-dimensions-directory` |
+| `java-1.21` | `3946–4297` | `3953` | `34` | `java-item-components-1.20.5` | `java-text-json (v1)` | `java-pack-singular` / `java-dimensions-directory` |
+| `java-nbt-text-initial-hover` | `4298–4303` | `4298` | `47` | `java-item-components-1.21.5` | `java-text-nbt (v1)` | `java-pack-singular` / `java-dimensions-directory` |
+| `java-nbt-text-homogeneous` | `4304–4307` | `4304` | `48` | `java-item-components-1.21.5` | `java-text-nbt (v1)` | `java-pack-singular` / `java-dimensions-directory` |
+| `java-nbt-text-mixed-lists` | `4308–4316` | `4308` | `49` | `java-item-components-1.21.5` | `java-text-nbt (v1)` | `java-pack-singular` / `java-dimensions-directory` |
+| `java-1.21.5` | `4317–4535` | `4325` | `55` | `java-item-components-1.21.5` | `java-text-nbt (v1)` | `java-pack-singular` / `java-dimensions-directory` |
+| `java-1.21.9` | `4536–4670` | `4554` | `69` | `java-item-components-1.21.5` | `java-text-nbt (v2)` | `java-pack-singular` / `java-dimensions-directory` |
+| `java-1.21.11` | `4671–4773` | `4671` | `75` | `java-item-components-1.21.11` | `java-text-nbt (v2)` | `java-pack-singular` / `java-dimensions-directory` |
+| `java-26.1-snapshot-6` | `4774+` | `4774` | `80` | `java-item-components-26.1-snapshot-6` | `java-text-nbt (v2)` | `java-pack-singular` / `java-dimensions-namespaced` |
 
 ### Classic Anvil Profiles (No `DataVersion`, Storage `19133`)
 
 - `java-classic-anvil` (read-only automatic)
-- `--minecraft-version`: `1.2.5` (signs), `1.5.2`, `1.6.4`, `1.8.1` (signs, books, display fields, recognized command text)
+- `--minecraft-version`: `1.2.5` (signs), `1.5.2`, `1.6.4`, and `1.8` through `1.8.9` (signs, books, display fields, recognized command text)
 
 ### 21 Text Role Names (`--types`)
 
-`Sign`, `HangingSign`, `ContainerName`, `CommandBlock`, `Book`, `LecternBook`, `Title`, `Author`, `ItemName`, `ItemLore`, `ArmorStand`, `EntityName`, `TextDisplay`, `BossBar`, `ScoreboardTeam`, `ScoreboardObjective`, `McFunction`, `Advancement`, `CommandStorage`, `LangKey`, `TranslationKey`
+`Sign`, `HangingSign`, `ContainerName`, `CommandBlock`, `Book`, `LecternBook`, `Title`, `Author`, `ItemName`, `ItemLore`, `ArmorStand`, `EntityName`, `TextDisplay`, `BossBar`, `ScoreboardTeam`, `ScoreboardObjective`, `McFunction`, `Advancement`, `CommandStorage`, `LangKey`, `TranslationKey` (plus `map.banner.name` for map banner names).
 
 ## Common Pitfalls
 
+- Do not pass non-`en-US` values to `--ui-locale` (exits `2`); CLI messages and translation instructions are always English.
 - Do not run `nbtcli help translate start`; use `nbtcli translate start --help`.
-- Do not write `--output` inside `<world>` or into a non-existent parent directory.
+- Do not write `--output` inside `<world>` or into a non-existent parent directory (applies to `translate fallback --output` as well).
 - Do not hand-construct `set` values without the `nbtcli.typed-nbt` envelope from `get --types`.
-- Do not omit `--output` on `translate export-lang` or `create-pack` if `<world>` must remain untouched.
+- Do not omit `--output` on `translate export-lang` or `create-pack` if `<world>` must remain untouched, and do not omit `--original-lang <language>` when exporting bilingual language files from a `sourceLocale: "und"` session.
 - Do not drop unchanged slots from `nbtcli.session-reply`; every slot in the exported page must be present (`"translated"` or `"unchanged"`).
-- Do not assume readable implies writable, or that CLI validation replaces testing in the matching Minecraft client.
+- Do not omit `--text-pointer` or alter selection/language bindings when submitting `translate fallback --reply`; repeat the exact selection and `--text-pointer` used when exporting the draft.
+- Do not assume readable or fallback-validated text implies formal apply approval, or that CLI validation replaces testing in the matching Minecraft client.
 - Do not modify identifying entity/armor-stand `CustomName` without checking command selector references (`--synchronize-references` in `translate plan --direct`).

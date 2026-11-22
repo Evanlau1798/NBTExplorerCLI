@@ -207,6 +207,22 @@ export const TRANSLATE_SUBCOMMANDS: TranslateSubcommandEntry[] = [
       'zh-tw': '在確認世界更新（apply）成功後，將這份翻譯進度正式標記為已完成並封存。',
     },
   },
+  {
+    subcommand: 'fallback',
+    tier: 'safe',
+    summary: {
+      en: 'Exports a read-only context draft and validated reply template (v2) for an unresolved NBT, JSON, SNBT, or UTF-8 text source, with optional --text-pointer and --reply verification.',
+      'zh-tw': '針對尚未判定文字用途的 NBT、JSON、SNBT 或 UTF-8 純文字來源，匯出唯讀上下文草稿與回覆範本（v2），並支援以 --text-pointer 指定已確認顯示欄位及 --reply 驗證。',
+    },
+  },
+  {
+    subcommand: 'help',
+    tier: 'safe',
+    summary: {
+      en: 'Lists available translate subcommands and accepted options.',
+      'zh-tw': '列出所有可用的 translate 子命令與支援參數。',
+    },
+  },
 ];
 
 export interface ExitCodeEntry {
@@ -339,159 +355,4 @@ export const EXIT_CODES: ExitCodeEntry[] = [
   },
 ];
 
-export interface ProfileMatrixRow {
-  profile: string;
-  dataVersionRange: string;
-  packFormat: number | null;
-  layout: string;
-  itemSchema: string;
-  textSchema: string;
-  packLayout: string;
-}
-
-export const SUPPORTED_PROFILES: ProfileMatrixRow[] = [
-  {
-    profile: 'java-early-anvil',
-    dataVersionRange: '100–1457',
-    packFormat: null,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-tags-1.20.4',
-    textSchema: 'java-early-anvil-text (v1)',
-    packLayout: 'java-pack-plural',
-  },
-  {
-    profile: 'java-early-anvil-json-names',
-    dataVersionRange: '1458–1513',
-    packFormat: null,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-tags-1.20.4',
-    textSchema: 'java-early-anvil-json-names (v1)',
-    packLayout: 'java-pack-plural',
-  },
-  {
-    profile: 'java-1.13',
-    dataVersionRange: '1514–1802',
-    packFormat: null,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-tags-1.20.4',
-    textSchema: 'java-text-json (v1)',
-    packLayout: 'java-pack-plural',
-  },
-  {
-    profile: 'java-1.14.4',
-    dataVersionRange: '1803–3462',
-    packFormat: null,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-tags-1.20.4',
-    textSchema: 'java-text-json (v1)',
-    packLayout: 'java-pack-plural',
-  },
-  {
-    profile: 'java-1.20.1',
-    dataVersionRange: '3463–3689',
-    packFormat: 15,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-tags-1.20.4',
-    textSchema: 'java-text-json (v1)',
-    packLayout: 'java-pack-plural',
-  },
-  {
-    profile: 'java-1.20.4',
-    dataVersionRange: '3690–3818',
-    packFormat: 22,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-tags-1.20.4',
-    textSchema: 'java-text-json (v1)',
-    packLayout: 'java-pack-plural',
-  },
-  {
-    profile: 'java-item-components-initial',
-    dataVersionRange: '3819–3820',
-    packFormat: 28,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.20.5',
-    textSchema: 'java-text-json (v1)',
-    packLayout: 'java-pack-plural',
-  },
-  {
-    profile: 'java-1.20.5',
-    dataVersionRange: '3821–3945',
-    packFormat: 32,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.20.5',
-    textSchema: 'java-text-json (v1)',
-    packLayout: 'java-pack-plural',
-  },
-  {
-    profile: 'java-1.21',
-    dataVersionRange: '3946–4297',
-    packFormat: 34,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.20.5',
-    textSchema: 'java-text-json (v1)',
-    packLayout: 'java-pack-singular',
-  },
-  {
-    profile: 'java-nbt-text-initial-hover',
-    dataVersionRange: '4298–4303',
-    packFormat: 47,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.21.5',
-    textSchema: 'java-text-nbt (v1)',
-    packLayout: 'java-pack-singular',
-  },
-  {
-    profile: 'java-nbt-text-homogeneous',
-    dataVersionRange: '4304–4307',
-    packFormat: 48,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.21.5',
-    textSchema: 'java-text-nbt (v1)',
-    packLayout: 'java-pack-singular',
-  },
-  {
-    profile: 'java-nbt-text-mixed-lists',
-    dataVersionRange: '4308–4316',
-    packFormat: 49,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.21.5',
-    textSchema: 'java-text-nbt (v1)',
-    packLayout: 'java-pack-singular',
-  },
-  {
-    profile: 'java-1.21.5',
-    dataVersionRange: '4317–4535',
-    packFormat: 55,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.21.5',
-    textSchema: 'java-text-nbt (v1)',
-    packLayout: 'java-pack-singular',
-  },
-  {
-    profile: 'java-1.21.9',
-    dataVersionRange: '4536–4670',
-    packFormat: 69,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.21.5',
-    textSchema: 'java-text-nbt (v2)',
-    packLayout: 'java-pack-singular',
-  },
-  {
-    profile: 'java-1.21.11',
-    dataVersionRange: '4671–4773',
-    packFormat: 75,
-    layout: 'java-dimensions-directory',
-    itemSchema: 'java-item-components-1.21.11',
-    textSchema: 'java-text-nbt (v2)',
-    packLayout: 'java-pack-singular',
-  },
-  {
-    profile: 'java-26.1-snapshot-6',
-    dataVersionRange: '4774+',
-    packFormat: 80,
-    layout: 'java-dimensions-namespaced',
-    itemSchema: 'java-item-components-26.1-snapshot-6',
-    textSchema: 'java-text-nbt (v2)',
-    packLayout: 'java-pack-singular',
-  },
-];
+export { SUPPORTED_PROFILES } from './cli-profiles';

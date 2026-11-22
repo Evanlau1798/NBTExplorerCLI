@@ -35,14 +35,14 @@
 
 ## 這個工具可以幫你做什麼
 
-- **零風險查閱存檔**：以唯讀方式查看 `level.dat`、地圖區塊（`.mca`）、資料包與資源包壓縮檔，完全不會動到原存檔。
-- **輕鬆翻譯整張冒險地圖**：自動掃描告示牌、書本、物品、實體、計分板、Boss 血條、指令方塊與資料包文字，分成一頁一頁慢慢翻，還能搭配術語表保持譯名一致。
+- **零風險查閱跨版本存檔**：以唯讀方式查看跨 Java 版格式家族（`DataVersion 100` 至 `4774+` 與經典 Anvil）的 `level.dat`、地圖區塊（`.mca`）、資料包與資源包壓縮檔，完全不會動到原存檔。
+- **跨語系翻譯整張冒險地圖**：自動掃描告示牌、書本、物品、實體、計分板、Boss 血條、指令方塊與資料包文字，支援自動偵測來源與系統目標語言（或手動指定任意語言對）、分頁搭配術語表翻譯，並可用 `translate fallback` 匯出未判定來源的驗證草稿。
 - **彈性輸出語言檔與資源包**：可以把翻譯直接寫回地圖、轉成多語言翻譯鍵，或單獨打包／合併成客戶端 `.zip` 資源包，不改動地圖本身。
 - **內建安全防呆機制**：所有修改都會先產生「預覽計畫」再寫入，寫入前自動在世界資料夾外建立備份；萬一中途當機也能安全續寫或一鍵還原。
 - **專為 AI 助手與腳本整合設計**：每個指令都輸出乾淨統一的 JSON 格式，可以直接交給 Claude、ChatGPT、Codex、Cursor 或 PowerShell 腳本自動化操作。
 
 > [!NOTE]
-> **適用環境：Windows 64 位元 + Minecraft Java Edition 存檔。** 解壓縮就能執行，**不需要另外安裝 .NET**。要修改存檔前，請務必先關閉 Minecraft 並用「世界副本」測試。不支援基岩版（Bedrock Edition）存檔，也沒有 3D 畫面編輯功能。
+> **適用環境：Windows 64 位元 + Minecraft Java Edition 存檔。** 解壓縮就能執行，**不需要另外安裝 .NET**。CLI 本身的說明、診斷與翻譯操作指引固定為英文，地圖內容則支援任意合法語言對。要修改存檔前，請務必先關閉 Minecraft 並用「世界副本」測試。不支援基岩版（Bedrock Edition）存檔，也沒有 3D 畫面編輯功能。
 
 ---
 
@@ -97,12 +97,23 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 
 ### 開始翻譯一張冒險地圖
 
+新建翻譯工作時可省略 `--source-language` 與 `--target-language`：來源會依可辨識內容自動選取（無法確定時標為 `und`），目標會採用目前 Windows 帳戶的系統顯示語言，兩者會在建立工作時顯示並綁定。只有需要指定其他語言時才傳入覆寫旗標：
+
 ```powershell
-# 建立翻譯進度（完全不會修改世界檔案）
-.\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw --page-size 30
+# 自動辨識來源並採用系統顯示語言開啟翻譯進度（完全不會修改世界檔案）
+.\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30
+
+# 手動覆寫來源與目標語言（例如日語翻德語）
+.\nbtcli.exe translate start 'D:\WorldCopy' --source-language ja-JP --target-language de-DE --page-size 30
 ```
 
-詳細的「匯出分頁 -> 填寫譯文 -> 套用到地圖或打包資源包」流程，請參閱 **[冒險地圖翻譯教學][doc-zh-translation]**。
+若掃描遇到尚未判定文字用途的 NBT、JSON、SNBT 或純文字片段，可用 `translate fallback` 匯出並驗證翻譯草稿：
+
+```powershell
+.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue
+```
+
+詳細的「匯出分頁 -> 填寫譯文 -> `translate fallback` 草稿 -> 套用到地圖或打包資源包」流程，請參閱 **[冒險地圖翻譯教學][doc-zh-translation]**。
 
 ### 修改前先幫世界做一份備份
 
@@ -125,13 +136,14 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 | 你想做的事 | 執行指令 | 安全等級 |
 | :--- | :--- | :--- |
 | 查看版本或指令說明 | `.\nbtcli.exe --version` / `.\nbtcli.exe help <指令>` | 純讀取 |
-| 切換提示訊息為中文或英文 | 在任意指令加上 `--ui-locale zh-TW` 或 `--ui-locale en-US` | 純讀取 |
+| 查看支援的 Java 版格式家族 | `.\nbtcli.exe capabilities` | 純讀取 |
 | 列出世界的維度或區塊清單 | `.\nbtcli.exe list 'D:\WorldCopy'` | 純讀取 |
 | 讀取單一數值（例如地圖名稱或版本） | `.\nbtcli.exe get 'D:\WorldCopy' --path level.dat --pointer /Data/LevelName` | 純讀取 |
 | 依名稱或內容搜尋存檔欄位 | `.\nbtcli.exe search 'D:\WorldCopy' --path level.dat --name Spawn` | 純讀取 |
 | 統計整張地圖有多少文字可翻譯 | `.\nbtcli.exe scan 'D:\WorldCopy' --summary` | 純讀取 |
 | 檢查存檔有沒有損壞或未支援的檔案 | `.\nbtcli.exe validate 'D:\WorldCopy'` | 純讀取 |
-| 開始一份地圖翻譯進度 | `.\nbtcli.exe translate start 'D:\WorldCopy' --source-language en_us --target-language zh_tw` | 僅預覽 |
+| 開始一份地圖翻譯進度（自動語言） | `.\nbtcli.exe translate start 'D:\WorldCopy' --page-size 30` | 僅預覽 |
+| 匯出並驗證單一標籤或指令行的翻譯草稿 | `.\nbtcli.exe translate fallback 'D:\dialogue.nbt' --pointer /dialogue` | 純讀取 |
 | 在修改前先備份世界 | `.\nbtcli.exe backup 'D:\WorldCopy' --suffix before-edit` | 純讀取 |
 | 套用已經檢查過的修改／翻譯計畫 | `.\nbtcli.exe apply 'D:\WorldCopy' --plan 'D:\Plans\plan.json' --world-offline` | 會修改存檔 |
 
@@ -147,7 +159,7 @@ New-Item -ItemType Directory -Path 'D:\Exports' -Force | Out-Null
 - **本儲存庫檔案位置**：[`docs/public/llms.txt`](docs/public/llms.txt)
 - **網頁版指南與直接可用的提示詞範本**：**[AI Agent 快速整合指南][doc-zh-ai-agents]**
 
-這份 `llms.txt` 完整收錄了全部指令與旗標、6 種輸入 JSON Schema、退出碼判斷規則、編輯／翻譯／復原標準 SOP 與常見注意事項，讓 AI 讀完就能精準安全地操作。
+這份 `llms.txt` 收錄指令與旗標、8 種輸入 JSON Schema、17 個支援的 Java 版格式家族、退出碼判斷規則、編輯／翻譯／fallback／復原流程與常見注意事項。
 
 ---
 

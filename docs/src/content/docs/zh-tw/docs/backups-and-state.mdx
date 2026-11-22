@@ -90,7 +90,7 @@ New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
     - 4a8b9c1d2e3f... (每個世界一個資料夾)
       - cache\ (翻譯與編輯用的加速快取)
       - sessions\ (翻譯進度、已翻譯文與術語表)
-      - agent\ (選用的預設語言設定)
+      - agent\ (選用的本機工具偏好設定)
       - objects\ (真正的備份與回滾原始檔 — 請保留！)
       - journals\ (寫入紀錄與中斷復原日誌 — 請保留！)
       - backup_before-translation_20261118T070000Z_a1b2c3.json
@@ -104,7 +104,7 @@ New-Item -ItemType Directory -Path 'D:\Backups' -Force | Out-Null
 | --- | --- | --- |
 | `scan/` 與 `worlds/<id>/cache/` | 讓重複掃描更快的高速快取。 | **可以。** 下次掃描會自動重建（或執行 `scan --refresh` 更新）。 |
 | `sessions/` | 你的翻譯進度、已提交頁數、備註與術語表。 | **翻譯期間請保留。** 等整張地圖確定翻完封存後再清理。 |
-| `agent/` | 透過 `agent setup` 記住的預設語言與分頁設定。 | **看需求。** 不需要記住預設值就可以刪。 |
+| `agent/` | 透過 `agent setup` 儲存的本機偏好設定（如 `preferredItemsPerPage` 與建議語言資訊）。 | **看需求。** 不需要保留偏好就可以刪。 |
 | `objects/` 與 `backup_*.json` | `restore` 與 `recover --rollback` 還原時真正依賴的原始檔案內容。 | **還需要還原就別刪！** |
 | `journals/` | `status` 與 `recover` 判斷寫入進度的紀錄。 | **寫入中斷（退出碼 7）期間絕對不可刪除。** |
 

@@ -45,7 +45,7 @@ Structured JSON output makes it easy for both people and AI assistants / scripts
 ### How is this different from the classic GUI NBTExplorer?
 
 - **Classic NBTExplorer** is a point-and-click tree window great for casually clicking around one or two tags by hand.
-- **NBTExplorerCLI** is a command-line engine for **large jobs, adventure map translation, resource pack generation, crash-safe edits, PowerShell scripts, and AI agents**. It provides automatic previews and backups. The [compatibility table](../support-and-troubleshooting/) lists supported Java versions, including `1.20.1` and classic Anvil worlds.
+- **NBTExplorerCLI** is a command-line engine for **large jobs, multilingual adventure map translation, resource pack generation, crash-safe edits, PowerShell scripts, and AI agents**. It provides automatic previews and backups, and supports broad Java Edition format families (`DataVersion 100` through `4774+` plus classic Anvil worlds — see the [compatibility table](../support-and-troubleshooting/)).
 
 ### Does it work with Minecraft Bedrock Edition or modded worlds?
 
@@ -56,14 +56,14 @@ Structured JSON output makes it easy for both people and AI assistants / scripts
 
 **Yes!** That is one of its core strengths. Just give your AI assistant our dedicated manual URL (`https://nbtcli.evanlau1798.com/llms.txt`) or check **[AI Agent Quickstart](../ai-agents/)** for copy-paste prompts.
 
-### How do I switch error and help messages between English and Traditional Chinese?
+### What language are CLI messages in, and what languages can I translate maps between?
 
-Add `--ui-locale en-US` or `--ui-locale zh-TW` anywhere in your command:
+- **CLI messages**: Help, error messages, diagnostics, and translation prompt instructions are fixed in **English** (`--ui-locale en-US` is accepted explicitly; other `--ui-locale` values exit with code `2`).
+- **Map content**: You can translate between any valid language tags. Omitting `--source-language` and `--target-language` automatically detects the source (or marks it `und`) and uses your Windows account display language as the target. Pass `--source-language` / `--target-language` whenever you want to override them (for example, `--source-language ja-JP --target-language de-DE`).
 
-```powershell title="PowerShell"
-.\nbtcli.exe help get --ui-locale en-US
-.\nbtcli.exe help get --ui-locale zh-TW
-```
+### What is `translate fallback` for?
+
+When a scan can read a file or tag but cannot establish how its text is used in gameplay, `translate fallback` exports the selected tag or line as context along with editable text leaves and a versioned reply template (`nbtcli.translation-draft-reply` v2). If you know a custom field is displayed in-game, designate its relative path with `--text-pointer` (such as `/caption`) and repeat the same selection when validating `--reply`. Validated drafts report `gameplayVerified: false` and leave the original file and whole-world scan verdict untouched.
 
 ---
 
@@ -78,7 +78,8 @@ Add `--ui-locale en-US` or `--ui-locale zh-TW` anywhere in your command:
 | **JSON Pointer (`--pointer`)** | A slash-separated address pointing to one specific value inside a file, just like a folder path (for example, `/Data/LevelName`). |
 | **Typed NBT (`--types`)** | Because Minecraft cares strictly about whether a number is a `Byte`, `Short`, `Int`, or `String`, `--types` saves that exact label alongside the value so edits never corrupt a tag. |
 | **Patch Plan (`plan.json`)** | A read-only "preview blueprint" describing exactly which files and values will change. You create it first, check it, and only apply it when ready. |
-| **Translation Session & Slot** | A saved translation project stored outside your world. Every individual sign line, book page, or item name becomes one numbered **slot** so nothing gets mixed up or lost. |
+| **Translation Session & Slot** | A saved translation project stored outside your world. Every individual sign line, book page, or item name becomes one numbered **slot** with bound source/target languages (`und` when source cannot be proven). |
+| **Fallback Draft (`translate fallback`)** | A read-only context and reply-validation workflow (`nbtcli.translation-draft-reply` v2) for unresolved NBT, JSON, SNBT, or UTF-8 text snippets; supports relative `--text-pointer` for confirmed custom display fields. |
 | **Translation Key (`--keys`)** | Replaces hard-coded text (like `"Welcome!"`) inside the map with a placeholder key (like `map.abc123`), while the actual words live in a resource pack `.json` language file so players can switch languages. |
 | **State Root (`--state-root`)** | The external folder (by default inside `%LOCALAPPDATA%\nbtcli\`) where `nbtcli` keeps backups, translation progress, caches, and recovery logs — completely separate from your Minecraft world folder. |
 | **`--world-offline`** | A safety switch required on commands that modify your world, reminding you to close Minecraft and any other editors first. |

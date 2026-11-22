@@ -1,123 +1,6 @@
 import type { LocaleKey } from './cli-surface';
-
-export interface HeroSceneCopy {
-  id: 'translate' | 'inspect' | 'pack';
-  label: string;
-  worldLabel: string;
-  outputLabel: string;
-  bridgeCmd: string;
-}
-
-export interface LandingCopy {
-  langAttr: string;
-  pageTitle: string;
-  skipLink: string;
-  navigationLabel: string;
-  menuOpen: string;
-  menuClose: string;
-  navDocs: string;
-  navAgents: string;
-  navDownload: string;
-  switchLangLabel: string;
-  switchLangHref: string;
-  docsHomeHref: string;
-  gettingStartedHref: string;
-  translationHref: string;
-  packsHref: string;
-  safetyHref: string;
-  agentsHref: string;
-  llmsHref: string;
-  heroTitlePlain: string;
-  heroTitleAccent: string;
-  heroSubtitle: string;
-  ctaDownload: string;
-  ctaDocs: string;
-  stageAriaLabel: string;
-  heroScenes: HeroSceneCopy[];
-  heroTranslate: {
-    signHeader: string;
-    itemHeader: string;
-    toggleOriginal: string;
-    toggleTranslated: string;
-    signOriginal: string[];
-    signTranslated: string[];
-    itemNameOriginal: string;
-    itemNameTranslated: string;
-    itemLoreOriginal: string;
-    itemLoreTranslated: string;
-    jsonLocaleOriginal: string;
-    jsonLocaleTranslated: string;
-  };
-  heroInspect: {
-    worldName: string;
-    layers: Array<{ file: string; detail: string }>;
-    jsonFields: Array<{ key: string; val: string; type: 'str' | 'num' }>;
-  };
-  heroPack: {
-    packName: string;
-    entries: Array<{ path: string; tag: string }>;
-    jsonFields: Array<{ key: string; val: string; type: 'str' | 'num' }>;
-  };
-  bentoTitle: string;
-  bentoTranslate: {
-    title: string;
-    description: string;
-    href: string;
-    linkLabel: string;
-    btnOriginal: string;
-    btnTranslated: string;
-    signMeta: string;
-    signOriginal: string[];
-    signTranslated: string[];
-    bookTitleOriginal: string;
-    bookTitleTranslated: string;
-    bookLineOriginal: string;
-    bookLineTranslated: string;
-    progressLabel: string;
-  };
-  bentoInspect: {
-    title: string;
-    description: string;
-    href: string;
-    linkLabel: string;
-    rootLabel: string;
-    nodes: Array<{
-      id: string;
-      key: string;
-      type: string;
-      value?: string;
-      children?: Array<{ key: string; type: string; value: string }>;
-    }>;
-  };
-  bentoPack: {
-    title: string;
-    description: string;
-    href: string;
-    linkLabel: string;
-    modeDirectLabel: string;
-    modeZipLabel: string;
-    directFiles: Array<{ path: string; note: string }>;
-    zipFiles: Array<{ path: string; note: string }>;
-  };
-  bentoSafe: {
-    title: string;
-    description: string;
-    href: string;
-    linkLabel: string;
-    checkpoints: Array<{
-      id: string;
-      label: string;
-      detail: string;
-      status: string;
-    }>;
-  };
-  ctaTitle: string;
-  ctaSubtitle: string;
-  ctaPrimary: string;
-  ctaQuickstart: string;
-  ctaAgents: string;
-  footerNote: string;
-}
+import type { LandingCopy } from './landing-copy';
+export type { LandingCopy } from './landing-copy';
 
 export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
   en: {
@@ -130,6 +13,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     navDocs: 'Docs',
     navAgents: 'AI Agents',
     navDownload: 'Download',
+    themeToLight: 'Switch to light theme',
+    themeToDark: 'Switch to dark theme',
     switchLangLabel: '繁體中文',
     switchLangHref: '/zh-tw/',
     docsHomeHref: '/docs/',
@@ -139,12 +24,16 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     safetyHref: '/docs/safe-editing/',
     agentsHref: '/docs/ai-agents/',
     llmsHref: '/llms.txt',
+    heroEyebrow: 'WINDOWS X64 · OFFLINE-SAFE NBT ENGINE',
     heroTitlePlain: 'Minecraft worlds,',
     heroTitleAccent: 'clearly decoded.',
     heroSubtitle:
-      'Inspect saves, translate entire adventure maps, and export resource packs — safely offline.',
-    ctaDownload: 'Download',
-    ctaDocs: 'Explore Docs',
+      'Inspect saves across Java Edition format families, translate adventure maps across languages with automatic language selection, and export resource packs — safely offline.',
+    ctaDownload: 'Download ZIP',
+    ctaDocs: 'Read Docs',
+    copyCmdLabel: 'Copy command',
+    copiedCmdLabel: 'Copied',
+    copyFailedCmdLabel: 'Copy failed',
     stageAriaLabel: 'Interactive world transformation preview',
     heroScenes: [
       {
@@ -153,13 +42,15 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         worldLabel: 'Map Text Slots',
         outputLabel: 'Translated Output',
         bridgeCmd: 'translate',
+        cliCommand: 'nbtcli translate start .\\MyWorld',
       },
       {
         id: 'inspect',
         label: 'Inspect Save',
         worldLabel: 'World Save',
         outputLabel: 'NBT JSON',
-        bridgeCmd: 'get',
+        bridgeCmd: 'list',
+        cliCommand: 'nbtcli list .\\MyWorld',
       },
       {
         id: 'pack',
@@ -167,6 +58,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         worldLabel: 'Resource Pack',
         outputLabel: 'Pack Manifest',
         bridgeCmd: 'create-pack',
+        cliCommand: 'nbtcli translate create-pack .\\MyWorld --session-id $sessionId --revision $revision --format zip --name pack --output .\\out',
       },
     ],
     heroTranslate: {
@@ -174,14 +66,14 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       itemHeader: 'item.lore · slot #14',
       toggleOriginal: 'Original',
       toggleTranslated: 'Translated',
-      signOriginal: ['SUNKEN CITADEL', 'Enter the vault', 'to claim the key'],
-      signTranslated: ['沉沒的要塞', '進入地下寶庫', '尋找遺落之鑰'],
-      itemNameOriginal: 'Blade of Dawn',
-      itemNameTranslated: '曙光之刃',
-      itemLoreOriginal: 'Forged beneath the ancient spire',
-      itemLoreTranslated: '鍛造於遠古尖塔之下',
-      jsonLocaleOriginal: 'en_us',
-      jsonLocaleTranslated: 'zh_tw',
+      signOriginal: ['沈んだ要塞', '地下宝物庫へ進み', '失われた鍵を探せ'],
+      signTranslated: ['SUNKEN CITADEL', 'Enter the vault', 'to claim the key'],
+      itemNameOriginal: '夜明けの刃',
+      itemNameTranslated: 'Blade of Dawn',
+      itemLoreOriginal: '古代の尖塔の下で鍛えられた',
+      itemLoreTranslated: 'Forged beneath the ancient spire',
+      jsonLocaleOriginal: 'ja_jp',
+      jsonLocaleTranslated: 'en_us',
     },
     heroInspect: {
       worldName: 'Sunken Citadel',
@@ -198,37 +90,50 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     heroPack: {
-      packName: 'citadel-zh_tw.zip',
+      packName: 'citadel-en_us.zip',
       entries: [
         { path: 'pack.mcmeta', tag: 'format 34' },
+        { path: 'assets/minecraft/lang/ja_jp.json', tag: '142 keys' },
         { path: 'assets/minecraft/lang/en_us.json', tag: '142 keys' },
-        { path: 'assets/minecraft/lang/zh_tw.json', tag: '142 keys' },
       ],
       jsonFields: [
-        { key: 'archive', val: '"citadel-zh_tw.zip"', type: 'str' },
+        { key: 'archive', val: '"citadel-en_us.zip"', type: 'str' },
         { key: 'packFormat', val: '34', type: 'num' },
         { key: 'entries', val: '142', type: 'num' },
         { key: 'worldModified', val: 'false', type: 'num' },
       ],
     },
-    bentoTitle: 'See every workflow at a glance.',
+    specStripAriaLabel: 'Technical specifications',
+    specStrip: [
+      { value: '17 Format Families', label: 'Java 1.2.5 through 26.1+' },
+      { value: 'Single-Line JSON', label: 'Strict UTF-8 stdout contract' },
+      { value: 'Offline-Safe Plans', label: 'Preview diffs & external backups' },
+      { value: 'Agent-Ready', label: 'Built-in llms.txt & auto locales' },
+    ],
+    bentoEyebrow: 'CAPABILITIES',
+    bentoTitle: 'Engineered for every save workflow.',
+    bentoSubtitle:
+      'Every operation follows a deterministic inspect, plan, and offline-apply contract.',
     bentoTranslate: {
+      indexLabel: '01 / TRANSLATION',
       title: 'Translate whole adventure maps',
-      description: 'Signs, books, items, NPCs, and command blocks — paged cleanly while preserving formatting.',
+      description:
+        'Signs, books, items, NPCs, and command blocks — automatic language detection, paginated sessions, and validated fallback drafts.',
       href: '/docs/translation-workflow/',
       linkLabel: 'Map translation guide',
-      btnOriginal: 'EN',
-      btnTranslated: '繁中',
+      btnOriginal: 'JA',
+      btnTranslated: 'EN',
       signMeta: 'sign · block_entity',
-      signOriginal: ['ANCIENT GATE', 'Place the emerald', 'to awaken the bridge'],
-      signTranslated: ['古老石門', '放上綠寶石', '喚醒沉睡之橋'],
-      bookTitleOriginal: 'book · p.1 · Keeper Journal',
-      bookTitleTranslated: 'book · p.1 · 守門人手記',
-      bookLineOriginal: 'The lighthouse dims when night falls across the harbor.',
-      bookLineTranslated: '當夜幕降臨海港，燈塔的光芒便會逐漸黯淡。',
+      signOriginal: ['古代の石門', 'エメラルドを置き', '眠る橋を目覚めさせよ'],
+      signTranslated: ['ANCIENT GATE', 'Place the emerald', 'to awaken the bridge'],
+      bookTitleOriginal: 'book · p.1 · 守門人の手記',
+      bookTitleTranslated: 'book · p.1 · Keeper Journal',
+      bookLineOriginal: '港に夜が訪れると、灯台の光は静かに弱まっていく。',
+      bookLineTranslated: 'The lighthouse dims when night falls across the harbor.',
       progressLabel: '142 / 142 slots ready',
     },
     bentoInspect: {
+      indexLabel: '02 / INSPECTION',
       title: 'Explore saves read-only',
       description: 'Inspect level.dat, region chunks, and datapacks without modifying a single byte.',
       href: '/docs/getting-started/',
@@ -257,6 +162,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     bentoPack: {
+      indexLabel: '03 / PACKAGING',
       title: 'Ship a map or a resource pack',
       description: 'Write translations directly into your world or bundle a standalone .zip client pack.',
       href: '/docs/resources-and-packs/',
@@ -269,10 +175,11 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
       zipFiles: [
         { path: 'pack.mcmeta', note: 'pack_format: 34' },
-        { path: 'assets/.../zh_tw.json', note: '142 translation keys' },
+        { path: 'assets/.../en_us.json', note: '142 translation keys' },
       ],
     },
     bentoSafe: {
+      indexLabel: '04 / RECOVERY',
       title: 'Preview first. Roll back anytime.',
       description: 'Every write creates a reviewable plan and an external backup before touching your save.',
       href: '/docs/safe-editing/',
@@ -298,9 +205,10 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         },
       ],
     },
+    ctaEyebrow: 'GET STARTED',
     ctaTitle: 'Ready for your next world.',
-    ctaSubtitle: 'Extract the full ZIP from GitHub Releases. The .NET runtime is included.',
-    ctaPrimary: 'Go to Download Page',
+    ctaSubtitle: 'Extract the full ZIP from GitHub Releases. The .NET runtime is bundled.',
+    ctaPrimary: 'Download Release',
     ctaQuickstart: 'Quickstart Guide',
     ctaAgents: 'AI Agent Manual (llms.txt)',
     footerNote:
@@ -316,6 +224,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     navDocs: '線上文件',
     navAgents: 'AI 整合',
     navDownload: '下載',
+    themeToLight: '切換為淺色主題',
+    themeToDark: '切換為深色主題',
     switchLangLabel: 'English',
     switchLangHref: '/',
     docsHomeHref: '/zh-tw/docs/',
@@ -325,12 +235,16 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
     safetyHref: '/zh-tw/docs/safe-editing/',
     agentsHref: '/zh-tw/docs/ai-agents/',
     llmsHref: '/llms.txt',
+    heroEyebrow: 'WINDOWS X64 · 離線安全 NBT 引擎',
     heroTitlePlain: '解碼方塊世界，',
     heroTitleAccent: '安全翻譯與編輯。',
     heroSubtitle:
-      '解壓縮即用的本地命令列工具，幫你唯讀查閱存檔、翻譯整張冒險地圖並打包資源包。',
-    ctaDownload: '前往下載頁面',
-    ctaDocs: '瀏覽教學文件',
+      '解壓縮即用的本地命令列工具，跨多版本 Java 存檔唯讀查閱、支援多語自動辨識翻譯整張冒險地圖並打包資源包。',
+    ctaDownload: '下載發行套件',
+    ctaDocs: '瀏覽文件',
+    copyCmdLabel: '複製指令',
+    copiedCmdLabel: '已複製',
+    copyFailedCmdLabel: '複製失敗',
     stageAriaLabel: '互動式世界轉換預覽',
     heroScenes: [
       {
@@ -339,13 +253,15 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         worldLabel: '地圖文字槽位',
         outputLabel: '轉換結果',
         bridgeCmd: 'translate',
+        cliCommand: 'nbtcli translate start .\\MyWorld',
       },
       {
         id: 'inspect',
         label: '查閱存檔',
         worldLabel: '世界結構',
         outputLabel: 'NBT JSON',
-        bridgeCmd: 'get',
+        bridgeCmd: 'list',
+        cliCommand: 'nbtcli list .\\MyWorld',
       },
       {
         id: 'pack',
@@ -353,6 +269,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         worldLabel: '資源包封裝',
         outputLabel: '輸出資訊',
         bridgeCmd: 'create-pack',
+        cliCommand: 'nbtcli translate create-pack .\\MyWorld --session-id $sessionId --revision $revision --format zip --name pack --output .\\out',
       },
     ],
     heroTranslate: {
@@ -397,10 +314,20 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         { key: 'worldModified', val: 'false', type: 'num' },
       ],
     },
-    bentoTitle: '用視覺一眼看懂核心功能。',
+    specStripAriaLabel: '核心技術規格',
+    specStrip: [
+      { value: '17 種格式家族', label: '涵蓋 Java 1.2.5 至 26.1+' },
+      { value: '單行 JSON 契約', label: '嚴格 UTF-8 stdout 結構輸出' },
+      { value: '離線安全計畫', label: '先預覽差異，世界外自動備份' },
+      { value: 'AI Agent 就緒', label: '內建 llms.txt 與自動語言辨識' },
+    ],
+    bentoEyebrow: '核心能力',
+    bentoTitle: '每個存檔流程都清晰可控。',
+    bentoSubtitle: '所有操作皆遵循可檢視、可預覽、離線套用與可回溯的結構化契約。',
     bentoTranslate: {
+      indexLabel: '01 / 冒險地圖翻譯',
       title: '翻譯整張冒險地圖',
-      description: '告示牌、書本、道具、NPC 與指令方塊，自動分頁並完整保留顏色與格式。',
+      description: '告示牌、書本、道具、NPC 與指令方塊，支援自動語言辨識、分頁翻譯與 fallback 草稿驗證。',
       href: '/zh-tw/docs/translation-workflow/',
       linkLabel: '看地圖翻譯教學',
       btnOriginal: '原文',
@@ -415,6 +342,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       progressLabel: '142 / 142 筆譯文就緒',
     },
     bentoInspect: {
+      indexLabel: '02 / 唯讀探索',
       title: '零風險探索存檔',
       description: '唯讀檢視 level.dat、區塊與資料包內容，絕不意外改動任何位元組。',
       href: '/zh-tw/docs/getting-started/',
@@ -443,6 +371,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     bentoPack: {
+      indexLabel: '03 / 資源包封裝',
       title: '直接改地圖，或打包資源包',
       description: '自由選擇把譯文寫回地圖，或一鍵封裝與合併成獨立 .zip 資源包。',
       href: '/zh-tw/docs/resources-and-packs/',
@@ -451,7 +380,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       modeZipLabel: '獨立 .zip',
       directFiles: [
         { path: 'region/r.0.0.mca', note: '告示牌與書本已更新' },
-        { path: 'datapacks/story/', note: '劇情對話已完成中文化' },
+        { path: 'datapacks/story/', note: '劇情對話已完成翻譯' },
       ],
       zipFiles: [
         { path: 'pack.mcmeta', note: 'pack_format: 34' },
@@ -459,6 +388,7 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
       ],
     },
     bentoSafe: {
+      indexLabel: '04 / 安全與復原',
       title: '先預覽，隨時可還原',
       description: '所有修改都先在世界外產出計畫與自動備份，離線寫入更安心。',
       href: '/zh-tw/docs/safe-editing/',
@@ -484,7 +414,8 @@ export const LANDING_COPY: Record<LocaleKey, LandingCopy> = {
         },
       ],
     },
-    ctaTitle: '準備好整理你的世界了嗎？',
+    ctaEyebrow: '開始使用',
+    ctaTitle: '準備好處理下一張世界存檔了嗎？',
     ctaSubtitle: '前往 GitHub Releases 下載並解壓完整 ZIP，內含 .NET 執行環境。',
     ctaPrimary: '前往下載頁面',
     ctaQuickstart: '快速入門指南',

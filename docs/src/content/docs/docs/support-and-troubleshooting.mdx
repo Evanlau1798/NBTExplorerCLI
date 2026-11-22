@@ -17,7 +17,7 @@ Not sure whether your Minecraft version is supported, or ran into an error messa
 
 ### Versioned Java Saves (Detected Automatically)
 
-`capabilities` reports each format family's inclusive `minimumDataVersion` and `maximumDataVersion`. For example, Java 1.20.2, 1.20.6, 1.21.1, and 1.21.4 use the corresponding families below. The table shows a representative game version and its resource pack format. If `create-pack` cannot verify the world's default resource format, provide the correct `--pack-format` for your game version.
+`capabilities` reports all 17 format families with their inclusive `minimumDataVersion` and `maximumDataVersion`. Intermediate releases (for example, Java 1.20.3, 1.20.6, 1.21.1, and 1.21.4) resolve automatically to the matching family below. The table shows each family's inclusive `DataVersion` range and representative resource pack format. If `create-pack` cannot verify the world's default resource format, provide the correct `--pack-format` for your game version.
 
 <ProfileTable lang="en" />
 
@@ -35,11 +35,9 @@ Older Minecraft Java Edition Anvil saves (storage version `19133`, before Minecr
 - **Read-only inspection** works automatically (`java-classic-anvil`).
 - **Translating or direct editing**. Tell `nbtcli` the game version using `--minecraft-version` on `scan`, `extract`, `validate`, or `translate start`. The supported releases are **`1.2.5`**, **`1.5.2`**, **`1.6.4`**, and **`1.8` through `1.8.9`**.
 
-```powershell title="Example: start translating a Java 1.8.1 adventure map"
+```powershell title="Example: start translating a Java 1.8.1 adventure map (auto languages; add --source-language / --target-language to override)"
 .\nbtcli.exe translate start 'D:\ClassicWorldCopy' `
-  --minecraft-version 1.8.1 `
-  --source-language en_us `
-  --target-language zh_tw
+  --minecraft-version 1.8.1
 ```
 
 The translation session and its direct update plan record the format profile for the supplied release.
@@ -133,6 +131,13 @@ Passing `validate`, `scan`, or `apply` confirms that the save files are structur
 - Split large worlds into smaller chunks with `--dimension`, `--region`, `--path`, or `--types`.
 - Lower `--page-size` or `--page-bytes` when translating.
 - Simplify complex `--match-pattern` filters.
+
+### Problem 7: Language Detection, `und` Source, `--ui-locale`, or Fallback Reply Conflict
+
+- **No usable system display language (Exit Code `2`)**: If Windows does not expose a usable display language when omitting `--target-language`, pass an explicit target such as `--target-language de-DE`.
+- **Detected `sourceLocale` is `und`**: Short strings, proper names, or mixed-language content cannot be proven automatically. You can still translate by reading the original text, or start a new job with explicit `--source-language`. When exporting bilingual language files with `translate export-lang` or `translate create-pack` from a `und` session, pass `--original-lang <language>` explicitly.
+- **Non-`en-US` `--ui-locale` rejected (Exit Code `2`)**: CLI help, errors, diagnostics, and translation prompt instructions are fixed in English. Remove `--ui-locale` or pass `--ui-locale en-US`.
+- **`translate fallback --reply` returned `CONFLICT` (Exit Code `3`)**: Ensure you pass the exact same input selection and `--text-pointer` used when exporting the draft, keep `draftId`, `sourceLocale`, `targetLocale`, `slotId`, and `sourceTextHash` unchanged, and preserve protected placeholders, numbers, private-use glyphs, and Roman level suffixes.
 
 ---
 

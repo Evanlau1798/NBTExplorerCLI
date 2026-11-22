@@ -9,7 +9,7 @@ const { lang = 'en' } = Astro.props;
 const ui =
   lang === 'zh-tw'
     ? {
-        placeholder: '篩選指令或參數（例如 translate、--merge、recover）...',
+        placeholder: '篩選指令或參數（例如 translate、fallback、recover）...',
         filterLabel: '依安全等級篩選',
         all: '全部',
         safe: '純讀取',
@@ -18,7 +18,7 @@ const ui =
         empty: '找不到符合條件的指令，請嘗試其他關鍵字。',
       }
     : {
-        placeholder: 'Filter commands or flags (e.g. translate, --merge, recover)...',
+        placeholder: 'Filter commands or flags (e.g. translate, fallback, recover)...',
         filterLabel: 'Filter by safety tier',
         all: 'All',
         safe: 'Read Only',
@@ -29,26 +29,36 @@ const ui =
 ---
 
 <div class="nbt-cmd-toolbar not-content" data-cmd-filter-root>
-  <input
-    type="search"
-    class="nbt-cmd-search"
-    data-cmd-search
-    placeholder={ui.placeholder}
-    aria-label={ui.placeholder}
-  />
+  <div class="nbt-cmd-search-wrap">
+    <svg class="nbt-cmd-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+      <circle cx="7.25" cy="7.25" r="4.75" />
+      <path d="m10.75 10.75 3 3" stroke-linecap="round" />
+    </svg>
+    <input
+      type="search"
+      class="nbt-cmd-search"
+      data-cmd-search
+      placeholder={ui.placeholder}
+      aria-label={ui.placeholder}
+    />
+  </div>
   <div class="nbt-tier-filters" role="group" aria-label={ui.filterLabel}>
     <button type="button" class="nbt-tier-btn is-active" data-filter-tier="all" aria-pressed="true">{ui.all}</button>
     <button type="button" class="nbt-tier-btn" data-filter-tier="safe" aria-pressed="false">{ui.safe}</button>
     <button type="button" class="nbt-tier-btn" data-filter-tier="preview" aria-pressed="false">{ui.preview}</button>
     <button type="button" class="nbt-tier-btn" data-filter-tier="write" aria-pressed="false">{ui.write}</button>
   </div>
+  <span class="nbt-cmd-count" data-cmd-count aria-live="polite"></span>
 </div>
 <p class="nbt-cmd-empty not-content" data-cmd-empty hidden>{ui.empty}</p>
 
 <script>
+  import { copyCommand } from './copy-command';
+
   const root = document.querySelector<HTMLElement>('[data-cmd-filter-root]');
   const input = root?.querySelector<HTMLInputElement>('[data-cmd-search]');
   const tierButtons = root ? [...root.querySelectorAll<HTMLButtonElement>('[data-filter-tier]')] : [];
+  const countEl = root?.querySelector<HTMLElement>('[data-cmd-count]');
   const cards = [...document.querySelectorAll<HTMLElement>('[data-cmd-card]')];
   const lists = [...document.querySelectorAll<HTMLElement>('.nbt-cmd-list')];
   const emptyMsg = document.querySelector<HTMLElement>('[data-cmd-empty]');
@@ -114,6 +124,9 @@ const ui =
           p.hidden = !anyListVisible;
         });
       });
+      if (countEl) {
+        countEl.textContent = `${visible} / ${cards.length}`;
+      }
       if (emptyMsg) emptyMsg.hidden = visible > 0;
     };
 
@@ -129,5 +142,32 @@ const ui =
         applyFilter();
       });
     });
+
+    applyFilter();
   }
+
+  // Event-delegated one-click copy for command syntax buttons
+  const copyTimers = new WeakMap<HTMLElement, number>();
+  document.addEventListener('click', async (event) => {
+    const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-copy-cmd]') : null;
+    if (!target) return;
+    const cmd = target.dataset.copyCmd;
+    if (!cmd) return;
+    const copied = await copyCommand(cmd);
+    target.dataset.copied = String(copied);
+    const feedback = copied ? (target.dataset.copiedLabel ?? 'Copied') : (target.dataset.copyFailedLabel ?? 'Copy failed');
+    target.setAttribute('aria-label', feedback);
+    target.setAttribute('title', feedback);
+    const prevTimer = copyTimers.get(target);
+    if (prevTimer) window.clearTimeout(prevTimer);
+    copyTimers.set(
+      target,
+      window.setTimeout(() => {
+        target.dataset.copied = 'false';
+        const defaultLabel = target.dataset.copyLabel ?? 'Copy command syntax';
+        target.setAttribute('aria-label', defaultLabel);
+        target.setAttribute('title', defaultLabel);
+      }, 1600)
+    );
+  });
 </script>
